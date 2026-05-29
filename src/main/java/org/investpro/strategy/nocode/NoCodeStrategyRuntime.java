@@ -1,10 +1,9 @@
 package org.investpro.strategy.nocode;
 
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.model.CandleData;
+import org.investpro.data.CandleData;
 import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategySignal;
-import org.investpro.utils.Side;
 
 import java.util.List;
 
@@ -26,8 +25,8 @@ import java.util.List;
  * <p>Indicator calculations are performed using the candle list from
  * {@link StrategyContext#getCandles()}. The last element is the most recent bar.</p>
  *
- * <p>This class is stateless with respect to strategy definition state and is
- * thread-safe when using separate instances per evaluation context.</p>
+ * <p>This class is stateless with respect to strategy state and is thread-safe
+ * when using separate instances per evaluation context.</p>
  */
 @Slf4j
 public class NoCodeStrategyRuntime {
@@ -39,7 +38,7 @@ public class NoCodeStrategyRuntime {
     /**
      * Creates a runtime for the given compiled strategy.
      *
-     * @param compiled the compiled strategy (must be valid)
+     * @param compiled the compiled strategy (must not be null)
      */
     public NoCodeStrategyRuntime(CompiledNoCodeStrategy compiled) {
         if (compiled == null) throw new IllegalArgumentException("Compiled strategy must not be null");
@@ -60,16 +59,20 @@ public class NoCodeStrategyRuntime {
         NoCodeStrategyDefinition def = compiled.getDefinition();
         List<CandleData> candles = ctx.getCandles();
 
+        String sym = ctx.getSymbol() != null ? ctx.getSymbol().toString() : "UNKNOWN";
+        String tf = ctx.getTimeframe() != null ? ctx.getTimeframe().toString() : "UNKNOWN";
+        String stratId = def.getStrategyId();
+
         if (candles == null || candles.size() < compiled.getWarmupBars()) {
             log.debug("Insufficient candles ({} < {}); emitting HOLD",
                     candles == null ? 0 : candles.size(), compiled.getWarmupBars());
-            return StrategySignal.hold(def.getName(), "Insufficient data for warmup");
+            return StrategySignal.hold(sym, tf, stratId, "Insufficient data for warmup");
         }
 
         // Evaluate entry rules first
         for (NoCodeRule rule : def.getEntryRules()) {
             if (evaluateRule(rule, candles)) {
-                return actionToSignal(rule.getAction(), rule.getConfidence(), def.getName(),
+                return toSignal(rule.getAction(), rule.getConfidence(), sym, tf, stratId,
                         rule.toPreviewText(), ctx.getCurrentPrice(), def.getRiskSettings());
             }
         }
@@ -77,12 +80,17 @@ public class NoCodeStrategyRuntime {
         // Evaluate exit rules
         for (NoCodeRule rule : def.getExitRules()) {
             if (evaluateRule(rule, candles)) {
-                return actionToSignal(rule.getAction(), rule.getConfidence(), def.getName(),
+                return toSignal(rule.getAction(), rule.getConfidence(), sym, tf, stratId,
                         rule.toPreviewText(), ctx.getCurrentPrice(), def.getRiskSettings());
             }
         }
 
-        return StrategySignal.hold(def.getName(), "No rule fired");
+        return StrategySignal.hold(sym, tf, stratId, "No rule fired");
+    }
+
+    /** @return the compiled strategy backing this runtime. */
+    public CompiledNoCodeStrategy getCompiled() {
+        return compiled;
     }
 
     // =========================================================================
@@ -133,7 +141,7 @@ public class NoCodeStrategyRuntime {
                 case BETWEEN -> {
                     double lo = cond.getRightValue();
                     double hi = cond.getRightValue2();
-                    yield leftValue >= lo && leftValue <= hi;
+                    yield !Double.isNaN(lo) && !Double.isNaN(hi) && leftValue >= lo && leftValue <= hi;
                 }
                 default -> false;
             };
@@ -151,17 +159,9 @@ public class NoCodeStrategyRuntime {
     }
 
     // =========================================================================
-    // Indicator computations
+    // Indicator dispatch
     // =========================================================================
 
-    /**
-     * Computes the indicator value for the given reference.
-     *
-     * @param ref        indicator reference
-     * @param candles    full candle list (newest = last element)
-     * @param usePrevious if true, compute using the one-bar-ago candle as current
-     * @return computed value, or Double.NaN if insufficient data
-     */
     private double computeIndicator(NoCodeIndicatorReference ref,
                                     List<CandleData> candles,
                                     boolean usePrevious) {
@@ -169,50 +169,41 @@ public class NoCodeStrategyRuntime {
         int offset = usePrevious ? 1 : 0;
         return switch (ref.getType()) {
             case PRICE_CLOSE -> getClose(candles, offset);
-            case PRICE_OPEN -> getOpen(candles, offset);
-            case PRICE_HIGH -> getHigh(candles, offset);
-            case PRICE_LOW -> getLow(candles, offset);
-            case VOLUME -> getVolume(candles, offset);
-            case SMA -> sma(candles, ref.effectivePeriod(), offset);
-            case EMA -> ema(candles, ref.effectivePeriod(), offset);
-            case RSI -> rsi(candles, ref.effectivePeriod(), offset);
-            case MACD -> macdLine(candles, offset);
+            case PRICE_OPEN  -> getOpen(candles, offset);
+            case PRICE_HIGH  -> getHigh(candles, offset);
+            case PRICE_LOW   -> getLow(candles, offset);
+            case VOLUME      -> getVolume(candles, offset);
+            case SMA         -> sma(candles, ref.effectivePeriod(), offset);
+            case EMA         -> ema(candles, ref.effectivePeriod(), offset);
+            case RSI         -> rsi(candles, ref.effectivePeriod(), offset);
+            case MACD        -> macdLine(candles, offset);
             case MACD_SIGNAL -> macdSignalLine(candles, offset);
             case BOLLINGER_UPPER -> bollingerUpper(candles, ref.effectivePeriod(), offset);
             case BOLLINGER_LOWER -> bollingerLower(candles, ref.effectivePeriod(), offset);
-            case BOLLINGER_MID -> sma(candles, ref.effectivePeriod(), offset);
-            case ATR -> atr(candles, ref.effectivePeriod(), offset);
-            case VOLUME_MA -> volumeMa(candles, ref.effectivePeriod(), offset);
+            case BOLLINGER_MID   -> sma(candles, ref.effectivePeriod(), offset);
+            case ATR         -> atr(candles, ref.effectivePeriod(), offset);
+            case VOLUME_MA   -> volumeMa(candles, ref.effectivePeriod(), offset);
         };
     }
 
     // =========================================================================
-    // Candle accessors
+    // Candle accessors (CandleData is a record: closePrice(), openPrice()...)
     // =========================================================================
 
-    private double getClose(List<CandleData> candles, int offset) {
-        int idx = candles.size() - 1 - offset;
-        return idx >= 0 ? candles.get(idx).getClose() : Double.NaN;
+    private double getClose(List<CandleData> c, int offset) {
+        int i = c.size() - 1 - offset; return i >= 0 ? c.get(i).closePrice() : Double.NaN;
     }
-
-    private double getOpen(List<CandleData> candles, int offset) {
-        int idx = candles.size() - 1 - offset;
-        return idx >= 0 ? candles.get(idx).getOpen() : Double.NaN;
+    private double getOpen(List<CandleData> c, int offset) {
+        int i = c.size() - 1 - offset; return i >= 0 ? c.get(i).openPrice() : Double.NaN;
     }
-
-    private double getHigh(List<CandleData> candles, int offset) {
-        int idx = candles.size() - 1 - offset;
-        return idx >= 0 ? candles.get(idx).getHigh() : Double.NaN;
+    private double getHigh(List<CandleData> c, int offset) {
+        int i = c.size() - 1 - offset; return i >= 0 ? c.get(i).highPrice() : Double.NaN;
     }
-
-    private double getLow(List<CandleData> candles, int offset) {
-        int idx = candles.size() - 1 - offset;
-        return idx >= 0 ? candles.get(idx).getLow() : Double.NaN;
+    private double getLow(List<CandleData> c, int offset) {
+        int i = c.size() - 1 - offset; return i >= 0 ? c.get(i).lowPrice() : Double.NaN;
     }
-
-    private double getVolume(List<CandleData> candles, int offset) {
-        int idx = candles.size() - 1 - offset;
-        return idx >= 0 ? candles.get(idx).getVolume() : Double.NaN;
+    private double getVolume(List<CandleData> c, int offset) {
+        int i = c.size() - 1 - offset; return i >= 0 ? c.get(i).volume() : Double.NaN;
     }
 
     // =========================================================================
@@ -222,23 +213,21 @@ public class NoCodeStrategyRuntime {
     private double sma(List<CandleData> candles, int period, int offset) {
         int end = candles.size() - offset;
         int start = end - period;
-        if (start < 0) return Double.NaN;
+        if (start < 0 || period <= 0) return Double.NaN;
         double sum = 0;
-        for (int i = start; i < end; i++) sum += candles.get(i).getClose();
+        for (int i = start; i < end; i++) sum += candles.get(i).closePrice();
         return sum / period;
     }
 
     private double ema(List<CandleData> candles, int period, int offset) {
         int end = candles.size() - offset;
-        if (end < period) return Double.NaN;
+        if (end < period || period <= 0) return Double.NaN;
         double k = 2.0 / (period + 1);
-        // Seed with SMA of first `period` bars
         double emaVal = 0;
-        int seedStart = end - candles.size(); // always 0 effectively
-        for (int i = 0; i < period; i++) emaVal += candles.get(i).getClose();
+        for (int i = 0; i < period; i++) emaVal += candles.get(i).closePrice();
         emaVal /= period;
         for (int i = period; i < end; i++) {
-            emaVal = candles.get(i).getClose() * k + emaVal * (1 - k);
+            emaVal = candles.get(i).closePrice() * k + emaVal * (1 - k);
         }
         return emaVal;
     }
@@ -246,31 +235,30 @@ public class NoCodeStrategyRuntime {
     private double volumeMa(List<CandleData> candles, int period, int offset) {
         int end = candles.size() - offset;
         int start = end - period;
-        if (start < 0) return Double.NaN;
+        if (start < 0 || period <= 0) return Double.NaN;
         double sum = 0;
-        for (int i = start; i < end; i++) sum += candles.get(i).getVolume();
+        for (int i = start; i < end; i++) sum += candles.get(i).volume();
         return sum / period;
     }
 
     // =========================================================================
-    // RSI
+    // RSI (Wilder smooth approximation)
     // =========================================================================
 
     private double rsi(List<CandleData> candles, int period, int offset) {
         int end = candles.size() - offset;
         if (end < period + 1) return Double.NaN;
         double avgGain = 0, avgLoss = 0;
-        // First period: simple average
-        for (int i = end - period; i < end; i++) {
-            double change = candles.get(i).getClose() - candles.get(i - 1).getClose();
+        int start = end - period;
+        for (int i = start; i < end; i++) {
+            double change = candles.get(i).closePrice() - candles.get(i - 1).closePrice();
             if (change > 0) avgGain += change;
             else avgLoss += Math.abs(change);
         }
         avgGain /= period;
         avgLoss /= period;
-        if (avgLoss == 0) return 100;
-        double rs = avgGain / avgLoss;
-        return 100 - (100 / (1 + rs));
+        if (avgLoss < EPSILON) return 100.0;
+        return 100.0 - (100.0 / (1.0 + avgGain / avgLoss));
     }
 
     // =========================================================================
@@ -285,23 +273,21 @@ public class NoCodeStrategyRuntime {
     }
 
     private double macdSignalLine(List<CandleData> candles, int offset) {
-        // Build a synthetic list of MACD values and EMA(9) over them
-        int size = candles.size() - offset;
-        if (size < 35) return Double.NaN;
-        double[] macdValues = new double[size];
-        for (int i = 0; i < size; i++) {
-            List<CandleData> sub = candles.subList(0, i + 1);
-            macdValues[i] = macdLine(sub, 0);
-        }
-        // EMA(9) over MACD values
+        int end = candles.size() - offset;
         int sigPeriod = 9;
-        if (size < 26 + sigPeriod) return Double.NaN;
+        int minRequired = 26 + sigPeriod;
+        if (end < minRequired) return Double.NaN;
+        // Build MACD line array and EMA(9) over it
         double k = 2.0 / (sigPeriod + 1);
-        double sig = macdValues[26]; // seed
-        for (int i = 27; i < size; i++) {
-            if (!Double.isNaN(macdValues[i])) {
-                sig = macdValues[i] * k + sig * (1 - k);
-            }
+        // Seed: first MACD value at index 25 (first valid slow EMA)
+        double sig = 0;
+        int seedIdx = 25;
+        sig = ema(candles.subList(0, seedIdx + 1), 12, 0)
+                - ema(candles.subList(0, seedIdx + 1), 26, 0);
+        for (int i = seedIdx + 1; i < end; i++) {
+            double m = ema(candles.subList(0, i + 1), 12, 0)
+                     - ema(candles.subList(0, i + 1), 26, 0);
+            if (!Double.isNaN(m)) sig = m * k + sig * (1 - k);
         }
         return sig;
     }
@@ -311,26 +297,25 @@ public class NoCodeStrategyRuntime {
     // =========================================================================
 
     private double bollingerUpper(List<CandleData> candles, int period, int offset) {
-        return bollingerMid(candles, period, offset) + 2 * bollingerStdDev(candles, period, offset);
+        double mid = sma(candles, period, offset);
+        double std = stdDev(candles, period, offset, mid);
+        return Double.isNaN(mid) ? Double.NaN : mid + 2 * std;
     }
 
     private double bollingerLower(List<CandleData> candles, int period, int offset) {
-        return bollingerMid(candles, period, offset) - 2 * bollingerStdDev(candles, period, offset);
+        double mid = sma(candles, period, offset);
+        double std = stdDev(candles, period, offset, mid);
+        return Double.isNaN(mid) ? Double.NaN : mid - 2 * std;
     }
 
-    private double bollingerMid(List<CandleData> candles, int period, int offset) {
-        return sma(candles, period, offset);
-    }
-
-    private double bollingerStdDev(List<CandleData> candles, int period, int offset) {
+    private double stdDev(List<CandleData> candles, int period, int offset, double mean) {
         int end = candles.size() - offset;
         int start = end - period;
-        if (start < 0) return Double.NaN;
-        double mean = sma(candles, period, offset);
+        if (start < 0 || Double.isNaN(mean)) return Double.NaN;
         double variance = 0;
         for (int i = start; i < end; i++) {
-            double diff = candles.get(i).getClose() - mean;
-            variance += diff * diff;
+            double d = candles.get(i).closePrice() - mean;
+            variance += d * d;
         }
         return Math.sqrt(variance / period);
     }
@@ -342,37 +327,40 @@ public class NoCodeStrategyRuntime {
     private double atr(List<CandleData> candles, int period, int offset) {
         int end = candles.size() - offset;
         if (end < period + 1) return Double.NaN;
-        double atrVal = 0;
+        double total = 0;
         for (int i = end - period; i < end; i++) {
             CandleData c = candles.get(i);
             CandleData prev = candles.get(i - 1);
-            double tr = Math.max(c.getHigh() - c.getLow(),
-                    Math.max(Math.abs(c.getHigh() - prev.getClose()),
-                            Math.abs(c.getLow() - prev.getClose())));
-            atrVal += tr;
+            double tr = Math.max(c.highPrice() - c.lowPrice(),
+                    Math.max(Math.abs(c.highPrice() - prev.closePrice()),
+                             Math.abs(c.lowPrice()  - prev.closePrice())));
+            total += tr;
         }
-        return atrVal / period;
+        return total / period;
     }
 
     // =========================================================================
-    // Signal builder
+    // Signal builder (AI / RiskEngine are downstream — no order submission here)
     // =========================================================================
 
-    private StrategySignal actionToSignal(NoCodeAction action, double confidence, String strategyName,
-                                          String reason, double currentPrice,
-                                          NoCodeRiskSettings risk) {
+    private StrategySignal toSignal(NoCodeAction action, double confidence,
+                                    String symbol, String timeframe, String stratId,
+                                    String reason, double price,
+                                    NoCodeRiskSettings risk) {
         return switch (action) {
-            case BUY -> StrategySignal.buy(strategyName, confidence, reason,
-                    risk != null ? risk.calculateStopLossForBuy(currentPrice) : 0,
-                    risk != null ? risk.calculateTakeProfitForBuy(currentPrice) : 0);
-            case SELL -> StrategySignal.sell(strategyName, confidence, reason,
-                    risk != null ? risk.calculateStopLossForSell(currentPrice) : 0,
-                    risk != null ? risk.calculateTakeProfitForSell(currentPrice) : 0);
-            case CLOSE_LONG -> StrategySignal.sell(strategyName, confidence,
-                    "Close long: " + reason, 0, 0);
-            case CLOSE_SHORT -> StrategySignal.buy(strategyName, confidence,
-                    "Close short: " + reason, 0, 0);
-            default -> StrategySignal.hold(strategyName, reason);
+            case BUY -> StrategySignal.buy(symbol, timeframe, stratId, confidence, price,
+                    risk != null && risk.hasStopLoss()  ? risk.calculateStopLossForBuy(price)  : 0,
+                    risk != null && risk.hasTakeProfit() ? risk.calculateTakeProfitForBuy(price) : 0,
+                    reason);
+            case SELL -> StrategySignal.sell(symbol, timeframe, stratId, confidence, price,
+                    risk != null && risk.hasStopLoss()  ? risk.calculateStopLossForSell(price)  : 0,
+                    risk != null && risk.hasTakeProfit() ? risk.calculateTakeProfitForSell(price) : 0,
+                    reason);
+            case CLOSE_LONG -> StrategySignal.sell(symbol, timeframe, stratId, confidence,
+                    price, 0, 0, "Close long: " + reason);
+            case CLOSE_SHORT -> StrategySignal.buy(symbol, timeframe, stratId, confidence,
+                    price, 0, 0, "Close short: " + reason);
+            default -> StrategySignal.hold(symbol, timeframe, stratId, reason);
         };
     }
 }
