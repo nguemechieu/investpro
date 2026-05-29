@@ -481,8 +481,8 @@ public class SystemCore {
             telegramNotifier.detectAndUseLatestChatId()
                     .ifPresentOrElse(
                             chatId -> log.info("\uD83D\uDCF1 Telegram chat auto-detected: {}", chatId),
-                            () -> log.warn(
-                                    "\u26A0\uFE0F No Telegram chat detected. Send /start to the bot or add it to a group."));
+                            () -> log.info(
+                                    "Telegram notifications are idle until TELEGRAM_CHAT_ID is configured or the bot receives /start."));
         }
 
         // Start Telegram polling if bot token is configured
@@ -826,7 +826,7 @@ public class SystemCore {
         }
 
         TradabilityScope scope = switch (mode) {
-            case MARKET_DATA, TICKER_ONLY, TRADES_ONLY, ORDER_BOOK_ONLY -> TradabilityScope.MARKET_DATA;
+            case MARKET_DATA, TICKER_ONLY, TRADES_ONLY, ORDER_BOOK_ONLY, SAFE_DEFAULT -> TradabilityScope.MARKET_DATA;
             default -> TradabilityScope.BOT_TRADING;
         };
 
@@ -1415,6 +1415,11 @@ public class SystemCore {
 
     private void notifyTelegram(String message) {
         if (telegramNotifier == null || message == null || message.isBlank()) {
+            return;
+        }
+
+        if (!telegramNotifier.isEnabled() || !telegramNotifier.hasTargetChat()) {
+            log.debug("Telegram notification skipped: no target chat configured.");
             return;
         }
 

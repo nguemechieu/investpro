@@ -10356,7 +10356,7 @@ public class TradingDesk extends BorderPane  {
 
                     ensureSystemCoreStarted(primarySymbol);
                     systemCore.setAutoTradingEnabled(true);
-                    systemCore.startStreaming(streamingSymbols, SystemCore.StreamingMode.EVERYTHING);
+                    systemCore.startStreaming(streamingSymbols, SystemCore.StreamingMode.SAFE_DEFAULT);
                     return new BotStartPlan(assignedSymbols, streamingSymbols);
                 }, botOperationExecutor)
                 .thenAccept(plan -> runOnFx(() -> {

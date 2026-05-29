@@ -121,8 +121,8 @@ public class TelegramNotifier {
                 log.debug("Telegram chat detection unavailable; message will be skipped until a chat_id is configured.");
                 return Optional.empty();
             }
-            log.warn(
-                    "Telegram chat detection found no chats. Send /start to the bot or add it to a group/channel first.");
+            log.info(
+                    "Telegram chat detection found no chats. Notifications will stay idle until /start is sent or TELEGRAM_CHAT_ID is configured.");
             return Optional.empty();
         }
 
@@ -245,7 +245,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            log.warn(NO_CHAT_ID_LOG, "message");
+            log.debug(NO_CHAT_ID_LOG, "message");
             return false;
         }
 
@@ -264,7 +264,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            log.warn(NO_CHAT_ID_LOG, "markdown message");
+            log.debug(NO_CHAT_ID_LOG, "markdown message");
             return false;
         }
 
@@ -284,7 +284,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            log.warn(NO_CHAT_ID_LOG, "HTML message");
+            log.debug(NO_CHAT_ID_LOG, "HTML message");
             return false;
         }
 
