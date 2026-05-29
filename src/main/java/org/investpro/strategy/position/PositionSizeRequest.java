@@ -3,6 +3,7 @@ package org.investpro.strategy.position;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
+import org.investpro.strategy.lifecycle.StrategyLearningProfile;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -22,23 +23,29 @@ public class PositionSizeRequest {
     @Builder.Default
     private final String requestId = UUID.randomUUID().toString();
 
+    /** Assignment identifier from the strategy lifecycle. */
+    private final String assignmentId;
+
     /** Trading symbol. */
     private final String symbol;
 
-    /** Timeframe. */
+    /** Timeframe code. */
     private final String timeframe;
 
     /** Strategy identifier requesting the sizing. */
     private final String strategyId;
 
+    /** Trade direction as string: BUY or SELL. */
+    private final String side;
+
     /** Sizing method to apply. */
     private final PositionSizingMethod method;
 
     /** Total account equity in account currency. */
-    private final double accountEquity;
+    private final double equity;
 
-    /** Risk percentage per trade (e.g. 1.0 = 1%). */
-    private final double riskPercent;
+    /** Risk per trade as a decimal (e.g. 0.02 = 2%). */
+    private final double riskPerTradePercent;
 
     /** Intended entry price. */
     private final double entryPrice;
@@ -46,31 +53,48 @@ public class PositionSizeRequest {
     /** Stop-loss price. */
     private final double stopLossPrice;
 
-    /** Average True Range value (used for ATR_BASED method). */
-    private final double atrValue;
+    /** Absolute distance from entry to stop-loss (|entry - stopLoss|). */
+    private final double stopLossDistance;
 
-    /** Current volatility measure (used for VOLATILITY_BASED method). */
-    private final double currentVolatility;
+    /** Pip/tick value in account currency. */
+    private final double pipValue;
 
-    /** Estimated win probability (used for KELLY_CRITERION method). */
+    /** Fixed lot size (used by FIXED_LOT method). */
+    private final double lotSize;
+
+    /** Average True Range value (used by ATR_BASED method). */
+    private final double atr;
+
+    /** Current volatility measure (used by VOLATILITY_ADJUSTED method). */
+    private final double volatility;
+
+    /** Estimated win probability (used by KELLY_CRITERION method). */
     private final double winProbability;
 
-    /** Expected win/loss ratio (used for KELLY_CRITERION method). */
+    /** Expected win/loss ratio (used by KELLY_CRITERION method). */
     private final double winLossRatio;
 
-    /** Current drawdown as a percentage (used for DRAWDOWN_SCALING method). */
+    /** Current drawdown as a decimal (used by DRAWDOWN_SCALING method). */
     private final double currentDrawdownPercent;
 
-    /** Maximum allowed position size as a percentage of equity. */
+    /** Maximum allowed position size as a decimal fraction of equity (e.g. 0.10 = 10%). */
     private final double maxPositionSizePercent;
 
+    /** Absolute maximum dollar loss allowed per trade (used by MAX_LOSS method). */
+    private final double maxDollarLoss;
+
+    /** Maximum concurrent open positions (used by EQUAL_WEIGHT method). */
+    private final int maxOpenPositions;
+
     /**
-     * Size multiplier from an AI signal review (0.1-1.0).
-     * Applied after the base calculation.
-     * Default 1.0 = no AI adjustment.
+     * AI-derived size multiplier (0.25–1.50). Applied after the base calculation.
+     * 1.0 = no adjustment (default).
      */
     @Builder.Default
     private final double aiSizeMultiplier = 1.0;
+
+    /** Optional learning profile providing historical win/loss context for Kelly sizing. */
+    private final StrategyLearningProfile learningProfile;
 
     /** Timestamp when this request was created. */
     @Builder.Default
