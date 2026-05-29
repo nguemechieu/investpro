@@ -234,6 +234,15 @@ public class AppConfigKeys {
     public static final String PYTHON_AI_COMMAND = "PYTHON_AI_COMMAND";
 
     // ============================================================
+    // Local AI gRPC Runtime
+    // ============================================================
+
+    public static final String AI_LOCAL_GRPC_ENABLED = "AI_LOCAL_GRPC_ENABLED";
+    public static final String AI_LOCAL_GRPC_HOST = "AI_LOCAL_GRPC_HOST";
+    public static final String AI_LOCAL_GRPC_PORT = "AI_LOCAL_GRPC_PORT";
+    public static final String AI_LOCAL_GRPC_TIMEOUT_MS = "AI_LOCAL_GRPC_TIMEOUT_MS";
+
+    // ============================================================
     // Notifications
     // ============================================================
 

@@ -1,0 +1,8 @@
+grpcio
+grpcio-tools
+protobuf
+numpy
+pandas
+scikit-learn
+pydantic
+pytest

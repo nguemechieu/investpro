@@ -6775,7 +6775,7 @@ public class TradingDesk extends BorderPane  {
     }
 
     private @Nullable CandleStickChart getActiveChart() {
-        DraggableTab selected = (DraggableTab) chartTabPane.getSelectionModel().getSelectedItem();
+        Tab selected = chartTabPane.getSelectionModel().getSelectedItem();
         if (selected == null || selected.getContent() == null) {
             return null;
         }

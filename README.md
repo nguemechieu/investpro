@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Institutional-style, multi-asset trading workstation built with Java 21 + JavaFX.</strong><br/>
-  Strategy engine · Agent runtime · AI-assisted analysis · Risk management · Backtesting · Paper trading · Multi-exchange execution
+  Strategy engine · Agent runtime · Local gRPC AI advisory · Risk management · Backtesting · Paper trading · Multi-exchange execution
 </p>
 
 <p align="center">
@@ -58,7 +58,7 @@
 
 ## Overview
 
-**InvestPro** is an open-source desktop trading workstation for serious traders, developers, and researchers. It combines a native JavaFX trading terminal with exchange adapters, strategy execution, agent-based automation, AI-assisted reasoning, risk controls, paper trading, and deployment support through Docker/noVNC.
+**InvestPro** is an open-source desktop trading workstation for serious traders, developers, and researchers. It combines a native JavaFX trading terminal with exchange adapters, strategy execution, agent-based automation, a local Python gRPC advisory runtime, risk controls, paper trading, and deployment support through Docker/noVNC.
 
 The goal is to provide a complete research-to-execution environment:
 
@@ -191,11 +191,13 @@ InvestPro provides:
 ### AI-Assisted Analysis
 
 - `AiReasoningService` interface for pluggable AI providers (in `ai/` package).
-- `OpenAiReasoningService` for optional GPT-assisted trade review.
-- `LocalAiReasoningService` fallback for offline operation.
-- `ReasoningAgent` in `reasoning/` for structured decision reasoning.
+- `LocalAiRuntimeService` uses the local Python gRPC service for advisory trade review and backtest scoring.
+- `OpenAiReasoningService` remains available as an optional fallback provider.
+- `LocalAiReasoningService` remains the deterministic offline fallback.
+- The Python advisory service should start alongside InvestPro so AI review is available at launch.
 - `AiAuditLogger` records AI decisions for auditability.
 - AI can approve, reject, or explain signals.
+- Python AI recommends, Java risk gates decide, and Java execution places orders.
 - AI **does not execute trades directly**.
 
 ### Charting & Technical Analysis
@@ -254,6 +256,7 @@ InvestPro provides:
 ```text
 src/main/java/org/investpro/
 ├── ai/                     # AI trade review interface, OpenAI/local providers, audit logging
+├── ai-service/             # Local Python gRPC advisory runtime and shared proto contract
 │   ├── learning/           # Machine learning helpers
 │   └── ml/                 # ML model integration
 ├── backtesting/            # BacktestingService, BacktestConfig, BacktestResult, simulators
@@ -593,7 +596,13 @@ telegram_token=YOUR_BOT_TOKEN
 from_email=you@example.com
 to_email=alerts@example.com
 
-# --- OpenAI optional ---
+# --- Local Python gRPC advisory runtime ---
+ai.local.grpc.enabled=true
+ai.local.grpc.host=127.0.0.1
+ai.local.grpc.port=8010
+ai.local.grpc.timeout.ms=1500
+
+# --- OpenAI optional fallback ---
 openai.api_key=YOUR_OPENAI_KEY
 
 # --- Risk limits ---
@@ -605,6 +614,12 @@ risk.max_daily_loss=0.03
 ```
 
 > **Security:** Never commit API keys, tokens, passwords, or account IDs to Git.
+
+Start the local Python AI runtime from the `ai-service/` directory with:
+
+```bash
+python app/server.py
+```
 
 The OpenAI API key may also be provided with:
 

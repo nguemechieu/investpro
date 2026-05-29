@@ -1,0 +1,73 @@
+# ai-service.toml
+# InvestPro Local AI Runtime - gRPC Configuration
+
+[server]
+host = "127.0.0.1"
+port = 8010
+workers = 4
+max_message_mb = 16
+request_timeout_ms = 1500
+
+[security]
+remote_enabled = false
+allow_hosts = ["127.0.0.1", "localhost"]
+log_sensitive_data = false
+
+[models]
+model_dir = "./models"
+default_mode = "baseline"
+enable_training = true
+enable_online_learning = false
+fallback_to_rules = true
+
+[features]
+signal_review = true
+regime_detection = true
+strategy_review = true
+strategy_ranking = true
+backtest_review = true
+risk_scoring = true
+anomaly_detection = true
+
+[signal_review]
+min_confidence = 0.60
+high_confidence = 0.80
+max_spread_percent = 0.30
+max_volatility_percent = 8.0
+
+[regime_detection]
+trend_window = 50
+volatility_window = 30
+min_candles = 50
+
+[backtest_review]
+min_trades = 30
+min_profit_factor = 1.30
+max_drawdown_percent = 10.0
+min_win_rate_percent = 45.0
+overfit_penalty_enabled = true
+
+[risk_scoring]
+max_risk_score = 1.0
+conservative_mode_risk_multiplier = 0.50
+max_drawdown_percent = 8.0
+max_exposure_percent = 25.0
+
+[fault_tolerance]
+return_safe_defaults = true
+circuit_breaker_enabled = true
+failure_threshold = 3
+cooldown_seconds = 30
+conservative_mode_on_failure = true
+
+[logging]
+level = "INFO"
+json_logs = true
+log_requests = false
+log_predictions = true
+
+[performance]
+cache_enabled = true
+cache_ttl_seconds = 5
+batching_enabled = false
+max_batch_size = 64

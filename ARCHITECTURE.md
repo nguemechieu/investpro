@@ -12,11 +12,17 @@ This document provides step-by-step guidance for refactoring InvestPro into a cl
 - Use `DesktopExchangeStreamBridge` for UI-only market data
 
 ### 2. Execution Gateway
-- Orders cannot reach Exchange without `FinalRiskGate` approval
-- Pipeline: Signal → Risk Evaluation → AI Review → FinalRiskGate → ExecutionEngine → Exchange
-- No agent directly calls Exchange.placeOrder()
+Orders cannot reach Exchange without `FinalRiskGate` approval
+Pipeline: Signal → Risk Evaluation → Local Python gRPC AI Review → FinalRiskGate → ExecutionEngine → Exchange
+Java remains the execution authority; Python only returns advisory output
+No agent directly calls Exchange.placeOrder()
 
-### 3. Streaming Rules
+### 3. Local AI Boundary
+`LocalAiRuntimeService` is the Java entry point to the Python gRPC runtime
+Python returns signal review, regime, strategy, backtest, risk, and anomaly advice
+`LocalAiReasoningService` remains the deterministic offline fallback
+If the Python service is unavailable, Java falls back conservatively and keeps execution behind `FinalRiskGate`
+
 - **Bot OFF**: TradingWindow streams selected symbol via `DesktopExchangeStreamBridge`
 - **Bot ON**: SystemCore owns bot stream, TradingWindow stops its stream
 - **Bot STOPS**: TradingWindow resumes desktop stream

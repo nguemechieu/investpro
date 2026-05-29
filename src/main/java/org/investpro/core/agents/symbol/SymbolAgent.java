@@ -24,10 +24,12 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Per-symbol agent that drives a single TradePair through strategy evaluation.
  *
- * <p>Lifecycle progression:
+ * <p>
+ * Lifecycle progression:
  * NOT_STARTED -> COLLECTING_DATA -> BACKTESTING -> ASSIGNED/FAILED
  *
- * <p>This agent listens for market ticks, updates the symbol panel state, and
+ * <p>
+ * This agent listens for market ticks, updates the symbol panel state, and
  * starts the real-candle strategy lab once enough market activity has arrived.
  */
 @Slf4j
@@ -80,15 +82,19 @@ public class SymbolAgent implements Agent {
 
     @Override
     public void onEvent(AgentEvent event) {
-        if (!running.get() || event == null) return;
+        if (!running.get() || event == null)
+            return;
 
-        if (!AgentEvent.MARKET_TICK.equals(event.type())) return;
+        if (!AgentEvent.MARKET_TICK.equals(event.type()))
+            return;
 
         Object pairObj = event.metadata().get("tradePairObject");
-        if (!(pairObj instanceof TradePair pair) || !pair.equals(symbol)) return;
+        if (!(pairObj instanceof TradePair pair) || !pair.equals(symbol))
+            return;
 
         Object payload = event.payload();
-        if (!(payload instanceof Ticker ticker)) return;
+        if (!(payload instanceof Ticker ticker))
+            return;
 
         long ticks = tickCount.incrementAndGet();
         advanceLifecycle(ticks, ticker);
@@ -97,8 +103,10 @@ public class SymbolAgent implements Agent {
     private void advanceLifecycle(long ticks, Ticker ticker) {
         SymbolAgentState state = manager.ensureSymbol(symbol);
 
-        if (ticker.getBidPrice() > 0) state.setBidPrice(ticker.getBidPrice());
-        if (ticker.getAskPrice() > 0) state.setAskPrice(ticker.getAskPrice());
+        if (ticker.getBidPrice() > 0)
+            state.setBidPrice(ticker.getBidPrice());
+        if (ticker.getAskPrice() > 0)
+            state.setAskPrice(ticker.getAskPrice());
         if (ticker.getAskPrice() > 0) {
             state.setSpreadPercent(
                     (ticker.getAskPrice() - ticker.getBidPrice()) / ticker.getAskPrice() * 100.0);
@@ -119,10 +127,12 @@ public class SymbolAgent implements Agent {
             }
             case BACKTESTING -> state.setLastIssue("Backtest and consensus assignment in progress...");
             case RANKING -> state.setLastIssue("Ranking strategies...");
-            case PAPER_TRADING -> state.setLastIssue("Paper validation is waiting for future live paper-trade results.");
+            case PAPER_TRADING ->
+                state.setLastIssue("Paper validation is waiting for future live paper-trade results.");
             default -> {
-                // ASSIGNED, LIVE_READY, LIVE_TRADING, FAILED, and PAUSED are managed externally.
-                state.setState(SymbolEvaluationState.NOT_STARTED);
+                // ASSIGNED, LIVE_READY, LIVE_TRADING, FAILED, and PAUSED are managed
+                // externally.
+                // Keep the current state unchanged to avoid regressing back into training mode.
             }
         }
 
@@ -198,7 +208,8 @@ public class SymbolAgent implements Agent {
         publishStateChange(previous, state);
 
         log.info("{}: real strategy evaluation assigned {} score={} requirePaper={}",
-                symbol.toString('/'), assignment.getStrategyId(), assignment.getScoreAtAssignment(), requirePaperTrading);
+                symbol.toString('/'), assignment.getStrategyId(), assignment.getScoreAtAssignment(),
+                requirePaperTrading);
     }
 
     private void markFailed(String reason) {
@@ -229,8 +240,7 @@ public class SymbolAgent implements Agent {
                 Map.of(
                         "tradePairObject", symbol,
                         "previousState", previous.name(),
-                        "newState", state.getState().name()
-                )));
+                        "newState", state.getState().name())));
     }
 
     private String rootMessage(Throwable throwable) {

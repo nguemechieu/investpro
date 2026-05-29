@@ -10,32 +10,32 @@ import java.time.Instant;
  * data into a single, comparable structure regardless of origin exchange.
  *
  * <p>Instances are immutable once constructed. Use the static factory methods
- * {@link #fromTicker}, {@link #fromRawPrices}, and {@link #stale} to build instances.
+ * {@link #fromTicker} and {@link #stale} to build instances.
  */
 public final class NormalizedMarketSnapshot {
 
-    // ─── Identity ────────────────────────────────────────────
+    // ─── Identity ──────────────────────────────────────────────
     /** Source exchange name (e.g. "Coinbase", "OANDA"). */
     private final String exchangeName;
-    /** Optional sub-venue identifier or raw symbol string (e.g. "SPOT", "BTC-USD"). May be null. */
+    /** Optional sub-venue identifier (e.g. "SPOT", "PERP"). May be null. */
     private final String venueId;
-    /** The traded instrument. May be null when built from raw prices. */
+    /** The traded instrument. */
     private final TradePair tradePair;
     /** Timestamp at which this snapshot was captured. */
     private final Instant capturedAt;
 
-    // ─── Best bid/ask ────────────────────────────────────
+    // ─── Best bid/ask ────────────────────────────────────────────
     private final double bidPrice;
     private final double askPrice;
     private final double midPrice;
     /** Bid-ask spread expressed in basis points. */
     private final double spreadBps;
 
-    // ─── Last trade ───────────────────────────────────────
+    // ─── Last trade ────────────────────────────────────────────
     private final double lastTradePrice;
     private final double lastTradeSize;
 
-    // ─── 24-hour statistics ──────────────────────────────────
+    // ─── 24-hour statistics ─────────────────────────────────────────
     private final double volume24h;
     private final double volumeQuote24h;
     private final double high24h;
@@ -44,7 +44,7 @@ public final class NormalizedMarketSnapshot {
     private final double close24h;
     private final double priceChangePercent24h;
 
-    // ─── Depth metadata ────────────────────────────────────
+    // ─── Depth metadata ──────────────────────────────────────────
     /** Number of bid price levels available in this snapshot. */
     private final int bidLevels;
     /** Number of ask price levels available in this snapshot. */
@@ -54,7 +54,7 @@ public final class NormalizedMarketSnapshot {
     /** Total quantity summed across all available ask levels. */
     private final double totalAskLiquidity;
 
-    // ─── Freshness ─────────────────────────────────────────
+    // ─── Freshness ─────────────────────────────────────────────
     /** False when this snapshot was served from a stale cache. */
     private final boolean dataFresh;
     /** Transport/source label: "WEBSOCKET", "REST", or "STALE_CACHE". */
@@ -96,7 +96,7 @@ public final class NormalizedMarketSnapshot {
         this.dataSource = dataSource != null ? dataSource : "UNKNOWN";
     }
 
-    // ─── Static Factories ─────────────────────────────────────
+    // ─── Static Factories ─────────────────────────────────────────
 
     /**
      * Creates a normalized snapshot from an exchange {@link Ticker}.
@@ -119,43 +119,6 @@ public final class NormalizedMarketSnapshot {
                 ticker.getVolume(), 0.0,
                 ticker.getHighPrice(), ticker.getLowPrice(), ticker.getOpenPrice(), ticker.getLastPrice(),
                 ticker.getChangePercent(),
-                0, 0, 0.0, 0.0,
-                true, "REST"
-        );
-    }
-
-    /**
-     * Creates a normalized snapshot from raw double prices.
-     *
-     * <p>Use this when a {@link TradePair} is not yet available (e.g. in tests
-     * or during normalization of simple ticker payloads).
-     *
-     * @param exchangeName  source exchange name
-     * @param symbol        symbol string (e.g. "BTC-USD") — stored in venueId
-     * @param bid           best bid price
-     * @param ask           best ask price
-     * @param last          last trade price
-     * @param volume24h     24-hour volume
-     * @param capturedAt    when the snapshot was taken
-     * @return fresh normalized snapshot
-     */
-    public static NormalizedMarketSnapshot fromRawPrices(
-            String exchangeName,
-            String symbol,
-            double bid,
-            double ask,
-            double last,
-            double volume24h,
-            Instant capturedAt
-    ) {
-        double mid = (bid + ask) / 2.0;
-        double spreadBps = computeSpreadBps(bid, ask);
-        return new NormalizedMarketSnapshot(
-                exchangeName, symbol, null, capturedAt,
-                bid, ask, mid, spreadBps,
-                last, 0.0,
-                volume24h, 0.0,
-                last, last, last, last, 0.0,
                 0, 0, 0.0, 0.0,
                 true, "REST"
         );
@@ -201,7 +164,44 @@ public final class NormalizedMarketSnapshot {
         );
     }
 
-    // ─── Derived Queries ─────────────────────────────────────
+    /**
+     * Convenience factory that creates a fresh snapshot from raw double prices.
+     *
+     * <p>Use this when a {@link TradePair} is not yet available (e.g. in tests
+     * or during normalization of simple ticker payloads).
+     *
+     * @param exchangeName  source exchange name
+     * @param symbol        symbol string (e.g. "BTC-USD")
+     * @param bid           best bid price
+     * @param ask           best ask price
+     * @param last          last trade price
+     * @param volume24h     24-hour volume
+     * @param capturedAt    when the snapshot was taken
+     * @return fresh normalized snapshot
+     */
+    public static NormalizedMarketSnapshot fromRawPrices(
+            String exchangeName,
+            String symbol,
+            double bid,
+            double ask,
+            double last,
+            double volume24h,
+            java.time.Instant capturedAt
+    ) {
+        double mid = (bid + ask) / 2.0;
+        double spreadBps = computeSpreadBps(bid, ask);
+        return new NormalizedMarketSnapshot(
+                exchangeName, symbol, null, capturedAt,
+                bid, ask, mid, spreadBps,
+                last, 0.0,
+                volume24h, 0.0,
+                last, last, last, last, 0.0,
+                0, 0, 0.0, 0.0,
+                true, "REST"
+        );
+    }
+
+    // ─── Derived Queries ──────────────────────────────────────────
 
     /**
      * Returns {@code true} if bid, ask, and last trade prices are all positive,
@@ -225,7 +225,7 @@ public final class NormalizedMarketSnapshot {
                         spreadBps, volume24h, dataFresh, dataSource);
     }
 
-    // ─── Computed Utility ─────────────────────────────────────
+    // ─── Computed Utility ─────────────────────────────────────────
 
     /**
      * Computes the bid-ask spread in basis points: {@code (ask - bid) / mid * 10_000}.
@@ -242,7 +242,7 @@ public final class NormalizedMarketSnapshot {
         return ((ask - bid) / mid) * 10_000.0;
     }
 
-    // ─── Accessors ──────────────────────────────────────────
+    // ─── Accessors ───────────────────────────────────────────────
 
     public String getExchangeName()          { return exchangeName; }
     public String getVenueId()               { return venueId; }
@@ -268,25 +268,25 @@ public final class NormalizedMarketSnapshot {
     public boolean isDataFresh()             { return dataFresh; }
     public String getDataSource()            { return dataSource; }
 
-    // ─── Convenience record-style accessors (SmartExecutionRouter / normalization layer) ─
+    // ─── Convenience record-style accessors (for use with SmartExecutionRouter) ──
+    /** Alias for {@link #getDataSource()}. */
+    public String dataSource()       { return dataSource; }
     /** Returns venueId or trade pair string as the symbol identifier. */
     public String symbol()           { return venueId != null ? venueId : (tradePair != null ? tradePair.toString() : ""); }
     /** Alias for {@link #getSpreadBps()}. */
     public double spreadBps()        { return spreadBps; }
-    /** Returns total bid liquidity as BigDecimal, or null if zero. */
+    /** Alias for {@link #getTotalBidLiquidity()} as BigDecimal. */
     public java.math.BigDecimal totalBidLiquidity() {
         return totalBidLiquidity > 0 ? java.math.BigDecimal.valueOf(totalBidLiquidity) : null;
     }
-    /** Returns bid price as BigDecimal. */
+    /** Alias for {@link #getBidPrice()} as BigDecimal. */
     public java.math.BigDecimal bidPrice()   { return java.math.BigDecimal.valueOf(bidPrice); }
-    /** Returns ask price as BigDecimal. */
+    /** Alias for {@link #getAskPrice()} as BigDecimal. */
     public java.math.BigDecimal askPrice()   { return java.math.BigDecimal.valueOf(askPrice); }
-    /** Returns mid price as BigDecimal. */
+    /** Alias for {@link #getMidPrice()} as BigDecimal. */
     public java.math.BigDecimal midPrice()   { return java.math.BigDecimal.valueOf(midPrice); }
-    /** Returns 24h volume as BigDecimal. */
+    /** Alias for {@link #getVolume24h()} as BigDecimal. */
     public java.math.BigDecimal volume24h()  { return java.math.BigDecimal.valueOf(volume24h); }
-    /** Alias for {@link #getDataSource()}. */
-    public String dataSource()       { return dataSource; }
 
     @Override
     public String toString() {

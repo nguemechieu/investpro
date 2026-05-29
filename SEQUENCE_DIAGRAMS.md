@@ -7,6 +7,8 @@
 
 ## 1. Application Startup Sequence
 
+The local Python gRPC AI service is started alongside InvestPro so advisory RPCs are available as soon as the desktop app launches.
+
 ```
 User │ App │ SystemCore │ SmartBot │ Agents │ Exchange
   │   │      │            │         │        │
@@ -71,8 +73,9 @@ User │ TradingWindow │ SystemCore │ TradeExecCoord │ RiskMgmt │ AIReas
   │   │               │            │  (includes market data)  │              │           │            │
   │   │               │            │  (includes AI preferences)              │           │            │
   │   │               │            │                          │              │           │            │
-  │   │               │            │                          ├─Call OpenAI API          │           │            │
-  │   │               │            │                          │  "Should we trade?"     │           │            │
+    │   │               │            │                          ├─Call local Python gRPC    │           │            │
+    │   │               │            │                          │  advisory service        │           │            │
+    │   │               │            │                          │  "Should we trade?"     │           │            │
   │   │               │            │                          │                         │           │            │
   │   │               │            │                          ◀─ Approve/Reject/Review  │           │            │
   │   │               │            │ ◀─ AiTradeReviewResponse│             │           │            │
@@ -139,9 +142,11 @@ Exchange │ MarketDataAgent │ SignalAgent │ BotDecisionEngine │ TradeExec
    │            │                │            ├─Send to TradeExecCoord       │      │
    │            │                │            │                 │            │      │
    │            │                │            │                 ├─RiskCheck()│      │
-   │            │                │            │                 ├─AIReview() ├─Call OpenAI
+    │            │                │            │                 ├─AIReview() ├─Call local Python gRPC
    │            │                │            │                 ├─FinalGate()│      │
+
    │            │                │            │                 │            │      │
+
    │            │                │            │                 │            ├─Place Order
    │            │                │            │                 │            │      │
    │            │                │            │                 │            ├─Update Balance
@@ -165,12 +170,15 @@ Signal │ RiskMgmtSystem │ Account │ Exchange │ Decision
    │    ├──────────────────────┐   │          │
    │    │ checkAuthentication()    │          │
    │    ├──────────────────────┘   │          │
-   │    │ (verify API credentials) │          │
-   │    │                │         │          │
-   │    ├──────────────────────────┐          │
-   │    │ getBalance()─────────────┼─────────►│
-   │    │                │         │          │
-   │    │ ◄─────────────────────────────────┤ (USD: 10000)
+
+    │    │ (verify API credentials) │          │
+
+    │    │                │         │          │
+    │    ├──────────────────────────┐          │
+    │    │ getBalance()─────────────┼─────────►│
+    │    │                │         │          │
+
+    │    │ ◄─────────────────────────────────┤ (USD: 10000)
    │    │                │ ◄──────┤          │
    │    │ ┌─checkBalance()         │          │
    │    │ │ available >= amount?   │          │
@@ -218,7 +226,7 @@ Signal │ RiskMgmtSystem │ Account │ Exchange │ Decision
 ## 5. AI Trade Review Process
 
 ```
-TradeExecCoord │ AiTradeReviewRequest │ AiReasoningService │ OpenAI API │ Decision
+TradeExecCoord │ AiTradeReviewRequest │ AiReasoningService │ Local gRPC │ Decision
       │            │                  │                  │             │
       ├────────────►│ Builder Pattern   │                  │             │
       │            │ .withSignal()     │                  │             │
@@ -237,10 +245,10 @@ TradeExecCoord │ AiTradeReviewRequest │ AiReasoningService │ OpenAI API �
       │            │                  │  conditions, should we trade?"│
       │            │                  │  (detailed context)           │
       │            │                  │                  │             │
-      │            │                  ├─callOpenAI()────►│             │
-      │            │                  │                  │ (gpt-4)     │
+    │            │                  ├─callLocalGrpc()──►│             │
+    │            │                  │                  │ (Python AI) │
       │            │                  │                  │             │
-      │            │                  │ ◄────────────────┤ Response    │
+    │            │                  │ ◄────────────────┤ Response    │
       │            │                  │  "APPROVED"      │  (reasoning)│
       │            │                  │  confidence: 0.92│             │
       │            │                  │                  │             │
@@ -255,7 +263,36 @@ TradeExecCoord │ AiTradeReviewRequest │ AiReasoningService │ OpenAI API �
 
 ---
 
-## 6. Agent Event Publishing & Processing
+## 6. Local AI Runtime Advisory Flow
+
+```mermaid
+sequenceDiagram
+    participant Java as TradeExecutionCoordinator
+    participant Client as LocalAiRuntimeService
+    participant Python as Python gRPC AI Service
+    participant Gate as FinalRiskGate
+    participant Exec as ExecutionEngine
+
+    Java->>Client: reviewTrade(request)
+    Client->>Python: AnalyzeSignal / ReviewStrategy / ReviewBacktest
+    alt service healthy
+        Python-->>Client: advisory response
+    else service unavailable
+        Client->>Client: enable conservative fallback
+    end
+    Client-->>Java: AiTradeReviewResponse
+    Java->>Gate: makeDecision(aiReview)
+    Gate-->>Java: OrderApprovalDecision
+    Java->>Exec: executeApprovedOrder()
+```
+
+### Advisory Rules
+
+- Python recommends; Java decides and executes.
+- The shared contract is [src/main/proto/investpro_ai.proto](src/main/proto/investpro_ai.proto).
+- If the Python service is unavailable, Java falls back to conservative local behavior.
+
+## 7. Agent Event Publishing & Processing
 
 ```
 MarketDataAgent │ EventBus │ SignalAgent │ RiskAgent │ PortfolioAgent │ ExecutionAgent
@@ -379,7 +416,7 @@ Phase 3: RISK EVALUATION
 
 Phase 4: AI REVIEW
     ├─ Format AiTradeReviewRequest (signal + risk + market)
-    ├─ Call OpenAI API (GPT-4)
+    ├─ Call local Python gRPC advisory service
     ├─ Get reasoning & decision
     └─ Returns AiTradeReviewResponse (APPROVED, REJECTED, MANUAL, WAIT)
     

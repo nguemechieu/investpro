@@ -3,6 +3,7 @@ package org.investpro.strategy.lab;
 import lombok.Data;
 
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.ai.local.grpc.LocalAiRuntimeService;
 import org.investpro.data.CandleData;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyAssignment;
@@ -45,12 +46,13 @@ public class StrategyLabService {
     private final StrategyVotingEngine votingEngine;
     /**
      * -- GETTER - -
-     *  Get assignment service for direct access.
+     * Get assignment service for direct access.
      */
 
     private final StrategyAssignmentService assignmentService;
     private final HistoricalDataRepository historicalDataRepository;
     private final BacktestScheduler backtestScheduler;
+    private final LocalAiRuntimeService localAiRuntimeService;
 
     private final ExecutorService executorService;
 
@@ -70,6 +72,7 @@ public class StrategyLabService {
         this.assignmentService = new StrategyAssignmentService();
         this.historicalDataRepository = HistoricalDataRepositoryImpl.getInstance();
         this.backtestScheduler = BacktestScheduler.getInstance();
+        this.localAiRuntimeService = LocalAiRuntimeService.fromConfiguration();
 
         // Create dedicated thread pool for strategy backtests
         this.executorService = Executors.newFixedThreadPool(
@@ -176,8 +179,8 @@ public class StrategyLabService {
         return CompletableFuture.supplyAsync(() -> {
             List<CandleData> cleanCandles = sanitizeCandles(candles);
             int candleCount = cleanCandles.size();
-            HistoricalDataPrefetcher.DataReadiness readiness =
-                    HistoricalDataPrefetcher.evaluateDataReadiness(candleCount, candleCount);
+            HistoricalDataPrefetcher.DataReadiness readiness = HistoricalDataPrefetcher
+                    .evaluateDataReadiness(candleCount, candleCount);
             if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
                 log.warn("Cannot evaluate strategies for {}/{}: only {} candles available, readiness={}",
                         symbol, timeframe.getCode(), candleCount, readiness);
@@ -202,7 +205,8 @@ public class StrategyLabService {
                     BacktestJobPriority.VISIBLE,
                     null);
 
-            List<StrategyPerformanceReport> ranked = rankingEngine.rank(results);
+            List<StrategyPerformanceReport> aiAdjustedResults = applyLocalAiBacktestReview(results);
+            List<StrategyPerformanceReport> ranked = rankingEngine.rank(aiAdjustedResults);
             String cacheKey = makeKey(symbol, timeframe);
             rankingsCache.put(cacheKey, ranked);
 
@@ -216,16 +220,14 @@ public class StrategyLabService {
                 return null;
             }
 
-            double minimumScore = readFirstDoubleProperty(
-            );
+            double minimumScore = readFirstDoubleProperty();
             if (selected.getScore() < minimumScore) {
                 log.warn("Best strategy for {}/{} did not meet minimum score: {} < {}",
                         symbol, timeframe.getCode(), selected.getScore(), minimumScore);
                 return null;
             }
 
-            boolean autoAssignBest = readFirstBooleanProperty(
-            );
+            boolean autoAssignBest = readFirstBooleanProperty();
             if (!autoAssignBest) {
                 log.info("Auto assignment disabled; ranked best strategy for {}/{} is {} score={}",
                         symbol, timeframe.getCode(), selected.getStrategyName(), selected.getScore());
@@ -276,8 +278,8 @@ public class StrategyLabService {
                 List<StrategyPerformanceReport> results = new ArrayList<>();
                 List<CandleData> candles = loadCachedCandlesForBacktest(symbol, timeframe);
                 int candleCount = candles.size();
-                HistoricalDataPrefetcher.DataReadiness readiness =
-                        HistoricalDataPrefetcher.evaluateDataReadiness(candleCount, candleCount);
+                HistoricalDataPrefetcher.DataReadiness readiness = HistoricalDataPrefetcher
+                        .evaluateDataReadiness(candleCount, candleCount);
 
                 if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
                     log.warn("Skipping Strategy Lab backtests for {}/{}: insufficient candles={} readiness={}",
@@ -312,7 +314,7 @@ public class StrategyLabService {
                 allResults.addAll(results);
 
                 // Rank and cache results for this timeframe
-                List<StrategyPerformanceReport> ranked = rankingEngine.rank(results);
+                List<StrategyPerformanceReport> ranked = rankingEngine.rank(applyLocalAiBacktestReview(results));
                 rankingsCache.put(cacheKey, ranked);
 
                 // Generate consensus
@@ -424,6 +426,12 @@ public class StrategyLabService {
         } catch (InterruptedException e) {
             executorService.shutdownNow();
             Thread.currentThread().interrupt();
+        } finally {
+            try {
+                localAiRuntimeService.close();
+            } catch (Exception exception) {
+                log.debug("Unable to close local AI runtime service", exception);
+            }
         }
     }
 
@@ -548,6 +556,22 @@ public class StrategyLabService {
         return results;
     }
 
+    private List<StrategyPerformanceReport> applyLocalAiBacktestReview(List<StrategyPerformanceReport> reports) {
+        if (reports == null || reports.isEmpty() || !LocalAiRuntimeService.isGrpcAdvisoryEnabled()) {
+            return reports == null ? List.of() : reports;
+        }
+
+        List<StrategyPerformanceReport> adjusted = new ArrayList<>(reports.size());
+        for (StrategyPerformanceReport report : reports) {
+            if (report == null) {
+                continue;
+            }
+            double advisoryScore = localAiRuntimeService.reviewBacktestScore(report);
+            adjusted.add(report.toBuilder().score(advisoryScore).build());
+        }
+        return adjusted;
+    }
+
     private List<CandleData> loadCachedCandlesForBacktest(String symbol, Timeframe timeframe) {
         TradePair pair = parsePair(symbol);
         if (pair == null || timeframe == null) {
@@ -591,7 +615,8 @@ public class StrategyLabService {
     }
 
     private double readFirstDoubleProperty() {
-        for (String propertyName : new String[]{"investpro.strategy.minStrategyScore", "investpro.strategy.minScore", "investpro.strategy.hardMinStrategyScore"}) {
+        for (String propertyName : new String[] { "investpro.strategy.minStrategyScore", "investpro.strategy.minScore",
+                "investpro.strategy.hardMinStrategyScore" }) {
             String rawValue = System.getProperty(propertyName);
             if (rawValue == null || rawValue.isBlank()) {
                 continue;
@@ -607,7 +632,7 @@ public class StrategyLabService {
     }
 
     private boolean readFirstBooleanProperty() {
-        for (String propertyName : new String[]{"investpro.strategy.autoAssignBest"}) {
+        for (String propertyName : new String[] { "investpro.strategy.autoAssignBest" }) {
             String rawValue = System.getProperty(propertyName);
             if (rawValue == null || rawValue.isBlank()) {
                 continue;

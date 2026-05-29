@@ -11,6 +11,8 @@ import javafx.scene.layout.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.ai.local.grpc.AiGrpcHealthStatus;
+import org.investpro.ai.local.grpc.LocalAiRuntimeService;
 import org.investpro.core.SystemCore;
 import org.investpro.data.CandleData;
 import org.investpro.i18n.LocalizationService;
@@ -99,6 +101,12 @@ public class StrategyLabPanel extends BorderPane {
     private Label sellVotesLabel;
     private Label holdVotesLabel;
     private Label consensusReasonLabel;
+    private Label aiStatusLabel;
+    private Label aiLatencyLabel;
+    private Label aiCircuitLabel;
+    private Label aiConservativeModeLabel;
+    private Label aiLastErrorLabel;
+    private Label aiReqRateLabel;
 
     private ProgressBar progressBar;
     private Label statusLabel;
@@ -119,16 +127,16 @@ public class StrategyLabPanel extends BorderPane {
     }
 
     @SuppressWarnings("unused")
-    private static final String BG_DEEP    = "-fx-background-color: #07090f;";
-    private static final String BG_PANEL   = "#0a0e27";
-    private static final String BG_CARD    = "#111827";
-    private static final String BG_CARD2   = "#1a1f35";
-    private static final String BG_HEADER  = "#0f172a";
+    private static final String BG_DEEP = "-fx-background-color: #07090f;";
+    private static final String BG_PANEL = "#0a0e27";
+    private static final String BG_CARD = "#111827";
+    private static final String BG_CARD2 = "#1a1f35";
+    private static final String BG_HEADER = "#0f172a";
     private static final String CLR_ACCENT = "#3b82f6";
-    private static final String CLR_TEXT   = "#e0e7ff";
-    private static final String CLR_MUTED  = "#94a3b8";
-    private static final String CLR_GREEN  = "#22c55e";
-    private static final String CLR_RED    = "#ef4444";
+    private static final String CLR_TEXT = "#e0e7ff";
+    private static final String CLR_MUTED = "#94a3b8";
+    private static final String CLR_GREEN = "#22c55e";
+    private static final String CLR_RED = "#ef4444";
     private static final String CLR_YELLOW = "#f59e0b";
     private static final String CLR_BORDER = "#1e293b";
 
@@ -157,8 +165,8 @@ public class StrategyLabPanel extends BorderPane {
         box.setPadding(new Insets(10));
         box.setStyle(
                 "-fx-background-color: " + BG_HEADER + "; " +
-                "-fx-border-color: " + CLR_BORDER + "; " +
-                "-fx-border-width: 0 0 1 0;");
+                        "-fx-border-color: " + CLR_BORDER + "; " +
+                        "-fx-border-width: 0 0 1 0;");
 
         HBox row1 = new HBox(8);
         row1.setStyle("-fx-alignment: center-left;");
@@ -229,7 +237,7 @@ public class StrategyLabPanel extends BorderPane {
         strategyFilterField.setPrefWidth(200);
         strategyFilterField.setStyle(
                 "-fx-background-color: #1e293b; -fx-text-fill: " + CLR_TEXT + "; " +
-                "-fx-border-color: #334155; -fx-border-radius: 3; -fx-prompt-text-fill: " + CLR_MUTED + ";");
+                        "-fx-border-color: #334155; -fx-border-radius: 3; -fx-prompt-text-fill: " + CLR_MUTED + ";");
         strategyFilterField.textProperty().addListener((obs, oldValue, newValue) -> applyStrategyFilter());
 
         row1.getChildren().setAll(
@@ -267,13 +275,13 @@ public class StrategyLabPanel extends BorderPane {
 
         assignBestButton.setStyle(
                 "-fx-padding: 7px 14px; -fx-background-color: #14532d; -fx-text-fill: " + CLR_GREEN + "; " +
-                "-fx-border-color: " + CLR_GREEN + "; -fx-border-radius: 4; -fx-cursor: hand;");
+                        "-fx-border-color: " + CLR_GREEN + "; -fx-border-radius: 4; -fx-cursor: hand;");
         unassignButton.setStyle(
                 "-fx-padding: 7px 14px; -fx-background-color: #451a03; -fx-text-fill: " + CLR_YELLOW + "; " +
-                "-fx-border-color: " + CLR_YELLOW + "; -fx-border-radius: 4; -fx-cursor: hand;");
+                        "-fx-border-color: " + CLR_YELLOW + "; -fx-border-radius: 4; -fx-cursor: hand;");
         disableAssignmentButton.setStyle(
                 "-fx-padding: 7px 14px; -fx-background-color: #450a0a; -fx-text-fill: " + CLR_RED + "; " +
-                "-fx-border-color: " + CLR_RED + "; -fx-border-radius: 4; -fx-cursor: hand;");
+                        "-fx-border-color: " + CLR_RED + "; -fx-border-radius: 4; -fx-cursor: hand;");
 
         row3.getChildren().setAll(
                 assignBestButton,
@@ -289,28 +297,28 @@ public class StrategyLabPanel extends BorderPane {
         Button button = new Button(text);
         button.setStyle(
                 "-fx-padding: 7px 14px; " +
-                "-fx-background-color: #1e293b; " +
-                "-fx-text-fill: " + CLR_TEXT + "; " +
-                "-fx-border-color: #334155; " +
-                "-fx-border-radius: 4; " +
-                "-fx-cursor: hand; " +
-                "-fx-font-size: 11px;");
+                        "-fx-background-color: #1e293b; " +
+                        "-fx-text-fill: " + CLR_TEXT + "; " +
+                        "-fx-border-color: #334155; " +
+                        "-fx-border-radius: 4; " +
+                        "-fx-cursor: hand; " +
+                        "-fx-font-size: 11px;");
         button.setOnMouseEntered(e -> button.setStyle(
                 "-fx-padding: 7px 14px; " +
-                "-fx-background-color: #334155; " +
-                "-fx-text-fill: white; " +
-                "-fx-border-color: " + CLR_ACCENT + "; " +
-                "-fx-border-radius: 4; " +
-                "-fx-cursor: hand; " +
-                "-fx-font-size: 11px;"));
+                        "-fx-background-color: #334155; " +
+                        "-fx-text-fill: white; " +
+                        "-fx-border-color: " + CLR_ACCENT + "; " +
+                        "-fx-border-radius: 4; " +
+                        "-fx-cursor: hand; " +
+                        "-fx-font-size: 11px;"));
         button.setOnMouseExited(e -> button.setStyle(
                 "-fx-padding: 7px 14px; " +
-                "-fx-background-color: #1e293b; " +
-                "-fx-text-fill: " + CLR_TEXT + "; " +
-                "-fx-border-color: #334155; " +
-                "-fx-border-radius: 4; " +
-                "-fx-cursor: hand; " +
-                "-fx-font-size: 11px;"));
+                        "-fx-background-color: #1e293b; " +
+                        "-fx-text-fill: " + CLR_TEXT + "; " +
+                        "-fx-border-color: #334155; " +
+                        "-fx-border-radius: 4; " +
+                        "-fx-cursor: hand; " +
+                        "-fx-font-size: 11px;"));
         button.setOnAction(event -> {
             if (action != null) {
                 action.run();
@@ -328,10 +336,10 @@ public class StrategyLabPanel extends BorderPane {
     private <T> void styleCombo(ComboBox<T> combo) {
         combo.setStyle(
                 "-fx-background-color: #1e293b; " +
-                "-fx-text-fill: " + CLR_TEXT + "; " +
-                "-fx-border-color: #334155; " +
-                "-fx-border-radius: 3; " +
-                "-fx-font-size: 11px;");
+                        "-fx-text-fill: " + CLR_TEXT + "; " +
+                        "-fx-border-color: #334155; " +
+                        "-fx-border-radius: 3; " +
+                        "-fx-font-size: 11px;");
     }
 
     private void applyStrategyFilter() {
@@ -428,14 +436,15 @@ public class StrategyLabPanel extends BorderPane {
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         tabPane.setStyle(
                 "-fx-background-color: " + BG_PANEL + "; " +
-                "-fx-tab-min-width: 130px; " +
-                "-fx-font-size: 12px;");
+                        "-fx-tab-min-width: 130px; " +
+                        "-fx-font-size: 12px;");
 
         tabPane.getTabs().setAll(
                 createAssignmentTab(),
                 createRankingTab(),
                 createVotingTab(),
                 createConsensusTab(),
+                createAiRuntimeTab(),
                 createSchedulerTab());
 
         return tabPane;
@@ -623,8 +632,8 @@ public class StrategyLabPanel extends BorderPane {
                     setText("");
                 } else {
                     setText(item);
-                    String color = "BUY".equalsIgnoreCase(item) ? CLR_GREEN :
-                                   "SELL".equalsIgnoreCase(item) ? CLR_RED : CLR_YELLOW;
+                    String color = "BUY".equalsIgnoreCase(item) ? CLR_GREEN
+                            : "SELL".equalsIgnoreCase(item) ? CLR_RED : CLR_YELLOW;
                     setStyle("-fx-background-color: transparent; -fx-text-fill: " + color + "; -fx-font-weight: bold;");
                 }
             }
@@ -696,6 +705,44 @@ public class StrategyLabPanel extends BorderPane {
         return tab;
     }
 
+    private Tab createAiRuntimeTab() {
+        Tab tab = new Tab("🤖 AI Runtime");
+
+        VBox box = new VBox(12);
+        box.setPadding(new Insets(16));
+        box.setStyle("-fx-background-color: " + BG_PANEL + ";");
+        box.getChildren().add(createCard("Local gRPC Advisory Runtime", createAiRuntimeContent()));
+
+        ScrollPane scrollPane = new ScrollPane(box);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setStyle("-fx-background-color: " + BG_PANEL + "; -fx-background: " + BG_PANEL + ";");
+
+        tab.setContent(scrollPane);
+        return tab;
+    }
+
+    private VBox createAiRuntimeContent() {
+        VBox box = new VBox(10);
+        box.setPadding(new Insets(14));
+
+        aiStatusLabel = infoLabel("Status: —");
+        aiLatencyLabel = infoLabel("Latency: —");
+        aiCircuitLabel = infoLabel("Circuit: —");
+        aiConservativeModeLabel = infoLabel("Conservative mode: —");
+        aiReqRateLabel = infoLabel("Requests/min: —");
+        aiLastErrorLabel = infoLabel("Last error: —");
+        aiLastErrorLabel.setWrapText(true);
+
+        box.getChildren().setAll(
+                aiStatusLabel,
+                aiLatencyLabel,
+                aiCircuitLabel,
+                aiConservativeModeLabel,
+                aiReqRateLabel,
+                aiLastErrorLabel);
+        return box;
+    }
+
     private VBox createConsensusContent() {
         VBox box = new VBox(10);
         box.setPadding(new Insets(14));
@@ -748,8 +795,8 @@ public class StrategyLabPanel extends BorderPane {
         box.setPadding(new Insets(10));
         box.setStyle(
                 "-fx-background-color: " + BG_HEADER + "; " +
-                "-fx-border-color: " + CLR_BORDER + "; " +
-                "-fx-border-width: 1 0 0 0;");
+                        "-fx-border-color: " + CLR_BORDER + "; " +
+                        "-fx-border-width: 1 0 0 0;");
         box.setPrefHeight(160);
 
         progressBar = new ProgressBar(0);
@@ -764,10 +811,10 @@ public class StrategyLabPanel extends BorderPane {
         logsArea.setPrefHeight(100);
         logsArea.setStyle(
                 "-fx-control-inner-background: #07090f; " +
-                "-fx-font-family: 'Courier New', monospace; " +
-                "-fx-font-size: 10px; " +
-                "-fx-text-fill: #a3e635; " +
-                "-fx-border-color: " + CLR_BORDER + ";");
+                        "-fx-font-family: 'Courier New', monospace; " +
+                        "-fx-font-size: 10px; " +
+                        "-fx-text-fill: #a3e635; " +
+                        "-fx-border-color: " + CLR_BORDER + ";");
 
         Label progressLbl = styledLabel("Progress:");
         HBox progressRow = new HBox(8, progressLbl, progressBar);
@@ -784,19 +831,19 @@ public class StrategyLabPanel extends BorderPane {
         VBox card = new VBox();
         card.setStyle(
                 "-fx-border-color: " + CLR_BORDER + "; " +
-                "-fx-border-radius: 6; " +
-                "-fx-background-color: " + BG_CARD + "; " +
-                "-fx-background-radius: 6;");
+                        "-fx-border-radius: 6; " +
+                        "-fx-background-color: " + BG_CARD + "; " +
+                        "-fx-background-radius: 6;");
 
         Label titleLabel = new Label(title);
         titleLabel.setMaxWidth(Double.MAX_VALUE);
         titleLabel.setStyle(
                 "-fx-padding: 10px 14px; " +
-                "-fx-font-size: 13px; " +
-                "-fx-font-weight: bold; " +
-                "-fx-text-fill: " + CLR_TEXT + "; " +
-                "-fx-background-color: " + BG_CARD2 + "; " +
-                "-fx-background-radius: 6 6 0 0;");
+                        "-fx-font-size: 13px; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-text-fill: " + CLR_TEXT + "; " +
+                        "-fx-background-color: " + BG_CARD2 + "; " +
+                        "-fx-background-radius: 6 6 0 0;");
 
         content.setStyle("-fx-background-color: " + BG_CARD + ";");
         card.getChildren().setAll(titleLabel, content);
@@ -806,10 +853,10 @@ public class StrategyLabPanel extends BorderPane {
     private <T> void applyDarkTableStyle(TableView<T> table) {
         table.setStyle(
                 "-fx-background-color: " + BG_PANEL + "; " +
-                "-fx-control-inner-background: " + BG_PANEL + "; " +
-                "-fx-table-cell-border-color: " + CLR_BORDER + "; " +
-                "-fx-font-size: 11px; " +
-                "-fx-text-fill: " + CLR_TEXT + ";");
+                        "-fx-control-inner-background: " + BG_PANEL + "; " +
+                        "-fx-table-cell-border-color: " + CLR_BORDER + "; " +
+                        "-fx-font-size: 11px; " +
+                        "-fx-text-fill: " + CLR_TEXT + ";");
         table.setRowFactory(tv -> new TableRow<>() {
             @Override
             protected void updateItem(T item, boolean empty) {
@@ -862,6 +909,7 @@ public class StrategyLabPanel extends BorderPane {
 
                         updateAssignmentView(snapshot);
                         updateConsensusView(snapshot);
+                        updateAiRuntimeView();
 
                         if (!running) {
                             statusLabel.setText("Ready");
@@ -940,7 +988,8 @@ public class StrategyLabPanel extends BorderPane {
     private void updateAssignmentView(@NotNull StrategyLabSnapshot snapshot) {
         if (!snapshot.hasAssignment()) {
             activeAssignmentLabel.setText("No assignment");
-            activeAssignmentLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: " + CLR_MUTED + ";");
+            activeAssignmentLabel
+                    .setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: " + CLR_MUTED + ";");
             activeStrategyLabel.setText("Strategy: —");
             activeScoreLabel.setText("Score: —");
             activeModeLabel.setText("Mode: —");
@@ -952,7 +1001,8 @@ public class StrategyLabPanel extends BorderPane {
 
         if (assignment == null) {
             activeAssignmentLabel.setText("No assignment");
-            activeAssignmentLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: " + CLR_MUTED + ";");
+            activeAssignmentLabel
+                    .setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: " + CLR_MUTED + ";");
             activeStrategyLabel.setText("Strategy: —");
             activeScoreLabel.setText("Score: —");
             activeModeLabel.setText("Mode: —");
@@ -967,6 +1017,30 @@ public class StrategyLabPanel extends BorderPane {
         activeScoreLabel.setText(String.format("Score: %.1f", assignment.getScoreAtAssignment()));
         activeModeLabel.setText("Mode: " + assignment.getMode().getDisplayName());
         activeAssignedAtLabel.setText("Assigned: " + assignment.getAssignedAt());
+    }
+
+    private void updateAiRuntimeView() {
+        if (aiStatusLabel == null) {
+            return;
+        }
+
+        if (!(systemCore.getAiReasoningService() instanceof LocalAiRuntimeService runtimeService)) {
+            aiStatusLabel.setText("Status: Disabled (not using local gRPC runtime)");
+            aiLatencyLabel.setText("Latency: —");
+            aiCircuitLabel.setText("Circuit: —");
+            aiConservativeModeLabel.setText("Conservative mode: —");
+            aiReqRateLabel.setText("Requests/min: —");
+            aiLastErrorLabel.setText("Last error: —");
+            return;
+        }
+
+        AiGrpcHealthStatus status = runtimeService.healthStatus();
+        aiStatusLabel.setText("Status: " + safe(status.status()));
+        aiLatencyLabel.setText(String.format("Latency: %.1f ms", status.avgLatencyMs()));
+        aiCircuitLabel.setText("Circuit: " + safe(status.circuitState()));
+        aiConservativeModeLabel.setText("Conservative mode: " + (status.conservativeMode() ? "ENABLED" : "DISABLED"));
+        aiReqRateLabel.setText("Requests/min: " + status.requestsPerMinute());
+        aiLastErrorLabel.setText("Last error: " + safe(status.lastError()));
     }
 
     private void testSelectedStrategy() {
@@ -984,7 +1058,8 @@ public class StrategyLabPanel extends BorderPane {
         }
         String selectedStrategyName = strategyName;
 
-        appendLog("Testing strategy '" + selectedStrategyName + "' on " + selectedSymbol + "/" + selectedTimeframe.getCode()
+        appendLog("Testing strategy '" + selectedStrategyName + "' on " + selectedSymbol + "/"
+                + selectedTimeframe.getCode()
                 + "...");
         setRunning(true, "Testing selected strategy with real candles...");
 
@@ -1255,7 +1330,8 @@ public class StrategyLabPanel extends BorderPane {
                 timeframe.getCode(),
                 progress -> {
                     if (progress >= 0) {
-                        runOnFx(() -> setRunning(true, "Fetching " + timeframe.getCode() + " candles: " + progress + "%"));
+                        runOnFx(() -> setRunning(true,
+                                "Fetching " + timeframe.getCode() + " candles: " + progress + "%"));
                     }
                 }).thenApply(candles -> validateBacktestDataDepth(pair, timeframe, candles));
     }

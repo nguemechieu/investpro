@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.ai.AiReasoningService;
 import org.investpro.ai.LocalAiReasoningService;
 import org.investpro.ai.OpenAiReasoningService;
+import org.investpro.ai.local.grpc.LocalAiRuntimeService;
 import org.investpro.core.agents.*;
 import org.investpro.core.agents.execution.ExecutionEngine;
 import org.investpro.core.agents.execution.SymbolExecutionFilter;
@@ -154,8 +155,7 @@ public class SystemCore {
     private SystemCoreDependencies systemCoreDependencies;
     private SymbolExecutionFilter symbolExecutionFilter;
     private EventBusManager eventBusManager;
-        private final java.util.Set<String> symbolAgents =
-            java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.Set<String> symbolAgents = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private final LiveTradingMetricsTracker liveMetricsTracker = new LiveTradingMetricsTracker();
     private final UniversalTradabilityService universalTradabilityService;
@@ -299,7 +299,8 @@ public class SystemCore {
                     log.info("   OpenAI API key status: {}", apiKeyStatus);
                 }
             } else {
-                log.info("\u2139\uFE0F Configuration file not found at {}; using defaults", configFile.toAbsolutePath());
+                log.info("\u2139\uFE0F Configuration file not found at {}; using defaults",
+                        configFile.toAbsolutePath());
                 log.info("   To persist settings, use /setapikey command or set OPENAI_API_KEY environment variable");
             }
         } catch (IOException e) {
@@ -452,7 +453,7 @@ public class SystemCore {
         log.info("✅ EventBusManager started - Event-driven architecture active");
 
         // Wire EventPersistenceListener to persist all events to database
-       // wireEventPersistenceListener();
+        // wireEventPersistenceListener();
 
         // Register default agents now that tradingService is available
         registerDefaultAgents();
@@ -490,7 +491,6 @@ public class SystemCore {
 
         notifyAllChannels("SmartBot", "\uD83E\uDD16 SmartBot started.");
     }
-
 
     /**
      * Initialize per-symbol agents for all symbols in the market watch list.
@@ -597,7 +597,6 @@ public class SystemCore {
                 && strategyEngine != null;
     }
 
-
     /**
      * Record a completed trade into the live metrics tracker.
      * Called by TradingService after every executed or closed trade.
@@ -619,7 +618,6 @@ public class SystemCore {
     // ---------------------------------------------------------------------
     // Bot flags
     // ---------------------------------------------------------------------
-
 
     public void setAutoTradingEnabled(boolean enabled) {
         // Safety gate: prevent auto trading if system health has critical blockers
@@ -697,8 +695,8 @@ public class SystemCore {
         if (selectedPairs.isEmpty()) {
             log.warn("Cannot start streaming: selected symbols are not tradable for mode {}", safeMode);
             notifyAllChannels(
-                "Streaming not started",
-                "Streaming was not started because selected symbols are restricted for mode " + safeMode.name());
+                    "Streaming not started",
+                    "Streaming was not started because selected symbols are restricted for mode " + safeMode.name());
             return;
         }
 
@@ -754,8 +752,8 @@ public class SystemCore {
         if (filtered.isEmpty()) {
             log.warn("Cannot start streaming: symbol {} is restricted for mode {}", tradePairText(tradePair), safeMode);
             notifyAllChannels(
-                "Streaming not started",
-                "Selected symbol is restricted for mode " + safeMode.name() + ": " + tradePairText(tradePair));
+                    "Streaming not started",
+                    "Selected symbol is restricted for mode " + safeMode.name() + ": " + tradePairText(tradePair));
             return;
         }
 
@@ -831,7 +829,8 @@ public class SystemCore {
         };
 
         try {
-            List<SymbolTradability> statuses = universalTradabilityService.getTradability(new ArrayList<>(symbols)).get();
+            List<SymbolTradability> statuses = universalTradabilityService.getTradability(new ArrayList<>(symbols))
+                    .get();
             Set<String> allowedSymbols = new HashSet<>();
 
             for (SymbolTradability status : statuses) {
@@ -847,7 +846,8 @@ public class SystemCore {
             }
 
             return symbols.stream()
-                    .filter(pair -> pair != null && allowedSymbols.contains(pair.toString('/').toUpperCase(Locale.ROOT)))
+                    .filter(pair -> pair != null
+                            && allowedSymbols.contains(pair.toString('/').toUpperCase(Locale.ROOT)))
                     .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         } catch (Exception exception) {
             log.warn("Unable to filter symbols for streaming mode {}", mode, exception);
@@ -1524,8 +1524,6 @@ public class SystemCore {
                 reason.isBlank() ? "No reason available" : reason);
     }
 
-
-
     private StrategySignal getMostRecentStrategySignal() {
         if (strategyEngine == null
                 || strategyEngine.getLastSignalCache() == null
@@ -1543,7 +1541,6 @@ public class SystemCore {
                 .map(Map.Entry::getValue)
                 .orElse(null);
     }
-
 
     private Object invokeNoArg(Object target, String... methodNames) {
         if (target == null || methodNames == null) {
@@ -1686,6 +1683,20 @@ public class SystemCore {
     // =====================================================================
 
     private AiReasoningService createAiReasoningService(Properties config) {
+        boolean localGrpcEnabled = Boolean.parseBoolean(firstNonBlank(
+                config.getProperty("AI_LOCAL_GRPC_ENABLED"),
+                System.getenv("AI_LOCAL_GRPC_ENABLED")));
+
+        if (localGrpcEnabled) {
+            try {
+                log.info("SystemCore: Using LocalAiRuntimeService (gRPC advisory). ");
+                return LocalAiRuntimeService.fromConfiguration();
+            } catch (Exception exception) {
+                log.warn("SystemCore: Failed to initialize LocalAiRuntimeService. Falling back. Reason={}",
+                        exception.getMessage());
+            }
+        }
+
         String provider = config.getProperty("ai.provider", "openai").trim().toLowerCase();
         String apiKey = firstNonBlank(
                 config.getProperty("OPENAI_API_KEY"),
@@ -1808,7 +1819,8 @@ public class SystemCore {
                 "*Exchange*\n" +
                 "Name: " + exchange.getName() + "\n" +
                 "ID: " + exchange.getExchangeId() + "\n" +
-                exchange.getName() + " Safe Mode: " + (isOandaExchange() ? "\uD83D\uDD34 ENABLED" : "\uD83D\uDFE2 N/A") + "\n\n" +
+                exchange.getName() + " Safe Mode: " + (isOandaExchange() ? "\uD83D\uDD34 ENABLED" : "\uD83D\uDFE2 N/A")
+                + "\n\n" +
 
                 // Streaming info
                 "*Streaming*\n" +
@@ -1869,9 +1881,6 @@ public class SystemCore {
     // Pre-Trade Validation APIs (for PreTradeValidationEngine)
     // =====================================================================
 
-
-
-
     /**
      * Get the trading account associated with this system.
      *
@@ -1899,10 +1908,7 @@ public class SystemCore {
             }
         }
 
-
         return new Account();
     }
-
-
 
 }

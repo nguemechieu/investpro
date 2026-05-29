@@ -80,7 +80,8 @@ InvestPro is a professional-grade algorithmic trading platform built with a **Cl
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │                      EXTERNAL SERVICES                               │  │
 │  │  • Live Exchange APIs (Binance, Coinbase, etc)                       │  │
-│  │  • OpenAI (AI reasoning & recommendations)                           │  │
+│  │  • Local Python gRPC advisory runtime                                 │  │
+│  │  • Optional OpenAI fallback                                            │  │
 │  │  • Telegram Bot API (notifications)                                  │  │
 │  │  • Email services                                                    │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
@@ -127,6 +128,12 @@ graph TB
         AIReasoning["AI Reasoning Service"]
         FinalRiskGate["Final Risk Gate"]
         ExecEngine["Execution Engine"]
+    end
+
+    subgraph AIRUNTIME["🧠 Local AI Advisory Runtime"]
+        GrpcClient["Java gRPC Client"]
+        PythonSvc["Python gRPC Service"]
+        LocalFallback["Deterministic Local Fallback"]
     end
 
     subgraph DATA["💾 Data & Persistence"]
@@ -184,7 +191,11 @@ graph TB
 
     TradeExecCoord --> RiskMgmt
     RiskMgmt --> AIReasoning
-    AIReasoning --> FinalRiskGate
+    AIReasoning --> GrpcClient
+    GrpcClient --> PythonSvc
+    GrpcClient -.-> LocalFallback
+    PythonSvc --> FinalRiskGate
+    LocalFallback --> FinalRiskGate
     FinalRiskGate --> ExecEngine
 
     ExecEngine --> Repos
@@ -326,7 +337,9 @@ Signal → BotTradeDecisionEngine → Risk Evaluation → AI Review → FinalRis
 - **Account Validation**: Balance & authentication checks
 
 #### **AiReasoningService**
-- **Interface**: Pluggable AI provider (OpenAI, Claude, local LLM)
+- **Interface**: Pluggable AI provider
+- **Local gRPC Runtime**: `LocalAiRuntimeService` calls the Python advisory service first
+- **Fallbacks**: Deterministic local fallback and optional OpenAI fallback remain available
 - **Trade Review**: Approves/rejects/flags orders for manual review
 - **Position Recommendations**: Hold, reduce, or exit positions
 - **Market Commentary**: Provides reasoning for decisions
@@ -355,7 +368,10 @@ RiskManagementSystem.evaluateTrade()
     (Check: balance, position size, leverage, margin)
     ↓
 AiReasoningService.reviewTrade()
-    (Ask AI: "Should we take this trade?")
+    (Java client calls local Python gRPC advisory service)
+    ↓
+Local Python gRPC runtime
+    (Produce advisory recommendation only)
     ↓
 FinalRiskGate.makeDecision()
     (Apply final rules)
