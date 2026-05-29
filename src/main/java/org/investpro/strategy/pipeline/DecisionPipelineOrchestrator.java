@@ -2,7 +2,9 @@ package org.investpro.strategy.pipeline;
 
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEvent;
+import org.investpro.decision.MarketRegime;
 import org.investpro.event.EventBusManager;
+import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.ai.AISignalReviewEngine;
 import org.investpro.strategy.execution.ExecutionPlan;
 import org.investpro.strategy.execution.ExecutionPlanningEngine;
@@ -13,7 +15,6 @@ import org.investpro.strategy.position.PositionSizeRequest;
 import org.investpro.strategy.position.PositionSizeResult;
 import org.investpro.strategy.position.PositionSizingEngine;
 import org.investpro.strategy.position.PositionSizingMethod;
-import org.investpro.model.StrategySignal;
 
 import java.util.Optional;
 
@@ -90,18 +91,22 @@ public class DecisionPipelineOrchestrator {
         // =====================================================================
         // Stage 1: AI Signal Review
         // =====================================================================
+        MarketRegime regime = record.getMarketRegime() != null
+                ? record.getMarketRegime() : MarketRegime.UNKNOWN;
+
         AISignalReview signalReview;
         try {
-            signalReview = signalReviewer.reviewSignal(signal, record);
+            signalReview = signalReviewer.reviewSignal(signal, regime);
         } catch (Exception ex) {
             log.error("Pipeline Stage 1 (AI Signal Review) failed for assignment={}: {}",
                     assignmentId, ex.getMessage());
             return Optional.empty();
         }
 
-        if (!signalReview.isApproved() || signalReview.getConfidence() < MIN_CONFIDENCE_THRESHOLD) {
-            log.info("Pipeline rejected at Stage 1 for assignment={}: approved={}, confidence={}",
-                    assignmentId, signalReview.isApproved(), signalReview.getConfidence());
+        boolean aiAllows = signalReview.getDecision().allowsExecution();
+        if (!aiAllows || signalReview.getAiConfidence() < MIN_CONFIDENCE_THRESHOLD) {
+            log.info("Pipeline rejected at Stage 1 for assignment={}: decision={}, confidence={}",
+                    assignmentId, signalReview.getDecision(), signalReview.getAiConfidence());
             eventBus.publish(AgentEvent.of(AgentEvent.SIGNAL_REJECTED, SOURCE, signalReview));
             return Optional.empty();
         }
@@ -111,22 +116,24 @@ public class DecisionPipelineOrchestrator {
         // =====================================================================
         // Stage 2: Position Sizing
         // =====================================================================
-        double stopLossDistance = signal.getStopLossDistance() > 0 ? signal.getStopLossDistance() : 0.01;
+        double stopLossDistance = signal.getRiskDistance() > 0 ? signal.getRiskDistance() : 0.001 * signal.getEntryPrice();
+        double sizeMultiplier = signalReview.getSuggestedSizeMultiplier();
+
         PositionSizeRequest sizeRequest = PositionSizeRequest.builder()
                 .assignmentId(assignmentId)
                 .strategyId(record.getStrategyId())
                 .symbol(signal.getSymbol())
+                .timeframe(signal.getTimeframe())
                 .side(signal.isBuy() ? "BUY" : "SELL")
                 .equity(equity)
-                .riskPerTradePercent(0.02)
+                .riskPerTradePercent(0.02)         // 2% risk per trade
                 .entryPrice(signal.getEntryPrice())
-                .stopLossPrice(signal.getEntryPrice() - stopLossDistance)
+                .stopLossPrice(signal.getStopLossPrice())
                 .stopLossDistance(stopLossDistance)
-                .pipValue(1.0)
-                .lotSize(100_000.0)
-                .maxPositionSizePercent(0.10)
+                .pipValue(1.0)                     // default; caller may override
+                .maxPositionSizePercent(0.10)      // 10% of equity cap
                 .method(method != null ? method : PositionSizingMethod.RISK_PERCENT)
-                .aiSizeMultiplier(signalReview.getConfidence())
+                .aiSizeMultiplier(sizeMultiplier)
                 .build();
 
         PositionSizeResult sizeResult;
@@ -138,9 +145,9 @@ public class DecisionPipelineOrchestrator {
             return Optional.empty();
         }
 
-        if (!sizeResult.isValid()) {
-            log.info("Pipeline rejected at Stage 2 (invalid position size) for assignment={}",
-                    assignmentId);
+        if (!sizeResult.isValid() || sizeResult.getPositionUnits() <= 0) {
+            log.info("Pipeline rejected at Stage 2 (invalid position size) for assignment={}. Reason: {}",
+                    assignmentId, sizeResult.getValidationReason());
             return Optional.empty();
         }
 
