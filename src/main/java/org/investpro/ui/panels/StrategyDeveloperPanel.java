@@ -174,10 +174,9 @@ public class StrategyDeveloperPanel extends VBox {
         return new Tab("Replacement Candidates", table);
     }
 
-    @SuppressWarnings("unchecked")
     private TableView<StrategyLifecycleRecord> buildLifecycleTable() {
         TableView<StrategyLifecycleRecord> table = new TableView<>();
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
 
         TableColumn<StrategyLifecycleRecord, String> strategyCol = new TableColumn<>("Strategy");
         strategyCol.setCellValueFactory(new PropertyValueFactory<>("strategyName"));

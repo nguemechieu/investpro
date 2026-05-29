@@ -29,21 +29,12 @@ public class StrategyRankingEngine {
             return List.of();
         }
 
-        // Score each report if not already scored
-        for (StrategyPerformanceReport report : reports) {
-            if (report.getScore() == 0.0 && report.getTotalTrades() > 0) {
-                double newScore = score(report);
-                // Score is already calculated in report, but we recalculate if needed
-                // The report builder should have already set it
-            }
-        }
-
         // Sort by score descending (highest first)
         List<StrategyPerformanceReport> sorted = reports.stream()
                 .sorted(Comparator.comparingDouble(StrategyPerformanceReport::getScore)
                         .reversed()
-                        .thenComparingInt(StrategyPerformanceReport::getTotalTrades)
-                        .reversed())
+                        .thenComparing(Comparator.comparingInt(StrategyPerformanceReport::getTotalTrades)
+                                .reversed()))
                 .toList();
 
         log.info("Ranked {} strategies", sorted.size());

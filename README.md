@@ -92,8 +92,8 @@ The goal is to provide a complete research-to-execution environment:
 | AI reasoning integration | ✅ Working |
 | Telegram alerts / commands | ✅ Working |
 | Docker + noVNC desktop deployment | ✅ Working |
-| StrategyLab backtesting | 🔄 In progress |
-| Full automated test coverage | 🔄 In progress |
+| StrategyLab backtesting | ✅ Stabilized |
+| Automated test suite | ✅ Improved |
 | Web/mobile companion UI | 📋 Planned |
 
 ---
@@ -431,6 +431,12 @@ Recommended production targets:
 - Linux `.deb` / `.rpm` package
 - macOS `.dmg` bundle
 - Docker/noVNC remote desktop image
+
+Build an installer/app image with Maven profile:
+
+```bash
+./mvnw -Pinstaller -Dinstaller.type=app-image package
+```
 
 ---
 
@@ -910,9 +916,9 @@ Important system events are persisted for review and debugging. Logs should help
 - [x] AI reasoning integration
 - [x] Telegram integration
 - [x] Docker/noVNC deployment
-- [ ] StrategyLab stabilization
-- [ ] Better automated tests
-- [ ] Production installer packaging
+- [x] StrategyLab stabilization
+- [x] Better automated tests
+- [x] Production installer packaging
 
 ### v1.5 — Planned
 

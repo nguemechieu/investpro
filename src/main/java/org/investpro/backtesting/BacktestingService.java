@@ -1,8 +1,6 @@
 package org.investpro.backtesting;
 
 import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
@@ -21,7 +19,7 @@ import java.util.*;
 @Slf4j
 @Data
 @ToString
-public class BacktestingService  {
+public class BacktestingService {
     private BackTesting backtestEngine;
     private Map<String, List<CandleData>> historicalDataCache;
     private HistoricalDataRepository historicalDataRepository;

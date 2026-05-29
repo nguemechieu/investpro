@@ -400,4 +400,57 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>installer</id>
+            <properties>
+                <installer.type>app-image</installer.type>
+                <installer.dest>${project.build.directory}/installer</installer.dest>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>build-installer</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>jpackage</executable>
+                                    <arguments>
+                                        <argument>--type</argument>
+                                        <argument>${installer.type}</argument>
+                                        <argument>--dest</argument>
+                                        <argument>${installer.dest}</argument>
+                                        <argument>--input</argument>
+                                        <argument>${project.build.directory}</argument>
+                                        <argument>--name</argument>
+                                        <argument>InvestPro</argument>
+                                        <argument>--app-version</argument>
+                                        <argument>${project.version}</argument>
+                                        <argument>--vendor</argument>
+                                        <argument>InvestPro</argument>
+                                        <argument>--description</argument>
+                                        <argument>InvestPro desktop trading workstation</argument>
+                                        <argument>--main-jar</argument>
+                                        <argument>${project.build.finalName}.jar</argument>
+                                        <argument>--main-class</argument>
+                                        <argument>org.investpro.InvestProLauncher</argument>
+                                        <argument>--java-options</argument>
+                                        <argument>--add-opens=java.base/java.lang=ALL-UNNAMED</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

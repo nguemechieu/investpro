@@ -1,7 +1,6 @@
 package org.investpro.enums;
 
 import lombok.Getter;
-import lombok.Setter;
 
 /**
  * Enum for capital protection strategies - defines how to preserve capital.
@@ -16,8 +15,8 @@ public enum CapitalProtection {
 
     private final String displayName;
     private final String description;
-    private final double capitalRetention;     // Expected % of capital retained per trade
-    private final double maxLossThreshold;     // Maximum acceptable loss per trade
+    private final double capitalRetention; // Expected % of capital retained per trade
+    private final double maxLossThreshold; // Maximum acceptable loss per trade
 
     CapitalProtection(String displayName, String description, double capitalRetention, double maxLossThreshold) {
         this.displayName = displayName;
@@ -28,6 +27,6 @@ public enum CapitalProtection {
 
     public double getMaxDrawdownPercent() {
 
-        return   maxLossThreshold;
+        return maxLossThreshold;
     }
 }

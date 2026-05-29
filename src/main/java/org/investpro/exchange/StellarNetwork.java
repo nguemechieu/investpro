@@ -162,7 +162,7 @@ public class StellarNetwork extends Exchange {
 
         this.apiKey = trimToNull(exchangeCredentials.apiKey());
         this.apiSecret = trimToNull(exchangeCredentials.apiSecret());
-        this.accountId = trimToNull(exchangeCredentials.accountId());
+        this.accountId = resolveAccountId(exchangeCredentials.accountId(), this.apiKey);
         this.okHttpClient = buildReadHttpClient();
         this.submitHttpClient = buildSubmitHttpClient();
         this.connected = false;
@@ -2524,6 +2524,21 @@ public class StellarNetwork extends Exchange {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String resolveAccountId(String configuredAccountId, String configuredApiKey) {
+        String explicitAccountId = trimToNull(configuredAccountId);
+        if (explicitAccountId != null) {
+            return explicitAccountId;
+        }
+
+        String apiKeyValue = trimToNull(configuredApiKey);
+        return isLikelyStellarAccountId(apiKeyValue) ? apiKeyValue : null;
+    }
+
+    private boolean isLikelyStellarAccountId(String value) {
+        String candidate = trimToNull(value);
+        return candidate != null && candidate.startsWith("G") && candidate.length() >= 32;
     }
 
     protected UnsupportedOperationException unsupported(String methodName) {

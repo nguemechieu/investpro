@@ -8,6 +8,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.util.Duration;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.monitoring.SystemAlert;
 import org.investpro.monitoring.TradingSystemStatusSnapshot;
@@ -22,6 +23,7 @@ import java.util.function.Supplier;
  * operational metrics.
  * Organized into multiple tabs for different aspects of system monitoring.
  */
+@EqualsAndHashCode(callSuper = true)
 @Slf4j
 @Data
 public class TradingSystemStatusPanel extends VBox {

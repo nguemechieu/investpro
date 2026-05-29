@@ -70,20 +70,14 @@ public class StrategyBacktestRunner {
      * Validate backtest request.
      */
     private boolean validateRequest(StrategyBacktestRequest request) {
-        if (request.getCandles() == null
-                || !HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(request.getCandles().size())) {
-            int candleCount = request.getCandles() == null ? 0 : request.getCandles().size();
+        if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(request.getCandles().size())) {
+            int candleCount = request.getCandles().size();
             log.warn("Insufficient candles for basic backtest: {} < {}", candleCount, MIN_LOOKBACK_BARS);
             return false;
         }
 
-        if (request.getSymbol() == null || request.getSymbol().isBlank()) {
+        if (request.getSymbol().isBlank()) {
             log.warn("Invalid symbol");
-            return false;
-        }
-
-        if (request.getTimeframe() == null) {
-            log.warn("Invalid timeframe");
             return false;
         }
 

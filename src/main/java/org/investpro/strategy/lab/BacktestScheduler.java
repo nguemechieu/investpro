@@ -106,6 +106,7 @@ public final class BacktestScheduler {
 
     /** Fixed-size worker pool. */
     private final ThreadPoolExecutor executor;
+    private volatile Thread dispatcherThread;
 
     /** Backtest execution engine (stateless, thread-safe). */
     private final StrategyBacktestRunner runner = new StrategyBacktestRunner();
@@ -207,6 +208,7 @@ public final class BacktestScheduler {
         if (shutdown.get()) {
             throw new RejectedExecutionException("BacktestScheduler has been shut down");
         }
+        ensureDispatchLoopRunning();
 
         if (workQueue.size() >= maxQueueSize) {
             throw new RejectedExecutionException(
@@ -327,6 +329,7 @@ public final class BacktestScheduler {
      */
     public void resume() {
         paused.set(false);
+        ensureDispatchLoopRunning();
         synchronized (paused) {
             paused.notifyAll();
         }
@@ -460,7 +463,11 @@ public final class BacktestScheduler {
      * back-pressure mechanism: if all workers are busy, {@code executor.submit()}
      * will block, throttling the dispatch thread without spinning.
      */
-    private void startDispatchLoop() {
+    private synchronized void startDispatchLoop() {
+        if (dispatcherThread != null && dispatcherThread.isAlive()) {
+            return;
+        }
+
         Thread dispatcher = new Thread(() -> {
             log.info("BacktestScheduler dispatch loop started");
             while (!shutdown.get()) {
@@ -473,7 +480,9 @@ public final class BacktestScheduler {
                     }
 
                     // Resource protection
-                    if (resourceProtection && resourceGuard.isSystemStressed()) {
+                    if (resourceProtection
+                            && resourceGuard.isSystemStressed()
+                            && executor.getActiveCount() > 0) {
                         log.debug("BacktestScheduler: system stressed, dispatch paused 2s");
                         Thread.sleep(2000);
                         continue;
@@ -516,7 +525,15 @@ public final class BacktestScheduler {
             log.info("BacktestScheduler dispatch loop terminated");
         }, "strategy-lab-dispatcher");
         dispatcher.setDaemon(true);
+        dispatcherThread = dispatcher;
         dispatcher.start();
+    }
+
+    private void ensureDispatchLoopRunning() {
+        if (!shutdown.get() && (dispatcherThread == null || !dispatcherThread.isAlive())) {
+            log.warn("BacktestScheduler dispatch loop was not running; restarting dispatcher.");
+            startDispatchLoop();
+        }
     }
 
     // ─── Job execution ───────────────────────────────────────────────────────
@@ -620,6 +637,9 @@ public final class BacktestScheduler {
     /** Periodic aggregate status log (replaces per-backtest INFO spam). */
     private void logStatus() {
         SchedulerStats s = getStats();
+        if (s.getQueued() > 0 && s.getActiveWorkers() == 0 && !paused.get() && !shutdown.get()) {
+            ensureDispatchLoopRunning();
+        }
         if (s.getQueued() > 0 || s.getRunning() > 0 || s.getCompleted() > 0) {
             log.info("Strategy Lab Status: queued={} running={} completed={} failed={} cancelled={} "
                     + "workers={}/{} avgMs={} rps={} heap={}/{}MiB",

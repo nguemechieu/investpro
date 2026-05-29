@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -66,8 +67,7 @@ import java.util.function.Consumer;
 @Slf4j
 @EqualsAndHashCode(callSuper = true)
 
-@Getter
-@Setter
+@Data
 
 public class Oanda extends Exchange {
 

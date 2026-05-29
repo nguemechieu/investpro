@@ -9384,6 +9384,7 @@ public class TradingDesk extends BorderPane {
         }
 
         boolean oanda = "OANDA".equalsIgnoreCase(selectedExchange);
+        boolean stellar = "STELLAR NETWORK".equalsIgnoreCase(selectedExchange);
         boolean isCoinbase = "Coinbase".equalsIgnoreCase(selectedExchange);
         boolean hasCreds = !configuredApiKey.isBlank();
 
@@ -9435,12 +9436,25 @@ public class TradingDesk extends BorderPane {
         // (label on top, control below — modern UI pattern)
 
         // ── Credentials section ───────────────────────────────────────────────
-        String apiLabelText = oanda ? "API Token" : "API Key";
-        String secretLabelText = oanda ? "Account ID" : "API Secret";
-        String apiPrompt = oanda ? "Enter your OANDA v20 API token" : "Paste your API key here";
-        String secretPrompt = oanda ? "Account ID (e.g. 001-001-123456-001)" : "Paste your API secret / private key";
+        String apiLabelText = oanda
+                ? "API Token"
+                : (stellar ? "Account ID (Public G... Key)" : "API Key");
+        String secretLabelText = oanda
+                ? "Account ID"
+                : (stellar ? "Secret Seed (S...)" : "API Secret");
+        String apiPrompt = oanda
+                ? "Enter your OANDA v20 API token"
+                : (stellar ? "Paste your Stellar public account ID (G...)" : "Paste your API key here");
+        String secretPrompt = oanda
+                ? "Account ID (e.g. 001-001-123456-001)"
+                : (stellar ? "Paste your Stellar secret seed (S...) for live trading"
+                        : "Paste your API secret / private key");
 
-        TextField apiKeyField = new TextField(configuredApiKey);
+        String apiFieldInitialValue = configuredApiKey;
+        if (stellar && apiFieldInitialValue.isBlank() && !configuredAccountId.isBlank()) {
+            apiFieldInitialValue = configuredAccountId;
+        }
+        TextField apiKeyField = new TextField(apiFieldInitialValue);
         PasswordField secretField = new PasswordField();
         secretField.setText(configuredApiSecret);
 
@@ -9607,8 +9621,19 @@ public class TradingDesk extends BorderPane {
                     }
                 }
 
+                if (stellar) {
+                    String validationError = validateStellarCredentials(apiKey, apiSecret, liveToggle.isSelected());
+                    if (validationError != null && !validationError.isBlank()) {
+                        showWarning("Invalid Stellar Credentials", validationError);
+                        return false;
+                    }
+                }
+
                 configuredApiKey = apiKey;
                 configuredApiSecret = apiSecret;
+                if (stellar) {
+                    configuredAccountId = apiKey;
+                }
                 configuredTradingMode = liveToggle.isSelected() ? "LIVE" : "PAPER";
                 telegramToken = safe(telegramField.getText());
                 configuredOpenAiApiKey = safe(openAiField.getText());
@@ -9755,6 +9780,53 @@ public class TradingDesk extends BorderPane {
         return null; // Validation passed
     }
 
+    private String validateStellarCredentials(String accountId, String secretSeed, boolean liveMode) {
+        String normalizedAccountId = safe(accountId).trim().toUpperCase(Locale.ROOT);
+        String normalizedSecretSeed = safe(secretSeed).trim().toUpperCase(Locale.ROOT);
+
+        if (!liveMode && normalizedAccountId.isBlank() && normalizedSecretSeed.isBlank()) {
+            return null;
+        }
+
+        if (normalizedAccountId.isBlank()) {
+            return """
+                    Stellar Account ID is required.
+
+                    Enter the public Stellar account starting with G...
+                    Example: GABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUVWXYZ2""";
+        }
+
+        if (!normalizedAccountId.matches("^G[A-Z2-7]{55}$")) {
+            return """
+                    Invalid Stellar Account ID format.
+
+                    Expected:
+                    • Starts with G
+                    • Exactly 56 characters
+                    • Uses only base32 characters A-Z and 2-7""";
+        }
+
+        if (normalizedSecretSeed.isBlank()) {
+            return """
+                    Stellar Secret Seed is required.
+
+                    Enter the secret seed starting with S...
+                    Example: SABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUVWXYZ2""";
+        }
+
+        if (!normalizedSecretSeed.matches("^S[A-Z2-7]{55}$")) {
+            return """
+                    Invalid Stellar Secret Seed format.
+
+                    Expected:
+                    • Starts with S
+                    • Exactly 56 characters
+                    • Uses only base32 characters A-Z and 2-7""";
+        }
+
+        return null;
+    }
+
     private boolean hasExchangeCredentials(String exchangeName) {
         loadExchangeCredentials(exchangeName);
         if ("OANDA".equalsIgnoreCase(exchangeName)) {
@@ -9768,6 +9840,11 @@ public class TradingDesk extends BorderPane {
         configuredApiKey = preferences.get("exchange_api_key_" + key, configuredApiKey);
         configuredApiSecret = preferences.get("exchange_api_secret_" + key, configuredApiSecret);
         configuredAccountId = preferences.get("exchange_account_id_" + key, configuredAccountId);
+        if ("STELLAR NETWORK".equalsIgnoreCase(exchangeName)
+                && configuredAccountId != null
+                && configuredAccountId.isBlank()) {
+            configuredAccountId = configuredApiKey;
+        }
         configuredTradingMode = preferences.get("exchange_trading_mode_" + key, configuredTradingMode);
         telegramToken = preferences.get("telegram_token_" + key, telegramToken);
         configuredOpenAiApiKey = preferences.get("openai_api_key", configuredOpenAiApiKey);
@@ -10005,12 +10082,19 @@ public class TradingDesk extends BorderPane {
                     "OANDA_API_KEY", "ALPACA_API_KEY", "SOLANA_API_KEY", "SOLANA_WALLET_ADDRESS", "SOLANA_PUBLIC_KEY",
                     "SOLANA_NETWORK_API_KEY" ->
                 Optional.ofNullable(credentials.apiKey());
+            case "STELLAR_PUBLIC_KEY", "STELLAR_NETWORK_API_KEY", "STELLAR_NETWORK_ACCOUNT_ID" ->
+                Optional.ofNullable(
+                        safe(credentials.accountId()).isBlank() ? credentials.apiKey() : credentials.accountId());
             case "COINBASE_API_SECRET", "COINBASE_PRIVATE_KEY", "BINANCE_API_SECRET", "BINANCE_US_API_SECRET",
                     "BITFINEX_API_SECRET", "OANDA_API_SECRET", "ALPACA_API_SECRET", "SOLANA_API_SECRET",
                     "SOLANA_NETWORK_API_SECRET" ->
                 Optional.ofNullable(credentials.apiSecret());
+            case "STELLAR_SECRET_KEY", "STELLAR_NETWORK_API_SECRET" ->
+                Optional.ofNullable(credentials.apiSecret());
             case "OANDA_ACCOUNT_ID" -> Optional.ofNullable(credentials.accountId());
             case "OANDA_SANDBOX", "ALPACA_PAPER" -> Optional.of(String.valueOf(credentials.sandbox()));
+            case "STELLAR_NETWORK", "STELLAR_NETWORK_TRADING_MODE" ->
+                Optional.of(Boolean.TRUE.equals(credentials.sandbox()) ? "PAPER" : "LIVE");
             default -> Optional.empty();
         };
     }
