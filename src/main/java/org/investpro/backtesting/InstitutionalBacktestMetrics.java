@@ -5,13 +5,12 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.ui.panels.BacktestingPanel.BacktestTrade;
 
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
  * Institutional-grade backtesting metrics calculator.
- * 
+ * <p>
  * Provides comprehensive performance analysis including:
  * - Advanced risk metrics (Sharpe, Sortino, Calmar, Recovery Factor, Ulcer
  * Index)
@@ -86,7 +85,7 @@ public class InstitutionalBacktestMetrics {
     private final Map<Integer, Double> returnsByMonth;
 
     private static final double RISK_FREE_RATE = 0.02; // 2% annual risk-free rate
-    private static final int TRADING_DAYS_PER_YEAR = 252;
+    private int TRADING_DAYS_PER_YEAR = 252;
 
     public InstitutionalBacktestMetrics(List<BacktestTrade> trades, double initialBalance) {
         this.initialBalance = initialBalance;
@@ -139,7 +138,6 @@ public class InstitutionalBacktestMetrics {
     private void calculateBasicTradeMetrics(List<BacktestTrade> trades) {
         totalTrades = trades.size();
         double equity = initialBalance;
-        double peakEquity = initialBalance;
 
         double positiveProfit = 0;
         double negativeProfit = 0;
@@ -203,7 +201,7 @@ public class InstitutionalBacktestMetrics {
     private void calculateRiskMetrics(List<BacktestTrade> trades) {
         List<Double> returns = trades.stream()
                 .map(t -> cleanNumber(t.getProfit()))
-                .collect(Collectors.toList());
+                .toList();
 
         if (returns.isEmpty())
             return;
@@ -239,8 +237,6 @@ public class InstitutionalBacktestMetrics {
         // Consecutive wins/losses
         int currentConsecutiveWins = 0;
         int currentConsecutiveLosses = 0;
-        List<Integer> consecutiveWinStrings = new ArrayList<>();
-        List<Integer> consecutiveLossStrings = new ArrayList<>();
 
         for (BacktestTrade trade : trades) {
             double profit = cleanNumber(trade.getProfit());
@@ -252,23 +248,14 @@ public class InstitutionalBacktestMetrics {
                 currentConsecutiveLosses++;
                 currentConsecutiveWins = 0;
 
-                if (currentConsecutiveWins > 0) {
-                    consecutiveWinStrings.add(currentConsecutiveWins);
-                }
             }
         }
 
-        maxConsecutiveWins = consecutiveWinStrings.isEmpty() ? currentConsecutiveWins
-                : Math.max(currentConsecutiveWins,
-                        consecutiveWinStrings.stream().mapToInt(Integer::intValue).max().orElse(0));
-        maxConsecutiveLosses = consecutiveLossStrings.isEmpty() ? currentConsecutiveLosses
-                : Math.max(currentConsecutiveLosses,
-                        consecutiveLossStrings.stream().mapToInt(Integer::intValue).max().orElse(0));
+        maxConsecutiveWins = currentConsecutiveWins;
+        maxConsecutiveLosses = currentConsecutiveLosses;
 
-        avgConsecutiveWins = consecutiveWinStrings.isEmpty() ? 0
-                : consecutiveWinStrings.stream().mapToDouble(Integer::doubleValue).average().orElse(0);
-        avgConsecutiveLosses = consecutiveLossStrings.isEmpty() ? 0
-                : consecutiveLossStrings.stream().mapToDouble(Integer::doubleValue).average().orElse(0);
+        avgConsecutiveWins = 0;
+        avgConsecutiveLosses = 0;
 
         // Win/Loss distribution
         largeWinThreshold = avgWinSize * 2;
@@ -286,7 +273,7 @@ public class InstitutionalBacktestMetrics {
         List<Double> returns = trades.stream()
                 .map(t -> cleanNumber(t.getProfit()))
                 .sorted()
-                .collect(Collectors.toList());
+                .toList();
 
         if (returns.isEmpty())
             return;
@@ -320,7 +307,7 @@ public class InstitutionalBacktestMetrics {
     private void calculateStatisticalMetrics(List<BacktestTrade> trades) {
         List<Double> profits = trades.stream()
                 .map(t -> cleanNumber(t.getProfit()))
-                .collect(Collectors.toList());
+                .toList();
 
         if (profits.isEmpty())
             return;

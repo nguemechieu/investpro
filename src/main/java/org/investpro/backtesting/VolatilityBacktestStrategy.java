@@ -6,6 +6,7 @@ import java.util.*;
 /**
  * Volatility-based trading strategy using ATR (Average True Range)
  */
+
 public class VolatilityBacktestStrategy extends BacktestStrategy {
     private int atrPeriod;
     private double atrMultiplierBuy;

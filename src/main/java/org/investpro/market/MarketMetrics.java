@@ -17,7 +17,7 @@ import java.util.*;
 @Slf4j
 @Data
 @Builder
-@AllArgsConstructor
+
 public class MarketMetrics {
 
     private String symbol;

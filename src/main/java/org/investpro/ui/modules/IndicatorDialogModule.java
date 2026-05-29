@@ -11,7 +11,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.stage.Window;
-import org.investpro.indicators.ChartIndicator;
+import org.investpro.indicators.Indicator;
 import org.investpro.spi.PluginIndicatorFactory;
 import org.investpro.spi.PluginRegistry;
 import org.investpro.ui.charts.CandleStickChart;
@@ -62,7 +62,7 @@ public final class IndicatorDialogModule {
             }
 
             PluginIndicatorFactory.saveConfig(choice, config);
-            ChartIndicator indicator = createChartIndicator(choice, config);
+            Indicator indicator = createChartIndicator(choice, config);
             if (indicator == null) {
                 if (warningHandler != null) {
                     warningHandler.accept("Indicators", "Unsupported indicator: " + choice);
@@ -133,7 +133,7 @@ public final class IndicatorDialogModule {
         return dialog.showAndWait().orElse(null);
     }
 
-    private ChartIndicator createChartIndicator(String choice, Map<String, String> config) {
+    private Indicator createChartIndicator(String choice, Map<String, String> config) {
         return PluginIndicatorFactory.create(choice, PluginRegistry.loadDefault(), config).orElse(null);
     }
 }

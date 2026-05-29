@@ -201,7 +201,7 @@ public class CandleStickChart extends Region {
     private int selectedDrawingIndex = -1;
     private ChartPoint movingAnchor;
     private ChartDrawing movingDrawingOriginal;
-    private final List<ChartIndicator> indicators = new ArrayList<>();
+    private final List<Indicator> indicators = new ArrayList<>();
     private final List<ChartEvent> chartEvents = Collections.synchronizedList(new ArrayList<>());
     private boolean showChartEvents = true; // Toggle for displaying events
     private Image backgroundImage;
@@ -1831,7 +1831,7 @@ public class CandleStickChart extends Region {
             return;
         List<CandleData> allCandles = getAllCandleData();
 
-        for (ChartIndicator indicator : List.copyOf(indicators)) {
+        for (Indicator indicator : List.copyOf(indicators)) {
             java.util.Map<String, double[]> values = indicator.getValues();
             if (values == null || values.isEmpty() || !indicator.isCalculated())
                 continue;
@@ -3276,7 +3276,7 @@ public class CandleStickChart extends Region {
                     return;
                 }
 
-                ChartIndicator indicator = createIndicator(choice);
+                Indicator indicator = createIndicator(choice);
                 if (indicator == null) {
                     showErrorMessage("Unsupported indicator: " + choice);
                     return;
@@ -3288,11 +3288,11 @@ public class CandleStickChart extends Region {
         });
     }
 
-    private ChartIndicator createIndicator(String choice) {
+    private Indicator createIndicator(String choice) {
         return PluginIndicatorFactory.create(choice, PluginRegistry.loadDefault()).orElse(null);
     }
 
-    public void addIndicator(ChartIndicator indicator) {
+    public void addIndicator(Indicator indicator) {
         if (indicator != null && indicators.stream().noneMatch(i -> i.getName().equals(indicator.getName()))) {
             indicator.calculate(getAllCandleData());
             indicators.add(indicator);
@@ -3305,7 +3305,7 @@ public class CandleStickChart extends Region {
         requestChartRedraw();
     }
 
-    public List<ChartIndicator> getIndicators() {
+    public List<Indicator> getIndicators() {
         return List.copyOf(indicators);
     }
 
@@ -3330,7 +3330,7 @@ public class CandleStickChart extends Region {
             return;
         }
         List<CandleData> candles = getAllCandleData();
-        for (ChartIndicator indicator : List.copyOf(indicators)) {
+        for (Indicator indicator : List.copyOf(indicators)) {
             try {
                 indicator.calculate(candles);
             } catch (Exception exception) {

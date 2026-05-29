@@ -140,18 +140,15 @@ public record EmailNotifier(
     }
 
     public boolean sendSmartBotAlert(String title, String body) {
-        NotificationMessage message = NotificationMessage.info(title, body).toEmailOnly();
-        return send(message);
+        return sendHtml(title, alertHtml("INFO", title, body));
     }
 
     public boolean sendTradeAlert(String title, String body) {
-        NotificationMessage message = NotificationMessage.trade(title, body).toEmailOnly();
-        return send(message);
+        return sendHtml(title, alertHtml("TRADE", title, body));
     }
 
     public boolean sendErrorAlert(String title, String body) {
-        NotificationMessage message = NotificationMessage.error(title, body).toEmailOnly();
-        return send(message);
+        return sendHtml(title, alertHtml("ERROR", title, body));
     }
 
     private MimeMessage createBaseMessage(String subject) throws MessagingException {
@@ -168,16 +165,7 @@ public record EmailNotifier(
     }
 
     private Session createSession() {
-        Properties properties = new Properties();
-
-        properties.put("mail.smtp.host", smtpHost);
-        properties.put("mail.smtp.port", String.valueOf(smtpPort));
-        properties.put("mail.smtp.auth", String.valueOf(hasAuthentication()));
-        properties.put("mail.smtp.starttls.enable", String.valueOf(startTls));
-        properties.put("mail.smtp.starttls.required", String.valueOf(startTls));
-        properties.put("mail.smtp.connectiontimeout", "15000");
-        properties.put("mail.smtp.timeout", "15000");
-        properties.put("mail.smtp.writetimeout", "15000");
+        Properties properties = createSmtpProperties();
 
         if (!hasAuthentication()) {
             return Session.getInstance(properties);
@@ -192,6 +180,21 @@ public record EmailNotifier(
                     }
                 }
         );
+    }
+
+    private Properties createSmtpProperties() {
+        Properties properties = new Properties();
+
+        properties.put("mail.smtp.host", smtpHost);
+        properties.put("mail.smtp.port", String.valueOf(smtpPort));
+        properties.put("mail.smtp.auth", String.valueOf(hasAuthentication()));
+        properties.put("mail.smtp.starttls.enable", String.valueOf(startTls));
+        properties.put("mail.smtp.starttls.required", String.valueOf(startTls));
+        properties.put("mail.smtp.connectiontimeout", "15000");
+        properties.put("mail.smtp.timeout", "15000");
+        properties.put("mail.smtp.writetimeout", "15000");
+
+        return properties;
     }
 
     public @NotNull String configurationSummary() {
@@ -248,5 +251,43 @@ public record EmailNotifier(
                 || text.equals("1")
                 || text.equals("yes")
                 || text.equals("y");
+    }
+
+    private static @NotNull String alertHtml(String severity, String title, String body) {
+        String color = switch (safe(severity).toUpperCase()) {
+            case "ERROR" -> "#dc2626";
+            case "TRADE" -> "#059669";
+            default -> "#2563eb";
+        };
+
+        return """
+                <!doctype html>
+                <html>
+                  <body style="margin:0;padding:24px;background:#f8fafc;font-family:Arial,sans-serif;color:#111827;">
+                    <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+                      <div style="padding:16px 20px;background:%s;color:#ffffff;font-size:16px;font-weight:700;">
+                        InvestPro %s Alert
+                      </div>
+                      <div style="padding:20px;">
+                        <h2 style="margin:0 0 12px;font-size:20px;color:#111827;">%s</h2>
+                        <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;margin:0;color:#374151;">%s</pre>
+                      </div>
+                    </div>
+                  </body>
+                </html>
+                """.formatted(
+                color,
+                escapeHtml(severity),
+                escapeHtml(title),
+                escapeHtml(body));
+    }
+
+    private static @NotNull String escapeHtml(String value) {
+        return safe(value)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 }

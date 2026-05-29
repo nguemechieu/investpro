@@ -1,9 +1,6 @@
 package org.investpro.ai;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.*;
 import org.investpro.models.trading.TradePair;
@@ -20,9 +17,7 @@ import org.investpro.models.trading.TradePair;
  */
 @Slf4j
 @Builder
-@Getter
-@Setter
-@AllArgsConstructor
+@Data
 public class AiPositionManagementRequest {
 
     // =========================================================================

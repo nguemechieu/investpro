@@ -15,6 +15,7 @@ import org.investpro.core.agents.modules.DefaultTradingAgentModule;
 import org.investpro.core.agents.symbol.SymbolAgent;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.core.bot.SmartBot;
+import org.investpro.core.controller.BotRuntimeController;
 import org.investpro.decision.BotTradeDecisionEngine;
 import org.investpro.decision.SignalToDecisionFilter;
 import org.investpro.models.Account;
@@ -110,6 +111,7 @@ public class SystemCore {
     private final Properties config;
 
     private final SmartBot smartBot;
+    private final BotRuntimeController botRuntimeController;
     private final AgentRegistry agentRegistry;
     private final StrategyEngine strategyEngine;
     private final ExecutionEngine executionEngine;
@@ -188,6 +190,7 @@ public class SystemCore {
 
         // Create Smart Bot — agents live inside the runtime, not in SmartBot
         this.smartBot = new SmartBot(agentRuntime, new AgentEventBus(), botTradingConfig);
+        this.botRuntimeController = new BotRuntimeController(this.smartBot);
 
         this.fromEmail = this.config.getProperty("from_email", "").trim();
         this.toEmail = this.config.getProperty("to_email", "").trim();
@@ -445,7 +448,7 @@ public class SystemCore {
             @NotNull TradingService tradingService,
             TradePair selectedTradePair) {
         this.tradingService = Objects.requireNonNull(tradingService, "tradingService cannot be null");
-        this.selectedTradePair = selectedTradePair;
+        selectTradePair(selectedTradePair);
 
         // Initialize and start EventBusManager for event-driven architecture
         this.eventBusManager = EventBusManager.getInstance();
@@ -458,7 +461,7 @@ public class SystemCore {
         // Register default agents now that tradingService is available
         registerDefaultAgents();
 
-        smartBot.start(exchange, tradingService, selectedTradePair);
+        botRuntimeController.start(exchange, tradingService, selectedTradePair);
 
         if (signalMonitorService != null) {
             signalMonitorService.start(smartBot.getEventBus());
@@ -565,7 +568,7 @@ public class SystemCore {
             log.info("✅ EventBusManager shutdown complete - Event-driven architecture stopped");
         }
 
-        smartBot.stop();
+        botRuntimeController.stop();
 
         notifyAllChannels("SmartBot stopped", "\uD83E\uDD16 SmartBot stopped.");
     }
@@ -632,7 +635,7 @@ public class SystemCore {
             return;
         }
 
-        smartBot.setAutoTradingEnabled(enabled);
+        botRuntimeController.setAutoTradingEnabled(enabled);
         setAiReasoningEnabled(true);
 
         notifyAllChannels(
@@ -641,7 +644,7 @@ public class SystemCore {
     }
 
     public void setAiReasoningEnabled(boolean enabled) {
-        smartBot.setAiReasoningEnabled(enabled);
+        botRuntimeController.setAiReasoningEnabled(enabled);
 
         notifyAllChannels(
                 "AI reasoning",
@@ -662,7 +665,7 @@ public class SystemCore {
                 "Streaming mode changed to %s".formatted(safeMode.name()));
 
         // Only start streaming if bot is already running
-        if (smartBot.isStarted() && streaming.get() && selectedTradePair != null) {
+        if (botRuntimeController.isStarted() && streaming.get() && selectedTradePair != null) {
             startStreaming(selectedTradePair, safeMode);
         } else {
             log.info("SystemCore streaming mode set to {} (waiting for bot to start)", safeMode);
@@ -703,7 +706,7 @@ public class SystemCore {
         stopStreaming();
         this.currentStreamingMode = safeMode;
 
-        this.selectedTradePair = selectedPairs.iterator().next();
+        selectTradePair(selectedPairs.iterator().next());
 
         activeSubscription = buildSubscription(selectedPairs, safeMode);
         streamConsumer = createAgentStreamConsumer();
@@ -762,7 +765,7 @@ public class SystemCore {
         stopStreaming();
 
         this.currentStreamingMode = safeMode;
-        this.selectedTradePair = resolvedPair;
+        selectTradePair(resolvedPair);
 
         activeSubscription = buildSubscription(resolvedPair, safeMode);
         streamConsumer = createAgentStreamConsumer();
@@ -950,7 +953,7 @@ public class SystemCore {
 
         stopStreaming();
 
-        this.selectedTradePair = tradePair;
+        selectTradePair(tradePair);
 
         ExchangeStreamSubscription subscription = new ExchangeStreamSubscription();
         subscription.setTradePairs(Set.of(tradePair));
@@ -1401,10 +1404,13 @@ public class SystemCore {
     // ---------------------------------------------------------------------
 
     private void configureNotifiers() {
+        EmailNotifier configuredEmail = (!fromEmail.isBlank() || !toEmail.isBlank())
+                ? new EmailNotifier(fromEmail, toEmail)
+                : EmailNotifier.fromEnvironment();
 
-        if (!fromEmail.isBlank() && !toEmail.isBlank()) {
-            this.emailNotifier = new EmailNotifier(fromEmail, toEmail);
-            log.info("\u2705 Email notifier configured");
+        if (configuredEmail.isEnabled()) {
+            this.emailNotifier = configuredEmail;
+            log.info("\u2705 Email notifier configured: {}", configuredEmail.configurationSummary());
         }
     }
 
@@ -1436,12 +1442,34 @@ public class SystemCore {
         }
 
         try {
-            emailNotifier.send(NotificationMessage.info(
-                    safe(title).isBlank() ? "InvestPro SystemCore" : title,
-                    message));
+            String safeTitle = safe(title).isBlank() ? "InvestPro SystemCore" : title;
+            if (isErrorNotification(safeTitle, message)) {
+                emailNotifier.sendErrorAlert(safeTitle, message);
+            } else if (isTradeNotification(safeTitle, message)) {
+                emailNotifier.sendTradeAlert(safeTitle, message);
+            } else {
+                emailNotifier.sendSmartBotAlert(safeTitle, message);
+            }
         } catch (Exception exception) {
             log.warn("Email notification failed: {}", exception.getMessage(), exception);
         }
+    }
+
+    private boolean isTradeNotification(String title, String message) {
+        String text = (safe(title) + " " + safe(message)).toLowerCase(Locale.ROOT);
+        return text.contains("trade")
+                || text.contains("order")
+                || text.contains("filled")
+                || text.contains("position");
+    }
+
+    private boolean isErrorNotification(String title, String message) {
+        String text = (safe(title) + " " + safe(message)).toLowerCase(Locale.ROOT);
+        return text.contains("error")
+                || text.contains("failed")
+                || text.contains("blocked")
+                || text.contains("not started")
+                || text.contains("cannot ");
     }
 
     // ============================================================================
@@ -1632,7 +1660,7 @@ public class SystemCore {
      * Check if auto trading is enabled
      */
     public boolean isAutoTradingEnabled() {
-        return smartBot != null && smartBot.isAutoTradingEnabled();
+        return botRuntimeController != null && botRuntimeController.isAutoTradingEnabled();
     }
 
     /**
@@ -1648,7 +1676,7 @@ public class SystemCore {
      * Check if AI reasoning is enabled
      */
     public boolean isAiReasoningEnabled() {
-        return smartBot != null && smartBot.isAiReasoningEnabled();
+        return botRuntimeController != null && botRuntimeController.isAiReasoningEnabled();
     }
 
     /**
@@ -1759,8 +1787,15 @@ public class SystemCore {
     // ---------------------------------------------------------------------
 
     private void ensureBotStarted() {
-        if (!smartBot.isStarted()) {
+        if (!botRuntimeController.isStarted()) {
             throw new IllegalStateException("SmartBot has not been started.");
+        }
+    }
+
+    private void selectTradePair(@Nullable TradePair tradePair) {
+        this.selectedTradePair = tradePair;
+        if (botRuntimeController != null && botRuntimeController.isStarted()) {
+            botRuntimeController.selectTradePair(tradePair);
         }
     }
 

@@ -3,6 +3,7 @@ package org.investpro.core.pipeline;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.Account;
+import org.investpro.models.trading.TradePair;
 import org.investpro.risk.TradeRiskContext;
 import org.jetbrains.annotations.NotNull;
 
@@ -11,13 +12,10 @@ import java.util.Objects;
 /**
  * TradeRiskContextBuilder provides helper methods to construct TradeRiskContext
  * from different input sources (signals, manual trades, etc.).
- *
+ * <p>
  * NOTE: TradeRiskContext uses TradePair objects, not symbol strings.
- * These builders accept strings for convenience but full symbol resolution
- * would require access to a TradePair registry.
- *
- * For now, we pass symbol as null and leave that for the risk engine to
- * resolve.
+ * These builders accept common symbol formats and normalize them into a
+ * TradePair before the risk engine evaluates the request.
  */
 @Slf4j
 public class TradeRiskContextBuilder {
@@ -28,7 +26,7 @@ public class TradeRiskContextBuilder {
 
     /**
      * Build TradeRiskContext from a manual trade UI request.
-     *
+     * <p>
      * Used when user clicks BUY/SELL in TradingWindow.
      *
      * @param symbol   the trading pair (e.g., "BTC/USDT")
@@ -54,16 +52,17 @@ public class TradeRiskContextBuilder {
             throw new IllegalArgumentException("quantity must be non-negative: " + quantity);
         }
 
-        String[] parts = symbol.split("/");
+        String normalizedSymbol = normalizeSymbol(symbol);
+        String[] parts = normalizedSymbol.split("/");
         if (parts.length != 2) {
-            throw new IllegalArgumentException("symbol must be in format 'BASE/QUOTE': " + symbol);
+            throw new IllegalArgumentException("symbol must identify a base and quote asset: " + symbol);
         }
 
-        // Build context with available account state
-        // Note: symbol is null - risk engine may need to resolve from string
+        TradePair pair = parseTradePair(symbol);
+
         return TradeRiskContext.builder()
-                .symbol(null) // TODO: Resolve symbol string to TradePair
-                .assetClass(inferAssetClass(symbol))
+                .symbol(pair)
+                .assetClass(inferAssetClass(normalizedSymbol))
                 .contractType("SPOT")
                 .broker(exchange.getName())
                 .accountEquity(account.getEquity())
@@ -82,7 +81,7 @@ public class TradeRiskContextBuilder {
 
     /**
      * Build TradeRiskContext from market data and current account state.
-     *
+     * <p>
      * For use by automated agents evaluating a trade decision.
      *
      * @param symbol          the trading pair string (e.g., "BTC/USDT")
@@ -107,14 +106,17 @@ public class TradeRiskContextBuilder {
         Objects.requireNonNull(exchange, "exchange must not be null");
         Objects.requireNonNull(account, "account must not be null");
 
-        String[] parts = symbol.split("/");
+        String normalizedSymbol = normalizeSymbol(symbol);
+        String[] parts = normalizedSymbol.split("/");
         if (parts.length != 2) {
-            throw new IllegalArgumentException("symbol must be in format 'BASE/QUOTE': " + symbol);
+            throw new IllegalArgumentException("symbol must identify a base and quote asset: " + symbol);
         }
 
+        TradePair pair = parseTradePair(symbol);
+
         return TradeRiskContext.builder()
-                .symbol(null) // TODO: Resolve symbol string to TradePair
-                .assetClass(inferAssetClass(symbol))
+                .symbol(pair)
+                .assetClass(inferAssetClass(normalizedSymbol))
                 .contractType("SPOT")
                 .broker(exchange.getName())
                 .accountEquity(account.getEquity())
@@ -140,7 +142,8 @@ public class TradeRiskContextBuilder {
     private static String inferAssetClass(@NotNull String symbol) {
         Objects.requireNonNull(symbol, "symbol must not be null");
 
-        String upper = symbol.toUpperCase();
+        String normalizedSymbol = normalizeSymbol(symbol);
+        String upper = normalizedSymbol.toUpperCase();
 
         // Crypto detection
         if (upper.contains("BTC") || upper.contains("ETH") || upper.contains("USDT") ||
@@ -149,16 +152,34 @@ public class TradeRiskContextBuilder {
         }
 
         // Forex detection (3-letter codes)
-        if (upper.matches("[A-Z]{3}_[A-Z]{3}")) {
+        if (upper.matches("[A-Z]{3}/[A-Z]{3}")) {
             return "FOREX";
         }
 
         // Standard forex pairs with 3-char base/quote
-        String[] parts = symbol.split("/");
+        String[] parts = normalizedSymbol.split("/");
         if (parts.length == 2 && parts[0].length() == 3 && parts[1].length() == 3) {
             return "FOREX";
         }
 
         return "UNKNOWN";
+    }
+
+    private static TradePair parseTradePair(@NotNull String symbol) {
+        String normalized = normalizeSymbol(symbol);
+        String[] parts = normalized.split("/");
+        if (parts.length < 2) {
+            return null;
+        }
+        try {
+            return new TradePair(parts[0], parts[1]);
+        } catch (Exception exception) {
+            log.debug("Unable to parse TradePair from {}", symbol, exception);
+            return null;
+        }
+    }
+
+    private static String normalizeSymbol(@NotNull String symbol) {
+        return symbol.trim().replace('_', '/').replace('-', '/');
     }
 }

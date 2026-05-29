@@ -18,32 +18,18 @@ for path in (PROJECT_ROOT, APP_DIR, GENERATED_DIR):
     if str(path) not in sys.path:
         sys.path.append(str(path))
 
-try:
-    from .config import load_config
-    from .models.model_registry import ModelRegistry
-    from .services.anomaly_detector import AnomalyDetector
-    from .services.backtest_reviewer import BacktestReviewer
-    from .services.regime_detector import RegimeDetector
-    from .services.risk_scorer import RiskScorer
-    from .services.signal_analyzer import SignalAnalyzer
-    from .services.strategy_ranker import StrategyRanker
-    from .services.strategy_reviewer import StrategyReviewer
-    from .utils.logging import configure_logging
-    from .generated import investpro_ai_pb2 as pb2
-    from .generated import investpro_ai_pb2_grpc as pb2_grpc
-except ImportError:
-    from config import load_config
-    from models.model_registry import ModelRegistry
-    from services.anomaly_detector import AnomalyDetector
-    from services.backtest_reviewer import BacktestReviewer
-    from services.regime_detector import RegimeDetector
-    from services.risk_scorer import RiskScorer
-    from services.signal_analyzer import SignalAnalyzer
-    from services.strategy_ranker import StrategyRanker
-    from services.strategy_reviewer import StrategyReviewer
-    from utils.logging import configure_logging
-    from generated import investpro_ai_pb2 as pb2
-    from generated import investpro_ai_pb2_grpc as pb2_grpc
+from app.config import load_config
+from app.models.model_registry import ModelRegistry
+from app.services.anomaly_detector import AnomalyDetector
+from app.services.backtest_reviewer import BacktestReviewer
+from app.services.regime_detector import RegimeDetector
+from app.services.risk_scorer import RiskScorer
+from app.services.signal_analyzer import SignalAnalyzer
+from app.services.strategy_ranker import StrategyRanker
+from app.services.strategy_reviewer import StrategyReviewer
+from app.utils.logging import configure_logging
+from app.generated import investpro_ai_pb2 as pb2
+from app.generated import investpro_ai_pb2_grpc as pb2_grpc
 
 
 class InvestProAiServicer(pb2_grpc.InvestProAiServiceServicer):

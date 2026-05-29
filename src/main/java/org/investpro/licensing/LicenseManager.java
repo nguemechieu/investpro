@@ -9,7 +9,11 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.SystemCore;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -239,7 +243,7 @@ public final class LicenseManager {
         }
     }
 
-    private License loadLicenseFromFile() {
+    private @Nullable License loadLicenseFromFile() {
         try {
             if (!Files.exists(licenseFile)) {
                 return null;
@@ -270,7 +274,7 @@ public final class LicenseManager {
         Instant now = Instant.now();
         return License.builder()
                 .licenseKey(generateUniqueLicenseKey())
-                .licenseeName("Trial User")
+                .licenseeName(type.name()+now+"@User")
                 .licenseeEmail("trial@investpro.local")
                 .licenseType(type)
                 .issuedDate(now)
@@ -302,9 +306,9 @@ public final class LicenseManager {
     }
 
     private License normalizeLicense(@NotNull License license) {
-        LicenseType type = license.getLicenseType() == null ? LicenseType.TRIAL : license.getLicenseType();
+        LicenseType type = license.getLicenseType();
         LicenseEntitlement entitlement = ENTITLEMENTS.get(type);
-        Set<String> features = license.getFeatures() == null || license.getFeatures().isEmpty()
+        Set<String> features = license.getFeatures().isEmpty()
                 ? entitlement.features()
                 : normalizeFeatures(license.getFeatures());
 
@@ -313,7 +317,7 @@ public final class LicenseManager {
                 .licenseeName(requireText(license.getLicenseeName(), "licenseeName"))
                 .licenseeEmail(requireText(license.getLicenseeEmail(), "licenseeEmail"))
                 .licenseType(type)
-                .issuedDate(license.getIssuedDate() == null ? Instant.now() : license.getIssuedDate())
+                .issuedDate(license.getIssuedDate())
                 .expirationDate(license.getExpirationDate())
                 .features(features)
                 .maxConnections(Math.max(1, license.getMaxConnections()))
@@ -324,7 +328,7 @@ public final class LicenseManager {
                 .build();
     }
 
-    private static LicensePayload toPayload(License license) {
+    private static @NonNull LicensePayload toPayload(@NonNull License license) {
         LicensePayload payload = new LicensePayload();
         payload.licenseKey = license.getLicenseKey();
         payload.licenseeName = license.getLicenseeName();
@@ -361,19 +365,20 @@ public final class LicenseManager {
                 .build();
     }
 
-    private static byte[] sign(String encodedPayload) throws Exception {
+    private static byte[] sign(@NonNull String encodedPayload) throws Exception {
         Mac mac = Mac.getInstance(SIGNING_ALGORITHM);
         mac.init(new SecretKeySpec(SIGNING_SECRET, SIGNING_ALGORITHM));
         return mac.doFinal(encodedPayload.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static String generateUniqueLicenseKey() {
+    private static @NonNull String generateUniqueLicenseKey() {
         byte[] randomBytes = new byte[12];
         RANDOM.nextBytes(randomBytes);
         return "INVEST-" + URL_ENCODER.encodeToString(randomBytes);
     }
 
-    private static String requireText(String value, String fieldName) {
+    @Contract("null, _ -> fail")
+    private static @NonNull String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(fieldName + " cannot be blank");
         }
@@ -394,7 +399,7 @@ public final class LicenseManager {
         return Set.copyOf(normalized);
     }
 
-    private static Map<LicenseType, LicenseEntitlement> createEntitlements() {
+    private static @NonNull @Unmodifiable Map<LicenseType, LicenseEntitlement> createEntitlements() {
         Map<LicenseType, LicenseEntitlement> entitlements = new EnumMap<>(LicenseType.class);
         entitlements.put(LicenseType.TRIAL, new LicenseEntitlement(
                 Set.of("BASIC_TRADING", "PAPER_TRADING", "MARKET_DATA", "SINGLE_STRATEGY"),
@@ -402,25 +407,25 @@ public final class LicenseManager {
                 1));
         entitlements.put(LicenseType.STANDARD, new LicenseEntitlement(
                 Set.of("BASIC_TRADING", "PAPER_TRADING", "MARKET_DATA", "SINGLE_STRATEGY", "RISK_MANAGEMENT"),
-                2,
-                2));
+                200,
+                200));
         entitlements.put(LicenseType.PREMIUM, new LicenseEntitlement(
                 Set.of("BASIC_TRADING", "ADVANCED_TRADING", "PAPER_TRADING", "MARKET_DATA",
                         "MULTIPLE_STRATEGIES", "RISK_MANAGEMENT", "AI_SIGNALS", "TELEGRAM_ALERTS"),
-                3,
-                5));
+                250,
+                250));
         entitlements.put(LicenseType.ENTERPRISE, new LicenseEntitlement(
                 Set.of("BASIC_TRADING", "ADVANCED_TRADING", "PAPER_TRADING", "MARKET_DATA",
                         "MULTIPLE_STRATEGIES", "RISK_MANAGEMENT", "AI_SIGNALS", "TELEGRAM_ALERTS",
                         "TEAM_MANAGEMENT", "UNLIMITED_CONNECTIONS"),
-                25,
-                50));
+                5000,
+                5000));
         entitlements.put(LicenseType.DEVELOPMENT, new LicenseEntitlement(
                 Set.of("BASIC_TRADING", "ADVANCED_TRADING", "PAPER_TRADING", "MARKET_DATA",
                         "MULTIPLE_STRATEGIES", "RISK_MANAGEMENT", "AI_SIGNALS", "TELEGRAM_ALERTS",
                         "DEVELOPER_TOOLS"),
-                10,
-                20));
+                1000,
+                1000));
         return Map.copyOf(entitlements);
     }
 

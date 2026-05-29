@@ -1,5 +1,6 @@
 package org.investpro.core.controller;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.bot.SmartBot;
 import org.investpro.models.trading.TradePair;
@@ -10,22 +11,32 @@ import java.util.Objects;
 
 /**
  * BotRuntimeController manages the SmartBot lifecycle and state transitions.
- *
+ * <p>
  * This controller:
  * - delegates to SmartBot for runtime control
  * - provides a clearer API for SystemCore
  * - enforces state transitions (STOPPED -> STARTED -> RUNNING)
  * - handles errors gracefully
- *
+ * <p>
  * This controller does NOT:
  * - create SmartBot (that's SystemCore's job)
  * - make trade decisions (that's Agent's job)
  * - execute trades (that's ExecutionService's job)
  * - manage UI (that's TradingWindow's job)
  */
+@Getter
 @Slf4j
 public class BotRuntimeController {
 
+    /**
+     * -- GETTER --
+     *  Get the underlying SmartBot instance.
+     *  <p>
+     *  Direct access is provided for advanced use cases where direct control is
+     *  needed.
+     *  For most operations, use the controller methods above.
+     *
+     */
     private final SmartBot smartBot;
 
     public BotRuntimeController(@NotNull SmartBot smartBot) {
@@ -80,7 +91,7 @@ public class BotRuntimeController {
 
     /**
      * Enable or disable auto-trading.
-     *
+     * <p>
      * When disabled, agents can still analyze, but no orders will be placed
      * automatically.
      * User manual trades are still possible with explicit confirmation.
@@ -99,7 +110,7 @@ public class BotRuntimeController {
 
     /**
      * Enable or disable AI reasoning.
-     *
+     * <p>
      * When disabled, trade decisions will not be reviewed by AI.
      *
      * @param enabled true to enable AI reasoning
@@ -165,16 +176,4 @@ public class BotRuntimeController {
         return smartBot.isAiReasoningEnabled();
     }
 
-    /**
-     * Get the underlying SmartBot instance.
-     *
-     * Direct access is provided for advanced use cases where direct control is
-     * needed.
-     * For most operations, use the controller methods above.
-     *
-     * @return the SmartBot instance
-     */
-    public SmartBot getSmartBot() {
-        return smartBot;
-    }
 }

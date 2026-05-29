@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Central orchestrator for market data flow.
- * 
+ * <p>
  * Responsibilities:
  * 1. Initialize and manage MarketDataCache (all instrument states)
  * 2. Initialize and manage InstrumentRegistry (all tradable instruments)
@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
  * 5. Bootstrap instruments from exchange adapters
  * 6. Coordinate async metadata enrichment
  * 7. Manage cache lifecycle (cleanup, pruning of stale data)
- * 
+ * <p>
  * Data flow: Exchange Adapters → MarketDataEngine → MarketDataCache → UI Panels
  */
 @Slf4j

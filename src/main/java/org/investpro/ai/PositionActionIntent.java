@@ -1,9 +1,6 @@
 package org.investpro.ai;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import org.investpro.enums.ExecutionStrategy;
 import org.investpro.models.trading.TradePair;
 
@@ -21,9 +18,7 @@ import org.investpro.models.trading.TradePair;
  * AI cannot directly create this object—it must pass through final gate first.
  */
 @Builder
-@Getter
-@Setter
-@AllArgsConstructor
+@Data
 public class PositionActionIntent {
     
     // =========================================================================

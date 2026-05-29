@@ -1,6 +1,5 @@
 package org.investpro.ai.local.grpc;
 
-import io.grpc.StatusRuntimeException;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.ai.AiDecision;
 import org.investpro.ai.AiReasoningService;
@@ -79,9 +78,6 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
             lastError.set("");
 
             return mapToTradeReviewResponse(request, result, System.currentTimeMillis() - startMs);
-        } catch (StatusRuntimeException runtimeException) {
-            onGrpcFailure(runtimeException);
-            return fallbackPolicy.fallbackTradeReview(request);
         } catch (Exception exception) {
             onGrpcFailure(exception);
             return fallbackPolicy.fallbackTradeReview(request);

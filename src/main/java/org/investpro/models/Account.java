@@ -1,7 +1,5 @@
 package org.investpro.models;
 
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import lombok.Data;
@@ -42,8 +40,7 @@ import java.util.*;
 // “How much capital can be exposed?”
 // “What protection system should be active?”
 // “Is this trade worth taking probabilistically?”
-@Getter
-@Setter
+
 @Data
 @Slf4j
 public class Account {

@@ -11,18 +11,18 @@ import java.util.Objects;
 /**
  * TradeDecisionPipeline orchestrates the flow from trade signal through risk
  * evaluation.
- *
+ * <p>
  * This pipeline enforces the architecture rule that:
  * 1. All trades MUST go through risk evaluation before execution
  * 2. Risk decisions are fact-based and transparent
  * 3. Execution is decoupled from decision-making
- *
+ * <p>
  * Flow:
  * - Signal/Manual Trade → TradeRiskContext builder
  * - TradeRiskContext → RiskManagementSystem.evaluateTrade()
  * - RiskDecision (approved/rejected) returned
  * - Execution layer decides next action
- *
+ * <p>
  * This class does NOT execute trades. ExecutionEngine handles that.
  */
 @Slf4j
@@ -37,7 +37,7 @@ public class TradeDecisionPipeline {
 
     /**
      * Evaluate a trade through the risk management system.
-     *
+     * <p>
      * This is the ONLY place where trade approval decisions are made.
      * All trades (automated signals or manual user actions) go through this.
      *
@@ -70,7 +70,7 @@ public class TradeDecisionPipeline {
 
     /**
      * Check if a trade would be approved without executing it.
-     *
+     * <p>
      * Useful for UI preview of whether a trade would be allowed.
      *
      * @param tradeContext the trade context

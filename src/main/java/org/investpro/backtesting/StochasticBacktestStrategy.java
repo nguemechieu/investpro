@@ -5,7 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
-import org.investpro.indicators.StochasticIndicator;
+import org.investpro.indicators.Stochastic;
 import org.investpro.spi.PluginIndicatorFactory;
 import java.util.*;
 
@@ -16,7 +16,7 @@ import java.util.*;
 @Setter(AccessLevel.PRIVATE)
 @Getter
 public class StochasticBacktestStrategy extends BacktestStrategy {
-    private final StochasticIndicator stochasticIndicator;
+    private final Stochastic stochasticIndicator;
     private double kUpperBand;
     private double kLowerBand;
     private double dUpperBand;
@@ -25,7 +25,7 @@ public class StochasticBacktestStrategy extends BacktestStrategy {
     public StochasticBacktestStrategy(BacktestConfig config) {
         super("Stochastic Strategy", config);
         Map<String, String> indicatorConfig = PluginIndicatorFactory.loadConfig("Stochastic");
-        this.stochasticIndicator = new StochasticIndicator(
+        this.stochasticIndicator = new Stochastic(
                 parseInt(indicatorConfig, "kPeriod", 14),
                 parseInt(indicatorConfig, "kSlowPeriod", 3),
                 parseInt(indicatorConfig, "dPeriod", 3));
@@ -113,17 +113,15 @@ public class StochasticBacktestStrategy extends BacktestStrategy {
         double d = dValues[dValues.length - 1];
 
         // Generate signal on live candle
-        if (candleIndex > 1) {
-            double prevK = kValues.length > 1 ? kValues[kValues.length - 2] : k;
-            double prevD = dValues.length > 1 ? dValues[dValues.length - 2] : d;
+        double prevK = kValues.length > 1 ? kValues[kValues.length - 2] : k;
+        double prevD = dValues.length > 1 ? dValues[dValues.length - 2] : d;
 
-            if (k > d && prevK <= prevD && k < 30) {
-                addSignal(new SignalEvent(candleIndex, SignalEvent.Type.BUY,
-                        String.format("K(%.2f) > D(%.2f) oversold", k, d)));
-            } else if (k < d && prevK >= prevD && k > 70) {
-                addSignal(new SignalEvent(candleIndex, SignalEvent.Type.SELL,
-                        String.format("K(%.2f) < D(%.2f) overbought", k, d)));
-            }
+        if (k > d && prevK <= prevD && k < 30) {
+            addSignal(new SignalEvent(candleIndex, SignalEvent.Type.BUY,
+                    String.format("K(%.2f) > D(%.2f) oversold", k, d)));
+        } else if (k < d && prevK >= prevD && k > 70) {
+            addSignal(new SignalEvent(candleIndex, SignalEvent.Type.SELL,
+                    String.format("K(%.2f) < D(%.2f) overbought", k, d)));
         }
     }
 

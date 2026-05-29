@@ -12,11 +12,16 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Evaluates whether a degraded strategy should be replaced, demoted, paused, or kept.
+ * Evaluates whether a degraded strategy should be replaced, demoted, paused, or
+ * kept.
  *
- * <p><strong>CRITICAL:</strong> This engine is an advisor only.
- * It NEVER replaces strategies autonomously. All replacement actions are performed
- * exclusively by {@link org.investpro.strategy.management.StrategyAssignmentManager}.</p>
+ * <p>
+ * <strong>CRITICAL:</strong> This engine is an advisor only.
+ * It NEVER replaces strategies autonomously. All replacement actions are
+ * performed
+ * exclusively by
+ * {@link org.investpro.strategy.management.StrategyAssignmentManager}.
+ * </p>
  */
 @Slf4j
 public class AIReplacementEngine {
@@ -52,7 +57,7 @@ public class AIReplacementEngine {
     /**
      * Evaluates whether the degraded strategy should be replaced.
      *
-     * @param degradedRecord     the lifecycle record of the degraded strategy
+     * @param degradedRecord      the lifecycle record of the degraded strategy
      * @param availableCandidates list of ranked candidate strategies to consider
      * @return AIReplacementReport with recommendation
      */
@@ -69,7 +74,8 @@ public class AIReplacementEngine {
         log.debug("Evaluating replacement for assignment={}", degradedRecord.getAssignmentId());
 
         double currentScore = degradedRecord.getRankScore() != null
-                ? degradedRecord.getRankScore().getCompositeScore() : 0.0;
+                ? degradedRecord.getRankScore().getCompositeScore()
+                : 0.0;
 
         List<String> reasons = new ArrayList<>();
 
@@ -154,12 +160,12 @@ public class AIReplacementEngine {
     // =========================================================================
 
     private AIReplacementReport buildReport(StrategyLifecycleRecord record,
-                                            AIReplacementRecommendation recommendation,
-                                            double confidence, String reasoning,
-                                            String candidateId, double candidateScore,
-                                            double currentScore, List<String> reasons,
-                                            double regimeFit, double riskImprovement,
-                                            String perfComparison) {
+            AIReplacementRecommendation recommendation,
+            double confidence, String reasoning,
+            String candidateId, double candidateScore,
+            double currentScore, List<String> reasons,
+            double regimeFit, double riskImprovement,
+            String perfComparison) {
         return AIReplacementReport.builder()
                 .reportId(UUID.randomUUID().toString())
                 .assignmentId(record != null ? record.getAssignmentId() : "UNKNOWN")

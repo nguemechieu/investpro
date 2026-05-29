@@ -21,6 +21,7 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.backtesting.BacktestingService;
 import org.investpro.backtesting.InstitutionalBacktestMetrics;
 import org.investpro.core.SystemCore;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
@@ -116,14 +117,14 @@ public class BacktestingPanel extends StackPane {
 
     private SymbolAgentManager symbolAgentManager;
     private final HistoricalDataRepository historicalDataRepository;
-    private  SystemCore systemCore;
+    private final BacktestingService backtestingService;
+    private SystemCore systemCore;
     private final AtomicBoolean backtestRunning = new AtomicBoolean(false);
 
     private static final double DEFAULT_INITIAL_EQUITY = 10_000.0;
     private static final double DEFAULT_QUANTITY = 1.0;
     private static final int MAX_BARS_HELD = 50;
-    private static final DateTimeFormatter PRICE_CHART_TIME_FORMAT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter PRICE_CHART_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     /**
      * Extra bars needed after strategy warmup so the strategy has enough room
@@ -135,7 +136,6 @@ public class BacktestingPanel extends StackPane {
      * Minimum absolute candles for any meaningful test.
      */
     private static final int MIN_ABSOLUTE_TEST_BARS = 150;
-
 
     public BacktestingPanel(SystemCore systemCore) {
         this(HistoricalDataRepositoryImpl.getInstance(),
@@ -150,6 +150,7 @@ public class BacktestingPanel extends StackPane {
         this.historicalDataRepository = historicalDataRepository != null
                 ? historicalDataRepository
                 : HistoricalDataRepositoryImpl.getInstance();
+        this.backtestingService = new BacktestingService();
 
         this.systemCore = systemCore;
         this.symbolAgentManager = systemCore == null ? null : systemCore.getSymbolAgentManager();
@@ -782,7 +783,8 @@ public class BacktestingPanel extends StackPane {
 
             if (systemCore == null || systemCore.getExchange() == null) {
                 Platform.runLater(() -> {
-                    statusLabel.setText("No live exchange is available. Backtests can still run with cached or sample data.");
+                    statusLabel.setText(
+                            "No live exchange is available. Backtests can still run with cached or sample data.");
                     dataQualityLabel.setText("Data quality: cached/sample data only");
                     progressBar.setProgress(0);
                     backtestRunning.set(false);
@@ -816,6 +818,7 @@ public class BacktestingPanel extends StackPane {
                     statusLabel.setText("No data fetched. The pair may not be available on Binance.");
                     dataQualityLabel.setText("Data quality: failed");
                 } else {
+                    backtestingService.storeHistoricalData(pair, start, end, timeframeCode, fetchedData);
                     statusLabel.setText(
                             "Successfully cached " + fetchedData.size() + " real candles for "
                                     + displayTradePair(pair) + " " + timeframeCode
@@ -921,7 +924,8 @@ public class BacktestingPanel extends StackPane {
             String timeframeCode = selectedTimeframe.getCode();
 
             Platform.runLater(() -> statusLabel.setText(
-                    "Updating historical data from exchange for " + displayTradePair(selectedPair) + " " + timeframeCode));
+                    "Updating historical data from exchange for " + displayTradePair(selectedPair) + " "
+                            + timeframeCode));
 
             refreshHistoricalDataCache(input);
 
@@ -1059,6 +1063,12 @@ public class BacktestingPanel extends StackPane {
                 if (fetched.isEmpty()) {
                     dataQualityLabel.setText("Data quality: using existing cached data - exchange returned no candles");
                 } else {
+                    backtestingService.storeHistoricalData(
+                            input.selectedPair(),
+                            fetchStart,
+                            fetchEnd,
+                            timeframeCode,
+                            fetched);
                     dataQualityLabel.setText("Data quality: saved/updated " + fetched.size()
                             + " exchange candles before backtest");
                 }
@@ -1185,6 +1195,24 @@ public class BacktestingPanel extends StackPane {
             LocalDateTime start,
             LocalDateTime end,
             String timeframeCode) {
+        try {
+            Optional<List<CandleData>> storedCandles = backtestingService.getStoredHistoricalData(
+                    pair,
+                    start,
+                    end,
+                    timeframeCode);
+
+            if (storedCandles.isPresent() && !storedCandles.get().isEmpty()) {
+                return storedCandles.get()
+                        .stream()
+                        .filter(Objects::nonNull)
+                        .sorted(Comparator.comparingLong(this::candleTimestamp))
+                        .toList();
+            }
+        } catch (Exception exception) {
+            log.debug("BacktestingService lookup failed, falling back to repository: {}", exception.getMessage());
+        }
+
         try {
             Optional<List<CandleData>> historicalCandles = historicalDataRepository.getHistoricalData(
                     pair,
@@ -2159,8 +2187,8 @@ public class BacktestingPanel extends StackPane {
                                 true,
                                 "Assigned from Backtesting panel after user-reviewed backtest: "
                                         + String.format(Locale.ROOT,
-                                        "return %.2f%%, win rate %.1f%%, max drawdown %.2f%%, trades %d",
-                                        totalReturn, winRate, drawdown, trades),
+                                                "return %.2f%%, win rate %.1f%%, max drawdown %.2f%%, trades %d",
+                                                totalReturn, winRate, drawdown, trades),
                                 score);
 
                 statusLabel.setText("Assigned " + assignment.getStrategyId() + " to "

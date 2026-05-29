@@ -125,6 +125,11 @@ public class BotTradeDecisionEngine {
         reasons.add(String.format(
                 "Best strategy: %s (fitness: %.2f)",
                 bestStrategyScore.strategyName(), bestStrategyScore.finalFitnessScore()));
+        if (bestStrategyScore.isExcellentFit()) {
+            reasons.add("Strategy fit quality: excellent");
+        } else if (bestStrategyScore.isPoorFit()) {
+            warnings.add("Strategy fit quality is poor for the current regime and signal context");
+        }
 
         SetupSource setupSource;
         String selectedStrategyName = null;
@@ -142,8 +147,14 @@ public class BotTradeDecisionEngine {
                         "Selected setup: Indicator - %s (fitness: %.2f)",
                         indicatorSetupScore.setupType().description,
                         indicatorSetupScore.finalFitnessScore()));
+                if (indicatorSetupScore.isExcellentFit()) {
+                    reasons.add("Indicator setup fit quality: excellent");
+                }
             } else {
                 setupSource = SetupSource.NONE;
+                if (indicatorSetupScore.isPoorFit()) {
+                    warnings.add("Indicator setup fit quality is poor for the current market context");
+                }
                 blockers.add(String.format(
                         "No setup reached minimum fitness (strategy: %.2f, indicator: %.2f vs threshold: %.2f)",
                         bestStrategyScore.finalFitnessScore(),
@@ -172,6 +183,19 @@ public class BotTradeDecisionEngine {
 
         TradeExpectation expectation = tradeExpectationEstimator.estimate(tradePlan, costEstimate, assetType);
         reasons.add("Expected profit: " + expectation.profitBreakdown());
+        double costPercentOfProfit = costEstimate.costAsPercentageOfProfit(expectation.expectedGrossProfit());
+        reasons.add(String.format("Cost efficiency: %.2f%% of expected gross profit", costPercentOfProfit));
+        if (costEstimate.isHighCost()) {
+            warnings.add(firstNonBlank(
+                    costEstimate.warningMessage(),
+                    String.format("Estimated trading costs are high: %.2f%% of expected gross profit",
+                            costPercentOfProfit)));
+        }
+        if (costPercentOfProfit > 50.0) {
+            blockers.add(String.format(
+                    "Trade costs consume too much expected gross profit: %.2f%%",
+                    costPercentOfProfit));
+        }
 
         if (!expectation.isPositiveExpectancy()) {
             blockers.add(String.format("Negative expected value: %.4f", expectation.expectedValue()));
@@ -225,6 +249,10 @@ public class BotTradeDecisionEngine {
 
     private boolean isValidSignalStrength(double signalStrength) {
         return signalStrength >= SIGNAL_STRENGTH_MIN && signalStrength <= SIGNAL_STRENGTH_MAX;
+    }
+
+    private @NotNull String firstNonBlank(@Nullable String first, @NotNull String fallback) {
+        return first == null || first.isBlank() ? fallback : first.trim();
     }
 
     @NotNull

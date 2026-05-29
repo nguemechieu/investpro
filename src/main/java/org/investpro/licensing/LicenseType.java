@@ -1,10 +1,13 @@
 package org.investpro.licensing;
 
+import lombok.Getter;
+
 /**
  * Types of licenses available for InvestPro.
  *
  * @author NOEL NGUEMECHIEU
  */
+@Getter
 public enum LicenseType {
     /**
      * Free trial license with limited features
@@ -14,17 +17,17 @@ public enum LicenseType {
     /**
      * Standard license for individual traders
      */
-    STANDARD("Standard", "Individual trader license", null),
+    STANDARD("Standard", "Individual trader license", 365/2),
 
     /**
      * Premium license with advanced features
      */
-    PREMIUM("Premium", "Advanced features for professional traders", null),
+    PREMIUM("Premium", "Advanced features for professional traders", 365/2),
 
     /**
      * Enterprise license for teams and institutions
      */
-    ENTERPRISE("Enterprise", "Team/institution license", null),
+    ENTERPRISE("Enterprise", "Team/institution license", 365),
 
     /**
      * Development license for testing
@@ -39,18 +42,6 @@ public enum LicenseType {
         this.displayName = displayName;
         this.description = description;
         this.trialDays = trialDays;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public Integer getTrialDays() {
-        return trialDays;
     }
 
     public boolean isTrial() {

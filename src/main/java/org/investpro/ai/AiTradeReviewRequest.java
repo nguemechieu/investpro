@@ -1,6 +1,7 @@
 package org.investpro.ai;
 
 import lombok.Builder;
+import lombok.Data;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.trading.TradePair;
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
 @Slf4j
 @Value
 @Builder
+@Data
 public class AiTradeReviewRequest {
     // =========================================================================
     // Market & Signal Context

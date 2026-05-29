@@ -1,8 +1,7 @@
 package org.investpro.ai;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -24,8 +23,7 @@ import java.util.UUID;
  * - Dispute resolution and transparency
  */
 @Slf4j
-@Getter
-@Setter
+@Data
 public class AiAuditLogger {
 
     private final String logFilePath;

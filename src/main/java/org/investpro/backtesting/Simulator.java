@@ -1,16 +1,19 @@
 package org.investpro.backtesting;
 
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
+import org.jspecify.annotations.NonNull;
+
 import java.util.*;
 
 /**
  * Market simulator that executes trading strategies on historical data
  */
-@Getter
-@Setter
+@Data
+@Slf4j
 public class Simulator {
     private BacktestStrategy strategy;
     private BacktestConfig config;
@@ -58,12 +61,12 @@ public class Simulator {
             switch (signal.type()) {
                 case BUY:
                     if (portfolioState.getCash() > 0 && !portfolioState.hasPosition()) {
-                        executeBuy(idx, candle, price, signal);
+                        executeBuy(idx, price, signal);
                     }
                     break;
                 case SELL:
                     if (portfolioState.hasPosition()) {
-                        executeSell(idx, candle, price, signal);
+                        executeSell(idx, price, signal);
                     }
                     break;
                 default:
@@ -78,14 +81,14 @@ public class Simulator {
         if (portfolioState.hasPosition() && !historicalData.isEmpty()) {
             int lastIdx = historicalData.size() - 1;
             CandleData lastCandle = historicalData.get(lastIdx);
-            executeSell(lastIdx, lastCandle, lastCandle.closePrice(), null);
+            executeSell(lastIdx, lastCandle.closePrice(), null);
         }
 
         long duration = System.currentTimeMillis() - startTime;
         return calculateResults(duration);
     }
 
-    private void executeBuy(int candleIndex, CandleData candle, double price, BacktestStrategy.SignalEvent signal) {
+    private void executeBuy(int candleIndex, double price, BacktestStrategy.SignalEvent signal) {
         double commission = price * portfolioState.getCash() * config.getCommissionPercent() / 100.0;
         double investAmount = portfolioState.getCash() - commission;
         double quantity = investAmount / price;
@@ -100,7 +103,8 @@ public class Simulator {
         executedTrades.add(trade);
     }
 
-    private void executeSell(int candleIndex, CandleData candle, double price, BacktestStrategy.SignalEvent signal) {
+    private void executeSell(int candleIndex, double price, BacktestStrategy.SignalEvent signal) {
+
         BacktestResult.TradeRecord trade = executedTrades.stream()
                 .filter(t -> t.getExitTime() == 0)
                 .findFirst()
@@ -120,9 +124,10 @@ public class Simulator {
 
             portfolioState.exitPosition(proceeds);
         }
+
     }
 
-    private BacktestResult calculateResults(long duration) {
+    private @NonNull BacktestResult calculateResults(long duration) {
         BacktestResult result = new BacktestResult();
         result.setStrategyName(strategy.getStrategyName());
         result.setInitialBalance(config.getInitialBalance());

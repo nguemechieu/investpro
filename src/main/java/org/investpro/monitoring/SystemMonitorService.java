@@ -11,7 +11,7 @@ import java.util.*;
  * System Monitor Service: The control tower for monitoring all trading
  * subsystems.
  * Uses only public APIs from SystemCore to determine health status.
- *
+ * <p>
  * Subsystems monitored:
  * 1. Exchange - accessibility via public diagnostics
  * 2. Market Data - subscription status via getSubscriptionSummary()
@@ -56,12 +56,8 @@ public class SystemMonitorService {
 
             for (ComponentHealth component : List.of(exchange, marketData, account, strategy, risk, execution, agents,
                     ai, notifications)) {
-                if (component.getBlockers() != null) {
-                    blockers.addAll(component.getBlockers());
-                }
-                if (component.getWarnings() != null) {
-                    warnings.addAll(component.getWarnings());
-                }
+                blockers.addAll(component.getBlockers());
+                warnings.addAll(component.getWarnings());
             }
 
             // Overall status determination

@@ -1,6 +1,6 @@
 package org.investpro.spi;
 
-import org.investpro.indicators.ChartIndicator;
+import org.investpro.indicators.Indicator;
 
 import java.util.Set;
 
@@ -9,5 +9,5 @@ public interface IndicatorProvider extends InvestProPlugin {
 
     Set<String> supportedInputs();
 
-    ChartIndicator create(IndicatorProviderContext context);
+    Indicator create(IndicatorProviderContext context);
 }

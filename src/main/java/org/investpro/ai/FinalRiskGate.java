@@ -1,5 +1,6 @@
 package org.investpro.ai;
 
+import lombok.Data;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.risk.RiskDecision;
@@ -20,6 +21,7 @@ import java.util.List;
  * AI can reduce risk, wait, reject, or escalate.
  * AI cannot increase position size, leverage, or risk beyond RiskDecision limits.
  */
+@Data
 @Slf4j
 public final class FinalRiskGate {
 

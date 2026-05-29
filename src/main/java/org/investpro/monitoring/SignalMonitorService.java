@@ -1,7 +1,6 @@
 package org.investpro.monitoring;
 
 import lombok.Data;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.AgentEventBus;

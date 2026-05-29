@@ -1,9 +1,6 @@
 package org.investpro.ai;
 
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.Value;
+import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
 
@@ -21,8 +18,7 @@ import java.util.List;
 @Slf4j
 @Value
 @Builder
-@Getter
-@Setter
+@Data
 public class AiTradeReviewResponse {
     // =========================================================================
     // Decision

@@ -5,7 +5,7 @@ import lombok.Getter;
 /**
  * AI reasoning engine decision on whether to approve, modify, wait, reject, or escalate a proposed trade.
  * This enum represents the final decision from the AI layer after risk review.
- *
+ * <p>
  * The AI never places trades directly. All decisions flow through FinalRiskGate for final authority.
  */
 public enum AiDecision {

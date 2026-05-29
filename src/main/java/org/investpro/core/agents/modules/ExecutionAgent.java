@@ -5,6 +5,7 @@ import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.execution.TradeExecutionCoordinator;
 import org.investpro.core.agents.risk.RiskReviewResult;
+import org.investpro.core.pipeline.TradeRiskContextBuilder;
 import org.investpro.enums.CapitalProtection;
 import org.investpro.enums.ExecutionStrategy;
 import org.investpro.enums.LiquidityProfile;
@@ -14,6 +15,7 @@ import org.investpro.enums.PsychologyProfile;
 import org.investpro.enums.RiskProfile;
 import org.investpro.enums.SystemDesign;
 import org.investpro.models.trading.TradePair;
+import org.investpro.models.Account;
 import org.investpro.risk.TradeRiskContext;
 import org.investpro.strategy.StrategySignal;
 
@@ -131,6 +133,33 @@ public class ExecutionAgent implements org.investpro.core.agents.Agent {
     }
 
     private TradeRiskContext buildRiskContext(StrategySignal signal) {
+        Account account = resolveAccount();
+        if (context != null && context.getExchange() != null && account != null) {
+            double entryPrice = signal.getEntryPrice() > 0.0 ? signal.getEntryPrice() : 1.0;
+            double stopLoss = signal.getStopLossPrice() > 0.0 ? signal.getStopLossPrice() : entryPrice * 0.99;
+            double takeProfit = signal.getTakeProfitPrice() > 0.0 ? signal.getTakeProfitPrice() : entryPrice * 1.02;
+            return TradeRiskContextBuilder.fromSignal(
+                    signal.getSymbol(),
+                    1.0,
+                    entryPrice,
+                    stopLoss,
+                    takeProfit,
+                    context.getExchange(),
+                    account)
+                    .toBuilder()
+                    .expectedWinRate(signal.getWinProbability() > 0.0 ? signal.getWinProbability() : signal.getConfidence())
+                    .expectedRewardRiskRatio(signal.getRiskRewardRatio() > 0.0 ? signal.getRiskRewardRatio() : 2.0)
+                    .riskProfile(RiskProfile.CONSERVATIVE)
+                    .marketBehavior(signal.getMarketBehavior() == null ? MarketBehavior.RANGING : signal.getMarketBehavior())
+                    .executionStrategy(ExecutionStrategy.MARKET_ORDER)
+                    .psychologyProfile(PsychologyProfile.CAUTIOUS)
+                    .probabilityLevel(probabilityFromConfidence(signal.getConfidence()))
+                    .capitalProtection(CapitalProtection.STRICT_STOPS)
+                    .systemDesign(SystemDesign.TECHNICAL_ANALYSIS)
+                    .volatility(0.25)
+                    .build();
+        }
+
         TradePair pair = context == null ? null : context.getSelectedTradePair();
         if (pair == null) {
             pair = parsePair(signal.getSymbol());
@@ -170,6 +199,18 @@ public class ExecutionAgent implements org.investpro.core.agents.Agent {
                         : pair.getTradingSession().getNotes())
                 .volatility(0.25)
                 .build();
+    }
+
+    private Account resolveAccount() {
+        if (context == null || context.getTradingService() == null) {
+            return null;
+        }
+        try {
+            return context.getTradingService().getAccount();
+        } catch (Exception exception) {
+            log.debug("Unable to resolve account for signal risk context", exception);
+            return null;
+        }
     }
 
     private TradePair parsePair(String symbol) {

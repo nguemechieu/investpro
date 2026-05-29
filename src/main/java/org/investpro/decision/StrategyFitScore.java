@@ -8,7 +8,7 @@ import java.time.Instant;
 /**
  * Score for a single strategy's suitability to the current market.
  * Combines multiple scoring factors into a final fitness score (0.0 - 1.0).
- * 
+ * <p>
  * Score >= 0.70 is considered "good fit" for trading.
  */
 public record StrategyFitScore(

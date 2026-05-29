@@ -1,6 +1,7 @@
 package org.investpro.monitoring;
 
 import lombok.Builder;
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
@@ -13,9 +14,9 @@ import java.util.Map;
  * Snapshot of the entire system's health at a point in time.
  * This is the main output of the system monitor.
  */
-@Getter
+
 @Builder
-@Setter
+@Data
 public class SystemHealthSnapshot {
     /**
      * Overall system status (aggregate of all components).

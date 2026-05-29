@@ -4,7 +4,7 @@ import lombok.Getter;
 
 /**
  * Recommended actions for open positions from AI position manager.
- *
+ * <p>
  * AI may recommend these actions, but RiskManagementSystem and FinalRiskGate retain final authority.
  * AI cannot directly execute these actions. Only approved PositionActionIntent objects are executed.
  */
@@ -27,7 +27,7 @@ public enum AiPositionAction {
 
     /**
      * Move stop loss to a better level.
-     *
+     * <p>
      * Warning:
      * This can reduce or increase risk depending on direction, so the validator
      * must check whether the new stop is safer than the old stop.
@@ -51,7 +51,7 @@ public enum AiPositionAction {
 
     /**
      * Open a hedge position if supported.
-     *
+     * <p>
      * This is complex and should require manual approval unless you later build
      * full broker/account hedge-mode validation.
      */

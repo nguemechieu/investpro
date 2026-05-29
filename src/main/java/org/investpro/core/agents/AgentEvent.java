@@ -28,6 +28,9 @@ public record AgentEvent(
     public static final String POSITION_UPDATE = "POSITION_UPDATE";
     public static final String ORDER_UPDATE = "ORDER_UPDATE";
     public static final String FILL_UPDATE = "FILL_UPDATE";
+    public static final String POSITION_ACTION_APPROVED = "POSITION_ACTION_APPROVED";
+    public static final String POSITION_ACTION_REJECTED = "POSITION_ACTION_REJECTED";
+    public static final String POSITION_ACTION_RISKY = "POSITION_ACTION_RISKY";
     public static final String STREAM_CONNECTED = "STREAM_CONNECTED";
     public static final String STREAM_DISCONNECTED = "STREAM_DISCONNECTED";
     public static final String RAW_STREAM_MESSAGE = "RAW_STREAM_MESSAGE";

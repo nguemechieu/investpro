@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.pipeline.TradeDecisionPipeline;
 import org.investpro.core.pipeline.TradeRiskContextBuilder;
 import org.investpro.exchange.Exchange;
-import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.Trade;
 import org.investpro.risk.TradeRiskContext;
 import org.investpro.risk.RiskDecision;
@@ -19,14 +18,14 @@ import java.util.concurrent.CompletableFuture;
 /**
  * ManualTradeController handles BUY/SELL/CLOSE requests from the TradingWindow
  * UI.
- *
+ * <p>
  * This controller enforces that ALL manual trades go through:
  * 1. Risk evaluation (TradeDecisionPipeline)
  * 2. Risk approval (RiskDecision)
  * 3. Execution engine (only if approved)
- *
+ * <p>
  * Users cannot bypass risk management even for manual trades.
- *
+ * <p>
  * This controller does NOT:
  * - Create exchanges (SystemCore does)
  * - Execute without risk approval
@@ -54,7 +53,7 @@ public class ManualTradeController {
 
     /**
      * Execute a BUY order from the UI.
-     *
+     * <p>
      * Flow:
      * 1. Build TradeRiskContext from symbol + quantity
      * 2. Evaluate through RiskDecisionPipeline
@@ -124,21 +123,31 @@ public class ManualTradeController {
                         exchange,
                         tradingService.getAccount());
 
-                // Step 2: Evaluate through risk pipeline
+                // Step 2: Fast preview through the same risk pipeline before building
+                // the full decision explanation. This uses the existing dry-run helper
+                // and still never executes without the final RiskDecision below.
+                if (!tradeDecisionPipeline.wouldApprove(riskContext)) {
+                    RiskDecision rejectedDecision = tradeDecisionPipeline.evaluate(riskContext);
+                    String reason = tradeDecisionPipeline.getApprovalReason(rejectedDecision);
+                    log.warn("ManualTradeController: Trade preview rejected - {}", reason);
+                    throw new RuntimeException("Trade rejected: " + reason);
+                }
+
+                // Step 3: Evaluate through risk pipeline for final sizing/explanation
                 RiskDecision riskDecision = tradeDecisionPipeline.evaluate(riskContext);
 
                 if (riskDecision == null) {
                     throw new RuntimeException("Risk evaluation returned null");
                 }
 
-                // Step 3: Check if approved
+                // Step 4: Check if approved
                 if (!riskDecision.isApproved()) {
                     String reason = tradeDecisionPipeline.getApprovalReason(riskDecision);
                     log.warn("ManualTradeController: Trade rejected - {}", reason);
                     throw new RuntimeException("Trade rejected: " + reason);
                 }
 
-                // Step 4: Execute approved trade
+                // Step 5: Execute approved trade
                 log.info("ManualTradeController: Trade approved. Executing with size={}",
                         riskDecision.getFinalPositionSize());
 

@@ -1,5 +1,7 @@
 package org.investpro.ai;
 
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.RiskProfile;
 import org.investpro.risk.PositionSizingEngine;
 
@@ -14,10 +16,12 @@ import java.util.List;
  * - OpenAI API key is not configured
  * - Running offline or in test mode
  * - As a fallback when the real API is unavailable
- *
+ * <p>
  * Logic is rule-based and deterministic, designed to be conservative and safe.
  * Not a real AI, but produces sound recommendations based on risk factors.
  */
+@Data
+@Slf4j
 public class LocalAiReasoningService implements AiReasoningService {
 
     private static final String SERVICE_NAME = "Local Fallback";

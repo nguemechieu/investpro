@@ -127,7 +127,7 @@ public class StrategyAssignmentDashboard extends BorderPane {
             boolean showActions) {
         TableView<StrategyLifecycleRecord> table = new TableView<>(items);
         table.setStyle(DARK_BG + " -fx-text-fill: #e6edf3;");
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
 
         TableColumn<StrategyLifecycleRecord, String> symbolCol = new TableColumn<>("Symbol");
         symbolCol.setCellValueFactory(new PropertyValueFactory<>("symbol"));

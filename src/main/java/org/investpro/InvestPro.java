@@ -15,9 +15,8 @@ import javafx.scene.layout.BackgroundSize;
 import javafx.stage.Stage;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.ai.local.grpc.LocalAiRuntimeLauncher;
 import org.investpro.config.AppConfig;
 import org.investpro.config.AppConfigKeys;
 import org.investpro.persistence.repository.CurrencyRepository;
@@ -126,6 +125,7 @@ public class InvestPro extends Application {
 
         try {
             StrategyBootstrapper.initialize();
+            LocalAiRuntimeLauncher.startIfConfigured();
 
             configurePrimaryStage();
             showOnboarding();
@@ -303,6 +303,7 @@ public class InvestPro extends Application {
     private void closeApplication(boolean exitPlatform) {
         try {
             shutdownTradingTerminal();
+            LocalAiRuntimeLauncher.stopManagedProcess();
             log.info("InvestPro shutdown completed.");
 
         } catch (Exception exception) {

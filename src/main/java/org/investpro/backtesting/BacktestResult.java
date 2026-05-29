@@ -1,5 +1,6 @@
 package org.investpro.backtesting;
 
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,8 +9,7 @@ import java.util.*;
 /**
  * Contains results and performance metrics from a completed backtest
  */
-@Setter
-@Getter
+@Data
 public class BacktestResult {
     // Core metrics
     private String strategyName;

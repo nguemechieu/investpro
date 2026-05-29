@@ -1,9 +1,6 @@
 package org.investpro.ai;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
 
@@ -15,7 +12,7 @@ import java.util.List;
  * position.
  * Contains AI recommendation, confidence, and detailed reasoning about the
  * position.
- *
+ * <p>
  * The AI NEVER modifies positions directly. This response feeds into
  * PositionActionValidator
  * and PositionActionFinalGate for validation and final authority before
@@ -23,9 +20,7 @@ import java.util.List;
  */
 @Slf4j
 @Builder
-@Getter
-@Setter
-@AllArgsConstructor
+@Data
 public class AiPositionManagementResponse {
 
     // =========================================================================
@@ -159,6 +154,7 @@ public class AiPositionManagementResponse {
                 && confidence >= 0.0 && confidence <= 1.0
                 && confirmations != null
                 && concerns != null
+                && explanation != null
                 && !explanation.isBlank();
     }
 

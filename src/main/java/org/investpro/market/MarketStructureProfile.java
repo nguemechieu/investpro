@@ -11,13 +11,13 @@ import org.investpro.models.trading.TradePair;
  */
 public record MarketStructureProfile(
 
-        /** The pair this profile describes. */
+        /* The pair this profile describes. */
         TradePair pair,
 
-        /** BIS-derived liquidity classification. */
+        /* BIS-derived liquidity classification. */
         LiquidityTier liquidityTier,
 
-        /** Importance score for the base currency (0–100 scale, USD = 100). */
+        /*Importance score for the base currency (0–100 scale, USD = 100). */
         double baseCurrencyImportanceScore,
 
         /** Importance score for the quote currency (0–100 scale, USD = 100). */

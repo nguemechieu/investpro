@@ -1,6 +1,7 @@
 package org.investpro.market;
 
 import lombok.Builder;
+import lombok.Data;
 import lombok.Getter;
 import lombok.ToString;
 import org.investpro.enums.TradingSessionStatus;
@@ -18,7 +19,7 @@ import java.time.Instant;
  * Used for thread-safe snapshot reads without locking.
  */
 @Builder
-@Getter
+@Data
 @ToString
 public class InstrumentMarketStateSnapshot {
     @NotNull

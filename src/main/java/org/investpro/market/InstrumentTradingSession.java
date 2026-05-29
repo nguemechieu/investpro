@@ -1,6 +1,7 @@
 package org.investpro.market;
 
 import lombok.Builder;
+import lombok.Data;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.TradingSessionStatus;
@@ -11,7 +12,7 @@ import java.time.ZonedDateTime;
 import java.time.ZoneId;
 import java.util.Set;
 
-@Getter
+@Data
 @Builder
 @Slf4j
 public class InstrumentTradingSession {

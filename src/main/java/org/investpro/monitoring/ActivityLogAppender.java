@@ -2,6 +2,8 @@ package org.investpro.monitoring;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
@@ -11,12 +13,14 @@ import java.util.function.Consumer;
 /**
  * Logback Appender that captures log events and broadcasts them to listeners.
  * Broadcasts log events to any UI surface that wants real-time log data.
- *
+ * <p>
  * Register listener via: ActivityLogAppender.getInstance().addListener(...)
  *
  * @author NOEL NGUEMECHIEU
  */
+@EqualsAndHashCode(callSuper = true)
 @Slf4j
+@Data
 public class ActivityLogAppender extends AppenderBase<ILoggingEvent> {
     private static final ActivityLogAppender INSTANCE = new ActivityLogAppender();
     private final CopyOnWriteArrayList<Consumer<LogEventData>> listeners = new CopyOnWriteArrayList<>();

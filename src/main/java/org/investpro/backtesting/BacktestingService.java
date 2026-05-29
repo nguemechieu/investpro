@@ -1,5 +1,6 @@
 package org.investpro.backtesting;
 
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -18,8 +19,7 @@ import java.util.*;
  * data caching.
  */
 @Slf4j
-@Getter
-@Setter
+@Data
 @ToString
 public class BacktestingService  {
     private BackTesting backtestEngine;
@@ -195,8 +195,7 @@ public class BacktestingService  {
         final double[] bestReturn = { Double.NEGATIVE_INFINITY };
 
         if (parameterRanges == null || parameterRanges.isEmpty()) {
-            BacktestResult single = runBacktest(strategy, config, historicalData);
-            return single;
+            return runBacktest(strategy, config, historicalData);
         }
 
         List<String> paramNames = new ArrayList<>(parameterRanges.keySet());
