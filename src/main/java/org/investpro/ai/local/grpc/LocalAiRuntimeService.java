@@ -1,6 +1,5 @@
 package org.investpro.ai.local.grpc;
 
-import io.grpc.StatusRuntimeException;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.ai.AiDecision;
 import org.investpro.ai.AiReasoningService;
@@ -19,10 +18,21 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * Integrates the local Python AI advisory service into the InvestPro decision pipeline.
+ *
+ * <p>This service wraps {@link PythonAiGrpcClient} with a circuit breaker, conservative-mode
+ * state, and a fallback policy so that the rest of the platform degrades gracefully when
+ * the Python AI service is unavailable.</p>
+ *
+ * <p><strong>CRITICAL:</strong> This service is an advisory layer only. It NEVER places,
+ * submits, or influences order execution directly. The RiskEngine and ExecutionEngine
+ * retain final authority over all capital decisions.</p>
+ */
 @Slf4j
 public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable {
 
-    private static final String SERVICE_NAME = "Local Python gRPC AI";
+    private static final String SERVICE_NAME = "Local Python AI";
 
     private final PythonAiGrpcClient grpcClient;
     private final AiFallbackPolicy fallbackPolicy;
@@ -32,29 +42,36 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
     private final AtomicReference<String> lastError = new AtomicReference<>("");
 
     public LocalAiRuntimeService(PythonAiGrpcClient grpcClient) {
-        this(grpcClient, new AiFallbackPolicy(), new AiCircuitBreaker(3, Duration.ofSeconds(20)), new AiConservativeModeState());
+        this(grpcClient,
+                new AiFallbackPolicy(),
+                new AiCircuitBreaker(3, Duration.ofSeconds(20)),
+                new AiConservativeModeState());
     }
 
     public LocalAiRuntimeService(PythonAiGrpcClient grpcClient,
             AiFallbackPolicy fallbackPolicy,
             AiCircuitBreaker circuitBreaker,
             AiConservativeModeState conservativeModeState) {
-        this.grpcClient = Objects.requireNonNull(grpcClient, "grpcClient cannot be null");
-        this.fallbackPolicy = Objects.requireNonNull(fallbackPolicy, "fallbackPolicy cannot be null");
-        this.circuitBreaker = Objects.requireNonNull(circuitBreaker, "circuitBreaker cannot be null");
+        this.grpcClient           = Objects.requireNonNull(grpcClient,           "grpcClient cannot be null");
+        this.fallbackPolicy       = Objects.requireNonNull(fallbackPolicy,       "fallbackPolicy cannot be null");
+        this.circuitBreaker       = Objects.requireNonNull(circuitBreaker,       "circuitBreaker cannot be null");
         this.conservativeModeState = Objects.requireNonNull(conservativeModeState, "conservativeModeState cannot be null");
     }
 
     public static LocalAiRuntimeService fromConfiguration() {
-        String host = AppConfig.get(AppConfigKeys.AI_LOCAL_GRPC_HOST, "127.0.0.1");
-        int port = AppConfig.getInt(AppConfigKeys.AI_LOCAL_GRPC_PORT, 8010);
-        long timeoutMs = AppConfig.getLong(AppConfigKeys.AI_LOCAL_GRPC_TIMEOUT_MS, 1500L);
+        String host       = AppConfig.get(AppConfigKeys.AI_LOCAL_GRPC_HOST,        "127.0.0.1");
+        int    port       = AppConfig.getInt(AppConfigKeys.AI_LOCAL_GRPC_PORT,     8010);
+        long   timeoutMs  = AppConfig.getLong(AppConfigKeys.AI_LOCAL_GRPC_TIMEOUT_MS, 1500L);
         return new LocalAiRuntimeService(new PythonAiGrpcClient(host, port, timeoutMs));
     }
 
     public static boolean isGrpcAdvisoryEnabled() {
         return AppConfig.getBoolean(AppConfigKeys.AI_LOCAL_GRPC_ENABLED, true);
     }
+
+    // =========================================================================
+    // AiReasoningService
+    // =========================================================================
 
     @Override
     public AiTradeReviewResponse reviewTrade(AiTradeReviewRequest request) {
@@ -71,23 +88,27 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
 
         long startMs = System.currentTimeMillis();
         try {
-            SignalReviewRequest grpcRequest = toGrpcSignalRequest(request);
-            PythonAiGrpcClient.SignalReviewResult result = grpcClient.analyzeSignal(grpcRequest);
+            SignalReviewRequest aiRequest = toSignalRequest(request);
+            PythonAiGrpcClient.SignalReviewResult result = grpcClient.analyzeSignal(aiRequest);
 
             circuitBreaker.recordSuccess();
-            conservativeModeState.disable("gRPC advisory healthy");
+            conservativeModeState.disable("AI advisory healthy");
             lastError.set("");
 
             return mapToTradeReviewResponse(request, result, System.currentTimeMillis() - startMs);
-        } catch (StatusRuntimeException runtimeException) {
-            onGrpcFailure(runtimeException);
-            return fallbackPolicy.fallbackTradeReview(request);
         } catch (Exception exception) {
-            onGrpcFailure(exception);
+            onAiFailure(exception);
             return fallbackPolicy.fallbackTradeReview(request);
         }
     }
 
+    /**
+     * Requests an advisory AI score for a completed backtest.
+     *
+     * @param report backtest report to review
+     * @return blended score (70% internal score + 30% AI advisory score), or the internal
+     *         score alone when the AI service is unavailable.
+     */
     public double reviewBacktestScore(StrategyPerformanceReport report) {
         if (report == null || !isGrpcAdvisoryEnabled() || !circuitBreaker.allowRequest()) {
             return report == null ? 0.0 : report.getScore();
@@ -113,7 +134,7 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
             conservativeModeState.disable("Backtest advisory healthy");
             return (report.getScore() * 0.7) + (response.aiScore() * 0.3);
         } catch (Exception exception) {
-            onGrpcFailure(exception);
+            onAiFailure(exception);
             return report.getScore();
         }
     }
@@ -140,15 +161,20 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
                 lastError.get());
     }
 
-    private SignalReviewRequest toGrpcSignalRequest(AiTradeReviewRequest request) {
+    // =========================================================================
+    // Internal helpers
+    // =========================================================================
+
+    private SignalReviewRequest toSignalRequest(AiTradeReviewRequest request) {
         String symbol = request.getSymbol() == null ? "UNKNOWN" : request.getSymbol().toString('/');
-        String regime = request.getRiskContext() == null || request.getRiskContext().getMarketBehavior() == null
+        String regime = request.getRiskContext() == null
+                || request.getRiskContext().getMarketBehavior() == null
                 ? "UNKNOWN"
-            : request.getRiskContext().getMarketBehavior().name();
+                : request.getRiskContext().getMarketBehavior().name();
 
         return SignalReviewRequest.newBuilder()
                 .setSymbol(symbol)
-            .setTimeframe("1h")
+                .setTimeframe("1h")
                 .setSide(request.getSignalSide() == null ? "HOLD" : request.getSignalSide())
                 .setConfidence(request.getSignalConfidence())
                 .setPrice(request.getCurrentPrice())
@@ -164,31 +190,38 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
             AiTradeReviewRequest request,
             PythonAiGrpcClient.SignalReviewResult result,
             long latencyMs) {
+
         AiDecision decision;
         if (result.approved()) {
-            decision = result.sizeAdjustment() < 0.99 ? AiDecision.APPROVE_WITH_REDUCED_SIZE : AiDecision.APPROVE;
+            decision = result.sizeAdjustment() < 0.99
+                    ? AiDecision.APPROVE_WITH_REDUCED_SIZE
+                    : AiDecision.APPROVE;
         } else if ("WAIT".equalsIgnoreCase(result.recommendation())) {
             decision = AiDecision.WAIT;
         } else {
             decision = AiDecision.ESCALATE_TO_MANUAL_REVIEW;
         }
 
-        double safeAdjustment = Math.max(0.0, Math.min(1.0, result.sizeAdjustment() <= 0.0 ? 1.0 : result.sizeAdjustment()));
+        double safeAdj = Math.max(0.0, Math.min(1.0,
+                result.sizeAdjustment() <= 0.0 ? 1.0 : result.sizeAdjustment()));
         double suggestedPosition = request.getRiskDecision() == null
                 ? 0.0
-                : request.getRiskDecision().getFinalPositionSize() * safeAdjustment;
+                : request.getRiskDecision().getFinalPositionSize() * safeAdj;
 
         return AiTradeReviewResponse.builder()
                 .decision(decision)
                 .confidence(Math.max(0.0, Math.min(1.0, result.aiConfidence())))
-                .suggestedRiskMultiplier(safeAdjustment)
+                .suggestedRiskMultiplier(safeAdj)
                 .suggestedPositionSize(suggestedPosition)
-                .recommendedExecutionStrategy("LOCAL_GRPC_ADVISORY")
-                .confirmations(result.approved() ? List.of("Python advisory approved signal") : List.of())
-                .concerns(result.approved() ? List.of() : List.of("Python advisory requested caution"))
+                .recommendedExecutionStrategy("LOCAL_AI_ADVISORY")
+                .confirmations(result.approved()
+                        ? List.of("Python advisory approved signal") : List.of())
+                .concerns(result.approved()
+                        ? List.of() : List.of("Python advisory requested caution"))
                 .blockers(List.of())
-                .recommendations(result.details().isBlank() ? List.of(result.recommendation()) : List.of(result.details()))
-                .explanation("Advisory decision from local Python gRPC runtime: " + result.recommendation())
+                .recommendations(result.details().isBlank()
+                        ? List.of(result.recommendation()) : List.of(result.details()))
+                .explanation("Advisory decision from local Python AI: " + result.recommendation())
                 .modelName(SERVICE_NAME)
                 .createdAt(LocalDateTime.now())
                 .processingTimeMs(latencyMs)
@@ -196,12 +229,14 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
                 .build();
     }
 
-    private void onGrpcFailure(Exception exception) {
+    private void onAiFailure(Exception exception) {
         circuitBreaker.recordFailure();
-        conservativeModeState.enable("gRPC failure");
-        String message = exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
+        conservativeModeState.enable("AI service failure");
+        String message = exception.getMessage() == null
+                ? exception.getClass().getSimpleName()
+                : exception.getMessage();
         lastError.set(message);
-        log.warn("Local gRPC AI advisory failed: {}", message);
+        log.warn("Local Python AI advisory failed: {}", message);
     }
 
     @Override

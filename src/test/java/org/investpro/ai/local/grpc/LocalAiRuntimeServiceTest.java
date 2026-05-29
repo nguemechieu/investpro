@@ -1,7 +1,5 @@
 package org.investpro.ai.local.grpc;
 
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import org.investpro.ai.AiDecision;
 import org.investpro.ai.AiReasoningService;
 import org.investpro.ai.AiTradeReviewRequest;
@@ -17,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LocalAiRuntimeServiceTest {
 
     @Test
-    void usesFallbackAndEnablesConservativeModeWhenGrpcFails() {
+    void usesFallbackAndEnablesConservativeModeWhenAiFails() {
         FakePythonClient failingClient = new FakePythonClient(true);
         AiFallbackPolicy fallbackPolicy = new AiFallbackPolicy(new TestFallbackAiService());
         LocalAiRuntimeService service = new LocalAiRuntimeService(
@@ -33,7 +31,7 @@ class LocalAiRuntimeServiceTest {
     }
 
     @Test
-    void mapsGrpcApproveResponseToAiApprove() {
+    void mapsApproveResponseToAiApprove() {
         FakePythonClient healthyClient = new FakePythonClient(false);
         LocalAiRuntimeService service = new LocalAiRuntimeService(healthyClient);
 
@@ -97,17 +95,19 @@ class LocalAiRuntimeServiceTest {
         }
 
         @Override
-        public SignalReviewResult analyzeSignal(org.investpro.ai.local.grpc.generated.SignalReviewRequest request) {
+        public SignalReviewResult analyzeSignal(
+                org.investpro.ai.local.grpc.generated.SignalReviewRequest request) {
             if (fail) {
-                throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("simulated"));
+                throw new RuntimeException("simulated AI service failure");
             }
             return new SignalReviewResult(true, 0.8, "APPROVE", 0.95, "ok");
         }
 
         @Override
-        public AiGrpcHealthStatus health(boolean conservativeMode, String circuitState, long requestsPerMinute,
-                String lastError) {
-            return new AiGrpcHealthStatus(true, "SERVING", "test", 2.0, circuitState, conservativeMode, lastError,
+        public AiGrpcHealthStatus health(boolean conservativeMode, String circuitState,
+                long requestsPerMinute, String lastError) {
+            return new AiGrpcHealthStatus(true, "SERVING", "test", 2.0,
+                    circuitState, conservativeMode, lastError,
                     requestsPerMinute, java.time.Instant.now());
         }
 
