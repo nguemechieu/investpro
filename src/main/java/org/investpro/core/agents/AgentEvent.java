@@ -106,6 +106,54 @@ public record AgentEvent(
     /** Emitted when a Solana transaction submission fails. */
     public static final String SOLANA_TRANSACTION_FAILED = "SOLANA_TRANSACTION_FAILED";
 
+    // ── Strategy lifecycle events ───────────────────────────────────────────────────────
+    /** Emitted when a strategy is assigned to a symbol/timeframe. */
+    public static final String STRATEGY_ASSIGNED         = "STRATEGY_ASSIGNED";
+    /** Emitted when a strategy is promoted from paper to live trading. */
+    public static final String STRATEGY_PROMOTED         = "STRATEGY_PROMOTED";
+    /** Emitted when a strategy is demoted from live back to paper trading. */
+    public static final String STRATEGY_DEMOTED          = "STRATEGY_DEMOTED";
+    /** Emitted when a strategy is paused (no new signals processed). */
+    public static final String STRATEGY_PAUSED           = "STRATEGY_PAUSED";
+    /** Emitted when a paused strategy is resumed. */
+    public static final String STRATEGY_RESUMED          = "STRATEGY_RESUMED";
+    /** Emitted when a strategy is replaced by a new candidate. */
+    public static final String STRATEGY_REPLACED         = "STRATEGY_REPLACED";
+    /** Emitted when a strategy is permanently archived. */
+    public static final String STRATEGY_ARCHIVED         = "STRATEGY_ARCHIVED";
+    /** Emitted when an AI health engine reports a change in strategy health level. */
+    public static final String STRATEGY_HEALTH_CHANGED   = "STRATEGY_HEALTH_CHANGED";
+    /** Emitted when the learning engine updates a strategy's learning profile. */
+    public static final String STRATEGY_LEARNING_UPDATED = "STRATEGY_LEARNING_UPDATED";
+    /** Emitted when a strategy enters degraded state (health below threshold). */
+    public static final String STRATEGY_DEGRADED         = "STRATEGY_DEGRADED";
+    /** Emitted when a strategy generates a risk alert (drawdown, drawdown speed, etc.). */
+    public static final String STRATEGY_RISK_ALERT       = "STRATEGY_RISK_ALERT";
+    /** Emitted on any lifecycle status transition. */
+    public static final String LIFECYCLE_STATE_CHANGED   = "LIFECYCLE_STATE_CHANGED";
+
+    // ── AI review events ────────────────────────────────────────────────────────────────
+    /** Emitted when the AI completes a backtest review for a strategy. */
+    public static final String AI_STRATEGY_BACKTEST_REVIEWED    = "AI_STRATEGY_BACKTEST_REVIEWED";
+    /** Emitted when the AI completes a validation review (paper trading phase). */
+    public static final String AI_STRATEGY_VALIDATION_REVIEWED  = "AI_STRATEGY_VALIDATION_REVIEWED";
+    /** Emitted when the AI completes a signal review. */
+    public static final String AI_SIGNAL_REVIEWED               = "AI_SIGNAL_REVIEWED";
+    /** Emitted when the AI replacement engine recommends replacing a strategy. */
+    public static final String AI_REPLACEMENT_RECOMMENDED       = "AI_REPLACEMENT_RECOMMENDED";
+
+    // ── Pipeline events ─────────────────────────────────────────────────────────────────
+    /** Emitted when the pipeline approves a signal for position sizing. */
+    public static final String SIGNAL_APPROVED       = "SIGNAL_APPROVED";
+    /** Emitted when the pipeline rejects a signal (AI veto or low confidence). */
+    public static final String SIGNAL_REJECTED       = "SIGNAL_REJECTED";
+    /** Emitted when a full execution plan has been created and validated. */
+    public static final String EXECUTION_PLAN_CREATED = "EXECUTION_PLAN_CREATED";
+
+    // ── Portfolio intelligence events ────────────────────────────────────────────────────
+    /** Emitted when the PortfolioIntelligenceEngine completes a portfolio analysis. */
+    public static final String PORTFOLIO_ANALYZED = "PORTFOLIO_ANALYZED";
+
     public AgentEvent {
         type = Objects.requireNonNull(type, "type must not be null").trim();
 
@@ -166,6 +214,29 @@ public record AgentEvent(
 
     public static AgentEvent learning(String source, Object payload) {
         return of(LEARNING_OBSERVATION_CREATED, source, payload);
+    }
+
+    /**
+     * Creates a lifecycle transition event.
+     *
+     * @param type    one of the STRATEGY_* or LIFECYCLE_* constants
+     * @param source  component publishing the event
+     * @param payload the lifecycle record or identifier
+     * @return AgentEvent for the lifecycle transition
+     */
+    public static AgentEvent lifecycle(String type, String source, Object payload) {
+        return of(type, source, payload);
+    }
+
+    /**
+     * Creates a strategy health change event.
+     *
+     * @param source  component publishing the event (typically AIStrategyHealthEngine)
+     * @param payload the StrategyHealthReport
+     * @return AgentEvent for the health change
+     */
+    public static AgentEvent health(String source, Object payload) {
+        return of(STRATEGY_HEALTH_CHANGED, source, payload);
     }
 
     public static AgentEvent error(String source, Throwable throwable, String message) {
