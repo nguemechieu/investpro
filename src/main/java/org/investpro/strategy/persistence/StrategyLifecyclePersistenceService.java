@@ -43,7 +43,7 @@ public class StrategyLifecyclePersistenceService {
      * @return singleton StrategyLifecyclePersistenceService
      */
     public static StrategyLifecyclePersistenceService getInstance() {
-        return getInstance(DEFAULT_DB_URL);
+        return getInstance(System.getProperty("investpro.strategy.lifecycle.dbUrl", DEFAULT_DB_URL));
     }
 
     /**
@@ -100,7 +100,7 @@ public class StrategyLifecyclePersistenceService {
             ps.setString(3, record.getStrategyName());
             ps.setString(4, record.getSymbol());
             ps.setString(5, record.getTimeframe());
-            ps.setString(6, record.getLifecycleStatus() != null ? record.getLifecycleStatus().name() : "ASSIGNED");
+            ps.setString(6, record.getLifecycleStatus() != null ? record.getLifecycleStatus().name() : "DISCOVERED");
             ps.setDouble(7, record.getAssignmentScore());
             ps.setDouble(8, record.getConfidence());
             ps.setDouble(9, record.getAiConfidence());
@@ -336,9 +336,9 @@ public class StrategyLifecyclePersistenceService {
     }
 
     private StrategyLifecycleStatus parseStatus(String s) {
-        if (s == null) return StrategyLifecycleStatus.ASSIGNED;
+        if (s == null) return StrategyLifecycleStatus.DISCOVERED;
         try { return StrategyLifecycleStatus.valueOf(s); }
-        catch (IllegalArgumentException ex) { return StrategyLifecycleStatus.ASSIGNED; }
+        catch (IllegalArgumentException ex) { return StrategyLifecycleStatus.DISCOVERED; }
     }
 
     private MarketRegime parseRegime(String s) {

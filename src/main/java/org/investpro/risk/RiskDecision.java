@@ -22,6 +22,9 @@ public class RiskDecision {
     // Primary decision
     boolean approved;
 
+    @Builder.Default
+    RiskDecisionType decisionType = RiskDecisionType.APPROVE;
+
     @Override
     public String toString() {
         return "RiskDecision{" +
@@ -134,10 +137,10 @@ public class RiskDecision {
     public static RiskDecision approved(
             String approvalReason,
             double finalPositionSize,
-            double finalLeverage
-    ) {
+            double finalLeverage) {
         return RiskDecision.builder()
                 .approved(true)
+                .decisionType(RiskDecisionType.APPROVE)
                 .approvalReason(nullToEmpty(approvalReason))
                 .finalPositionSize(finalPositionSize)
                 .finalLeverage(finalLeverage)
@@ -158,6 +161,7 @@ public class RiskDecision {
 
         return RiskDecision.builder()
                 .approved(false)
+                .decisionType(RiskDecisionType.REJECT)
                 .approvalReason(nullToEmpty(reason))
                 .finalPositionSize(0.0)
                 .finalLeverage(0.0)
@@ -181,6 +185,7 @@ public class RiskDecision {
 
         return RiskDecision.builder()
                 .approved(false)
+                .decisionType(RiskDecisionType.REJECT)
                 .approvalReason(reason)
                 .finalPositionSize(0.0)
                 .finalLeverage(0.0)
@@ -200,10 +205,10 @@ public class RiskDecision {
             double finalPositionSize,
             double finalLeverage,
             List<String> warnings,
-            List<String> recommendations
-    ) {
+            List<String> recommendations) {
         return RiskDecision.builder()
                 .approved(true)
+                .decisionType(RiskDecisionType.APPROVE)
                 .approvalReason(nullToEmpty(approvalReason))
                 .finalPositionSize(finalPositionSize)
                 .finalLeverage(finalLeverage)
@@ -244,6 +249,5 @@ public class RiskDecision {
     }
 
     // Explicit getters because Lombok @Value may not be invoked in your build/IDE.
-
 
 }

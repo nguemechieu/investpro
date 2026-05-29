@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * Complete structured decision output from BotTradeDecisionEngine.
  * Every signal is converted to a BotTradeDecision before any execution.
- *
+ * <p>
  * The bot NEVER trades directly from a signal.
  * Every signal must pass through this rigorous institutional-grade evaluation.
  */
@@ -41,7 +41,11 @@ public record BotTradeDecision(
      */
     public enum FinalAction {
         TRADE("Execute trade"),
-        SKIP("Skip trade");
+        SKIP("Skip trade"),
+        WAIT("Wait for better conditions"),
+        HOLD("Hold current state"),
+        REDUCE_SIZE("Reduce order size and continue"),
+        CLOSE("Close existing position");
 
         public final String description;
 
@@ -50,7 +54,7 @@ public record BotTradeDecision(
         }
 
         public boolean shouldTrade() {
-            return this == TRADE;
+            return this == TRADE || this == REDUCE_SIZE || this == CLOSE;
         }
     }
 

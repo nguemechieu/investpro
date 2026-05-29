@@ -6,6 +6,13 @@ package org.investpro.strategy.execution;
  * for a given symbol and strategy.
  */
 public enum ExecutionVenue {
+    // Legacy names retained for compatibility with existing routing code.
+    PAPER_TRADE("Paper Trading Simulator", "simulation", false),
+    COINBASE_ADVANCED("Coinbase Advanced Trade", "crypto", true),
+    BINANCE_SPOT("Binance", "crypto", true),
+    OANDA_REST("OANDA FX", "forex", true),
+    INTERACTIVE_BROKERS("Interactive Brokers", "equities", true),
+
     COINBASE("Coinbase Advanced Trade", "crypto", true),
     OANDA("OANDA FX", "forex", true),
     BINANCE("Binance", "crypto", true),

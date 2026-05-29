@@ -5,11 +5,13 @@ import lombok.Getter;
 import lombok.ToString;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * Immutable result of an AI review of a strategy backtest or paper trading period.
+ * Immutable result of an AI review of a strategy backtest or paper trading
+ * period.
  * Produced by {@link org.investpro.strategy.ai.AIStrategyReviewEngine}.
  * This is advisory only — the lifecycle manager makes the final decision.
  */
@@ -58,7 +60,10 @@ public class AIStrategyReview {
     /** True if the maximum drawdown is within the acceptable limit. */
     private final boolean drawdownAcceptable;
 
-    /** Regime compatibility score (0.0-1.0): how well the strategy fits the current regime. */
+    /**
+     * Regime compatibility score (0.0-1.0): how well the strategy fits the current
+     * regime.
+     */
     private final double regimeCompatibilityScore;
 
     /** True if the backtest results are statistically meaningful. */
@@ -75,16 +80,80 @@ public class AIStrategyReview {
         return decision == AIReviewDecision.APPROVE;
     }
 
+    /** Institutional lifecycle alias: AI score on a 0-100 scale. */
+    public double getAiScore() {
+        return aiConfidence * 100.0;
+    }
+
+    /** Institutional lifecycle alias for the approval decision. */
+    public AIReviewDecision getApprovalStatus() {
+        return decision;
+    }
+
+    /** Institutional lifecycle alias for overfit risk on a 0-1 scale. */
+    public double getOverfitRisk() {
+        return overfitWarning ? 1.0 : 0.0;
+    }
+
+    /** Institutional lifecycle alias for confidence. */
+    public double getConfidence() {
+        return aiConfidence;
+    }
+
+    /** Institutional lifecycle alias for the recommendation. */
+    public String getRecommendation() {
+        return recommendedNextStep;
+    }
+
+    /** Institutional lifecycle alias for the reasoning summary. */
+    public String getReasoning() {
+        return reasoningSummary;
+    }
+
     /** @return true if more work/data is needed before a final determination. */
     public boolean requiresMoreWork() {
         return decision != null && decision.requiresMoreWork();
     }
 
     /**
-     * @return true if the review found critical issues that would prevent live deployment.
+     * @return true if the review found critical issues that would prevent live
+     *         deployment.
      *         Critical issues: overfit, insufficient sample, unacceptable drawdown.
      */
     public boolean hasCriticalIssues() {
         return overfitWarning || !sampleSizeSufficient || !drawdownAcceptable;
+    }
+
+    /**
+     * Backward-compatible alias for older UI panels.
+     */
+    public List<String> getReasoningPoints() {
+        if (reasoningSummary == null || reasoningSummary.isBlank()) {
+            return List.of();
+        }
+        return List.of(reasoningSummary);
+    }
+
+    /**
+     * Backward-compatible alias for older UI panels.
+     */
+    public List<String> getWarnings() {
+        List<String> warnings = new ArrayList<>();
+        if (overfitWarning) {
+            warnings.add("Potential overfitting detected");
+        }
+        if (underfitWarning) {
+            warnings.add("Potential underfitting detected");
+        }
+        if (!sampleSizeSufficient) {
+            warnings.add("Sample size may be insufficient");
+        }
+        if (!profitFactorAcceptable) {
+            warnings.add("Profit factor below threshold");
+        }
+        if (!drawdownAcceptable) {
+            warnings.add("Drawdown exceeds acceptable threshold");
+        }
+        return warnings;
     }
 }

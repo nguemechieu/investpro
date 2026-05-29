@@ -10,6 +10,7 @@ import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import lombok.Getter;
@@ -22,6 +23,9 @@ import org.investpro.persistence.repository.HistoricalDataRepositoryImpl;
 import org.investpro.strategy.StrategyRegistry;
 import org.investpro.strategy.TradingStrategy;
 import org.investpro.strategy.impl.UserStrategyAdapter;
+import org.investpro.strategy.lifecycle.StrategyLifecycleRecord;
+import org.investpro.strategy.lifecycle.StrategyLifecycleStatus;
+import org.investpro.strategy.management.StrategyAssignmentManager;
 import org.investpro.strategy.user.UserStrategyLoader;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -111,14 +115,33 @@ public class StrategyDeveloperPanel extends VBox {
         VBox.setVgrow(strategiesTable, Priority.ALWAYS);
         VBox.setVgrow(outputLog, Priority.SOMETIMES);
 
-        getChildren().addAll(
-                titleLabel,
-                descLabel,
-                new Separator(),
+        VBox userStrategyContent = new VBox(10,
                 strategiesTable,
                 buttonsBar,
                 outputLabel,
                 outputLog
+        );
+        userStrategyContent.setPadding(new Insets(4, 0, 0, 0));
+        VBox.setVgrow(userStrategyContent, Priority.ALWAYS);
+
+        TabPane lifecycleTabs = new TabPane();
+        lifecycleTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        lifecycleTabs.getTabs().addAll(
+                new Tab("User Strategies", userStrategyContent),
+                createLifecycleTab("Assignments", null),
+                createLifecycleTab("Paper Trading", StrategyLifecycleStatus.PAPER_TRADING),
+                createLifecycleTab("Live Trading", StrategyLifecycleStatus.LIVE_ACTIVE),
+                createLifecycleTab("Degraded Strategies", StrategyLifecycleStatus.DEGRADED),
+                createReplacementCandidatesTab(),
+                new Tab("AI Reasoning", new AIReasoningPanel())
+        );
+        VBox.setVgrow(lifecycleTabs, Priority.ALWAYS);
+
+        getChildren().addAll(
+                titleLabel,
+                descLabel,
+                new Separator(),
+                lifecycleTabs
         );
 
         try {
@@ -128,6 +151,78 @@ public class StrategyDeveloperPanel extends VBox {
         }
 
         loadStrategiesIntoTable();
+    }
+
+    private Tab createLifecycleTab(String title, @Nullable StrategyLifecycleStatus status) {
+        TableView<StrategyLifecycleRecord> table = buildLifecycleTable();
+        List<StrategyLifecycleRecord> records = StrategyAssignmentManager.getInstance().getAllRecords();
+        if (status != null) {
+            records = records.stream()
+                    .filter(record -> record.getLifecycleStatus() == status)
+                    .toList();
+        }
+        table.setItems(FXCollections.observableArrayList(records));
+        return new Tab(title, table);
+    }
+
+    private Tab createReplacementCandidatesTab() {
+        TableView<StrategyLifecycleRecord> table = buildLifecycleTable();
+        table.setItems(FXCollections.observableArrayList(
+                StrategyAssignmentManager.getInstance().getAllRecords().stream()
+                        .filter(StrategyLifecycleRecord::needsReplacement)
+                        .toList()));
+        return new Tab("Replacement Candidates", table);
+    }
+
+    @SuppressWarnings("unchecked")
+    private TableView<StrategyLifecycleRecord> buildLifecycleTable() {
+        TableView<StrategyLifecycleRecord> table = new TableView<>();
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        TableColumn<StrategyLifecycleRecord, String> strategyCol = new TableColumn<>("Strategy");
+        strategyCol.setCellValueFactory(new PropertyValueFactory<>("strategyName"));
+
+        TableColumn<StrategyLifecycleRecord, String> symbolCol = new TableColumn<>("Symbol");
+        symbolCol.setCellValueFactory(new PropertyValueFactory<>("symbol"));
+
+        TableColumn<StrategyLifecycleRecord, String> timeframeCol = new TableColumn<>("Timeframe");
+        timeframeCol.setCellValueFactory(new PropertyValueFactory<>("timeframe"));
+
+        TableColumn<StrategyLifecycleRecord, Number> aiScoreCol = new TableColumn<>("AI Score");
+        aiScoreCol.setCellValueFactory(cell -> new javafx.beans.property.SimpleDoubleProperty(
+                cell.getValue().getAiConfidence() * 100.0));
+
+        TableColumn<StrategyLifecycleRecord, String> healthCol = new TableColumn<>("Health");
+        healthCol.setCellValueFactory(cell -> new SimpleStringProperty(
+                cell.getValue().getLastHealthReport() == null
+                        ? ""
+                        : cell.getValue().getLastHealthReport().getHealthLevel().name()));
+
+        TableColumn<StrategyLifecycleRecord, Number> winRateCol = new TableColumn<>("Win Rate");
+        winRateCol.setCellValueFactory(cell -> new javafx.beans.property.SimpleDoubleProperty(
+                cell.getValue().getLastHealthReport() == null
+                        ? 0.0
+                        : cell.getValue().getLastHealthReport().getWinRate()));
+
+        TableColumn<StrategyLifecycleRecord, Number> profitFactorCol = new TableColumn<>("Profit Factor");
+        profitFactorCol.setCellValueFactory(cell -> new javafx.beans.property.SimpleDoubleProperty(
+                cell.getValue().getLastHealthReport() == null
+                        ? 0.0
+                        : cell.getValue().getLastHealthReport().getProfitFactor()));
+
+        TableColumn<StrategyLifecycleRecord, Number> drawdownCol = new TableColumn<>("Drawdown");
+        drawdownCol.setCellValueFactory(cell -> new javafx.beans.property.SimpleDoubleProperty(
+                cell.getValue().getLastHealthReport() == null
+                        ? 0.0
+                        : cell.getValue().getLastHealthReport().getMaxDrawdown()));
+
+        TableColumn<StrategyLifecycleRecord, String> statusCol = new TableColumn<>("Status");
+        statusCol.setCellValueFactory(cell -> new SimpleStringProperty(
+                cell.getValue().getLifecycleStatus() == null ? "" : cell.getValue().getLifecycleStatus().name()));
+
+        table.getColumns().setAll(strategyCol, symbolCol, timeframeCol, aiScoreCol,
+                healthCol, winRateCol, profitFactorCol, drawdownCol, statusCol);
+        return table;
     }
 
     private void createStrategiesTable() {

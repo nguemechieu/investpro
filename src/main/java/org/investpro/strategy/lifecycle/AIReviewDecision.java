@@ -8,7 +8,13 @@ package org.investpro.strategy.lifecycle;
 public enum AIReviewDecision {
     APPROVE("Strategy approved to proceed to next phase"),
     REJECT("Strategy rejected - does not meet requirements"),
+    REQUIRE_MORE_DATA("Insufficient data for reliable assessment"),
+    REQUIRE_PAPER_TRADING("Strategy requires paper trading validation before live approval"),
+    /** @deprecated Use {@link #REQUIRE_MORE_DATA}. */
+    @Deprecated
     NEEDS_MORE_DATA("Insufficient data for reliable assessment"),
+    /** @deprecated Use {@link #REQUIRE_PAPER_TRADING}. */
+    @Deprecated
     PAPER_TRADE_FIRST("Strategy requires paper trading validation before live approval"),
     LOW_CONFIDENCE("AI confidence too low to make a reliable determination");
 
@@ -26,6 +32,7 @@ public enum AIReviewDecision {
 
     /** @return true if more work or data is required before a final decision can be made. */
     public boolean requiresMoreWork() {
-        return this == NEEDS_MORE_DATA || this == PAPER_TRADE_FIRST;
+        return this == REQUIRE_MORE_DATA || this == REQUIRE_PAPER_TRADING
+                || this == NEEDS_MORE_DATA || this == PAPER_TRADE_FIRST;
     }
 }

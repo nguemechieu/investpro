@@ -50,6 +50,10 @@ public  class StrategySelectionService {
     private final Set<String> paperTradedFiltered = ConcurrentHashMap.newKeySet();
     private final Set<String> liveEligible = ConcurrentHashMap.newKeySet();
 
+    /**
+     * -- GETTER --
+     *  Check if selection is in progress.
+     */
     private volatile boolean selectionInProgress = false;
     private volatile Instant lastSelectionTime;
     private volatile String lastSelectionStatus = "Not started";
@@ -154,7 +158,7 @@ public  class StrategySelectionService {
 
     /**
      * Start the tiered selection process asynchronously.
-     *
+     * <p>
      * Returns immediately; selection happens in background.
      * Monitor progress with getSelectionStatus().
      */
@@ -243,10 +247,9 @@ public  class StrategySelectionService {
             log.info("Catalog has {} strategies (≤ {}), using all", allStrategies.size(), INITIAL_CANDIDATES);
         } else {
             // Stratified sampling: prioritize core strategies and key variants
-            List<String> selected = new ArrayList<>();
 
             // 1. Always include core and provider-discovered strategies
-            selected.addAll(StrategyCatalog.availableStrategyNames());
+            List<String> selected = new ArrayList<>(StrategyCatalog.availableStrategyNames());
 
             // 2. Sample remaining variants proportionally
             List<String> variants = allStrategies.stream()
@@ -278,7 +281,7 @@ public  class StrategySelectionService {
 
     /**
      * Stage 2: Filter candidates via backtest.
-     *
+     * <p>
      * Backtests each candidate (minimal bars) and keeps top BACKTEST_FILTER_TOP by
      * profit factor.
      * Non-blocking: uses parallel backtest execution.
@@ -311,7 +314,7 @@ public  class StrategySelectionService {
 
     /**
      * Stage 3: Filter via paper trading simulation.
-     *
+     * <p>
      * Simulates paper trading performance and keeps top PAPER_TRADE_FILTER_TOP.
      */
     private void paperTradeFilter() {
@@ -339,7 +342,7 @@ public  class StrategySelectionService {
 
     /**
      * Stage 4: Determine live eligibility.
-     *
+     * <p>
      * Selects top LIVE_ELIGIBLE_PER_PAIR_TIMEFRAME strategies per symbol/timeframe.
      * For now: selects across all symbol/timeframe combinations.
      */
@@ -377,7 +380,7 @@ public  class StrategySelectionService {
 
     /**
      * Instantiate only the selected strategies in the registry.
-     *
+     * <p>
      * Stages are instantiated in order of priority:
      * 1. Live eligible (tier 0)
      * 2. Paper traded (tier 1)
@@ -424,13 +427,6 @@ public  class StrategySelectionService {
         }
 
         return lastSelectionStatus != null ? lastSelectionStatus : "Not started";
-    }
-
-    /**
-     * Check if selection is in progress.
-     */
-    public boolean isSelectionInProgress() {
-        return selectionInProgress;
     }
 
     /**

@@ -2,6 +2,7 @@ package org.investpro.decision;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
 
@@ -24,7 +25,7 @@ public record TradeCostEstimate(
     /**
      * Return the percentage of total cost relative to gross profit
      */
-    public double costAsPercentageOfProfit(BigDecimal grossProfit) {
+    public double costAsPercentageOfProfit(@NonNull BigDecimal grossProfit) {
         if (grossProfit.signum() <= 0)
             return 100.0;
         return totalCost.divide(grossProfit, 4, java.math.RoundingMode.HALF_UP)

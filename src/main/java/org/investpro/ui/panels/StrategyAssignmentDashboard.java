@@ -29,7 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Displays strategies grouped by lifecycle status and provides quick-action
  * buttons for lifecycle management.
  *
- * <p>Auto-refreshes data every 10 seconds from {@link StrategyAssignmentManager}.</p>
+ * <p>
+ * Auto-refreshes data every 10 seconds from {@link StrategyAssignmentManager}.
+ * </p>
  */
 public class StrategyAssignmentDashboard extends BorderPane {
 
@@ -38,12 +40,12 @@ public class StrategyAssignmentDashboard extends BorderPane {
     private static final String TEXT_WHITE = "-fx-text-fill: #e6edf3;";
     private static final String TEXT_MUTED = "-fx-text-fill: #8b949e;";
     private static final String BTN_PROMOTE = "-fx-background-color: #238636; -fx-text-fill: white;";
-    private static final String BTN_DEMOTE  = "-fx-background-color: #da3633; -fx-text-fill: white;";
-    private static final String BTN_PAUSE   = "-fx-background-color: #9e6a03; -fx-text-fill: white;";
+    private static final String BTN_DEMOTE = "-fx-background-color: #da3633; -fx-text-fill: white;";
+    private static final String BTN_PAUSE = "-fx-background-color: #9e6a03; -fx-text-fill: white;";
     private static final String BTN_REFRESH = "-fx-background-color: #1f6feb; -fx-text-fill: white;";
 
-    private static final DateTimeFormatter FORMATTER =
-            DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault());
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss")
+            .withZone(ZoneId.systemDefault());
 
     private final StrategyAssignmentManager manager = StrategyAssignmentManager.getInstance();
     private final PortfolioIntelligenceEngine portfolioEngine = PortfolioIntelligenceEngine.getInstance();
@@ -108,8 +110,7 @@ public class StrategyAssignmentDashboard extends BorderPane {
                 buildTab("Pending", pendingRecords, false),
                 buildTab("Degraded", degradedRecords, true),
                 buildTab("Paused", pausedRecords, true),
-                buildTab("Archived", archivedRecords, false)
-        );
+                buildTab("Archived", archivedRecords, false));
 
         setCenter(tabPane);
     }
@@ -123,7 +124,7 @@ public class StrategyAssignmentDashboard extends BorderPane {
 
     @SuppressWarnings("unchecked")
     private TableView<StrategyLifecycleRecord> buildTable(ObservableList<StrategyLifecycleRecord> items,
-                                                          boolean showActions) {
+            boolean showActions) {
         TableView<StrategyLifecycleRecord> table = new TableView<>(items);
         table.setStyle(DARK_BG + " -fx-text-fill: #e6edf3;");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
@@ -162,8 +163,7 @@ public class StrategyAssignmentDashboard extends BorderPane {
         return table;
     }
 
-    private Callback<TableColumn<StrategyLifecycleRecord, Void>,
-            TableCell<StrategyLifecycleRecord, Void>> buildActionsCellFactory() {
+    private Callback<TableColumn<StrategyLifecycleRecord, Void>, TableCell<StrategyLifecycleRecord, Void>> buildActionsCellFactory() {
         return col -> new TableCell<>() {
             private final Button promoteBtn = new Button("Promote");
             private final Button demoteBtn = new Button("Demote");
@@ -176,7 +176,13 @@ public class StrategyAssignmentDashboard extends BorderPane {
 
                 promoteBtn.setOnAction(e -> {
                     StrategyLifecycleRecord rec = getTableView().getItems().get(getIndex());
-                    manager.promoteToLive(rec.getAssignmentId(), "Manual promotion via dashboard");
+                    StrategyLifecycleRecord promoted = manager.promoteToLive(
+                            rec.getAssignmentId(),
+                            "Manual promotion via dashboard");
+                    if (promoted == null) {
+                        manager.getLastPromotionGateFailure(rec.getAssignmentId())
+                                .ifPresent(reason -> showPromotionBlocked(rec, reason));
+                    }
                     refreshData();
                 });
                 demoteBtn.setOnAction(e -> {
@@ -205,8 +211,7 @@ public class StrategyAssignmentDashboard extends BorderPane {
         };
     }
 
-    private Callback<TableColumn<StrategyLifecycleRecord, String>,
-            TableCell<StrategyLifecycleRecord, String>> coloredStatusCell() {
+    private Callback<TableColumn<StrategyLifecycleRecord, String>, TableCell<StrategyLifecycleRecord, String>> coloredStatusCell() {
         return col -> new TableCell<>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -235,7 +240,8 @@ public class StrategyAssignmentDashboard extends BorderPane {
     // =========================================================================
 
     private void refreshData() {
-        if (!refreshing.compareAndSet(false, true)) return;
+        if (!refreshing.compareAndSet(false, true))
+            return;
         try {
             List<StrategyLifecycleRecord> all = manager.getAllRecords();
 
@@ -243,7 +249,9 @@ public class StrategyAssignmentDashboard extends BorderPane {
                 allRecords.setAll(all);
                 liveRecords.setAll(filter(all, StrategyLifecycleStatus.LIVE_ACTIVE));
                 paperRecords.setAll(filter(all, StrategyLifecycleStatus.PAPER_TRADING));
-                pendingRecords.setAll(filter(all, StrategyLifecycleStatus.ASSIGNED));
+                pendingRecords.setAll(all.stream()
+                        .filter(record -> record.getLifecycleStatus() != null && record.getLifecycleStatus().isPending())
+                        .toList());
                 degradedRecords.setAll(filter(all, StrategyLifecycleStatus.DEGRADED));
                 pausedRecords.setAll(filter(all, StrategyLifecycleStatus.PAUSED));
                 archivedRecords.setAll(filter(all, StrategyLifecycleStatus.ARCHIVED));
@@ -258,7 +266,7 @@ public class StrategyAssignmentDashboard extends BorderPane {
     }
 
     private List<StrategyLifecycleRecord> filter(List<StrategyLifecycleRecord> all,
-                                                  StrategyLifecycleStatus status) {
+            StrategyLifecycleStatus status) {
         return all.stream()
                 .filter(r -> r.getLifecycleStatus() == status)
                 .toList();
@@ -300,5 +308,18 @@ public class StrategyAssignmentDashboard extends BorderPane {
                 refreshData();
             }
         }, 10_000L, 10_000L);
+    }
+
+    private void showPromotionBlocked(StrategyLifecycleRecord rec, String reason) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Promotion Blocked");
+        alert.setHeaderText("Live promotion was blocked by safety gates");
+        alert.setContentText(String.format(
+                "Strategy %s on %s/%s cannot be promoted yet.%n%nReason:%n%s",
+                rec.getStrategyName(),
+                rec.getSymbol(),
+                rec.getTimeframe(),
+                reason));
+        alert.showAndWait();
     }
 }

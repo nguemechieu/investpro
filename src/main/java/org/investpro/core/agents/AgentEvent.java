@@ -17,8 +17,7 @@ public record AgentEvent(
         String source,
         Object payload,
         Instant timestamp,
-        Map<String, Object> metadata
-) {
+        Map<String, Object> metadata) {
 
     public static final String MARKET_TICK = "MARKET_TICK";
     public static final String MARKET_TRADE = "MARKET_TRADE";
@@ -68,32 +67,47 @@ public record AgentEvent(
 
     public static final String ERROR = "ERROR";
 
-    // ── Exchange resilience events ──────────────────────────────────────────────────────
+    // ── Exchange resilience events
+    // ──────────────────────────────────────────────────────
     /** Emitted when an exchange WebSocket or REST connection is established. */
-    public static final String EXCHANGE_CONNECTED       = "EXCHANGE_CONNECTED";
+    public static final String EXCHANGE_CONNECTED = "EXCHANGE_CONNECTED";
     /** Emitted when an exchange connection is lost. */
-    public static final String EXCHANGE_DISCONNECTED    = "EXCHANGE_DISCONNECTED";
+    public static final String EXCHANGE_DISCONNECTED = "EXCHANGE_DISCONNECTED";
     /** Emitted when a specific endpoint degrades below the health threshold. */
-    public static final String ENDPOINT_DEGRADED        = "ENDPOINT_DEGRADED";
+    public static final String ENDPOINT_DEGRADED = "ENDPOINT_DEGRADED";
     /** Emitted when an endpoint circuit breaker transitions to OPEN state. */
-    public static final String CIRCUIT_OPENED           = "CIRCUIT_OPENED";
+    public static final String CIRCUIT_OPENED = "CIRCUIT_OPENED";
     /** Emitted when an endpoint circuit breaker recovers to CLOSED state. */
-    public static final String CIRCUIT_RECOVERED        = "CIRCUIT_RECOVERED";
-    /** Emitted when the overall exchange health grade changes (GREEN/YELLOW/ORANGE/RED). */
-    public static final String EXCHANGE_HEALTH_CHANGED  = "EXCHANGE_HEALTH_CHANGED";
+    public static final String CIRCUIT_RECOVERED = "CIRCUIT_RECOVERED";
+    /**
+     * Emitted when the overall exchange health grade changes
+     * (GREEN/YELLOW/ORANGE/RED).
+     */
+    public static final String EXCHANGE_HEALTH_CHANGED = "EXCHANGE_HEALTH_CHANGED";
     /** Emitted when a stale cached response is served instead of a live fetch. */
-    public static final String STALE_CACHE_SERVED       = "STALE_CACHE_SERVED";
-    /** Emitted when a reconciliation cycle completes (balances, positions, orders). */
+    public static final String STALE_CACHE_SERVED = "STALE_CACHE_SERVED";
+    /**
+     * Emitted when a reconciliation cycle completes (balances, positions, orders).
+     */
     public static final String RECONCILIATION_COMPLETED = "RECONCILIATION_COMPLETED";
-    /** Emitted when an exchange degrades but remains operational (non-critical endpoint failure). */
-    public static final String EXCHANGE_DEGRADED            = "EXCHANGE_DEGRADED";
+    /**
+     * Emitted when an exchange degrades but remains operational (non-critical
+     * endpoint failure).
+     */
+    public static final String EXCHANGE_DEGRADED = "EXCHANGE_DEGRADED";
     /** Emitted when authentication fails for an exchange. */
-    public static final String EXCHANGE_AUTH_FAILED         = "EXCHANGE_AUTH_FAILED";
+    public static final String EXCHANGE_AUTH_FAILED = "EXCHANGE_AUTH_FAILED";
     /** Emitted when WebSocket data exceeds the freshness threshold. */
-    public static final String WEBSOCKET_STALE              = "WEBSOCKET_STALE";
-    /** Emitted when the SmartExecutionRouter selects an execution route for an order. */
-    public static final String EXECUTION_ROUTE_SELECTED     = "EXECUTION_ROUTE_SELECTED";
-    /** Emitted when the reconciliation engine detects drift between local and live state. */
+    public static final String WEBSOCKET_STALE = "WEBSOCKET_STALE";
+    /**
+     * Emitted when the SmartExecutionRouter selects an execution route for an
+     * order.
+     */
+    public static final String EXECUTION_ROUTE_SELECTED = "EXECUTION_ROUTE_SELECTED";
+    /**
+     * Emitted when the reconciliation engine detects drift between local and live
+     * state.
+     */
     public static final String RECONCILIATION_DRIFT_DETECTED = "RECONCILIATION_DRIFT_DETECTED";
     /** Emitted when the Solana RPC adapter connects successfully. */
     public static final String SOLANA_CONNECTED = "SOLANA_CONNECTED";
@@ -106,52 +120,72 @@ public record AgentEvent(
     /** Emitted when a Solana transaction submission fails. */
     public static final String SOLANA_TRANSACTION_FAILED = "SOLANA_TRANSACTION_FAILED";
 
-    // ── Strategy lifecycle events ───────────────────────────────────────────────────────
+    // ── Strategy lifecycle events
+    // ───────────────────────────────────────────────────────
     /** Emitted when a strategy is assigned to a symbol/timeframe. */
-    public static final String STRATEGY_ASSIGNED         = "STRATEGY_ASSIGNED";
+    public static final String STRATEGY_ASSIGNED = "STRATEGY_ASSIGNED";
     /** Emitted when a strategy is promoted from paper to live trading. */
-    public static final String STRATEGY_PROMOTED         = "STRATEGY_PROMOTED";
+    public static final String STRATEGY_PROMOTED = "STRATEGY_PROMOTED";
     /** Emitted when a strategy is demoted from live back to paper trading. */
-    public static final String STRATEGY_DEMOTED          = "STRATEGY_DEMOTED";
+    public static final String STRATEGY_DEMOTED = "STRATEGY_DEMOTED";
     /** Emitted when a strategy is paused (no new signals processed). */
-    public static final String STRATEGY_PAUSED           = "STRATEGY_PAUSED";
+    public static final String STRATEGY_PAUSED = "STRATEGY_PAUSED";
     /** Emitted when a paused strategy is resumed. */
-    public static final String STRATEGY_RESUMED          = "STRATEGY_RESUMED";
+    public static final String STRATEGY_RESUMED = "STRATEGY_RESUMED";
     /** Emitted when a strategy is replaced by a new candidate. */
-    public static final String STRATEGY_REPLACED         = "STRATEGY_REPLACED";
+    public static final String STRATEGY_REPLACED = "STRATEGY_REPLACED";
     /** Emitted when a strategy is permanently archived. */
-    public static final String STRATEGY_ARCHIVED         = "STRATEGY_ARCHIVED";
-    /** Emitted when an AI health engine reports a change in strategy health level. */
-    public static final String STRATEGY_HEALTH_CHANGED   = "STRATEGY_HEALTH_CHANGED";
+    public static final String STRATEGY_ARCHIVED = "STRATEGY_ARCHIVED";
+    /**
+     * Emitted when an AI health engine reports a change in strategy health level.
+     */
+    public static final String STRATEGY_HEALTH_CHANGED = "STRATEGY_HEALTH_CHANGED";
     /** Emitted when the learning engine updates a strategy's learning profile. */
     public static final String STRATEGY_LEARNING_UPDATED = "STRATEGY_LEARNING_UPDATED";
     /** Emitted when a strategy enters degraded state (health below threshold). */
-    public static final String STRATEGY_DEGRADED         = "STRATEGY_DEGRADED";
-    /** Emitted when a strategy generates a risk alert (drawdown, drawdown speed, etc.). */
-    public static final String STRATEGY_RISK_ALERT       = "STRATEGY_RISK_ALERT";
+    public static final String STRATEGY_DEGRADED = "STRATEGY_DEGRADED";
+    /**
+     * Emitted when a strategy generates a risk alert (drawdown, drawdown speed,
+     * etc.).
+     */
+    public static final String STRATEGY_RISK_ALERT = "STRATEGY_RISK_ALERT";
     /** Emitted on any lifecycle status transition. */
-    public static final String LIFECYCLE_STATE_CHANGED   = "LIFECYCLE_STATE_CHANGED";
+    public static final String LIFECYCLE_STATE_CHANGED = "LIFECYCLE_STATE_CHANGED";
 
-    // ── AI review events ────────────────────────────────────────────────────────────────
+    // ── AI review events
+    // ────────────────────────────────────────────────────────────────
     /** Emitted when the AI completes a backtest review for a strategy. */
-    public static final String AI_STRATEGY_BACKTEST_REVIEWED    = "AI_STRATEGY_BACKTEST_REVIEWED";
+    public static final String AI_STRATEGY_BACKTEST_REVIEWED = "AI_STRATEGY_BACKTEST_REVIEWED";
     /** Emitted when the AI completes a validation review (paper trading phase). */
-    public static final String AI_STRATEGY_VALIDATION_REVIEWED  = "AI_STRATEGY_VALIDATION_REVIEWED";
+    public static final String AI_STRATEGY_VALIDATION_REVIEWED = "AI_STRATEGY_VALIDATION_REVIEWED";
     /** Emitted when the AI completes a signal review. */
-    public static final String AI_SIGNAL_REVIEWED               = "AI_SIGNAL_REVIEWED";
+    public static final String AI_SIGNAL_REVIEWED = "AI_SIGNAL_REVIEWED";
     /** Emitted when the AI replacement engine recommends replacing a strategy. */
-    public static final String AI_REPLACEMENT_RECOMMENDED       = "AI_REPLACEMENT_RECOMMENDED";
+    public static final String AI_REPLACEMENT_RECOMMENDED = "AI_REPLACEMENT_RECOMMENDED";
+    /** Emitted when AI review approves a strategy lifecycle stage. */
+    public static final String AI_STRATEGY_APPROVED = "AI_STRATEGY_APPROVED";
+    /** Emitted when AI review rejects a strategy lifecycle stage. */
+    public static final String AI_STRATEGY_REJECTED = "AI_STRATEGY_REJECTED";
 
-    // ── Pipeline events ─────────────────────────────────────────────────────────────────
+    // Backward-compatible aliases used by legacy strategy modules
+    public static final String AI_REPLACEMENT_EVALUATED = AI_REPLACEMENT_RECOMMENDED;
+    public static final String AI_STRATEGY_VALIDATION_COMPLETED = AI_STRATEGY_VALIDATION_REVIEWED;
+    public static final String STRATEGY_HEALTH_DEGRADED = STRATEGY_DEGRADED;
+
+    // ── Pipeline events
+    // ─────────────────────────────────────────────────────────────────
     /** Emitted when the pipeline approves a signal for position sizing. */
-    public static final String SIGNAL_APPROVED       = "SIGNAL_APPROVED";
+    public static final String SIGNAL_APPROVED = "SIGNAL_APPROVED";
     /** Emitted when the pipeline rejects a signal (AI veto or low confidence). */
-    public static final String SIGNAL_REJECTED       = "SIGNAL_REJECTED";
+    public static final String SIGNAL_REJECTED = "SIGNAL_REJECTED";
     /** Emitted when a full execution plan has been created and validated. */
     public static final String EXECUTION_PLAN_CREATED = "EXECUTION_PLAN_CREATED";
 
-    // ── Portfolio intelligence events ────────────────────────────────────────────────────
-    /** Emitted when the PortfolioIntelligenceEngine completes a portfolio analysis. */
+    // ── Portfolio intelligence events
+    // ────────────────────────────────────────────────────
+    /**
+     * Emitted when the PortfolioIntelligenceEngine completes a portfolio analysis.
+     */
     public static final String PORTFOLIO_ANALYZED = "PORTFOLIO_ANALYZED";
 
     public AgentEvent {
@@ -179,8 +213,7 @@ public record AgentEvent(
             String type,
             String source,
             Object payload,
-            Map<String, Object> metadata
-    ) {
+            Map<String, Object> metadata) {
         return new AgentEvent(type, source, payload, Instant.now(), metadata);
     }
 
@@ -231,7 +264,8 @@ public record AgentEvent(
     /**
      * Creates a strategy health change event.
      *
-     * @param source  component publishing the event (typically AIStrategyHealthEngine)
+     * @param source  component publishing the event (typically
+     *                AIStrategyHealthEngine)
      * @param payload the StrategyHealthReport
      * @return AgentEvent for the health change
      */

@@ -6,6 +6,9 @@ import org.investpro.event.EventBusManager;
 import org.investpro.strategy.StrategyBacktestResult;
 import org.investpro.strategy.lifecycle.AIReviewDecision;
 import org.investpro.strategy.lifecycle.AIStrategyReview;
+import org.investpro.strategy.lifecycle.StrategyLifecycleRecord;
+import org.investpro.strategy.lifecycle.StrategyPerformanceMetrics;
+import org.investpro.strategy.lifecycle.StrategyValidationReport;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -134,12 +137,12 @@ public class AIStrategyReviewEngine {
         String recommendedNextStep;
 
         if (!sampleSufficient) {
-            decision = AIReviewDecision.NEEDS_MORE_DATA;
+            decision = AIReviewDecision.REQUIRE_MORE_DATA;
             confidence = 0.3;
             recommendedNextStep = "Collect at least " + minSampleSize + " more backtest trades before re-review.";
         } else if (!rejectionReasons.isEmpty()) {
             if (pfAcceptable && ddAcceptable && wrAcceptable && overfitWarning) {
-                decision = AIReviewDecision.PAPER_TRADE_FIRST;
+                decision = AIReviewDecision.REQUIRE_PAPER_TRADING;
                 confidence = 0.55;
                 recommendedNextStep = "Run paper trading to validate out-of-sample performance before live approval.";
             } else {
@@ -183,6 +186,102 @@ public class AIStrategyReviewEngine {
         EventBusManager.getInstance().publish(
                 AgentEvent.of(AgentEvent.AI_STRATEGY_BACKTEST_REVIEWED, SOURCE, review));
 
+        return review;
+    }
+
+    /** Reviews paper trading validation quality before PAPER_APPROVED. */
+    public AIStrategyReview reviewPaperTrading(StrategyLifecycleRecord record, StrategyValidationReport report) {
+        if (record == null || report == null) {
+            return buildRejectReview(null, null, null, "Paper review input missing",
+                    List.of("Assignment record or paper validation report was missing"), 0.0);
+        }
+        List<String> reasons = new ArrayList<>();
+        if (report.getTotalPaperTrades() < minSampleSize) {
+            reasons.add("Paper sample size below minimum " + minSampleSize);
+        }
+        if (report.getPaperProfitFactor() < minProfitFactor) {
+            reasons.add("Paper profit factor below minimum " + minProfitFactor);
+        }
+        if (report.getPaperDrawdown() > maxDrawdown) {
+            reasons.add("Paper drawdown exceeds maximum " + maxDrawdown);
+        }
+        AIReviewDecision decision = reasons.isEmpty() && report.isApprovedForLive()
+                ? AIReviewDecision.APPROVE
+                : (report.getTotalPaperTrades() < minSampleSize
+                ? AIReviewDecision.REQUIRE_MORE_DATA
+                : AIReviewDecision.REJECT);
+        double confidence = Math.max(0.0, Math.min(0.95, report.getAiConfidence()));
+        AIStrategyReview review = AIStrategyReview.builder()
+                .reviewId(UUID.randomUUID().toString())
+                .strategyId(record.getStrategyId())
+                .symbol(record.getSymbol())
+                .timeframe(record.getTimeframe())
+                .decision(decision)
+                .aiConfidence(confidence)
+                .reasoningSummary(report.getAiReasoningSummary())
+                .rejectionReasons(reasons)
+                .overfitWarning(false)
+                .underfitWarning(false)
+                .sampleSizeSufficient(report.getTotalPaperTrades() >= minSampleSize)
+                .profitFactorAcceptable(report.getPaperProfitFactor() >= minProfitFactor)
+                .drawdownAcceptable(report.getPaperDrawdown() <= maxDrawdown)
+                .regimeCompatibilityScore(report.isRegimeChanging() ? 0.35 : 0.75)
+                .statisticallyMeaningful(report.getTotalPaperTrades() >= minSampleSize)
+                .recommendedNextStep(decision == AIReviewDecision.APPROVE
+                        ? "Proceed to live approval gate."
+                        : "Continue paper trading or revise the strategy.")
+                .reviewedAt(Instant.now())
+                .build();
+        EventBusManager.getInstance().publish(
+                AgentEvent.of(AgentEvent.AI_STRATEGY_VALIDATION_REVIEWED, SOURCE, review));
+        return review;
+    }
+
+    /** Reviews live performance during continuous monitoring. */
+    public AIStrategyReview reviewLivePerformance(StrategyLifecycleRecord record, StrategyPerformanceMetrics metrics) {
+        if (record == null || metrics == null) {
+            return buildRejectReview(null, null, null, "Live review input missing",
+                    List.of("Assignment record or live metrics were missing"), 0.0);
+        }
+        List<String> reasons = new ArrayList<>();
+        if (metrics.getProfitFactor() < 1.0) {
+            reasons.add("Live profit factor is below breakeven");
+        }
+        if (metrics.getMaxDrawdown() > maxDrawdown) {
+            reasons.add("Live drawdown exceeds maximum " + maxDrawdown);
+        }
+        if (metrics.getWinRate() < minWinRate) {
+            reasons.add("Live win rate below minimum " + minWinRate);
+        }
+        AIReviewDecision decision = reasons.isEmpty() ? AIReviewDecision.APPROVE : AIReviewDecision.REJECT;
+        double confidence = reasons.isEmpty() ? 0.80 : 0.70;
+        AIStrategyReview review = AIStrategyReview.builder()
+                .reviewId(UUID.randomUUID().toString())
+                .strategyId(record.getStrategyId())
+                .symbol(record.getSymbol())
+                .timeframe(record.getTimeframe())
+                .decision(decision)
+                .aiConfidence(confidence)
+                .reasoningSummary("Live review: WR=" + metrics.getWinRate()
+                        + ", PF=" + metrics.getProfitFactor()
+                        + ", DD=" + metrics.getMaxDrawdown())
+                .rejectionReasons(reasons)
+                .overfitWarning(false)
+                .underfitWarning(false)
+                .sampleSizeSufficient(metrics.getTotalTrades() >= minSampleSize)
+                .profitFactorAcceptable(metrics.getProfitFactor() >= minProfitFactor)
+                .drawdownAcceptable(metrics.getMaxDrawdown() <= maxDrawdown)
+                .regimeCompatibilityScore(0.70)
+                .statisticallyMeaningful(metrics.getTotalTrades() >= minSampleSize)
+                .recommendedNextStep(decision == AIReviewDecision.APPROVE
+                        ? "Continue live monitoring."
+                        : "Pause, demote, or replace through the assignment manager.")
+                .reviewedAt(Instant.now())
+                .build();
+        EventBusManager.getInstance().publish(
+                AgentEvent.of(decision == AIReviewDecision.APPROVE
+                        ? AgentEvent.AI_STRATEGY_APPROVED
+                        : AgentEvent.AI_STRATEGY_REJECTED, SOURCE, review));
         return review;
     }
 

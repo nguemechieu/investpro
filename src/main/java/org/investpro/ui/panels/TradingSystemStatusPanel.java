@@ -7,9 +7,11 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.util.Duration;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.monitoring.SystemAlert;
 import org.investpro.monitoring.TradingSystemStatusSnapshot;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -21,6 +23,7 @@ import java.util.function.Supplier;
  * Organized into multiple tabs for different aspects of system monitoring.
  */
 @Slf4j
+@Data
 public class TradingSystemStatusPanel extends VBox {
 
     private TradingSystemStatusSnapshot snapshot;
@@ -606,7 +609,7 @@ public class TradingSystemStatusPanel extends VBox {
         return tab;
     }
 
-    private HBox createControlBox() {
+    private @NonNull HBox createControlBox() {
         HBox controlBox = new HBox(12);
         controlBox.setAlignment(Pos.CENTER_LEFT);
         controlBox.setStyle("-fx-padding: 12;");

@@ -1,6 +1,8 @@
 package org.investpro.decision;
 
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
 
@@ -28,7 +30,8 @@ public record TradeExpectation(
     /**
      * Return risk/reward as formatted percentage string
      */
-    public String getRiskRewardFormatted() {
+    @Contract(pure = true)
+    public @NonNull String getRiskRewardFormatted() {
         return String.format("%.2f:1", riskRewardRatio);
     }
 

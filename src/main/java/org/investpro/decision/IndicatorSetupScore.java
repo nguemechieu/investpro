@@ -8,7 +8,7 @@ import java.time.Instant;
 /**
  * Score for an indicator composite setup's suitability.
  * Used when no single strategy reaches the minimum fitness threshold.
- * 
+ * <p>
  * Score >= 0.70 is considered "good fit" for trading.
  */
 public record IndicatorSetupScore(

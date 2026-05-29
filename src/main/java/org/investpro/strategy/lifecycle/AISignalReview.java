@@ -12,8 +12,11 @@ import java.util.UUID;
  * Immutable AI review result for an individual trading signal.
  * Produced by {@link org.investpro.strategy.ai.AISignalReviewEngine}.
  *
- * <p><strong>CRITICAL:</strong> This review is advisory only. AI never places orders.
- * The ExecutionEngine makes all final trading decisions.</p>
+ * <p>
+ * <strong>CRITICAL:</strong> This review is advisory only. AI never places
+ * orders.
+ * The ExecutionEngine makes all final trading decisions.
+ * </p>
  */
 @Getter
 @Builder
@@ -76,4 +79,18 @@ public class AISignalReview {
 
     /** Timestamp when this review was generated. */
     private final Instant reviewedAt;
+
+    /**
+     * Backward-compatible alias for older UI panels.
+     */
+    public boolean isApproved() {
+        return decision != null && decision.allowsExecution();
+    }
+
+    /**
+     * Backward-compatible alias for older UI panels.
+     */
+    public double getConfidence() {
+        return aiConfidence;
+    }
 }

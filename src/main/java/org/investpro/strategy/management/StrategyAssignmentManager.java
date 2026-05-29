@@ -10,6 +10,7 @@ import org.investpro.strategy.ai.AIStrategyHealthEngine;
 import org.investpro.strategy.lifecycle.*;
 import org.investpro.strategy.performance.StrategyLearningEngine;
 import org.investpro.strategy.performance.StrategyPerformanceTracker;
+import org.investpro.strategy.persistence.StrategyLifecyclePersistenceService;
 
 import java.time.Instant;
 import java.util.*;
@@ -19,31 +20,41 @@ import java.util.stream.Collectors;
 /**
  * Central lifecycle manager for strategy assignments.
  *
- * <p>Manages the entire lifecycle from ASSIGNED through LIVE_ACTIVE to ARCHIVED.
+ * <p>
+ * Manages the entire lifecycle from ASSIGNED through LIVE_ACTIVE to ARCHIVED.
  * All state transitions are logged and published as {@link AgentEvent} events.
- * AI engines provide advisory input; this manager applies all transitions.</p>
+ * AI engines provide advisory input; this manager applies all transitions.
+ * </p>
  *
- * <p><strong>CRITICAL:</strong> This manager orchestrates lifecycle transitions only.
- * It NEVER places orders or bypasses RiskEngine controls.</p>
+ * <p>
+ * <strong>CRITICAL:</strong> This manager orchestrates lifecycle transitions
+ * only.
+ * It NEVER places orders or bypasses RiskEngine controls.
+ * </p>
  */
 @Slf4j
 public class StrategyAssignmentManager {
 
     private static volatile StrategyAssignmentManager instance;
 
-    private final ConcurrentHashMap<String, StrategyLifecycleRecord> lifecycleRecords =
-            new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, StrategyLifecycleRecord> lifecycleRecords = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> lastPromotionGateFailures = new ConcurrentHashMap<>();
 
     private final AIStrategyHealthEngine healthEngine = AIStrategyHealthEngine.getInstance();
     private final AIReplacementEngine replacementEngine = AIReplacementEngine.getInstance();
     private final StrategyPerformanceTracker performanceTracker = StrategyPerformanceTracker.getInstance();
     private final StrategyLearningEngine learningEngine = StrategyLearningEngine.getInstance();
+    private final StrategyAssignmentGatekeeper gatekeeper = StrategyAssignmentGatekeeper.getInstance();
+    private final StrategyLifecyclePersistenceService persistence = StrategyLifecyclePersistenceService.getInstance();
     private final EventBusManager eventBus = EventBusManager.getInstance();
 
     private static final String SOURCE = "StrategyAssignmentManager";
 
     private StrategyAssignmentManager() {
-        log.info("StrategyAssignmentManager initialised");
+        for (StrategyLifecycleRecord record : persistence.recoverAll()) {
+            lifecycleRecords.put(record.getAssignmentId(), record);
+        }
+        log.info("StrategyAssignmentManager initialised with {} recovered assignment(s)", lifecycleRecords.size());
     }
 
     /**
@@ -70,7 +81,7 @@ public class StrategyAssignmentManager {
     // =========================================================================
 
     /**
-     * Creates a new strategy lifecycle record at ASSIGNED status.
+     * Creates a new strategy lifecycle record at DISCOVERED status.
      *
      * @param symbol       trading symbol
      * @param timeframe    timeframe
@@ -81,8 +92,8 @@ public class StrategyAssignmentManager {
      * @return the newly created StrategyLifecycleRecord
      */
     public StrategyLifecycleRecord assign(String symbol, Timeframe timeframe,
-                                          String strategyId, String strategyName,
-                                          double score, String reason) {
+            String strategyId, String strategyName,
+            double score, String reason) {
         String assignmentId = UUID.randomUUID().toString();
         StrategyLifecycleRecord record = StrategyLifecycleRecord.builder()
                 .assignmentId(assignmentId)
@@ -96,7 +107,7 @@ public class StrategyAssignmentManager {
                 .assignedBy(SOURCE)
                 .assignmentReason(reason)
                 .marketRegime(MarketRegime.UNKNOWN)
-                .lifecycleStatus(StrategyLifecycleStatus.ASSIGNED)
+                .lifecycleStatus(StrategyLifecycleStatus.DISCOVERED)
                 .assignmentMode("AUTO")
                 .promotionHistory(new ArrayList<>())
                 .demotionHistory(new ArrayList<>())
@@ -105,6 +116,8 @@ public class StrategyAssignmentManager {
                 .build();
 
         lifecycleRecords.put(assignmentId, record);
+        persistence.upsert(record);
+        persistence.logLifecycleEvent(assignmentId, null, StrategyLifecycleStatus.DISCOVERED, reason);
         log.info("Strategy assigned: id={} strategy={} symbol={}/{} score={}",
                 assignmentId, strategyId, symbol,
                 timeframe != null ? timeframe.getCode() : "UNKNOWN", score);
@@ -121,8 +134,103 @@ public class StrategyAssignmentManager {
      * @return updated StrategyLifecycleRecord
      */
     public StrategyLifecycleRecord promoteToLive(String assignmentId, String reason) {
+        StrategyLifecycleRecord record = lifecycleRecords.get(assignmentId);
+        if (record == null) {
+            log.warn("promoteToLive: assignment not found: {}", assignmentId);
+            return null;
+        }
+
+        StrategyAssignmentGatekeeper.GateResult gateResult = gatekeeper.canPromoteLive(record);
+        if (!gateResult.isAllowed()) {
+            lastPromotionGateFailures.put(assignmentId, gateResult.summary());
+            log.warn("Blocked live promotion for assignment {} [{}]: {}",
+                    assignmentId, record.getStrategyId(), gateResult.summary());
+            return null;
+        }
+
+        lastPromotionGateFailures.remove(assignmentId);
+
         return transitionStatus(assignmentId, StrategyLifecycleStatus.LIVE_ACTIVE,
                 reason, AgentEvent.STRATEGY_PROMOTED, true, false);
+    }
+
+    /**
+     * Returns the last safety-gate block reason for a promotion attempt.
+     */
+    public Optional<String> getLastPromotionGateFailure(String assignmentId) {
+        if (assignmentId == null || assignmentId.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(lastPromotionGateFailures.get(assignmentId));
+    }
+
+    /**
+     * Updates validation evidence for an existing lifecycle record.
+     *
+     * <p>
+     * This is used by validation/backtest pipelines to attach report data that
+     * is required by live promotion safety gates.
+     * </p>
+     */
+    public StrategyLifecycleRecord updateValidationContext(
+            String assignmentId,
+            AIStrategyReview aiReview,
+            StrategyValidationReport validationReport,
+            StrategyHealthReport healthReport,
+            double validationScore,
+            StrategyLifecycleStatus nextStatus) {
+        StrategyLifecycleRecord existing = lifecycleRecords.get(assignmentId);
+        if (existing == null) {
+            log.warn("updateValidationContext: assignment not found: {}", assignmentId);
+            return null;
+        }
+
+        StrategyLifecycleStatus targetStatus = nextStatus != null ? nextStatus : existing.getLifecycleStatus();
+
+        StrategyLifecycleRecord updated = StrategyLifecycleRecord.builder()
+                .assignmentId(existing.getAssignmentId())
+                .symbol(existing.getSymbol())
+                .timeframe(existing.getTimeframe())
+                .strategyId(existing.getStrategyId())
+                .strategyName(existing.getStrategyName())
+                .assignmentScore(existing.getAssignmentScore())
+                .confidence(existing.getConfidence())
+                .assignedAt(existing.getAssignedAt())
+                .assignedBy(existing.getAssignedBy())
+                .assignmentReason(existing.getAssignmentReason())
+                .marketRegime(existing.getMarketRegime())
+                .lifecycleStatus(targetStatus)
+                .assignmentMode(existing.getAssignmentMode())
+                .aiApprovalStatus(aiReview != null ? aiReview.getDecision() : existing.getAiApprovalStatus())
+                .aiConfidence(aiReview != null ? aiReview.getAiConfidence() : existing.getAiConfidence())
+                .aiReasoningSummary(
+                        aiReview != null ? aiReview.getReasoningSummary() : existing.getAiReasoningSummary())
+                .validationScore(validationScore > 0.0 ? validationScore : existing.getValidationScore())
+                .lastHealthReport(healthReport != null ? healthReport : existing.getLastHealthReport())
+                .lastAIReview(aiReview != null ? aiReview : existing.getLastAIReview())
+                .lastValidationReport(validationReport != null ? validationReport : existing.getLastValidationReport())
+                .rankScore(existing.getRankScore())
+                .learningProfile(existing.getLearningProfile())
+                .promotionHistory(existing.getPromotionHistory())
+                .demotionHistory(existing.getDemotionHistory())
+                .createdAt(existing.getCreatedAt())
+                .updatedAt(Instant.now())
+                .build();
+
+        lifecycleRecords.put(assignmentId, updated);
+        persistence.upsert(updated);
+        if (aiReview != null) {
+            persistence.saveAIReview(assignmentId, "STRATEGY", aiReview.isApproved(),
+                    aiReview.getAiConfidence(), aiReview.getReasoningSummary());
+            eventBus.publish(AgentEvent.of(aiReview.isApproved()
+                    ? AgentEvent.AI_STRATEGY_APPROVED
+                    : AgentEvent.AI_STRATEGY_REJECTED, SOURCE, aiReview));
+        }
+        if (healthReport != null) {
+            persistence.saveHealthSnapshot(assignmentId, healthReport.getHealthScore(),
+                    healthReport.getHealthLevel() != null ? healthReport.getHealthLevel().name() : "UNKNOWN");
+        }
+        return updated;
     }
 
     /**
@@ -150,7 +258,8 @@ public class StrategyAssignmentManager {
     }
 
     /**
-     * Resumes a paused strategy (returns to LIVE_ACTIVE if was live, else PAPER_TRADING).
+     * Resumes a paused strategy (returns to LIVE_ACTIVE if was live, else
+     * PAPER_TRADING).
      *
      * @param assignmentId the assignment identifier
      * @param reason       reason for resuming
@@ -164,14 +273,15 @@ public class StrategyAssignmentManager {
         }
         StrategyLifecycleStatus resumeStatus = record.getDemotionHistory() != null
                 && !record.getDemotionHistory().isEmpty()
-                ? StrategyLifecycleStatus.PAPER_TRADING
-                : StrategyLifecycleStatus.LIVE_ACTIVE;
+                        ? StrategyLifecycleStatus.PAPER_TRADING
+                        : StrategyLifecycleStatus.LIVE_ACTIVE;
         return transitionStatus(assignmentId, resumeStatus,
                 reason, AgentEvent.STRATEGY_RESUMED, false, false);
     }
 
     /**
-     * Replaces a strategy with a new one. Marks the old as REPLACED and creates a new ASSIGNED record.
+     * Replaces a strategy with a new one. Marks the old as REPLACED and creates a
+     * new ASSIGNED record.
      *
      * @param assignmentId    the old assignment identifier
      * @param newStrategyId   new strategy identifier
@@ -180,7 +290,7 @@ public class StrategyAssignmentManager {
      * @return the new StrategyLifecycleRecord
      */
     public StrategyLifecycleRecord replace(String assignmentId, String newStrategyId,
-                                           String newStrategyName, String reason) {
+            String newStrategyName, String reason) {
         StrategyLifecycleRecord old = lifecycleRecords.get(assignmentId);
         if (old == null) {
             log.warn("replace: assignment not found: {}", assignmentId);
@@ -203,7 +313,7 @@ public class StrategyAssignmentManager {
                 .assignedBy(SOURCE)
                 .assignmentReason("Replacement for " + assignmentId + ": " + reason)
                 .marketRegime(MarketRegime.UNKNOWN)
-                .lifecycleStatus(StrategyLifecycleStatus.ASSIGNED)
+                .lifecycleStatus(StrategyLifecycleStatus.DISCOVERED)
                 .assignmentMode("AUTO")
                 .promotionHistory(new ArrayList<>())
                 .demotionHistory(new ArrayList<>())
@@ -212,6 +322,8 @@ public class StrategyAssignmentManager {
                 .build();
 
         lifecycleRecords.put(newRecord.getAssignmentId(), newRecord);
+        persistence.upsert(newRecord);
+        persistence.logLifecycleEvent(newRecord.getAssignmentId(), null, StrategyLifecycleStatus.DISCOVERED, reason);
         log.info("Strategy replaced: old={} new={} newStrategy={}",
                 assignmentId, newRecord.getAssignmentId(), newStrategyId);
         eventBus.publish(AgentEvent.of(AgentEvent.STRATEGY_ASSIGNED, SOURCE, newRecord));
@@ -239,8 +351,8 @@ public class StrategyAssignmentManager {
      * @return updated StrategyLifecycleRecord
      */
     public StrategyLifecycleRecord updateLifecycleStatus(String assignmentId,
-                                                         StrategyLifecycleStatus newStatus,
-                                                         String reason) {
+            StrategyLifecycleStatus newStatus,
+            String reason) {
         return transitionStatus(assignmentId, newStatus, reason, null, false, false);
     }
 
@@ -280,7 +392,8 @@ public class StrategyAssignmentManager {
     }
 
     /**
-     * Returns all records that are currently in a live state (LIVE_ACTIVE or WATCH).
+     * Returns all records that are currently in a live state (LIVE_ACTIVE or
+     * WATCH).
      *
      * @return list of live strategy records
      */
@@ -304,9 +417,9 @@ public class StrategyAssignmentManager {
     // =========================================================================
 
     private StrategyLifecycleRecord transitionStatus(String assignmentId,
-                                                     StrategyLifecycleStatus newStatus,
-                                                     String reason, String eventType,
-                                                     boolean isPromotion, boolean isDemotion) {
+            StrategyLifecycleStatus newStatus,
+            String reason, String eventType,
+            boolean isPromotion, boolean isDemotion) {
         StrategyLifecycleRecord existing = lifecycleRecords.get(assignmentId);
         if (existing == null) {
             log.warn("transitionStatus: assignment not found: {}", assignmentId);
@@ -319,8 +432,10 @@ public class StrategyAssignmentManager {
         List<String> demotionHistory = new ArrayList<>(
                 existing.getDemotionHistory() != null ? existing.getDemotionHistory() : List.of());
 
-        if (isPromotion) promoHistory.add(historyEntry);
-        if (isDemotion) demotionHistory.add(historyEntry);
+        if (isPromotion)
+            promoHistory.add(historyEntry);
+        if (isDemotion)
+            demotionHistory.add(historyEntry);
 
         StrategyLifecycleRecord updated = StrategyLifecycleRecord.builder()
                 .assignmentId(existing.getAssignmentId())
@@ -352,6 +467,8 @@ public class StrategyAssignmentManager {
                 .build();
 
         lifecycleRecords.put(assignmentId, updated);
+        persistence.upsert(updated);
+        persistence.logLifecycleEvent(assignmentId, existing.getLifecycleStatus(), newStatus, reason);
 
         log.info("Lifecycle transition: assignment={} {}->{}  reason={}",
                 assignmentId, existing.getLifecycleStatus(), newStatus, reason);
@@ -360,5 +477,10 @@ public class StrategyAssignmentManager {
             eventBus.publish(AgentEvent.of(eventType, SOURCE, updated));
         }
         return updated;
+    }
+
+    /** Returns whether a live assignment can currently process a trade signal. */
+    public StrategyAssignmentGatekeeper.GateResult canTrade(String assignmentId) {
+        return gatekeeper.canTrade(lifecycleRecords.get(assignmentId));
     }
 }

@@ -71,7 +71,7 @@ import java.util.function.Consumer;
 
 public class Oanda extends Exchange {
 
-   private  static  final Logger logger=log;
+    private static final Logger logger = log;
     protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -92,8 +92,7 @@ public class Oanda extends Exchange {
     private static final String ACCOUNT_PENDING_ORDERS_ROUTE = "/v3/accounts/%s/pendingOrders";
     private static final String ACCOUNT_ORDER_ROUTE = "/v3/accounts/%s/orders/%s";
     private static final String ACCOUNT_ORDER_CANCEL_ROUTE = "/v3/accounts/%s/orders/%s/cancel";
-    private static final String ACCOUNT_ORDER_CLIENT_EXTENSIONS_ROUTE =
-            "/v3/accounts/%s/orders/%s/clientExtensions";
+    private static final String ACCOUNT_ORDER_CLIENT_EXTENSIONS_ROUTE = "/v3/accounts/%s/orders/%s/clientExtensions";
     private static final String ACCOUNT_POSITIONS_ROUTE = "/v3/accounts/%s/positions";
     private static final String ACCOUNT_OPEN_POSITIONS_ROUTE = "/v3/accounts/%s/openPositions";
     private static final String ACCOUNT_POSITION_ROUTE = "/v3/accounts/%s/positions/%s";
@@ -115,9 +114,16 @@ public class Oanda extends Exchange {
 
     // Rate limiting and concurrency
     private final OandaRateLimiter rateLimiter = new OandaRateLimiter(1, Duration.ofMillis(250));
-    private final ExecutorService oandaExecutor=Executors.newFixedThreadPool(2,new ThreadFactory(){private final AtomicInteger count=new AtomicInteger(0);
+    private final ExecutorService oandaExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
+        private final AtomicInteger count = new AtomicInteger(0);
 
-    @Override public Thread newThread(@NotNull Runnable r){Thread t=new Thread(r,"oanda-http-worker-"+count.incrementAndGet());t.setDaemon(false);return t;}});
+        @Override
+        public Thread newThread(@NotNull Runnable r) {
+            Thread t = new Thread(r, "oanda-http-worker-" + count.incrementAndGet());
+            t.setDaemon(false);
+            return t;
+        }
+    });
 
     // Caching with TTL
     private static class CacheEntry<T> {
@@ -572,7 +578,8 @@ public class Oanda extends Exchange {
 
         } catch (Exception exception) {
             if (isConnectivityException(exception)) {
-                logConnectivityFailure("OANDA trade pair load", oandaRoute(ACCOUNT_INSTRUMENTS_ROUTE, resolvedAccountId), exception);
+                logConnectivityFailure("OANDA trade pair load",
+                        oandaRoute(ACCOUNT_INSTRUMENTS_ROUTE, resolvedAccountId), exception);
             } else {
                 log.error("Failed to load OANDA trade pairs", exception);
             }
@@ -606,7 +613,8 @@ public class Oanda extends Exchange {
     @Override
     public CompletableFuture<SymbolTradability> fetchTradabilityStatus(TradePair pair) {
         if (pair == null) {
-            return CompletableFuture.completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+            return CompletableFuture
+                    .completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
         }
 
         return CompletableFuture.supplyAsync(() -> {
@@ -841,9 +849,9 @@ public class Oanda extends Exchange {
         // Reject malformed symbols (XXX, ¤¤¤) before making HTTP requests
         String baseCode = tradePair.getBaseCode();
         String counterCode = tradePair.getCounterCode();
-        
-        if (baseCode.equals("XXX") || baseCode.equals("¤¤¤") || 
-            counterCode.equals("XXX") || counterCode.equals("¤¤¤")) {
+
+        if (baseCode.equals("XXX") || baseCode.equals("¤¤¤") ||
+                counterCode.equals("XXX") || counterCode.equals("¤¤¤")) {
             log.debug("Skipping OANDA order book fetch for malformed symbol: {}", tradePair);
             return CompletableFuture.completedFuture(new OrderBook(tradePair));
         }
@@ -883,10 +891,6 @@ public class Oanda extends Exchange {
                 });
     }
 
-
-
-
-
     /**
      * Parse OANDA distribution order book response.
      *
@@ -919,7 +923,7 @@ public class Oanda extends Exchange {
 
                 /*
                  * OANDA orderBook bucket fields:
-                 * - longCountPercent  = long-side order distribution at this price
+                 * - longCountPercent = long-side order distribution at this price
                  * - shortCountPercent = short-side order distribution at this price
                  *
                  * They are not real bid/ask sizes like Binance/Coinbase order books.
@@ -967,8 +971,7 @@ public class Oanda extends Exchange {
                     "Parsed OANDA orderBook for {} with {} bid buckets and {} ask buckets",
                     tradePair,
                     bids.size(),
-                    asks.size()
-            );
+                    asks.size());
 
             return orderBook;
 
@@ -976,12 +979,12 @@ public class Oanda extends Exchange {
             log.warn(
                     "Failed to parse OANDA orderBook response for {}: {}",
                     tradePair,
-                    exception.getMessage()
-            );
+                    exception.getMessage());
             orderBook.setTimestamp(Instant.now());
             return orderBook;
         }
     }
+
     /**
      * Parse OANDA position book (distribution) response.
      *
@@ -1024,7 +1027,7 @@ public class Oanda extends Exchange {
                  * not executable order sizes.
                  *
                  * Use them as visual market concentration:
-                 * - longCountPercent  => bullish/long concentration
+                 * - longCountPercent => bullish/long concentration
                  * - shortCountPercent => bearish/short concentration
                  */
                 double longCountPercent = bucket.path("longCountPercent").asDouble(0.0);
@@ -1050,8 +1053,7 @@ public class Oanda extends Exchange {
                     "Parsed OANDA positionBook for {} with {} long buckets and {} short buckets",
                     tradePair,
                     bids.size(),
-                    asks.size()
-            );
+                    asks.size());
 
             return positionBookDepth;
 
@@ -1059,8 +1061,7 @@ public class Oanda extends Exchange {
             log.warn(
                     "Failed to parse OANDA positionBook response for {}: {}",
                     tradePair,
-                    exception.getMessage()
-            );
+                    exception.getMessage());
 
             positionBookDepth.setBids(bids);
             positionBookDepth.setAsks(asks);
@@ -1100,8 +1101,7 @@ public class Oanda extends Exchange {
                                 "OANDA pricing fallback failed for {}. HTTP {}: {}",
                                 tradePair,
                                 response.statusCode(),
-                                response.body()
-                        );
+                                response.body());
                         return emptyOrderBook(tradePair);
                     }
 
@@ -1140,8 +1140,7 @@ public class Oanda extends Exchange {
                                 bids.get(0).getPrice(),
                                 asks.get(0).getPrice(),
                                 bids.size(),
-                                asks.size()
-                        );
+                                asks.size());
 
                         return orderBook;
 
@@ -1149,8 +1148,7 @@ public class Oanda extends Exchange {
                         log.warn(
                                 "Failed to parse OANDA pricing fallback for {}: {}",
                                 tradePair,
-                                exception.getMessage()
-                        );
+                                exception.getMessage());
                         return emptyOrderBook(tradePair);
                     }
                 })
@@ -1158,13 +1156,13 @@ public class Oanda extends Exchange {
                     if (isConnectivityException(exception)) {
                         logConnectivityFailure("OANDA pricing fallback", url, exception);
                     } else {
-                        log.warn("OANDA pricing fallback failed for {}: {}", tradePair, rootCause(exception).getMessage());
+                        log.warn("OANDA pricing fallback failed for {}: {}", tradePair,
+                                rootCause(exception).getMessage());
                         log.debug("OANDA pricing fallback failure details for {}", tradePair, exception);
                     }
                     return emptyOrderBook(tradePair);
                 });
     }
-
 
     private List<OrderBook.PriceLevel> parseOandaPricingLevels(JsonNode levelsNode) {
         List<OrderBook.PriceLevel> levels = new ArrayList<>();
@@ -1218,6 +1216,7 @@ public class Oanda extends Exchange {
             return Instant.now();
         }
     }
+
     @Override
     public Ticker getLivePrice(TradePair tradePair) {
         try {
@@ -1239,7 +1238,7 @@ public class Oanda extends Exchange {
             return 0.0;
         }
 
-        Ticker ticker ;
+        Ticker ticker;
         try {
             ticker = fetchTicker(tradePair).get();
         } catch (InterruptedException | ExecutionException e) {
@@ -1384,7 +1383,7 @@ public class Oanda extends Exchange {
             userAccount.setUpdatedAt(Instant.now());
             userAccount.setConnected(true);
             userAccount.setSandbox(accountNode.path("id").asText("").startsWith("101-")); // OANDA sandbox accounts
-            userAccount.setCreatedBy(createdByUserAtStr);                                                                                          // start with 101-
+            userAccount.setCreatedBy(createdByUserAtStr); // start with 101-
             userAccount.setPaperTrading(userAccount.isSandbox());
 
             // Cache the account
@@ -1395,7 +1394,8 @@ public class Oanda extends Exchange {
 
         } catch (Exception exception) {
             if (isConnectivityException(exception)) {
-                accountConnectivityUnavailableUntilMs = System.currentTimeMillis() + ACCOUNT_CONNECTIVITY_FAILURE_TTL_MS;
+                accountConnectivityUnavailableUntilMs = System.currentTimeMillis()
+                        + ACCOUNT_CONNECTIVITY_FAILURE_TTL_MS;
                 logConnectivityFailure("OANDA account details", url, exception);
             } else {
                 log.error("Failed to fetch OANDA account details", exception);
@@ -1450,7 +1450,6 @@ public class Oanda extends Exchange {
         // Fetch from cached account summary instead of making separate call
         return fetchAccount().thenApply(account -> account != null ? account.getFreeMargin() : 0.0);
     }
-
 
     // ---------------------------------------------------------------------
     // Orders
@@ -1830,7 +1829,7 @@ public class Oanda extends Exchange {
         return CompletableFuture.supplyAsync(() -> {
             totalOandaRequests.incrementAndGet();
             try {
-                HttpResponse<String> response = sendWithExponentialBackoffSync(request, 2, 1_000, 8_000);
+                HttpResponse<String> response = sendWithExponentialBackoffSync(request, 3, 1_000, 8_000);
 
                 if (response.statusCode() == 429) {
                     oanda429Count.incrementAndGet();
@@ -1838,11 +1837,11 @@ public class Oanda extends Exchange {
                     last429Endpoint = "order-history";
                 }
 
-                    if (!isSuccess(response)) {
+                if (!isSuccess(response)) {
                     List<Order> fallback = getCached(cacheKey + "|stale", orderHistoryCache);
                     logOrderHistoryFailure(cacheKey, response.statusCode(), response.body(), fallback != null);
                     return fallback == null ? Collections.emptyList() : fallback;
-                    }
+                }
 
                 JsonNode orders = OBJECT_MAPPER.readTree(response.body()).path("orders");
                 if (!orders.isArray() || orders.isEmpty()) {
@@ -1890,11 +1889,16 @@ public class Oanda extends Exchange {
         long now = System.currentTimeMillis();
         long nextWarn = orderHistoryWarnAfterMs.getOrDefault(cacheKey, 0L);
         String fallback = usingCachedFallback ? " using cached fallback" : "";
-        if (now >= nextWarn) {
+        boolean transientGatewayFailure = statusCode == -1 || statusCode == 502 || statusCode == 503
+                || statusCode == 504;
+        boolean shouldWarn = !usingCachedFallback || !transientGatewayFailure;
+        if (now >= nextWarn && shouldWarn) {
             log.warn("OANDA order history unavailable{} HTTP {}: {}", fallback, statusCode, safe(message));
             orderHistoryWarnAfterMs.put(cacheKey, now + 120_000L);
         } else {
-            log.debug("OANDA order history unavailable{} HTTP {}: {}", fallback, statusCode, safe(message));
+            String transientTag = transientGatewayFailure ? " (transient)" : "";
+            log.debug("OANDA order history unavailable{}{} HTTP {}: {}", fallback, transientTag, statusCode,
+                    safe(message));
         }
     }
 
@@ -3103,7 +3107,7 @@ public class Oanda extends Exchange {
     /**
      * GET /v3/accounts/{accountID}/transactions - Get transaction history
      */
-    
+
     public CompletableFuture<List<JsonNode>> getTransactions(int maxCount, String sinceTransactionID) {
         String account = resolveAccountId();
         if (account.isBlank()) {
@@ -3450,9 +3454,6 @@ public class Oanda extends Exchange {
         setCached(cacheKey, account, 3000, accountCache); // 3s TTL
     }
 
-
-
-
     public void logDiagnostics() {
         logger.info(
                 "OANDA Diagnostics: totalRequests={}, http429Count={}, retryCount={}, pricingCacheHits={}, pricingCacheMisses={}, accountCacheHits={}, accountCacheMisses={}, last429Endpoint={}ms ago: {}",
@@ -3476,7 +3477,8 @@ public class Oanda extends Exchange {
     // ---------------------------------------------------------------------
 
     /**
-     * When a 401 is received from the primary OANDA environment, tries the alternate
+     * When a 401 is received from the primary OANDA environment, tries the
+     * alternate
      * environment (practice ↔ live). If the alternate succeeds, the adapter's
      * internal base URL switches accordingly so all subsequent calls work.
      */
@@ -3576,7 +3578,8 @@ public class Oanda extends Exchange {
 
     /** Truncates a string to at most {@code maxLen} chars for safe log output. */
     private static String truncate(String s, int maxLen) {
-        if (s == null) return "";
+        if (s == null)
+            return "";
         return s.length() <= maxLen ? s : s.substring(0, maxLen) + "…";
     }
 
@@ -3733,46 +3736,74 @@ public class Oanda extends Exchange {
         long lastLogTime = 0;
 
         while (true) {
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response;
+            try {
+                response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            } catch (IOException ioException) {
+                if (attemptCount >= maxRetries) {
+                    throw ioException;
+                }
 
-            // If successful or not a rate limit error, return immediately
-            if (response.statusCode() != 429) {
+                oandaRetryCount.incrementAndGet();
+                long delayMs = Math.min(initialDelayMs * (long) Math.pow(2, attemptCount), maxDelayMs);
+                long jitter = 250 + jitterRandom.nextLong(501);
+                delayMs = Math.min(delayMs + jitter, maxDelayMs);
+
+                long now = System.currentTimeMillis();
+                if (now - lastLogTime > 60000) {
+                    logger.warn("OANDA network error: {}. Retrying after {}ms (attempt {}/{}). Endpoint: {}",
+                            safe(ioException.getMessage()), delayMs, attemptCount + 1, maxRetries,
+                            extractEndpoint(request.uri().toString()));
+                    lastLogTime = now;
+                }
+
+                Thread.sleep(delayMs);
+                attemptCount++;
+                continue;
+            }
+
+            int statusCode = response.statusCode();
+            boolean retryable = statusCode == 429 || statusCode == 502 || statusCode == 503 || statusCode == 504;
+
+            if (!retryable) {
                 return response;
             }
 
-            // If we've exhausted retries, return the 429 response
             if (attemptCount >= maxRetries) {
                 long now = System.currentTimeMillis();
-                if (now - lastLogTime > 60000) { // Log once per minute to avoid spam
-                    logger.warn("OANDA 429: Max retries ({}) exhausted. Endpoint: {}",
-                            maxRetries, extractEndpoint(request.uri().toString()));
-                    last429TimeMs = now;
-                    last429Endpoint = extractEndpoint(request.uri().toString());
+                if (now - lastLogTime > 60000) {
+                    logger.warn("OANDA HTTP {}: Max retries ({}) exhausted. Endpoint: {}",
+                            statusCode, maxRetries, extractEndpoint(request.uri().toString()));
+                    lastLogTime = now;
+                    if (statusCode == 429) {
+                        last429TimeMs = now;
+                        last429Endpoint = extractEndpoint(request.uri().toString());
+                    }
                 }
-                oanda429Count.incrementAndGet();
+                if (statusCode == 429) {
+                    oanda429Count.incrementAndGet();
+                }
                 return response;
             }
 
             oandaRetryCount.incrementAndGet();
-
-            // Check for Retry-After header
-            long delayMs = parseRetryAfterHeader(response);
+            long delayMs = statusCode == 429 ? parseRetryAfterHeader(response) : 0L;
             if (delayMs <= 0) {
-                // Calculate exponential backoff: 1000 * 2^attempt
                 delayMs = Math.min(initialDelayMs * (long) Math.pow(2, attemptCount), maxDelayMs);
             }
 
-            // Add jitter to prevent thundering herd: ±250-750ms
             long jitter = 250 + jitterRandom.nextLong(501);
             delayMs = Math.min(delayMs + jitter, maxDelayMs);
 
             long now = System.currentTimeMillis();
-            if (now - lastLogTime > 60000) { // Log once per minute
-                logger.warn("OANDA 429: Retrying after {}ms with jitter (attempt {}/{}). Endpoint: {}",
-                        delayMs, attemptCount + 1, maxRetries, extractEndpoint(request.uri().toString()));
+            if (now - lastLogTime > 60000) {
+                logger.warn("OANDA HTTP {}: Retrying after {}ms with jitter (attempt {}/{}). Endpoint: {}",
+                        statusCode, delayMs, attemptCount + 1, maxRetries, extractEndpoint(request.uri().toString()));
                 lastLogTime = now;
-                last429TimeMs = now;
-                last429Endpoint = extractEndpoint(request.uri().toString());
+                if (statusCode == 429) {
+                    last429TimeMs = now;
+                    last429Endpoint = extractEndpoint(request.uri().toString());
+                }
             }
 
             Thread.sleep(delayMs);
@@ -4065,6 +4096,5 @@ public class Oanda extends Exchange {
             }
         }, oandaExecutor);
     }
-
 
 }

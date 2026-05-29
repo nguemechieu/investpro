@@ -1,0 +1,13 @@
+package org.investpro.broker.events;
+
+public enum BrokerActivityType {
+    ORDER_SUBMITTED,
+    ORDER_ACKNOWLEDGED,
+    ORDER_PARTIALLY_FILLED,
+    ORDER_FILLED,
+    ORDER_REJECTED,
+    ORDER_CANCELED,
+    POSITION_OPENED,
+    POSITION_REDUCED,
+    POSITION_CLOSED
+}

@@ -8,9 +8,11 @@ import org.investpro.strategy.lifecycle.StrategyLearningProfile;
  * All calculations apply an AI-derived size multiplier and enforce
  * a maximum position size cap as a percentage of account equity.
  *
- * <p><strong>CRITICAL:</strong> This engine computes advisory position sizes only.
+ * <p>
+ * <strong>CRITICAL:</strong> This engine computes advisory position sizes only.
  * It NEVER places orders or directly interacts with any exchange.
- * The RiskEngine reviews and may further reduce the resulting size.</p>
+ * The RiskEngine reviews and may further reduce the resulting size.
+ * </p>
  */
 @Slf4j
 public class PositionSizingEngine {
@@ -51,13 +53,13 @@ public class PositionSizingEngine {
         validateRequest(request);
 
         double rawUnits = switch (request.getMethod()) {
-            case RISK_PERCENT        -> calcRiskPercent(request);
-            case FIXED_LOT          -> calcFixedLot(request);
-            case KELLY_CRITERION    -> calcKelly(request);
-            case ATR_BASED          -> calcAtrBased(request);
-            case VOLATILITY_ADJUSTED -> calcVolatilityAdjusted(request);
-            case EQUAL_WEIGHT       -> calcEqualWeight(request);
-            case MAX_LOSS           -> calcMaxLoss(request);
+            case RISK_PERCENT, FIXED_RISK_PERCENT -> calcRiskPercent(request);
+            case FIXED_LOT, FIXED_UNITS -> calcFixedLot(request);
+            case KELLY_CRITERION -> calcKelly(request);
+            case ATR_BASED -> calcAtrBased(request);
+            case VOLATILITY_ADJUSTED, VOLATILITY_BASED -> calcVolatilityAdjusted(request);
+            case EQUAL_WEIGHT, RISK_PARITY -> calcEqualWeight(request);
+            case MAX_LOSS, DRAWDOWN_SCALING -> calcMaxLoss(request);
         };
 
         // Apply AI multiplier (confidence-derived) — clamped to [0.25, 1.50]
@@ -81,8 +83,9 @@ public class PositionSizingEngine {
                 && riskPercent <= request.getMaxPositionSizePercent();
         String validationReason = !valid
                 ? (finalUnits <= 0 ? "Computed size is zero or negative"
-                    : "Risk " + String.format("%.2f%%", riskPercent * 100)
-                    + " exceeds maximum " + String.format("%.2f%%", request.getMaxPositionSizePercent() * 100))
+                        : "Risk " + String.format("%.2f%%", riskPercent * 100)
+                                + " exceeds maximum "
+                                + String.format("%.2f%%", request.getMaxPositionSizePercent() * 100))
                 : "OK";
 
         log.debug("Position size: assignment={} method={} raw={} ai={} final={}",
@@ -131,8 +134,8 @@ public class PositionSizingEngine {
         StrategyLearningProfile profile = req.getLearningProfile();
         double winRate = profile != null ? profile.getAvgWinConfidence() : 0.50;
         double equity = req.getEquity();
-        double avgWin = equity * 0.02;   // fallback 2%
-        double avgLoss = equity * 0.01;  // fallback 1%
+        double avgWin = equity * 0.02; // fallback 2%
+        double avgLoss = equity * 0.01; // fallback 1%
         double b = avgLoss > 0 ? avgWin / avgLoss : 2.0;
         double kellFraction = (b * winRate - (1.0 - winRate)) / b;
         kellFraction = clamp(kellFraction, 0.0, 0.25); // cap full Kelly at 25%
@@ -178,9 +181,12 @@ public class PositionSizingEngine {
     // =========================================================================
 
     private void validateRequest(PositionSizeRequest request) {
-        if (request == null) throw new IllegalArgumentException("PositionSizeRequest must not be null");
-        if (request.getEquity() <= 0) throw new IllegalArgumentException("Equity must be positive");
-        if (request.getMethod() == null) throw new IllegalArgumentException("Sizing method must not be null");
+        if (request == null)
+            throw new IllegalArgumentException("PositionSizeRequest must not be null");
+        if (request.getEquity() <= 0)
+            throw new IllegalArgumentException("Equity must be positive");
+        if (request.getMethod() == null)
+            throw new IllegalArgumentException("Sizing method must not be null");
     }
 
     private static double clamp(double value, double min, double max) {

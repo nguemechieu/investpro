@@ -89,4 +89,11 @@ public class StrategyHealthReport {
         return previousHealthLevel != null
                 && healthLevel.priority < previousHealthLevel.priority;
     }
+
+    /**
+     * Backward-compatible alias expected by older portfolio/UI components.
+     */
+    public double getCompositeHealthScore() {
+        return healthScore;
+    }
 }

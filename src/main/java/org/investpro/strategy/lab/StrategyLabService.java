@@ -16,12 +16,12 @@ import org.investpro.persistence.repository.HistoricalDataRepositoryImpl;
 import org.investpro.persistence.repository.StrategyAssignmentRepository;
 import org.investpro.utils.HistoricalDataPrefetcher;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.IntConsumer;
 
 /**
  * Main service orchestrating all Strategy Lab operations.
@@ -201,9 +201,8 @@ public class StrategyLabService {
                     symbol,
                     timeframe,
                     cleanCandles,
-                    strategyNames,
-                    BacktestJobPriority.VISIBLE,
-                    null);
+                    strategyNames
+            );
 
             List<StrategyPerformanceReport> aiAdjustedResults = applyLocalAiBacktestReview(results);
             List<StrategyPerformanceReport> ranked = rankingEngine.rank(aiAdjustedResults);
@@ -275,7 +274,6 @@ public class StrategyLabService {
 
             for (Timeframe timeframe : timeframes) {
                 String cacheKey = makeKey(symbol, timeframe);
-                List<StrategyPerformanceReport> results = new ArrayList<>();
                 List<CandleData> candles = loadCachedCandlesForBacktest(symbol, timeframe);
                 int candleCount = candles.size();
                 HistoricalDataPrefetcher.DataReadiness readiness = HistoricalDataPrefetcher
@@ -304,13 +302,12 @@ public class StrategyLabService {
                             completed.incrementAndGet(),
                             totalTests);
                 }
-                results.addAll(runBacktestsViaScheduler(
+                List<StrategyPerformanceReport> results = new ArrayList<>(runBacktestsViaScheduler(
                         symbol,
                         timeframe,
                         candles,
-                        strategyNames,
-                        BacktestJobPriority.VISIBLE,
-                        null));
+                        strategyNames
+                ));
                 allResults.addAll(results);
 
                 // Rank and cache results for this timeframe
@@ -452,7 +449,7 @@ public class StrategyLabService {
                 .toList();
     }
 
-    private StrategyContext buildVotingContext(String symbol, Timeframe timeframe, List<CandleData> candles) {
+    private StrategyContext buildVotingContext(String symbol, Timeframe timeframe, @NonNull List<CandleData> candles) {
         CandleData latest = candles.isEmpty() ? null : candles.get(candles.size() - 1);
         double current = latest == null ? 0.0 : latest.closePrice();
         double spread = current > 0.0 ? Math.max(current * 0.0001, 0.00000001) : 0.0;
@@ -493,9 +490,7 @@ public class StrategyLabService {
             return null;
         }
         String[] parts = symbol.replace('_', '/').replace('-', '/').split("/");
-        if (parts.length < 2) {
-            return null;
-        }
+        if (parts.length < 2) return null;
         try {
             return new TradePair(parts[0], parts[1]);
         } catch (Exception exception) {
@@ -508,11 +503,8 @@ public class StrategyLabService {
             String symbol,
             Timeframe timeframe,
             List<CandleData> candles,
-            List<String> strategyNames,
-            BacktestJobPriority priority,
-            IntConsumer progressCallback) {
+            List<String> strategyNames) {
         List<BacktestJob> jobs = new ArrayList<>();
-        AtomicInteger finished = new AtomicInteger(0);
 
         for (String strategyName : strategyNames) {
             StrategyBacktestRequest request = StrategyBacktestRequest.builder()
@@ -528,14 +520,10 @@ public class StrategyLabService {
                     .useRiskManagement(true)
                     .build();
             try {
-                jobs.add(backtestScheduler.submit(request, priority, job -> {
-                    int count = finished.incrementAndGet();
-                    if (progressCallback != null) {
-                        progressCallback.accept(count);
-                    }
+                jobs.add(backtestScheduler.submitWhenCapacityAvailable(request, BacktestJobPriority.VISIBLE, job -> {
                 }));
             } catch (RejectedExecutionException exception) {
-                log.warn("Backtest scheduler rejected {}/{} strategy={}: {}",
+                log.warn("Backtest scheduler could not accept {}/{} strategy={}: {}",
                         symbol, timeframe.getCode(), strategyName, exception.getMessage());
             }
         }

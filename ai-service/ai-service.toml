@@ -71,3 +71,17 @@ cache_enabled = true
 cache_ttl_seconds = 5
 batching_enabled = false
 max_batch_size = 64
+
+[requirements]
+python = ">=3.11"
+grpcio = ">=1.64.0"
+grpcio_tools = ">=1.64.0"
+protobuf = ">=5.27.0"
+numpy = ">=1.26.0"
+pandas = ">=2.2.0"
+scikit_learn = ">=1.5.0"
+pydantic = ">=2.7.0"
+joblib = ">=1.4.0"
+cachetools = ">=5.3.0"
+structlog = ">=24.1.0"
+pytest = ">=8.2.0"

@@ -133,7 +133,7 @@ public class AIStrategyValidationEngine {
         String reasoning;
 
         if (totalTrades < minPaperTrades) {
-            decision = AIReviewDecision.NEEDS_MORE_DATA;
+            decision = AIReviewDecision.REQUIRE_MORE_DATA;
             confidence = 0.40;
             reasoning = String.format("Only %d paper trades completed; %d required for validation.",
                     totalTrades, minPaperTrades);

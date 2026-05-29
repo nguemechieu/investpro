@@ -5,13 +5,12 @@ package org.investpro.strategy.lifecycle;
  * Institutional AI-Driven Strategy Lifecycle Management System.
  */
 public enum StrategyLifecycleStatus {
-    DISCOVERED("Strategy has been discovered and is pending backtesting"),
-    BACKTESTING("Strategy is currently being backtested"),
-    AI_REVIEW("Strategy backtest is under AI review"),
-    RANKED("Strategy has been ranked following AI review"),
-    ASSIGNED("Strategy has been assigned to a symbol/timeframe"),
+    DISCOVERED("Strategy has been discovered and is pending validation"),
+    VALIDATED("Strategy API, configuration, and platform-safety checks passed"),
+    BACKTESTED("Strategy has completed backtesting with enough data"),
+    AI_REVIEWED("Strategy has been reviewed by the AI supervision layer"),
     PAPER_TRADING("Strategy is in paper trading validation phase"),
-    VALIDATING("Strategy paper trade results are being validated by AI"),
+    PAPER_APPROVED("Strategy paper trading period has been reviewed and approved"),
     LIVE_APPROVED("Strategy has been approved for live trading"),
     LIVE_ACTIVE("Strategy is actively trading live"),
     WATCH("Strategy is live but under close monitoring"),
@@ -19,8 +18,23 @@ public enum StrategyLifecycleStatus {
     PAUSED("Strategy has been paused by AI or user"),
     DEMOTED("Strategy has been demoted from live to paper trading"),
     REPLACED("Strategy has been replaced by a better candidate"),
-    FAILED("Strategy has failed validation or performance requirements"),
-    ARCHIVED("Strategy has been archived and is no longer active");
+    ARCHIVED("Strategy has been archived and is no longer active"),
+
+    /** @deprecated Use {@link #DISCOVERED}. */
+    @Deprecated
+    ASSIGNED("Legacy alias for discovered strategy assignments"),
+    /** @deprecated Use {@link #BACKTESTED}. */
+    @Deprecated
+    BACKTESTING("Legacy alias for in-progress backtesting"),
+    /** @deprecated Use {@link #AI_REVIEWED}. */
+    @Deprecated
+    AI_REVIEW("Legacy alias for AI-reviewed strategies"),
+    /** @deprecated Use {@link #PAPER_APPROVED}. */
+    @Deprecated
+    VALIDATING("Legacy alias for paper approval validation"),
+    /** @deprecated Use {@link #ARCHIVED}. */
+    @Deprecated
+    FAILED("Legacy alias for archived failed strategies");
 
     /** Human-readable description of this lifecycle stage. */
     public final String description;
@@ -41,11 +55,24 @@ public enum StrategyLifecycleStatus {
 
     /** @return true if the strategy is in pre-deployment evaluation. */
     public boolean isPending() {
-        return this == DISCOVERED || this == BACKTESTING || this == AI_REVIEW || this == RANKED;
+        return this == DISCOVERED || this == VALIDATED || this == BACKTESTED || this == AI_REVIEWED
+                || this == BACKTESTING || this == AI_REVIEW || this == ASSIGNED || this == VALIDATING;
     }
 
     /** @return true if the strategy has reached a terminal state and will no longer trade. */
     public boolean isTerminal() {
         return this == FAILED || this == ARCHIVED || this == REPLACED;
+    }
+
+    /** @return true if this status can be treated as a validation-complete state. */
+    public boolean hasValidationEvidence() {
+        return this == VALIDATED || this == BACKTESTED || this == AI_REVIEWED || this == PAPER_TRADING
+                || this == PAPER_APPROVED || this == LIVE_APPROVED || this == LIVE_ACTIVE
+                || this == VALIDATING;
+    }
+
+    /** @return true if this status has completed paper trading review. */
+    public boolean hasPaperApproval() {
+        return this == PAPER_APPROVED || this == LIVE_APPROVED || this == LIVE_ACTIVE || this == VALIDATING;
     }
 }

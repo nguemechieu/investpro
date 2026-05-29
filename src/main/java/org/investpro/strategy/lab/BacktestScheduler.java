@@ -235,6 +235,40 @@ public final class BacktestScheduler {
     }
 
     /**
+     * Submits a job after waiting for queue capacity.
+     *
+     * <p>This is intended for bulk Strategy Lab runs where rejecting a valid
+     * strategy because the queue is temporarily full would hide useful results.
+     * The caller should already be off the JavaFX thread.
+     */
+    @NotNull
+    public BacktestJob submitWhenCapacityAvailable(
+            @NotNull StrategyBacktestRequest request,
+            @NotNull BacktestJobPriority priority,
+            @Nullable Consumer<BacktestJob> onComplete) {
+        while (!shutdown.get()) {
+            if (workQueue.size() < maxQueueSize) {
+                try {
+                    return submit(request, priority, onComplete);
+                } catch (RejectedExecutionException exception) {
+                    if (shutdown.get()) {
+                        throw exception;
+                    }
+                }
+            }
+
+            try {
+                Thread.sleep(100L);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new RejectedExecutionException("Interrupted while waiting for backtest queue capacity", exception);
+            }
+        }
+
+        throw new RejectedExecutionException("BacktestScheduler has been shut down");
+    }
+
+    /**
      * Submits a job with {@link BacktestJobPriority#BACKGROUND} priority.
      */
     @NotNull

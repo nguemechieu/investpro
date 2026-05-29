@@ -13,8 +13,10 @@ import java.util.UUID;
  * Portfolio-level intelligence report produced by
  * {@link PortfolioIntelligenceEngine}.
  *
- * <p><strong>NOTE:</strong> AI recommendations in this report are advisory only.
- * The RiskEngine enforces hard exposure limits.</p>
+ * <p>
+ * <strong>NOTE:</strong> AI recommendations in this report are advisory only.
+ * The RiskEngine enforces hard exposure limits.
+ * </p>
  */
 @Getter
 @Builder
@@ -24,6 +26,24 @@ public class PortfolioIntelligenceReport {
     /** Unique report identifier (UUID). */
     @Builder.Default
     private final String reportId = UUID.randomUUID().toString();
+
+    // --- Current engine/dashboard fields ---
+    private final double totalEquity;
+    private final int activeStrategies;
+    private final int liveStrategies;
+    private final int degradedStrategies;
+    private final int symbolCount;
+    private final int timeframeCount;
+    private final int strategyTypeCount;
+    private final Map<String, Double> concentrationBySymbol;
+    private final double maxConcentration;
+    private final boolean concentrationRisk;
+    private final boolean correlationRisk;
+    private final double avgAiConfidence;
+    private final double avgHealthScore;
+    private final List<String> recommendations;
+    private final List<String> warnings;
+    private final Instant analyzedAt;
 
     /** Total portfolio exposure as a fraction of equity. */
     private final double totalExposurePercent;
@@ -38,10 +58,10 @@ public class PortfolioIntelligenceReport {
     private final double equityAllocationPercent;
 
     /** Concentration risk score (0.0-1.0; high = concentrated in few symbols). */
-    private final double concentrationRisk;
+    private final double concentrationRiskScore;
 
     /** Correlation risk score (0.0-1.0; high = positions are highly correlated). */
-    private final double correlationRisk;
+    private final double correlationRiskScore;
 
     /** Volatility risk score (0.0-1.0; high = portfolio is volatile). */
     private final double volatilityRisk;
@@ -63,4 +83,11 @@ public class PortfolioIntelligenceReport {
 
     /** Timestamp when this report was generated. */
     private final Instant generatedAt;
+
+    /**
+     * Backward-compatible alias expected by older UI components.
+     */
+    public List<String> getWarnings() {
+        return warnings == null ? List.of() : warnings;
+    }
 }

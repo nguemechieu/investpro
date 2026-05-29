@@ -149,9 +149,8 @@ public class StrategyLifecycleRecord {
         return lastValidationReport != null
                 && lastValidationReport.isApprovedForLive()
                 && validationScore >= 0.60
-                && (lifecycleStatus == StrategyLifecycleStatus.LIVE_APPROVED
-                    || lifecycleStatus == StrategyLifecycleStatus.PAPER_TRADING
-                    || lifecycleStatus == StrategyLifecycleStatus.VALIDATING);
+                && lifecycleStatus != null
+                && lifecycleStatus.hasPaperApproval();
     }
 
     /**

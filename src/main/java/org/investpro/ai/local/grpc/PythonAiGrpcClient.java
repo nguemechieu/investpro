@@ -9,9 +9,19 @@ import org.investpro.ai.local.grpc.generated.BacktestReviewResponse;
 import org.investpro.ai.local.grpc.generated.HealthRequest;
 import org.investpro.ai.local.grpc.generated.HealthResponse;
 import org.investpro.ai.local.grpc.generated.InvestProAiServiceGrpc;
+import org.investpro.ai.local.grpc.generated.RankedStrategy;
+import org.investpro.ai.local.grpc.generated.RegimeDetectionRequest;
+import org.investpro.ai.local.grpc.generated.RegimeDetectionResponse;
+import org.investpro.ai.local.grpc.generated.RiskScoreRequest;
+import org.investpro.ai.local.grpc.generated.RiskScoreResponse;
 import org.investpro.ai.local.grpc.generated.SignalReviewRequest;
 import org.investpro.ai.local.grpc.generated.SignalReviewResponse;
+import org.investpro.ai.local.grpc.generated.StrategyRankingRequest;
+import org.investpro.ai.local.grpc.generated.StrategyRankingResponse;
+import org.investpro.ai.local.grpc.generated.StrategyReviewRequest;
+import org.investpro.ai.local.grpc.generated.StrategyReviewResponse;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -22,6 +32,20 @@ public class PythonAiGrpcClient implements AutoCloseable {
     }
 
     public record BacktestReviewResult(boolean accepted, double aiScore, double overfitRisk, String warnings) {
+    }
+
+    public record StrategyReviewResult(boolean accepted, double aiScore, String recommendation,
+            String reasons, String warnings) {
+    }
+
+    public record StrategyRankingResult(List<RankedStrategy> ranked, String recommendation, String warnings) {
+    }
+
+    public record RegimeDetectionResult(String regime, double confidence, String volatilityState,
+            double trendStrength, String reasons) {
+    }
+
+    public record RiskScoreResult(double riskScore, String recommendation, double maxPositionSize, String reasons) {
     }
 
     private final ManagedChannel channel;
@@ -78,6 +102,51 @@ public class PythonAiGrpcClient implements AutoCloseable {
                 response.getAiScore(),
                 response.getOverfitRisk(),
                 String.join(";", response.getWarningsList()));
+    }
+
+    public StrategyReviewResult reviewStrategy(StrategyReviewRequest request) {
+        StrategyReviewResponse response = blockingStub
+                .withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS)
+                .reviewStrategy(request);
+        return new StrategyReviewResult(
+                response.getAccepted(),
+                response.getAiScore(),
+                response.getRecommendation(),
+                String.join(";", response.getReasonsList()),
+                String.join(";", response.getWarningsList()));
+    }
+
+    public StrategyRankingResult rankStrategies(StrategyRankingRequest request) {
+        StrategyRankingResponse response = blockingStub
+                .withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS)
+                .rankStrategies(request);
+        return new StrategyRankingResult(
+                List.copyOf(response.getRankedList()),
+                response.getRecommendation(),
+                String.join(";", response.getWarningsList()));
+    }
+
+    public RegimeDetectionResult detectRegime(RegimeDetectionRequest request) {
+        RegimeDetectionResponse response = blockingStub
+                .withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS)
+                .detectRegime(request);
+        return new RegimeDetectionResult(
+                response.getRegime(),
+                response.getConfidence(),
+                response.getVolatilityState(),
+                response.getTrendStrength(),
+                String.join(";", response.getReasonsList()));
+    }
+
+    public RiskScoreResult scoreRisk(RiskScoreRequest request) {
+        RiskScoreResponse response = blockingStub
+                .withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS)
+                .scoreRisk(request);
+        return new RiskScoreResult(
+                response.getRiskScore(),
+                response.getRecommendation(),
+                response.getMaxPositionSize(),
+                String.join(";", response.getReasonsList()));
     }
 
     @Override
