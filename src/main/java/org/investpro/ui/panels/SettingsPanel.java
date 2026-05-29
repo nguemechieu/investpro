@@ -194,7 +194,7 @@ public class SettingsPanel extends StackPane {
         requirePaperTradingBeforeLiveCheckbox = styledCheckBox("Require Paper Trading Before Live Trading", true);
         autoAssignBestStrategyCheckbox = styledCheckBox("Auto Assign Best Strategy After Evaluation", true);
 
-        minStrategyScoreSpinner = doubleSpinner(0.0, 100.0, 60.0, 5.0);
+        minStrategyScoreSpinner = doubleSpinner(0.0, 100.0, 5.0, 1.0);
         topStrategiesToPaperTradeSpinner = intSpinner(1, 50, 5, 1);
 
         smallAccountModeCheckbox = styledCheckBox("Enable Small Account Mode", true);
@@ -1123,7 +1123,7 @@ public class SettingsPanel extends StackPane {
                     true,
                     true,
                     true,
-                    60.0,
+                    5.0,
                     5,
                     true,
                     100.0,
@@ -1135,12 +1135,19 @@ public class SettingsPanel extends StackPane {
 
         public static SystemSafetySettings load() {
             SystemSafetySettings d = defaults();
+            double minStrategyScore = PREFS.getDouble("minStrategyScore", d.minStrategyScore());
+            boolean migratedScoreDefault = PREFS.getBoolean("minStrategyScoreDefaultMigrated", false);
+            if (!migratedScoreDefault && Double.compare(minStrategyScore, 60.0) == 0) {
+                minStrategyScore = d.minStrategyScore();
+                PREFS.putDouble("minStrategyScore", minStrategyScore);
+                PREFS.putBoolean("minStrategyScoreDefaultMigrated", true);
+            }
 
             return new SystemSafetySettings(
                     PREFS.getBoolean("requireBacktestBeforeLive", d.requireBacktestBeforeLive()),
                     PREFS.getBoolean("requirePaperTradingBeforeLive", d.requirePaperTradingBeforeLive()),
                     PREFS.getBoolean("autoAssignBestStrategy", d.autoAssignBestStrategy()),
-                    PREFS.getDouble("minStrategyScore", d.minStrategyScore()),
+                    minStrategyScore,
                     PREFS.getInt("topStrategiesToPaperTrade", d.topStrategiesToPaperTrade()),
                     PREFS.getBoolean("smallAccountModeEnabled", d.smallAccountModeEnabled()),
                     PREFS.getDouble("smallAccountThreshold", d.smallAccountThreshold()),
