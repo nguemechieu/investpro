@@ -1,490 +1,237 @@
 package org.investpro.strategy;
 
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.spi.PluginRegistry;
-import org.investpro.spi.StrategyProvider;
-import org.investpro.spi.StrategyProviderContext;
-import org.investpro.strategy.impl.UnifiedStrategy;
-import org.investpro.strategy.impl.UserStrategyAdapter;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Registry for catalog-driven trading strategies.
+ * Central registry for ALL trading strategies — developer plugins and no-code strategies alike.
  *
- * This registry stores StrategyDefinition objects first and lazily creates
- * UnifiedStrategy instances only when requested.
+ * <p>Every strategy that reaches InvestPro's pipeline must be registered here first.
+ * The registry is the single source of truth for:
+ * <ul>
+ *   <li>Backtesting engine — "which strategies can be backtested?"</li>
+ *   <li>Strategy Assignment Manager — "which strategies are available for assignment?"</li>
+ *   <li>AI Review Engine — "which strategies need AI review?"</li>
+ *   <li>UI panels — "what should be displayed in the strategy list?"</li>
+ * </ul>
  *
- * This mirrors the Python strategy registry pattern:
- * - register built-in definitions
- * - lazy instantiate selected strategy
- * - support aliases
- * - track active strategy
- * - configure parameters dynamically
+ * <p><strong>CRITICAL:</strong> Registration does NOT grant live trading permission.
+ * Strategies must pass the full safety-gate pipeline before live approval.
+ * The {@link StrategyDescriptor#isLiveAllowed()} flag is the gate.</p>
+ *
+ * <p>Thread-safe: all operations use a {@link ConcurrentHashMap}.</p>
  */
 @Slf4j
-@Getter
-public final class StrategyRegistry {
+public class StrategyRegistry {
 
     private static volatile StrategyRegistry instance;
 
-    /**
-     * Instantiated strategies, keyed by normalized strategy name.
-     */
-    private final Map<String, TradingStrategy> strategies = new LinkedHashMap<>();
+    /** strategyId → TradingStrategy. */
+    private final ConcurrentHashMap<String, TradingStrategy> strategies = new ConcurrentHashMap<>();
 
-    /**
-     * Strategy catalog definitions, keyed by normalized strategy name.
-     */
-    private final Map<String, StrategyDefinition> definitions = new LinkedHashMap<>();
+    /** strategyId → StrategyDescriptor (metadata + status). */
+    private final ConcurrentHashMap<String, StrategyDescriptor> descriptors = new ConcurrentHashMap<>();
 
-    private final Map<String, StrategyProvider> pluginProviders = new LinkedHashMap<>();
-
-    /**
-     * Current active strategy variant name.
-     */
-    private String activeName;
-
-    /**
-     * Fallback strategy if nothing else can be resolved.
-     */
-    private final UnifiedStrategy defaultStrategy = new UnifiedStrategy("Trend Following");
-
-    public StrategyRegistry() {
-        registerBuiltInStrategies();
+    private StrategyRegistry() {
+        log.info("StrategyRegistry initialised");
     }
 
+    /**
+     * Returns the singleton instance.
+     *
+     * @return singleton StrategyRegistry
+     */
     public static StrategyRegistry getInstance() {
         StrategyRegistry local = instance;
-
         if (local == null) {
             synchronized (StrategyRegistry.class) {
                 local = instance;
-
                 if (local == null) {
                     local = new StrategyRegistry();
                     instance = local;
                 }
             }
         }
-
         return local;
     }
 
-    private void registerBuiltInStrategies() {
-        registerPluginProviders();
-
-        for (StrategyDefinition definition : StrategyCatalog.STRATEGY_DEFINITIONS.values()) {
-            if (definition == null || isBlank(definition.getName())) {
-                continue;
-            }
-
-            String normalized = StrategyCatalog.normalizeStrategyName(definition.getName());
-
-            definitions.putIfAbsent(normalized, definition);
-
-            if (activeName == null) {
-                activeName = normalized;
-            }
-        }
-
-        log.info("StrategyRegistry initialized with {} strategy definitions", definitions.size());
-    }
-
-    private void registerPluginProviders() {
-        try {
-            for (StrategyProvider provider : PluginRegistry.loadDefault().strategyProviders()) {
-                if (provider == null || isBlank(provider.id())) {
-                    continue;
-                }
-
-                String providerId = StrategyCatalog.normalizeStrategyName(provider.id());
-                String displayName = StrategyCatalog.normalizeStrategyName(provider.displayName());
-                pluginProviders.putIfAbsent(providerId, provider);
-                pluginProviders.putIfAbsent(displayName, provider);
-
-                definitions.putIfAbsent(displayName, StrategyDefinition.builder()
-                        .name(displayName)
-                        .baseName(displayName)
-                        .parameters(StrategyParameters.builder().build())
-                        .build());
-
-                if (activeName == null && provider.enabledByDefault()) {
-                    activeName = displayName;
-                }
-
-                log.info("Registered strategy provider: id={}, name={}", provider.id(), provider.displayName());
-            }
-        } catch (Exception exception) {
-            log.warn("Failed to register strategy providers. Legacy catalog remains available.", exception);
-        }
-    }
+    // =========================================================================
+    // Registration
+    // =========================================================================
 
     /**
-     * Registers a concrete strategy instance.
+     * Registers a strategy with a descriptor.
      *
-     * Useful for custom strategies that are not catalog-driven.
+     * @param descriptor the strategy metadata and pipeline status
+     * @param strategy   the TradingStrategy implementation
+     * @throws IllegalArgumentException if descriptor or strategy is null
      */
-    public synchronized void register(@NotNull String name, @NotNull TradingStrategy strategy) {
-        Objects.requireNonNull(strategy, "strategy must not be null");
+    public void register(StrategyDescriptor descriptor, TradingStrategy strategy) {
+        if (descriptor == null) throw new IllegalArgumentException("descriptor must not be null");
+        if (strategy == null) throw new IllegalArgumentException("strategy must not be null");
 
-        String normalized = StrategyCatalog.normalizeStrategyName(name);
-
-        // Check for duplicate registration (especially important for user strategies)
-        if (strategies.containsKey(normalized) || definitions.containsKey(normalized)) {
-            log.warn(
-                    "Strategy with ID '{}' is already registered. Skipping duplicate registration.",
-                    normalized);
-            return;
-        }
-
-        StrategyDefinition definition = StrategyCatalog.definition(normalized);
-        definitions.put(normalized, definition);
-        strategies.put(normalized, strategy);
-
-        if (activeName == null) {
-            activeName = normalized;
-        }
-
-        log.info("Registered strategy instance: {}", normalized);
+        String id = descriptor.getStrategyId();
+        descriptors.put(id, descriptor);
+        strategies.put(id, strategy);
+        log.info("Registered strategy: id={} name='{}' type={}",
+                id, descriptor.getName(), descriptor.getStrategyType());
     }
 
     /**
-     * Registers a definition without instantiating the strategy yet.
-     */
-    public synchronized void registerDefinition(@NotNull StrategyDefinition definition) {
-        Objects.requireNonNull(definition, "definition must not be null");
-
-        String normalized = StrategyCatalog.normalizeStrategyName(definition.getName());
-
-        definitions.put(normalized, definition);
-
-        if (activeName == null) {
-            activeName = normalized;
-        }
-
-        log.info("Registered strategy definition: {}", normalized);
-    }
-
-    /**
-     * Gets a strategy by name or alias.
+     * Updates the descriptor for an already-registered strategy (e.g. after validation).
      *
-     * If the strategy has not been instantiated yet, this lazily creates it.
+     * @param descriptor updated descriptor; must match an existing strategyId
+     * @throws IllegalArgumentException if the strategyId is not registered
      */
-    @Nullable
-    public synchronized TradingStrategy getStrategy(@Nullable String name) {
-        String normalized = StrategyCatalog.normalizeStrategyName(name);
-
-        TradingStrategy existing = strategies.get(normalized);
-
-        if (existing != null) {
-            return existing;
+    public void updateDescriptor(StrategyDescriptor descriptor) {
+        if (!descriptors.containsKey(descriptor.getStrategyId())) {
+            throw new IllegalArgumentException(
+                    "Strategy not registered: " + descriptor.getStrategyId());
         }
-
-        return instantiateStrategy(normalized);
+        descriptors.put(descriptor.getStrategyId(), descriptor);
+        log.debug("Updated descriptor for strategyId={} status={}",
+                descriptor.getStrategyId(), descriptor.getValidationStatus());
     }
 
     /**
-     * Alias for compatibility with older code.
+     * Removes a strategy from the registry.
+     *
+     * @param strategyId the strategy to remove
      */
-    @Nullable
-    public TradingStrategy get(@Nullable String name) {
-        return getStrategy(name);
+    public void unregister(String strategyId) {
+        if (strategyId == null) return;
+        strategies.remove(strategyId);
+        StrategyDescriptor removed = descriptors.remove(strategyId);
+        if (removed != null) {
+            log.info("Unregistered strategy: id={} name='{}'", strategyId, removed.getName());
+        }
+    }
+
+    // =========================================================================
+    // Lookup
+    // =========================================================================
+
+    /**
+     * Finds a strategy by its ID.
+     *
+     * @param strategyId the strategy ID
+     * @return Optional containing the strategy if found
+     */
+    public Optional<TradingStrategy> findById(String strategyId) {
+        return Optional.ofNullable(strategies.get(strategyId));
     }
 
     /**
-     * Instantiates a catalog-driven UnifiedStrategy for the selected variant.
+     * Finds the descriptor for a strategy by its ID.
+     *
+     * @param strategyId the strategy ID
+     * @return Optional containing the descriptor if found
      */
-    @Nullable
-    private TradingStrategy instantiateStrategy(@NotNull String name) {
-        StrategyProvider provider = pluginProviders.get(name);
-        if (provider != null) {
-            try {
-                TradingStrategy strategy = provider.create(new StrategyProviderContext(null, PluginRegistry.loadDefault(), null, Map.of()));
-                if (strategy != null) {
-                    strategies.put(name, strategy);
-                    log.debug("Instantiated plugin strategy: id={}, name={}", provider.id(), provider.displayName());
-                    return strategy;
-                }
-            } catch (Exception exception) {
-                log.warn(
-                        "Failed to instantiate plugin strategy provider '{}'. Falling back to catalog if possible.",
-                        provider.id(),
-                        exception);
-            }
-        }
-
-        StrategyDefinition definition = definitions.get(name);
-
-        if (definition == null) {
-            log.warn("Strategy definition not found: {}", name);
-            return null;
-        }
-
-        UnifiedStrategy strategy = new UnifiedStrategy(definition.getName());
-        strategy.applyParameters(definition.getParameters());
-
-        strategies.put(name, strategy);
-
-        log.debug(
-                "Instantiated strategy: name={}, baseName={}",
-                definition.getName(),
-                definition.getBaseName());
-
-        return strategy;
+    public Optional<StrategyDescriptor> findDescriptorById(String strategyId) {
+        return Optional.ofNullable(descriptors.get(strategyId));
     }
 
     /**
-     * Lists all available strategy names, including lazy definitions.
+     * Returns all strategies of a given type.
+     *
+     * @param type the strategy type to filter by
+     * @return unmodifiable list of matching strategies
      */
-    public List<String> list() {
-        return definitions.keySet().stream().toList();
-    }
-
-    public List<String> listStrategyNames() {
-        return list();
-    }
-
-    public Collection<TradingStrategy> getEnabledStrategies() {
-        // Instantiate only the active strategy by default if nothing is loaded yet.
-        if (strategies.isEmpty() && activeName != null) {
-            getStrategy(activeName);
-        }
-
-        return strategies.values()
-                .stream()
-                .filter(Objects::nonNull)
-                .filter(TradingStrategy::isEnabled)
-                .toList();
-    }
-
-    public synchronized void setActive(@Nullable String name) {
-        String normalized = StrategyCatalog.normalizeStrategyName(name);
-
-        if (definitions.containsKey(normalized) || strategies.containsKey(normalized)) {
-            activeName = normalized;
-            log.info("Active strategy set to {}", activeName);
-            return;
-        }
-
-        log.warn("Cannot set active strategy. Unknown strategy: {}", name);
-    }
-
-    public synchronized TradingStrategy configure(@Nullable String strategyName, @Nullable StrategyParameters params) {
-        String targetName = StrategyCatalog.normalizeStrategyName(
-                strategyName == null || strategyName.isBlank() ? activeName : strategyName);
-
-        setActive(targetName);
-
-        TradingStrategy target = resolveStrategy(targetName);
-
-        if (target instanceof UnifiedStrategy unifiedStrategy) {
-            unifiedStrategy.setStrategyName(targetName);
-
-            if (params != null) {
-                unifiedStrategy.applyParameters(params);
+    public List<TradingStrategy> findByType(StrategyType type) {
+        List<TradingStrategy> result = new ArrayList<>();
+        for (Map.Entry<String, StrategyDescriptor> entry : descriptors.entrySet()) {
+            if (entry.getValue().getStrategyType() == type) {
+                TradingStrategy s = strategies.get(entry.getKey());
+                if (s != null) result.add(s);
             }
         }
-
-        return target;
+        return Collections.unmodifiableList(result);
     }
 
-    public TradingStrategy resolveStrategy(@Nullable String strategyName) {
-        String normalized = strategyName == null || strategyName.isBlank()
-                ? null
-                : StrategyCatalog.normalizeStrategyName(strategyName);
-
-        if (normalized != null) {
-            TradingStrategy selected = getStrategy(normalized);
-
-            if (selected != null) {
-                return selected;
+    /**
+     * Returns strategies that support a given asset symbol.
+     *
+     * @param assetSymbol asset symbol, e.g. "BTC"
+     * @return unmodifiable list of matching strategies (or all if no asset filter set)
+     */
+    public List<TradingStrategy> findByAsset(String assetSymbol) {
+        List<TradingStrategy> result = new ArrayList<>();
+        for (Map.Entry<String, StrategyDescriptor> entry : descriptors.entrySet()) {
+            StrategyDescriptor desc = entry.getValue();
+            List<String> assets = desc.getSupportedAssets();
+            if (assets == null || assets.isEmpty() ||
+                    assets.stream().anyMatch(a -> a.equalsIgnoreCase(assetSymbol))) {
+                TradingStrategy s = strategies.get(entry.getKey());
+                if (s != null) result.add(s);
             }
         }
+        return Collections.unmodifiableList(result);
+    }
 
-        if (activeName != null) {
-            TradingStrategy active = getStrategy(activeName);
+    /**
+     * Returns all registered strategies.
+     *
+     * @return unmodifiable collection of all strategies
+     */
+    public Collection<TradingStrategy> getAll() {
+        return Collections.unmodifiableCollection(strategies.values());
+    }
 
-            if (active != null) {
-                return active;
+    /**
+     * Returns all descriptors.
+     *
+     * @return unmodifiable collection of all descriptors
+     */
+    public Collection<StrategyDescriptor> getAllDescriptors() {
+        return Collections.unmodifiableCollection(descriptors.values());
+    }
+
+    /**
+     * Returns only strategies cleared for live trading.
+     *
+     * @return unmodifiable list of live-approved strategies
+     */
+    public List<TradingStrategy> getLiveApproved() {
+        List<TradingStrategy> result = new ArrayList<>();
+        for (Map.Entry<String, StrategyDescriptor> entry : descriptors.entrySet()) {
+            if (entry.getValue().isLiveAllowed()) {
+                TradingStrategy s = strategies.get(entry.getKey());
+                if (s != null) result.add(s);
             }
         }
-
-        if (!definitions.isEmpty()) {
-            String firstName = definitions.keySet().iterator().next();
-            TradingStrategy first = getStrategy(firstName);
-
-            if (first != null) {
-                return first;
-            }
-        }
-
-        return defaultStrategy;
+        return Collections.unmodifiableList(result);
     }
 
-    public StrategySignal generateSignal(@NotNull StrategyContext context, @Nullable String strategyName) {
-        TradingStrategy strategy = resolveStrategy(strategyName);
-        return strategy.generateSignal(context);
+    /**
+     * Returns whether a strategy is registered.
+     *
+     * @param strategyId the ID to check
+     * @return true if registered
+     */
+    public boolean isRegistered(String strategyId) {
+        return strategies.containsKey(strategyId);
     }
 
-    public StrategySignal generateSignal(@NotNull StrategyContext context) {
-        return generateSignal(context, activeName);
-    }
-
-    public boolean contains(@Nullable String name) {
-        String normalized = StrategyCatalog.normalizeStrategyName(name);
-        return definitions.containsKey(normalized) || strategies.containsKey(normalized);
-    }
-
-    public int definitionCount() {
-        return definitions.size();
-    }
-
-    public int instantiatedCount() {
+    /**
+     * Returns the number of registered strategies.
+     *
+     * @return count
+     */
+    public int size() {
         return strategies.size();
     }
 
-    public void clearInstantiatedStrategies() {
+    /** Clears all registered strategies. Use only in tests. */
+    public void clear() {
         strategies.clear();
-        log.info("Cleared instantiated strategies. Definitions remain loaded: {}", definitions.size());
-    }
-
-    // =========================================================================
-    // User Strategy Management
-    // =========================================================================
-
-    /**
-     * Find a strategy by its ID.
-     *
-     * @param strategyId the strategy ID to search for
-     * @return Optional containing the strategy if found, empty otherwise
-     */
-    public Optional<TradingStrategy> findById(@NotNull String strategyId) {
-        Objects.requireNonNull(strategyId, "strategyId must not be null");
-
-        String normalized = StrategyCatalog.normalizeStrategyName(strategyId);
-
-        return Optional.ofNullable(strategies.get(normalized))
-                .or(() -> Optional.ofNullable(instantiateStrategy(normalized)));
-    }
-
-    /**
-     * Get all registered strategies (both built-in and user-developed).
-     *
-     * @return List of all TradingStrategy instances
-     */
-    public List<TradingStrategy> getAllStrategies() {
-        return strategies.values()
-                .stream()
-                .filter(Objects::nonNull)
-                .toList();
-    }
-
-    /**
-     * Get only user-developed strategies (UserStrategyAdapter instances).
-     *
-     * @return List of user strategies only
-     */
-    public List<TradingStrategy> getUserStrategies() {
-        return strategies.values()
-                .stream()
-                .filter(Objects::nonNull)
-                .filter(strategy -> strategy instanceof UserStrategyAdapter)
-                .toList();
-    }
-
-    /**
-     * Check if a strategy ID is already registered (duplicate check).
-     *
-     * @param strategyId the ID to check
-     * @return true if already registered, false otherwise
-     */
-    public synchronized boolean hasDuplicate(@NotNull String strategyId) {
-        Objects.requireNonNull(strategyId, "strategyId must not be null");
-
-        String normalized = StrategyCatalog.normalizeStrategyName(strategyId);
-
-        return strategies.containsKey(normalized) || definitions.containsKey(normalized);
-    }
-
-    /**
-     * Unregister a strategy from the registry.
-     *
-     * Used to disable or remove strategies (e.g., on validation failure).
-     *
-     * @param strategyId the ID of the strategy to remove
-     * @return true if successfully unregistered, false if not found
-     */
-    public synchronized boolean unregister(@NotNull String strategyId) {
-        Objects.requireNonNull(strategyId, "strategyId must not be null");
-
-        String normalized = StrategyCatalog.normalizeStrategyName(strategyId);
-
-        boolean removedFromStrategies = strategies.remove(normalized) != null;
-        boolean removedFromDefinitions = definitions.remove(normalized) != null;
-
-        if (removedFromStrategies || removedFromDefinitions) {
-            log.info("Unregistered strategy: {}", normalized);
-
-            // Reset active strategy if we just unregistered it
-            if (normalized.equals(activeName)) {
-                activeName = definitions.isEmpty() && strategies.isEmpty()
-                        ? null
-                        : definitions.keySet().stream().findFirst().orElse(null);
-                log.info("Reset active strategy to: {}", activeName);
-            }
-
-            return true;
-        }
-
-        log.warn("Cannot unregister strategy '{}' - not found in registry", normalized);
-        return false;
-    }
-
-    /**
-     * Instantiates all registered strategy definitions upfront.
-     *
-     * This ensures all strategies are "wired" and available for use by the
-     * StrategyEngine
-     * rather than being lazily instantiated on-demand.
-     *
-     * @return The count of successfully instantiated strategies
-     */
-    public synchronized int instantiateAllStrategies() {
-        int instantiatedCount = 0;
-        List<String> definitionNames = new ArrayList<>(definitions.keySet());
-
-        for (String name : definitionNames) {
-            try {
-                TradingStrategy strategy = getStrategy(name);
-
-                if (strategy != null && !strategies.containsKey(name)) {
-                    strategies.put(name, strategy);
-                    instantiatedCount++;
-
-                    log.debug("Instantiated strategy: {}", name);
-                }
-            } catch (Exception exception) {
-                log.warn("Failed to instantiate strategy '{}': {}", name, exception.getMessage());
-            }
-        }
-
-        log.info("Instantiated {} strategies for multi-strategy consensus", instantiatedCount);
-        return instantiatedCount;
-    }
-
-
-
-    private boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
+        descriptors.clear();
+        log.warn("StrategyRegistry cleared — all strategies removed");
     }
 }
