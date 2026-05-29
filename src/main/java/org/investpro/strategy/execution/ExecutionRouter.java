@@ -9,11 +9,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Routes execution plans to the appropriate venue based on symbol type.
- * Tracks venue health and adapts routing decisions accordingly.
+ * Routes execution plans to the appropriate venue based on symbol type and venue health.
+ * Tracks venue error counts and adapts routing decisions accordingly.
  *
  * <p><strong>CRITICAL:</strong> This router selects a venue for the plan
- * but does NOT submit or execute the plan against any exchange.</p>
+ * but does NOT submit or execute the plan against any exchange.
+ * The ExecutionEngine owns all order submission.</p>
  */
 @Slf4j
 public class ExecutionRouter {
@@ -29,7 +30,6 @@ public class ExecutionRouter {
     private static final int MAX_ERRORS_BEFORE_DEMOTION = 5;
 
     private ExecutionRouter() {
-        // Initialise all venues as healthy
         for (ExecutionVenue venue : ExecutionVenue.values()) {
             venueErrorCounts.put(venue, new AtomicInteger(0));
             venueHealthy.put(venue, true);
@@ -61,7 +61,7 @@ public class ExecutionRouter {
      *
      * @param plan   the execution plan to route
      * @param record the strategy lifecycle record
-     * @return ExecutionPlan with the venue field set
+     * @return ExecutionPlan with the venue field set to the selected venue
      */
     public ExecutionPlan route(ExecutionPlan plan, StrategyLifecycleRecord record) {
         if (plan == null) throw new IllegalArgumentException("ExecutionPlan must not be null");
@@ -71,14 +71,18 @@ public class ExecutionRouter {
         log.debug("Routing: assignment={} symbol={} -> venue={}",
                 plan.getAssignmentId(), plan.getSymbol(), selectedVenue);
 
-        eventBus().publish(AgentEvent.of(AgentEvent.EXECUTION_ROUTE_SELECTED, SOURCE, selectedVenue));
+        EventBusManager.getInstance().publish(
+                AgentEvent.of(AgentEvent.EXECUTION_ROUTE_SELECTED, SOURCE, selectedVenue));
 
-        return ExecutionPlan.builder()
+        ExecutionPlan.ExecutionPlanBuilder builder = ExecutionPlan.builder()
+                .planId(plan.getPlanId())
                 .assignmentId(plan.getAssignmentId())
                 .strategyId(plan.getStrategyId())
                 .symbol(plan.getSymbol())
+                .timeframe(plan.getTimeframe())
                 .side(plan.getSide())
                 .orderType(plan.getOrderType())
+                .timeInForce(plan.getTimeInForce())
                 .units(plan.getUnits())
                 .notionalValue(plan.getNotionalValue())
                 .entryPrice(plan.getEntryPrice())
@@ -87,15 +91,24 @@ public class ExecutionRouter {
                 .riskRewardRatio(plan.getRiskRewardRatio())
                 .riskAmount(plan.getRiskAmount())
                 .riskPercent(plan.getRiskPercent())
+                .leverage(plan.getLeverage())
+                .slippageTolerance(plan.getSlippageTolerance())
                 .venue(selectedVenue)
                 .aiApproved(plan.isAiApproved())
                 .aiConfidence(plan.getAiConfidence())
                 .aiReasoningSummary(plan.getAiReasoningSummary())
-                .validationNotes(plan.getValidationNotes())
                 .isValid(plan.isValid())
+                .riskApproved(plan.isRiskApproved())
                 .createdAt(plan.getCreatedAt())
-                .planValidUntil(plan.getPlanValidUntil())
-                .build();
+                .planValidUntil(plan.getPlanValidUntil());
+
+        if (plan.getValidationNotes() != null) {
+            for (String note : plan.getValidationNotes()) {
+                builder.validationNote(note);
+            }
+        }
+
+        return builder.build();
     }
 
     /**
@@ -142,7 +155,7 @@ public class ExecutionRouter {
     private ExecutionVenue selectVenue(String symbol, StrategyLifecycleRecord record) {
         if (symbol == null) return ExecutionVenue.PAPER_TRADE;
 
-        // Prefer paper trading for non-live strategies
+        // Use paper trading for non-live strategies
         if (record != null && !record.getLifecycleStatus().isLive()) {
             return ExecutionVenue.PAPER_TRADE;
         }
@@ -155,7 +168,7 @@ public class ExecutionRouter {
             return pickHealthy(ExecutionVenue.COINBASE_ADVANCED, ExecutionVenue.BINANCE_SPOT);
         }
 
-        // Forex pairs (contain underscore or _ format like EUR_USD)
+        // Forex pairs (contain _ separating currencies, e.g. EUR_USD)
         if (upper.contains("_") || isForexPair(upper)) {
             return pickHealthy(ExecutionVenue.OANDA_REST, ExecutionVenue.INTERACTIVE_BROKERS);
         }
@@ -165,14 +178,14 @@ public class ExecutionRouter {
             return pickHealthy(ExecutionVenue.INTERACTIVE_BROKERS, ExecutionVenue.OANDA_REST);
         }
 
-        // Default
+        // Default fallback
         return pickHealthy(ExecutionVenue.OANDA_REST, ExecutionVenue.PAPER_TRADE);
     }
 
     private ExecutionVenue pickHealthy(ExecutionVenue preferred, ExecutionVenue fallback) {
         if (venueHealthy.getOrDefault(preferred, true)) return preferred;
         if (venueHealthy.getOrDefault(fallback, true)) return fallback;
-        return ExecutionVenue.PAPER_TRADE; // last resort
+        return ExecutionVenue.PAPER_TRADE;
     }
 
     private boolean isForexPair(String symbol) {
@@ -182,9 +195,5 @@ public class ExecutionRouter {
             if (symbol.contains(c)) matches++;
         }
         return matches >= 2;
-    }
-
-    private EventBusManager eventBus() {
-        return EventBusManager.getInstance();
     }
 }
