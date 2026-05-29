@@ -45,6 +45,9 @@
 - [Configuration](#configuration)
 - [Quick Start](#quick-start)
 - [Strategy Development](#strategy-development)
+- [User Strategy Setup](#user-strategy-setup)
+- [Plugin Setup](#plugin-setup)
+- [Production Readiness Checklist](#production-readiness-checklist)
 - [Risk Management Philosophy](#risk-management-philosophy)
 - [System Monitoring](#system-monitoring)
 - [Roadmap](#roadmap)
@@ -771,6 +774,46 @@ Before assigning a strategy to auto-trading:
 | Live/paper slippage | Must be measured |
 
 > A strategy with a high win rate can still lose money if average losses are larger than average wins.
+
+---
+
+## User Strategy Setup
+
+Use this path to add and validate user strategies safely:
+
+1. Read [docs/USER_STRATEGY_GUIDE.md](docs/USER_STRATEGY_GUIDE.md).
+2. Start from [examples/user-strategy-simple-ema/README.md](examples/user-strategy-simple-ema/README.md).
+3. Place JSON strategies/signals in `~/InvestPro/strategies/json`.
+4. Place Java strategy/signal JARs in `~/InvestPro/strategies/jars`.
+5. Validate in backtest and paper mode before any live promotion.
+
+## Plugin Setup
+
+InvestPro plugin loading uses Java `ServiceLoader` SPI. Full reference: [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md).
+
+1. Implement the relevant SPI under `org.investpro.spi`.
+2. Register provider classes in `META-INF/services/*`.
+3. Build and deploy plugin JARs to the plugin scan location.
+4. Verify loaded providers in the JavaFX Plugin Manager panel.
+
+Supported plugin categories:
+
+- Exchange providers
+- Strategy providers
+- Indicator providers
+- Risk module providers
+- Market data providers
+
+## Production Readiness Checklist
+
+Before promoting to production/live usage:
+
+1. `mvn clean test` passes.
+2. Local AI gRPC advisory service starts and responds to health checks.
+3. Credentials and risk limits are configured in local config.
+4. Strategy promotion gates pass (validation, paper results, AI/risk review).
+5. Monitoring and alerts are enabled.
+6. Deployment runbook is documented for your target environment.
 
 ---
 
