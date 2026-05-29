@@ -9,11 +9,11 @@ import java.util.List;
  * <p>
  * Enriches exchange-tradeable pairs with BIS FX liquidity data, currency importance
  * scores, session relevance, and risk recommendations. This layer does NOT replace
- * exchange tradeability filtering — it runs after the exchange has confirmed a pair
+ * exchange tradability filtering — it runs after the exchange has confirmed a pair
  * is available.
  *
  * <pre>
- * Exchange tradeability → "Can this account trade this pair?"
+ * Exchange tradability -> "Can this account trade this pair?"
  * Market structure      → "How liquid, important, risky, and suitable is this pair?"
  * </pre>
  */

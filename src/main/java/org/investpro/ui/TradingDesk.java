@@ -1893,7 +1893,9 @@ public class TradingDesk extends BorderPane  {
                     setStyle("-fx-text-fill: #86efac;");
                 } else if (lower.contains("paper")) {
                     setStyle("-fx-text-fill: #60a5fa;");
-                } else if (lower.contains("train") || lower.contains("evaluat")) {
+                } else if (lower.contains("train")
+                        || lower.contains("evaluate")
+                        || lower.contains("evaluation")) {
                     setStyle("-fx-text-fill: #fbbf24;");
                 } else if (lower.contains("fail") || lower.contains("block")) {
                     setStyle("-fx-text-fill: #f87171;");
@@ -2214,8 +2216,8 @@ public class TradingDesk extends BorderPane  {
     }
 
     private void updateChartHeader() {
-        TradePair selected = symbolSelector == null ? null : symbolSelector.getSelectionModel().getSelectedItem();
-        Timeframe timeframe = timeframeSelector == null ? null : timeframeSelector.getSelectionModel().getSelectedItem();
+        TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
+        Timeframe timeframe = timeframeSelector.getSelectionModel().getSelectedItem();
         chartHeaderSymbolLabel.setText(selected == null ? "No chart" : selected.toString('/'));
         chartHeaderTimeframeLabel.setText("TF: " + (timeframe == null ? "-" : timeframe.name()));
         chartHeaderQuoteLabel.setText(selected == null
@@ -2511,11 +2513,7 @@ public class TradingDesk extends BorderPane  {
     }
 
     private @NotNull Node createMailboxPlaceholder() {
-        return createTerminalPlaceholder("Broker messages, system mail, and alerts appear here.");
-    }
-
-    private @NotNull VBox createTerminalPlaceholder(String text) {
-        Label label = new Label(text);
+        Label label = new Label("Broker messages, system mail, and alerts appear here.");
         label.getStyleClass().add("mt5-empty-subtitle");
         VBox box = new VBox(label);
         box.setAlignment(Pos.CENTER);
@@ -3982,8 +3980,8 @@ public class TradingDesk extends BorderPane  {
     private List<TradePair> transactionFetchPairs() {
         LinkedHashMap<String, TradePair> pairs = new LinkedHashMap<>();
 
-        TradePair selected = marketWatchTable == null ? null : marketWatchTable.getSelectionModel().getSelectedItem();
-        if (selected == null && symbolSelector != null) {
+        TradePair selected = marketWatchTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
             selected = symbolSelector.getSelectionModel().getSelectedItem();
         }
         if (selected != null) {
@@ -4205,9 +4203,9 @@ public class TradingDesk extends BorderPane  {
     }
 
     private void updateStatusBarValues() {
-        TradePair selected = symbolSelector == null ? null : symbolSelector.getSelectionModel().getSelectedItem();
-        statusBrokerLabel.setText("Broker: " + safe(exchangeSelector == null ? "" : exchangeSelector.getValue()));
-        statusModeLabel.setText("Mode: " + safe(tradingModeSelector == null ? "" : tradingModeSelector.getValue()));
+        TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
+        statusBrokerLabel.setText("Broker: " + safe(exchangeSelector.getValue()));
+        statusModeLabel.setText("Mode: " + safe(tradingModeSelector.getValue()));
         statusActiveSymbolLabel.setText("Symbol: " + (selected == null ? "-" : selected.toString('/')));
         statusLatencyLabel.setText("Latency: -- ms");
         statusMarketDataLabel.setText("Data: " + (marketDataEngine == null ? "idle" : "cache"));
@@ -4233,10 +4231,6 @@ public class TradingDesk extends BorderPane  {
     }
 
     private void updateDeskCommandStrip() {
-        if (deskConnectionLabel == null) {
-            return;
-        }
-
         boolean connected;
         try {
             connected = hasBrokerAccess();
@@ -4292,12 +4286,10 @@ public class TradingDesk extends BorderPane  {
     private void focusRiskMonitor() {
         openSystemConsolePanel();
         refreshAccountWorkspace();
-        if (terminalTabPane != null) {
-            terminalTabPane.getTabs().stream()
-                    .filter(tab -> Objects.equals(tab.getText(), TabName.RISK_MONITOR.getTabId()))
-                    .findFirst()
-                    .ifPresent(tab -> terminalTabPane.getSelectionModel().select(tab));
-        }
+        terminalTabPane.getTabs().stream()
+                .filter(tab -> Objects.equals(tab.getText(), TabName.RISK_MONITOR.getTabId()))
+                .findFirst()
+                .ifPresent(tab -> terminalTabPane.getSelectionModel().select(tab));
         updateDeskCommandStrip();
     }
 
@@ -4426,7 +4418,7 @@ public class TradingDesk extends BorderPane  {
                 return normalized;
             }
         }
-        return normalizeExchangeName(exchangeSelector == null ? "" : exchangeSelector.getValue());
+        return normalizeExchangeName(exchangeSelector.getValue());
     }
 
     private boolean isExchangeConnected(String exchangeName) {
@@ -5096,7 +5088,7 @@ public class TradingDesk extends BorderPane  {
         journal("Credentials validated for %s".formatted(exchangeSelector.getValue()));
 
         // Sync trading mode selector with configured trading mode from credentials
-        if (tradingModeSelector != null && configuredTradingMode != null) {
+        if (configuredTradingMode != null) {
             tradingModeSelector.getSelectionModel().select(configuredTradingMode);
             if (exchange != null) {
                 exchange.setUserSelectedTradingMode(configuredTradingMode);
@@ -6374,23 +6366,34 @@ public class TradingDesk extends BorderPane  {
             selectedFilter = MarketWatchTradabilityFilter.TRADABLE_ONLY;
         }
 
-        final MarketWatchTradabilityFilter activeFilter = selectedFilter;
-        return pairs.stream()
-                .filter(Objects::nonNull)
-                .filter(pair -> {
-                    SymbolTradability status = tradabilityBySymbol.get(symbolKey(pair));
-                    if (status == null) {
-                        return activeFilter != MarketWatchTradabilityFilter.RESTRICTED_ONLY;
-                    }
+        List<TradePair> filtered = new ArrayList<>(pairs.size());
+        for (TradePair pair : pairs) {
+            if (pair != null && isAllowedByMarketWatchFilter(pair, selectedFilter)) {
+                filtered.add(pair);
+            }
+        }
+        return filtered;
+    }
 
-                    return switch (activeFilter) {
-                        case TRADABLE_ONLY -> status.isFullyTradable();
-                        case MARKET_DATA_ONLY, VIEW_ONLY_ALLOWED -> status.canBeDisplayedInMarketWatch();
-                        case RESTRICTED_ONLY -> !status.isFullyTradable();
-                        case ALL_PRODUCTS -> true;
-                    };
-                })
-                .toList();
+    private boolean isAllowedByMarketWatchFilter(
+            TradePair pair,
+            MarketWatchTradabilityFilter filter) {
+        SymbolTradability status = tradabilityBySymbol.get(symbolKey(pair));
+        if (status == null) {
+            return filter != MarketWatchTradabilityFilter.RESTRICTED_ONLY;
+        }
+
+        if (filter == MarketWatchTradabilityFilter.TRADABLE_ONLY) {
+            return status.isFullyTradable();
+        }
+        if (filter == MarketWatchTradabilityFilter.MARKET_DATA_ONLY
+                || filter == MarketWatchTradabilityFilter.VIEW_ONLY_ALLOWED) {
+            return status.canBeDisplayedInMarketWatch();
+        }
+        if (filter == MarketWatchTradabilityFilter.RESTRICTED_ONLY) {
+            return !status.isFullyTradable();
+        }
+        return true;
     }
 
     private void applyCurrentMarketWatchFilter() {
@@ -6482,7 +6485,7 @@ public class TradingDesk extends BorderPane  {
         if (status == null) {
             buyButton.setDisable(true);
             sellButton.setDisable(true);
-            String tip = "Tradeability status for " + selected.toSlashSymbol() + " is unknown. Refreshing…";
+            String tip = "Tradability status for " + selected.toSlashSymbol() + " is unknown. Refreshing...";
             Tooltip.install(buyButton, new Tooltip(tip));
             Tooltip.install(sellButton, new Tooltip(tip));
             return;
@@ -6648,13 +6651,13 @@ public class TradingDesk extends BorderPane  {
     }
 
     private boolean isPaperTradingMode() {
-        String selectedMode = tradingModeSelector == null ? null : tradingModeSelector.getValue();
+        String selectedMode = tradingModeSelector.getValue();
         String mode = safe(selectedMode).isBlank() ? safe(configuredTradingMode) : safe(selectedMode);
         return "PAPER".equalsIgnoreCase(mode);
     }
 
     private boolean isOandaExchangeSelectedOrActive() {
-        String selectedExchange = safe(exchangeSelector == null ? "" : exchangeSelector.getValue());
+        String selectedExchange = safe(exchangeSelector.getValue());
         String activeExchange = exchange == null ? "" : safe(exchange.getExchangeId()) + " " + safe(exchange.getName());
         return normalizeExchangeName(selectedExchange).contains("OANDA")
                 || activeExchange.toUpperCase(Locale.ROOT).contains("OANDA");
@@ -6677,7 +6680,7 @@ public class TradingDesk extends BorderPane  {
         if (exchange != null && "stellar".equalsIgnoreCase(exchange.getExchangeId())) {
             return true;
         }
-        String selected = safe(exchangeSelector == null ? null : exchangeSelector.getValue());
+        String selected = safe(exchangeSelector.getValue());
         return selected.toLowerCase(Locale.ROOT).contains("stellar");
     }
 
@@ -6772,7 +6775,7 @@ public class TradingDesk extends BorderPane  {
     }
 
     private @Nullable CandleStickChart getActiveChart() {
-        Tab selected = chartTabPane.getSelectionModel().getSelectedItem();
+        DraggableTab selected = (DraggableTab) chartTabPane.getSelectionModel().getSelectedItem();
         if (selected == null || selected.getContent() == null) {
             return null;
         }
@@ -6872,7 +6875,7 @@ public class TradingDesk extends BorderPane  {
 
     private void saveActiveChartSnapshot() {
         Node node = null;
-        Tab selectedTab = chartTabPane.getSelectionModel().getSelectedItem();
+        DraggableTab selectedTab = (DraggableTab) chartTabPane.getSelectionModel().getSelectedItem();
         if (selectedTab != null) {
             node = selectedTab.getContent();
         }
@@ -6937,7 +6940,7 @@ public class TradingDesk extends BorderPane  {
                 .whenComplete((unused, exception) -> accountWorkspaceRefreshInFlight.set(false));
     }
 
-    private <T> CompletableFuture<T> fetchAccountWorkspaceAsync(
+    private <T> @NonNull CompletableFuture<T> fetchAccountWorkspaceAsync(
             String label,
             Function<Exchange, CompletableFuture<T>> request) {
         Exchange currentExchange = exchange;
@@ -6960,14 +6963,14 @@ public class TradingDesk extends BorderPane  {
 
     private TradePair selectedSymbolSnapshot() {
         if (Platform.isFxApplicationThread()) {
-            return symbolSelector == null ? null : symbolSelector.getValue();
+            return symbolSelector.getValue();
         }
 
         AtomicReference<TradePair> selected = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(1);
         runOnFx(() -> {
             try {
-                selected.set(symbolSelector == null ? null : symbolSelector.getValue());
+                selected.set(symbolSelector.getValue());
             } finally {
                 latch.countDown();
             }
@@ -7580,7 +7583,7 @@ public class TradingDesk extends BorderPane  {
     }
 
     private String buildResearchVenueStatus() {
-        String venue = exchange == null ? safe(exchangeSelector == null ? null : exchangeSelector.getValue())
+        String venue = exchange == null ? safe(exchangeSelector.getValue())
                 : safe(exchange.getDisplayName());
         if (venue.isBlank()) {
             venue = "No venue selected";
@@ -7591,7 +7594,7 @@ public class TradingDesk extends BorderPane  {
     }
 
     private String buildNewsBiasLine() {
-        TradePair selected = symbolSelector == null ? null : symbolSelector.getSelectionModel().getSelectedItem();
+        TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
         if (selected == null) {
             return "News Bias: Select a symbol to load RSS sentiment";
         }
@@ -7633,7 +7636,7 @@ public class TradingDesk extends BorderPane  {
     }
 
     private String inferResearchBrokerType() {
-        String venue = exchange == null ? safe(exchangeSelector == null ? null : exchangeSelector.getValue())
+        String venue = exchange == null ? safe(exchangeSelector.getValue())
                 : safe(exchange.getDisplayName());
         String normalized = venue.toLowerCase(Locale.ROOT);
         if (normalized.contains("binance") || normalized.contains("coinbase") || normalized.contains("bitfinex")
@@ -7647,11 +7650,8 @@ public class TradingDesk extends BorderPane  {
     }
 
     private String buildLiveCorrelationMatrixText() {
-        List<TradePair> pairs = new ArrayList<>();
-        if (marketWatchItems != null) {
-            pairs.addAll(marketWatchItems.stream().filter(Objects::nonNull).limit(6).toList());
-        }
-        if (pairs.isEmpty() && symbolSelector != null && symbolSelector.getValue() != null) {
+        List<TradePair> pairs = new ArrayList<>(marketWatchItems.stream().filter(Objects::nonNull).limit(6).toList());
+        if (pairs.isEmpty() && symbolSelector.getValue() != null) {
             pairs.add(symbolSelector.getValue());
         }
 
@@ -7675,8 +7675,8 @@ public class TradingDesk extends BorderPane  {
                 if (rowPair == colPair) {
                     similarity = 1.0;
                 } else {
-                    double denom = Math.max(1.0, Math.abs(rowChange) + Math.abs(colChange));
-                    similarity = clamp(1.0 - (Math.abs(rowChange - colChange) / denom), -1.0, 1.0);
+                    double denominator = Math.max(1.0, Math.abs(rowChange) + Math.abs(colChange));
+                    similarity = clamp(1.0 - (Math.abs(rowChange - colChange) / denominator), -1.0, 1.0);
                 }
                 builder.append(String.format("%10.2f", similarity));
             }
@@ -7687,7 +7687,7 @@ public class TradingDesk extends BorderPane  {
         return builder.toString();
     }
 
-    private List<String> buildVolatilityMetricsLines() {
+    private @NonNull List<String> buildVolatilityMetricsLines() {
         MarketSnapshot snapshot = marketSnapshot();
         List<String> lines = new ArrayList<>();
 
@@ -7702,13 +7702,11 @@ public class TradingDesk extends BorderPane  {
         lines.add("Average 24h Change: " + formatSignedPercent(snapshot.averageChangePercent(), 2));
         lines.add("Quote Volume (24h): " + formatCurrencyCompact(snapshot.totalQuoteVolume()));
 
-        List<TradePair> movers = marketWatchItems == null
-                ? List.of()
-                : marketWatchItems.stream()
-                        .filter(Objects::nonNull)
-                        .sorted(Comparator.comparingDouble(pair -> -Math.abs(finite(pair.getChangePercent()))))
-                        .limit(3)
-                        .toList();
+        List<TradePair> movers = marketWatchItems.stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparingDouble(pair -> -Math.abs(finite(pair.getChangePercent()))))
+                .limit(3)
+                .toList();
 
         if (movers.isEmpty()) {
             lines.add("Top Movers: no market watch symbols available");
@@ -7734,7 +7732,7 @@ public class TradingDesk extends BorderPane  {
         journal("Strategy Research panel opened");
     }
 
-    private VBox createStrategyResearchPanel() {
+    private @NonNull VBox createStrategyResearchPanel() {
         VBox panel = new VBox(12);
         panel.setPadding(new Insets(16));
         panel.setStyle("-fx-background-color: #1a1a2e;");
@@ -7746,10 +7744,10 @@ public class TradingDesk extends BorderPane  {
         strategyTabs.setStyle("-fx-control-inner-background: #0f3460;");
         strategyTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
-        Tab performanceTab = new Tab("Performance Analysis", createStrategyPerformanceTab());
-        Tab drawdownTab = new Tab("Drawdown Analysis", createDrawdownTab());
-        Tab statsTab = new Tab("Statistics", createStrategyStatsTab());
-        Tab equityTab = new Tab("Equity Curve", createEquityCurveTab());
+            DraggableTab performanceTab = new DraggableTab("Performance Analysis", createStrategyPerformanceTab());
+        DraggableTab drawdownTab = new DraggableTab("Drawdown Analysis", createDrawdownTab());
+        DraggableTab statsTab = new DraggableTab("Statistics", createStrategyStatsTab());
+        DraggableTab equityTab = new DraggableTab("Equity Curve", createEquityCurveTab());
 
         strategyTabs.getTabs().addAll(performanceTab, drawdownTab, statsTab, equityTab);
         panel.getChildren().addAll(title, strategyTabs);
@@ -7795,7 +7793,7 @@ public class TradingDesk extends BorderPane  {
         return tab;
     }
 
-    private VBox createStrategyStatsTab() {
+    private @NonNull VBox createStrategyStatsTab() {
         VBox tab = new VBox(12);
         tab.setPadding(new Insets(12));
         Label label = new Label("Performance Statistics");
@@ -7902,7 +7900,7 @@ public class TradingDesk extends BorderPane  {
         journal("Performances Review panel opened");
     }
 
-    private Map<String, Double> computeTradeMetrics(List<org.investpro.models.trading.Trade> trades) {
+    private @NonNull Map<String, Double> computeTradeMetrics(List<org.investpro.models.trading.Trade> trades) {
         Map<String, Double> m = new java.util.LinkedHashMap<>();
         m.put("totalTrades", (double) trades.size());
         double totalProfit = 0, totalLoss = 0, bestTrade = Double.NEGATIVE_INFINITY, worstTrade = Double.POSITIVE_INFINITY;
@@ -7936,7 +7934,7 @@ public class TradingDesk extends BorderPane  {
         return m;
     }
 
-    private VBox createPerformancesReviewPanel() {
+    private @NonNull VBox createPerformancesReviewPanel() {
         List<org.investpro.models.trading.Trade> trades;
         try {
             trades = tradeRepository.findAll();
@@ -9123,36 +9121,26 @@ public class TradingDesk extends BorderPane  {
             marketWatchWrapper.setVisible(showMarketWatch);
             marketWatchWrapper.setManaged(showMarketWatch);
         }
-        if (marketWatchTable != null) {
-            marketWatchTable.setVisible(showMarketWatch);
-            marketWatchTable.setManaged(showMarketWatch);
-        }
+        marketWatchTable.setVisible(showMarketWatch);
+        marketWatchTable.setManaged(showMarketWatch);
 
         // Order Book visibility
         if (orderBookWrapper != null) {
             orderBookWrapper.setVisible(showOrderBook);
             orderBookWrapper.setManaged(showOrderBook);
         }
-        if (orderBookBidsTable != null) {
-            orderBookBidsTable.setVisible(showOrderBook);
-            orderBookBidsTable.setManaged(showOrderBook);
-        }
-        if (orderBookAsksTable != null) {
-            orderBookAsksTable.setVisible(showOrderBook);
-            orderBookAsksTable.setManaged(showOrderBook);
-        }
+        orderBookBidsTable.setVisible(showOrderBook);
+        orderBookBidsTable.setManaged(showOrderBook);
+        orderBookAsksTable.setVisible(showOrderBook);
+        orderBookAsksTable.setManaged(showOrderBook);
 
         // Terminal visibility
-        if (terminalTabPane != null) {
-            terminalTabPane.setVisible(showTerminal);
-            terminalTabPane.setManaged(showTerminal);
-        }
+        terminalTabPane.setVisible(showTerminal);
+        terminalTabPane.setManaged(showTerminal);
 
         // Charts tab visibility
-        if (chartTabPane != null) {
-            chartTabPane.setVisible(showCharts);
-            chartTabPane.setManaged(showCharts);
-        }
+        chartTabPane.setVisible(showCharts);
+        chartTabPane.setManaged(showCharts);
     }
 
     /**
@@ -10589,7 +10577,7 @@ public class TradingDesk extends BorderPane  {
                 ? new ArrayList<>(exchange.getSupportedTimeframes())
                 : new ArrayList<>(MT5_TIMEFRAMES);
         LinkedHashSet<Timeframe> selected = new LinkedHashSet<>();
-        Timeframe current = timeframeSelector == null ? null : timeframeSelector.getValue();
+        Timeframe current = timeframeSelector.getValue();
         if (current != null && available.contains(current) && !current.isLongTerm()) {
             selected.add(current);
         }
@@ -10885,12 +10873,8 @@ public class TradingDesk extends BorderPane  {
         javafx.beans.value.ChangeListener<Timeframe> timeframeRefreshListener = (obs, oldValue, newValue) ->
                 refreshAssignmentIndicator.run();
 
-        if (symbolSelector != null) {
-            symbolSelector.getSelectionModel().selectedItemProperty().addListener(symbolRefreshListener);
-        }
-        if (timeframeSelector != null) {
-            timeframeSelector.getSelectionModel().selectedItemProperty().addListener(timeframeRefreshListener);
-        }
+        symbolSelector.getSelectionModel().selectedItemProperty().addListener(symbolRefreshListener);
+        timeframeSelector.getSelectionModel().selectedItemProperty().addListener(timeframeRefreshListener);
 
         strategyList.sceneProperty().addListener((sceneObs, oldScene, newScene) -> {
             if (newScene == null) {
@@ -10901,13 +10885,9 @@ public class TradingDesk extends BorderPane  {
                     return;
                 }
                 windowStage.setOnHidden(event -> {
-                    if (symbolSelector != null) {
-                        symbolSelector.getSelectionModel().selectedItemProperty().removeListener(symbolRefreshListener);
-                    }
-                    if (timeframeSelector != null) {
-                        timeframeSelector.getSelectionModel().selectedItemProperty()
-                                .removeListener(timeframeRefreshListener);
-                    }
+                    symbolSelector.getSelectionModel().selectedItemProperty().removeListener(symbolRefreshListener);
+                    timeframeSelector.getSelectionModel().selectedItemProperty()
+                            .removeListener(timeframeRefreshListener);
                     windowStage.close();
                     log.info("Window closed: {}", windowStage.getTitle());
                 });
@@ -10943,15 +10923,13 @@ public class TradingDesk extends BorderPane  {
                 return;
             }
 
-            TradePair selectedPair = symbolSelector == null ? null : symbolSelector.getSelectionModel().getSelectedItem();
+            TradePair selectedPair = symbolSelector.getSelectionModel().getSelectedItem();
             if (selectedPair == null) {
                 showWarning("Select Strategy", "Select a symbol in the main toolbar first.");
                 return;
             }
 
-            Timeframe selectedTimeframe = timeframeSelector == null
-                    ? null
-                    : timeframeSelector.getSelectionModel().getSelectedItem();
+            Timeframe selectedTimeframe = timeframeSelector.getSelectionModel().getSelectedItem();
             if (selectedTimeframe == null) {
                 showWarning("Select Strategy", "Select a timeframe in the main toolbar first.");
                 return;
@@ -11002,8 +10980,8 @@ public class TradingDesk extends BorderPane  {
     }
 
     private @NotNull String buildCurrentAssignmentIndicatorText() {
-        TradePair selectedPair = symbolSelector == null ? null : symbolSelector.getSelectionModel().getSelectedItem();
-        Timeframe selectedTimeframe = timeframeSelector == null ? null : timeframeSelector.getSelectionModel().getSelectedItem();
+        TradePair selectedPair = symbolSelector.getSelectionModel().getSelectedItem();
+        Timeframe selectedTimeframe = timeframeSelector.getSelectionModel().getSelectedItem();
 
         if (selectedPair == null || selectedTimeframe == null) {
             return "Current assignment: select symbol and timeframe in the main toolbar.";
@@ -11063,18 +11041,16 @@ public class TradingDesk extends BorderPane  {
         StrategyDefinition definition = StrategyCatalog.definition(strategyName);
         StrategyParameters params = definition.getParameters();
 
-        String symbol = symbolSelector == null || symbolSelector.getSelectionModel().getSelectedItem() == null
+        String symbol = symbolSelector.getSelectionModel().getSelectedItem() == null
                 ? "(none selected)"
                 : symbolSelector.getSelectionModel().getSelectedItem().toString('/');
 
-        Timeframe timeframe = timeframeSelector == null
-                ? null
-                : timeframeSelector.getSelectionModel().getSelectedItem();
+        Timeframe timeframe = timeframeSelector.getSelectionModel().getSelectedItem();
 
         String timeframeCode = timeframe == null ? "(none selected)" : timeframe.getCode();
         String activeAssignment = "None";
 
-        if (timeframe != null && symbolSelector != null && symbolSelector.getSelectionModel().getSelectedItem() != null) {
+        if (timeframe != null && symbolSelector.getSelectionModel().getSelectedItem() != null) {
             StrategyAssignment assignment = StrategyAssignmentRepository.getInstance().getActive(symbol, timeframe);
             if (assignment != null && assignment.getStrategyId() != null && !assignment.getStrategyId().isBlank()) {
                 activeAssignment = assignment.getStrategyId();
@@ -11232,7 +11208,7 @@ public class TradingDesk extends BorderPane  {
 
     private void openOrderPanel() {
         try {
-            TradePair selectedSymbol = symbolSelector == null ? null : symbolSelector.getValue();
+            TradePair selectedSymbol = symbolSelector.getValue();
             showOrderPanelWindow(selectedSymbol);
 
         } catch (Exception e) {
@@ -11360,12 +11336,12 @@ public class TradingDesk extends BorderPane  {
     /**
      * Strategy Performance Data Getters
      */
-    private String getStrategyTotalReturn() {
+    private @NonNull String getStrategyTotalReturn() {
         StrategyStats stats = strategyStats();
         return stats.totalTrades() > 0 ? formatSignedPercent(stats.totalReturnPercent(), 1) : "N/A";
     }
 
-    private String getStrategyWinRate() {
+    private @NonNull String getStrategyWinRate() {
         StrategyStats stats = strategyStats();
         return stats.totalTrades() > 0 ? formatPercent(stats.winRatePercent()) : "N/A";
     }
@@ -11390,12 +11366,12 @@ public class TradingDesk extends BorderPane  {
         return stats.totalTrades() > 0 ? formatSignedPercent(stats.monthlyReturnPercent(), 1) : "N/A";
     }
 
-    private String getStrategyMaxDrawdown() {
+    private @NonNull String getStrategyMaxDrawdown() {
         StrategyStats stats = strategyStats();
         return stats.totalTrades() > 0 ? formatSignedPercent(-stats.maxDrawdownPercent(), 1) : "N/A";
     }
 
-    private String getStrategyCurrentDrawdown() {
+    private @NonNull String getStrategyCurrentDrawdown() {
         StrategyStats stats = strategyStats();
         return stats.totalTrades() > 0 ? formatSignedPercent(-stats.currentDrawdownPercent(), 1) : "N/A";
     }
@@ -11410,20 +11386,20 @@ public class TradingDesk extends BorderPane  {
         return stats.totalTrades() > 0 ? stats.maxRecoveryDays() + " days" : "N/A";
     }
 
-    private String getStrategyUnderwaterDuration() {
+    private @NonNull String getStrategyUnderwaterDuration() {
         StrategyStats stats = strategyStats();
         return stats.totalTrades() > 0 ? stats.currentUnderwaterDays() + " days" : "N/A";
     }
 
-    private String getStrategyTotalTrades() {
+    private @NonNull String getStrategyTotalTrades() {
         return String.valueOf(strategyStats().totalTrades());
     }
 
-    private String getStrategyWinningTrades() {
+    private @NonNull String getStrategyWinningTrades() {
         return String.valueOf(strategyStats().winningTrades());
     }
 
-    private String getStrategyLosingTrades() {
+    private @NonNull String getStrategyLosingTrades() {
         return String.valueOf(strategyStats().losingTrades());
     }
 
@@ -11906,7 +11882,7 @@ public class TradingDesk extends BorderPane  {
             double realizedPnlToday = account != null ? account.getRealizedPnlToday() : 0.0;
             var isAutoTrading = systemCore.getSmartBot() != null && systemCore.getSmartBot().isAutoTradingEnabled();
             List<CandleData> candleList = new ArrayList<>(systemCore.getHistoricalDataRepository().findAll());
-                TradePair selectedPair = symbolSelector == null ? null : symbolSelector.getValue();
+                TradePair selectedPair = symbolSelector.getValue();
                 TradingSessionStatus sessionStatus = selectedPair == null
                     ? TradingSessionStatus.UNKNOWN
                     : selectedPair.getTradingSessionStatus();
@@ -12062,7 +12038,7 @@ public class TradingDesk extends BorderPane  {
             log.debug("Unable to refresh status candle count: {}", rootMessage(exception));
             candleList = List.of();
         }
-        TradePair selectedPair = symbolSelector == null ? null : symbolSelector.getValue();
+        TradePair selectedPair = symbolSelector.getValue();
         TradingSessionStatus sessionStatus = selectedPair == null
                 ? TradingSessionStatus.UNKNOWN
                 : selectedPair.getTradingSessionStatus();

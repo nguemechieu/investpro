@@ -1,5 +1,7 @@
 package org.investpro.strategy.impl;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.enums.MarketBehavior;
@@ -21,14 +23,16 @@ import static org.investpro.utils.Side.SELL;
 
 /**
  * Mean Reversion Strategy.
- *
+ * <p>
  * Trades reversions back toward the mean using Bollinger Bands and RSI.
- *
+ * <p>
  * Best for:
  * - range-bound markets
  * - low-volatility consolidation
  * - temporary overbought/oversold extremes
  */
+@EqualsAndHashCode(callSuper = true)
+@Data
 @Slf4j
 public class MeanReversionStrategy extends BaseStrategy {
 
@@ -44,6 +48,8 @@ public class MeanReversionStrategy extends BaseStrategy {
     private static final int MINIMUM_BARS_REQUIRED = 80;
 
     private static final double STOP_LOSS_BUFFER = 0.03;
+    private double takeProfit;
+    private double stopLoss;
 
     public MeanReversionStrategy() {
         super(buildMetadata());
@@ -130,13 +136,13 @@ public class MeanReversionStrategy extends BaseStrategy {
                                 ", sma20=" + sma20 +
                                 ", rsi14=" + rsi14);
 
-                double takeProfit = sma20;
+                takeProfit = sma20;
                 return buildBuySignal(context, currentPrice, stopLoss, takeProfit);
             }
 
             if (overboughtAtUpperBand) {
-                double stopLoss = upperBand * (1.0 + STOP_LOSS_BUFFER);
-                double takeProfit = sma20;
+                 stopLoss = upperBand * (1.0 + STOP_LOSS_BUFFER);
+                 takeProfit = sma20;
 
                 updateSignalDescription(
                         "Mean-reversion SELL: price above upper Bollinger Band and RSI overbought. " +
@@ -301,7 +307,7 @@ public class MeanReversionStrategy extends BaseStrategy {
         return StrategySignal.builder()
                 .strategyId(STRATEGY_ID)
                 .strategyName(metadata.getDisplayName())
-                .symbol(context.getSymbol().toString('/'))
+                .symbol(context.getSymbol().getSymbol())
                 .timeframe(context.getTimeframe().toString())
                 .side(SELL)
                 .confidence(confidence)

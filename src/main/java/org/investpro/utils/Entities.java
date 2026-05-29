@@ -1,10 +1,9 @@
 package org.investpro.utils;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
+
 import org.investpro.data.users;
-@Getter
-@Setter
+@Data
 public class Entities {
     // type	String	Type of the entity. Currently, can be “mention” (@username), “hashtag” (#hashtag), “hashtag” ($USD), “bot_command” (/start@jobs_bot), “url” (https://telegram.org), “email” (do-not-reply@telegram.org), “phone_number” (+1-212-555-0123), “bold” (bold text), “italic” (italic text), “underline” (underlined text), “strikethrough” (strikethrough text), “spoiler” (spoiler message), “code” (monowidth string), “pre” (monowidth block), “text_link” (for clickable text URLs), “text_mention” (for users without usernames), “custom_emoji” (for inline custom emoji stickers)
     // offset	Integer	Offset in UTF-16 code units to the start of the entity
@@ -57,29 +56,6 @@ public class Entities {
         this.url = url;
     }
 
-    public users getUser() {
-        return user;
-    }
-
-    public void setUser(users user) {
-        this.user = user;
-    }
-
-    public String getLanguage() {
-        return language;
-    }
-
-    public void setLanguage(String language) {
-        this.language = language;
-    }
-
-    public String getCustom_emoji_id() {
-        return custom_emoji_id;
-    }
-
-    public void setCustom_emoji_id(String custom_emoji_id) {
-        this.custom_emoji_id = custom_emoji_id;
-    }
 
     public long getOffset() {
         return offset;

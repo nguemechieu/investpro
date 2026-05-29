@@ -7,7 +7,7 @@ import org.investpro.models.trading.TradePair;
  * <p>
  * Sourced from BIS Triennial Central Bank Survey FX turnover data.
  * This enriches exchange-tradeable pairs with liquidity intelligence —
- * it does NOT replace exchange tradeability decisions.
+ * it does NOT replace exchange tradability decisions.
  */
 public record MarketStructureProfile(
 

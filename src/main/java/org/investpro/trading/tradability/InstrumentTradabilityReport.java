@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
-public record InstrumentTradeabilityReport(
+public record InstrumentTradabilityReport(
         String exchangeId,
         String originalSymbol,
         String normalizedSymbol,
@@ -18,7 +18,7 @@ public record InstrumentTradeabilityReport(
         Instant lastCheckedAt,
         Map<String, Object> metadata
 ) {
-    public InstrumentTradeabilityReport {
+    public InstrumentTradabilityReport {
         exchangeId = exchangeId == null ? "" : exchangeId;
         originalSymbol = originalSymbol == null ? "" : originalSymbol;
         normalizedSymbol = normalizedSymbol == null ? "" : normalizedSymbol;
@@ -30,7 +30,7 @@ public record InstrumentTradeabilityReport(
         metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
     }
 
-    public static InstrumentTradeabilityReport from(
+    public static InstrumentTradabilityReport from(
             SymbolTradability st,
             String exchangeId,
             String originalSymbol,
@@ -40,7 +40,7 @@ public record InstrumentTradeabilityReport(
 
         InstrumentTradeStatus its = InstrumentTradeStatus.from(st.status());
         Map<String, Object> meta = new HashMap<>(st.rawMetadata());
-        return new InstrumentTradeabilityReport(
+        return new InstrumentTradabilityReport(
                 exchangeId,
                 originalSymbol,
                 normalizedSymbol,
@@ -64,11 +64,11 @@ public record InstrumentTradeabilityReport(
                     "Your account does not have permission to trade " + displayName + ".";
             case UNSUPPORTED_BY_EXCHANGE ->
                     displayName + " is not available on " + exchangeId + ".";
-            case INVALID_SYMBOL -> "Symbol '" + originalSymbol + "' is not recognised.";
+            case INVALID_SYMBOL -> "Symbol '" + originalSymbol + "' is not recognized.";
             case PERMISSION_DENIED -> "Permission denied" + (reason.isBlank() ? "." : ": " + reason);
             case RATE_LIMITED -> "Rate limit reached. Please try again shortly.";
             case API_ERROR -> "Exchange API error" + (reason.isBlank() ? "." : ": " + reason);
-            case UNKNOWN -> "Tradeability status unknown" + (reason.isBlank() ? "." : ": " + reason);
+            case UNKNOWN -> "Tradability status unknown" + (reason.isBlank() ? "." : ": " + reason);
         };
     }
 

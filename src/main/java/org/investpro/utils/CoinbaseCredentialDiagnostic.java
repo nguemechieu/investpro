@@ -123,7 +123,7 @@ public class CoinbaseCredentialDiagnostic {
         if (value == null || value.length() < 10) {
             return value;
         }
-        String start = value.substring(0, Math.min(10, value.length()));
+        String start = value.substring(0, 10);
         String end = value.substring(Math.max(0, value.length() - 5));
         return start + "..." + end;
     }

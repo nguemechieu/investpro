@@ -791,12 +791,12 @@ public class BacktestingPanel extends StackPane {
                 return;
             }
 
-            // Create prefetcher for Binance (most reliable)
-            HistoricalDataPrefetcher prefetcher = HistoricalDataPrefetcher
+            // Create pre-fetcher for the active exchange.
+            HistoricalDataPrefetcher preFetcher = HistoricalDataPrefetcher
                     .forCurrentExchange(systemCore.getExchange(), historicalDataRepository);
 
             // Fetch and cache data with progress updates
-            List<CandleData> fetchedData = prefetcher.fetchAndCacheDataSync(
+            List<CandleData> fetchedData = preFetcher.fetchAndCacheDataSync(
                     pair,
                     start,
                     end,
@@ -1040,10 +1040,10 @@ public class BacktestingPanel extends StackPane {
             LocalDateTime fetchStart = fetchStartDate.atStartOfDay();
             LocalDateTime fetchEnd = endDate.atTime(23, 59, 59);
 
-            HistoricalDataPrefetcher prefetcher = HistoricalDataPrefetcher
+            HistoricalDataPrefetcher preFetcher = HistoricalDataPrefetcher
                     .forCurrentExchange(systemCore.getExchange(), historicalDataRepository);
 
-            List<CandleData> fetched = prefetcher.fetchAndCacheDataSync(
+            List<CandleData> fetched = preFetcher.fetchAndCacheDataSync(
                     input.selectedPair(),
                     fetchStart,
                     fetchEnd,

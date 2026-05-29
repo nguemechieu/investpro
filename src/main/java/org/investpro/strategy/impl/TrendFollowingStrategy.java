@@ -237,8 +237,8 @@ public class TrendFollowingStrategy extends BaseStrategy {
         return StrategySignal.builder()
                 .strategyId(STRATEGY_ID)
                 .strategyName(metadata.getDisplayName())
-                .symbol(context.getSymbol().toString('/'))
-                .timeframe(context.getTimeframe().toString())
+                .symbol(resolveSignalSymbol(context))
+                .timeframe(resolveSignalTimeframe(context))
                 .side(BUY)
                 .confidence(confidence)
                 .entryPrice(entry)
@@ -273,8 +273,8 @@ public class TrendFollowingStrategy extends BaseStrategy {
         return StrategySignal.builder()
                 .strategyId(STRATEGY_ID)
                 .strategyName(metadata.getDisplayName())
-                .symbol(context.getSymbol().toString('/'))
-                .timeframe(context.getTimeframe().toString())
+                .symbol(resolveSignalSymbol(context))
+                .timeframe(resolveSignalTimeframe(context))
                 .side(SELL)
                 .confidence(confidence)
                 .entryPrice(entry)
@@ -317,5 +317,13 @@ public class TrendFollowingStrategy extends BaseStrategy {
         }
 
         return Math.min(confidence, 0.85);
+    }
+
+    private String resolveSignalSymbol(@NotNull StrategyContext context) {
+        return context.getSymbol() == null ? "" : context.getSymbol().toString('/');
+    }
+
+    private String resolveSignalTimeframe(@NotNull StrategyContext context) {
+        return context.getTimeframe() == null ? "" : context.getTimeframe().toString();
     }
 }

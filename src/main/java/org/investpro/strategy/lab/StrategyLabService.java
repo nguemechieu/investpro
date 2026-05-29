@@ -1,5 +1,7 @@
 package org.investpro.strategy.lab;
 
+import lombok.Data;
+
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.strategy.StrategyCatalog;
@@ -8,16 +10,21 @@ import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategySelectionService;
 import org.investpro.models.trading.TradePair;
 import org.investpro.enums.timeframe.Timeframe;
+import org.investpro.persistence.repository.HistoricalDataRepository;
+import org.investpro.persistence.repository.HistoricalDataRepositoryImpl;
 import org.investpro.persistence.repository.StrategyAssignmentRepository;
+import org.investpro.utils.HistoricalDataPrefetcher;
 import org.jetbrains.annotations.NotNull;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntConsumer;
 
 /**
  * Main service orchestrating all Strategy Lab operations.
- *
+ * <p>
  * Responsibilities:
  * - Run backtests for multiple strategies and timeframes
  * - Rank results by performance
@@ -25,18 +32,25 @@ import java.util.concurrent.atomic.AtomicInteger;
  * - Assign best strategies automatically
  * - Manage assignments
  * - Provide snapshots for UI display
- *
+ * <p>
  * Runs backtests asynchronously in a dedicated thread pool.
  */
+@Data
 @Slf4j
 public class StrategyLabService {
 
     private static volatile StrategyLabService instance = null;
 
-    private final StrategyBacktestRunner backtestRunner;
     private final StrategyRankingEngine rankingEngine;
     private final StrategyVotingEngine votingEngine;
+    /**
+     * -- GETTER - -
+     *  Get assignment service for direct access.
+     */
+
     private final StrategyAssignmentService assignmentService;
+    private final HistoricalDataRepository historicalDataRepository;
+    private final BacktestScheduler backtestScheduler;
 
     private final ExecutorService executorService;
 
@@ -51,10 +65,11 @@ public class StrategyLabService {
     private final Map<String, StrategyConsensusResult> consensusCache = new ConcurrentHashMap<>();
 
     public StrategyLabService() {
-        this.backtestRunner = new StrategyBacktestRunner();
         this.rankingEngine = new StrategyRankingEngine();
         this.votingEngine = new StrategyVotingEngine();
         this.assignmentService = new StrategyAssignmentService();
+        this.historicalDataRepository = HistoricalDataRepositoryImpl.getInstance();
+        this.backtestScheduler = BacktestScheduler.getInstance();
 
         // Create dedicated thread pool for strategy backtests
         this.executorService = Executors.newFixedThreadPool(
@@ -70,7 +85,7 @@ public class StrategyLabService {
 
     /**
      * Get singleton instance of StrategyLabService.
-     *
+     * <p>
      * Thread-safe lazy initialization using double-checked locking.
      */
     public static StrategyLabService getInstance() {
@@ -96,7 +111,7 @@ public class StrategyLabService {
 
     /**
      * Test all available strategies on given symbol/timeframes asynchronously.
-     *
+     * <p>
      * Returns a CompletableFuture to allow async operation without blocking UI.
      */
     public CompletableFuture<List<StrategyPerformanceReport>> testAllStrategies(
@@ -160,33 +175,32 @@ public class StrategyLabService {
             @NotNull List<String> strategyNames) {
         return CompletableFuture.supplyAsync(() -> {
             List<CandleData> cleanCandles = sanitizeCandles(candles);
-            if (cleanCandles.size() < 50) {
-                log.warn("Cannot evaluate strategies for {}/{}: only {} candles available",
-                        symbol, timeframe.getCode(), cleanCandles.size());
+            int candleCount = cleanCandles.size();
+            HistoricalDataPrefetcher.DataReadiness readiness =
+                    HistoricalDataPrefetcher.evaluateDataReadiness(candleCount, candleCount);
+            if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
+                log.warn("Cannot evaluate strategies for {}/{}: only {} candles available, readiness={}",
+                        symbol, timeframe.getCode(), candleCount, readiness);
                 return null;
             }
-
-            List<StrategyPerformanceReport> results = new ArrayList<>();
-            for (String strategyName : strategyNames) {
-                try {
-                    StrategyBacktestRequest request = StrategyBacktestRequest.builder()
-                            .symbol(symbol)
-                            .timeframe(timeframe)
-                            .strategyName(strategyName)
-                            .candles(cleanCandles)
-                            .initialCapital(10000.0)
-                            .commissionRate(0.001)
-                            .slippageRate(0.0002)
-                            .maxTrades(Integer.MAX_VALUE)
-                            .allowShorts(true)
-                            .useRiskManagement(true)
-                            .build();
-                    results.add(backtestRunner.run(request));
-                } catch (Exception exception) {
-                    log.warn("Strategy evaluation failed for {}/{} strategy={}: {}",
-                            symbol, timeframe.getCode(), strategyName, exception.getMessage());
-                }
+            if (!HistoricalDataPrefetcher.hasEnoughDataForGoodTesting(candleCount)) {
+                log.info("Strategy evaluation for {}/{} is using basic data depth: {} candles",
+                        symbol, timeframe.getCode(), candleCount);
+            } else if (!HistoricalDataPrefetcher.hasEnoughDataForStrongTesting(candleCount)) {
+                log.info("Strategy evaluation for {}/{} is using good data depth: {} candles",
+                        symbol, timeframe.getCode(), candleCount);
+            } else {
+                log.info("Strategy evaluation for {}/{} is using strong data depth: {} candles",
+                        symbol, timeframe.getCode(), candleCount);
             }
+
+            List<StrategyPerformanceReport> results = runBacktestsViaScheduler(
+                    symbol,
+                    timeframe,
+                    cleanCandles,
+                    strategyNames,
+                    BacktestJobPriority.VISIBLE,
+                    null);
 
             List<StrategyPerformanceReport> ranked = rankingEngine.rank(results);
             String cacheKey = makeKey(symbol, timeframe);
@@ -202,18 +216,16 @@ public class StrategyLabService {
                 return null;
             }
 
-            double minimumScore = readFirstDoubleProperty(5.0,
-                    "investpro.strategy.minStrategyScore",
-                    "investpro.strategy.minScore",
-                    "investpro.strategy.hardMinStrategyScore");
+            double minimumScore = readFirstDoubleProperty(
+            );
             if (selected.getScore() < minimumScore) {
                 log.warn("Best strategy for {}/{} did not meet minimum score: {} < {}",
                         symbol, timeframe.getCode(), selected.getScore(), minimumScore);
                 return null;
             }
 
-            boolean autoAssignBest = readFirstBooleanProperty(true,
-                    "investpro.strategy.autoAssignBest");
+            boolean autoAssignBest = readFirstBooleanProperty(
+            );
             if (!autoAssignBest) {
                 log.info("Auto assignment disabled; ranked best strategy for {}/{} is {} score={}",
                         symbol, timeframe.getCode(), selected.getStrategyName(), selected.getScore());
@@ -262,38 +274,42 @@ public class StrategyLabService {
             for (Timeframe timeframe : timeframes) {
                 String cacheKey = makeKey(symbol, timeframe);
                 List<StrategyPerformanceReport> results = new ArrayList<>();
+                List<CandleData> candles = loadCachedCandlesForBacktest(symbol, timeframe);
+                int candleCount = candles.size();
+                HistoricalDataPrefetcher.DataReadiness readiness =
+                        HistoricalDataPrefetcher.evaluateDataReadiness(candleCount, candleCount);
+
+                if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
+                    log.warn("Skipping Strategy Lab backtests for {}/{}: insufficient candles={} readiness={}",
+                            symbol, timeframe.getCode(), candleCount, readiness);
+                    rankingsCache.put(cacheKey, List.of());
+                    consensusCache.put(cacheKey, StrategyConsensusResult.builder()
+                            .symbol(symbol)
+                            .timeframe(timeframe)
+                            .consensusSide(org.investpro.utils.Side.HOLD)
+                            .selectedStrategyName("NONE")
+                            .reason("Not enough historical candles for basic backtesting: " + candleCount)
+                            .build());
+                    completed.addAndGet(strategyNames.size());
+                    continue;
+                }
 
                 for (String strategyName : strategyNames) {
-                    try {
-                        log.info(
-                                "Testing {}/{}: {} ({}/{})",
-                                symbol,
-                                timeframe.getCode(),
-                                strategyName,
-                                completed.incrementAndGet(),
-                                totalTests);
-
-                        StrategyBacktestRequest request = StrategyBacktestRequest.builder()
-                                .symbol(symbol)
-                                .timeframe(timeframe)
-                                .strategyName(strategyName)
-                                .candles(generateMockCandles()) // TODO: get real historical candles
-                                .initialCapital(10000.0)
-                                .commissionRate(0.001)
-                                .slippageRate(0.0002)
-                                .maxTrades(Integer.MAX_VALUE)
-                                .allowShorts(true)
-                                .useRiskManagement(true)
-                                .build();
-
-                        StrategyPerformanceReport report = backtestRunner.run(request);
-                        results.add(report);
-                        allResults.add(report);
-
-                    } catch (Exception e) {
-                        log.error("Backtest failed for {}", strategyName, e);
-                    }
+                    log.info("Queueing {}/{}: {} ({}/{})",
+                            symbol,
+                            timeframe.getCode(),
+                            strategyName,
+                            completed.incrementAndGet(),
+                            totalTests);
                 }
+                results.addAll(runBacktestsViaScheduler(
+                        symbol,
+                        timeframe,
+                        candles,
+                        strategyNames,
+                        BacktestJobPriority.VISIBLE,
+                        null));
+                allResults.addAll(results);
 
                 // Rank and cache results for this timeframe
                 List<StrategyPerformanceReport> ranked = rankingEngine.rank(results);
@@ -397,13 +413,6 @@ public class StrategyLabService {
     }
 
     /**
-     * Get assignment service for direct access.
-     */
-    public StrategyAssignmentService getAssignmentService() {
-        return assignmentService;
-    }
-
-    /**
      * Shutdown the service.
      */
     public void shutdown() {
@@ -468,7 +477,7 @@ public class StrategyLabService {
             return tradable;
         }
 
-        return ranked == null || ranked.isEmpty() ? null : ranked.getFirst();
+        return ranked.isEmpty() ? null : ranked.getFirst();
     }
 
     private TradePair parsePair(String symbol) {
@@ -487,6 +496,87 @@ public class StrategyLabService {
         }
     }
 
+    private List<StrategyPerformanceReport> runBacktestsViaScheduler(
+            String symbol,
+            Timeframe timeframe,
+            List<CandleData> candles,
+            List<String> strategyNames,
+            BacktestJobPriority priority,
+            IntConsumer progressCallback) {
+        List<BacktestJob> jobs = new ArrayList<>();
+        AtomicInteger finished = new AtomicInteger(0);
+
+        for (String strategyName : strategyNames) {
+            StrategyBacktestRequest request = StrategyBacktestRequest.builder()
+                    .symbol(symbol)
+                    .timeframe(timeframe)
+                    .strategyName(strategyName)
+                    .candles(candles)
+                    .initialCapital(10000.0)
+                    .commissionRate(0.001)
+                    .slippageRate(0.0002)
+                    .maxTrades(Integer.MAX_VALUE)
+                    .allowShorts(true)
+                    .useRiskManagement(true)
+                    .build();
+            try {
+                jobs.add(backtestScheduler.submit(request, priority, job -> {
+                    int count = finished.incrementAndGet();
+                    if (progressCallback != null) {
+                        progressCallback.accept(count);
+                    }
+                }));
+            } catch (RejectedExecutionException exception) {
+                log.warn("Backtest scheduler rejected {}/{} strategy={}: {}",
+                        symbol, timeframe.getCode(), strategyName, exception.getMessage());
+            }
+        }
+
+        List<StrategyPerformanceReport> results = new ArrayList<>();
+        for (BacktestJob job : jobs) {
+            try {
+                results.add(job.getFuture().join());
+            } catch (CancellationException exception) {
+                log.warn("Backtest cancelled for {}/{} strategy={}",
+                        symbol, timeframe.getCode(), job.getRequest().getStrategyName());
+            } catch (CompletionException exception) {
+                log.warn("Backtest failed for {}/{} strategy={}: {}",
+                        symbol, timeframe.getCode(), job.getRequest().getStrategyName(),
+                        exception.getCause() == null ? exception.getMessage() : exception.getCause().getMessage());
+            }
+        }
+        return results;
+    }
+
+    private List<CandleData> loadCachedCandlesForBacktest(String symbol, Timeframe timeframe) {
+        TradePair pair = parsePair(symbol);
+        if (pair == null || timeframe == null) {
+            return List.of();
+        }
+
+        LocalDateTime end = LocalDateTime.now();
+        LocalDateTime start = historicalWindowStart(end, timeframe);
+        try {
+            return historicalDataRepository
+                    .getHistoricalData(pair, start, end, timeframe.getCode())
+                    .map(this::sanitizeCandles)
+                    .orElseGet(List::of);
+        } catch (Exception exception) {
+            log.warn("Unable to load cached historical candles for {}/{}: {}",
+                    symbol, timeframe.getCode(), exception.getMessage());
+            return List.of();
+        }
+    }
+
+    private LocalDateTime historicalWindowStart(LocalDateTime end, Timeframe timeframe) {
+        if (timeframe == null) {
+            return end.minusDays(90);
+        }
+        long seconds = Math.max(60L, timeframe.getSeconds());
+        long days = Math.max(30L, Math.min(730L, (seconds * 1_000L) / 86_400L + 14L));
+        return end.minusDays(days);
+    }
+
     private double readDoubleProperty(String propertyName, double fallback) {
         String rawValue = System.getProperty(propertyName);
         if (rawValue == null || rawValue.isBlank()) {
@@ -500,11 +590,8 @@ public class StrategyLabService {
         }
     }
 
-    private double readFirstDoubleProperty(double fallback, String... propertyNames) {
-        if (propertyNames == null) {
-            return fallback;
-        }
-        for (String propertyName : propertyNames) {
+    private double readFirstDoubleProperty() {
+        for (String propertyName : new String[]{"investpro.strategy.minStrategyScore", "investpro.strategy.minScore", "investpro.strategy.hardMinStrategyScore"}) {
             String rawValue = System.getProperty(propertyName);
             if (rawValue == null || rawValue.isBlank()) {
                 continue;
@@ -516,42 +603,18 @@ public class StrategyLabService {
                         propertyName, rawValue);
             }
         }
-        return fallback;
+        return 5.0;
     }
 
-    private boolean readFirstBooleanProperty(boolean fallback, String... propertyNames) {
-        if (propertyNames == null) {
-            return fallback;
-        }
-        for (String propertyName : propertyNames) {
+    private boolean readFirstBooleanProperty() {
+        for (String propertyName : new String[]{"investpro.strategy.autoAssignBest"}) {
             String rawValue = System.getProperty(propertyName);
             if (rawValue == null || rawValue.isBlank()) {
                 continue;
             }
             return Boolean.parseBoolean(rawValue.trim());
         }
-        return fallback;
+        return true;
     }
 
-    /**
-     * Generate mock candles for testing (TODO: replace with real historical data).
-     */
-    private List<CandleData> generateMockCandles() {
-        List<CandleData> candles = new ArrayList<>();
-        double price = 100.0;
-
-        for (int i = 0; i < 200; i++) {
-            double change = (Math.random() - 0.5) * 2;
-            double open = price;
-            double close = price + change;
-            double high = Math.max(open, close) + Math.random() * 0.5;
-            double low = Math.min(open, close) - Math.random() * 0.5;
-            double volume = 1000 + Math.random() * 500;
-
-            candles.add(new CandleData(open, close, high, low, i, volume));
-            price = close;
-        }
-
-        return candles;
-    }
 }

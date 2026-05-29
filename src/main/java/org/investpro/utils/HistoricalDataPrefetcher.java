@@ -8,6 +8,7 @@ import org.investpro.exchange.bitfinex.BitfinexCandleDataSupplier;
 import org.investpro.exchange.coinbase.CoinbaseCandleDataSupplier;
 import org.investpro.models.trading.TradePair;
 import org.investpro.persistence.repository.HistoricalDataRepository;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,26 +30,26 @@ import java.util.function.Consumer;
 
 /**
  * Utility to pre-fetch and cache historical candle data from exchanges before backtesting.
- *
+ * <p>
  * Supported default exchanges:
  * - Binance
  * - Coinbase
  * - Bitfinex
- *
+ * <p>
  * Important:
  * The current CandleDataSupplier contract only exposes get().
  * It does not accept start/end range parameters directly.
  * Because of that, this class fetches from the supplier once, validates the result,
  * removes duplicates when possible, and saves the candles to HistoricalDataRepository.
- *
+ * <p>
  * Usage:
- *
- * HistoricalDataPrefetcher prefetcher =
+ * <p>
+ * HistoricalDataPrefetcher preFetcher =
  *         HistoricalDataPrefetcher.forCurrentExchange(exchange, repository);
- *
- * List<CandleData> candles = prefetcher.fetchAndCacheDataSync(
+
+ * List<CandleData> candles = preFetcher.fetchAndCacheDataSync(
  *         tradePair,
- *         LocalDateTime.now().minusDays(60),
+ *         start,
  *         LocalDateTime.now(),
  *         "1h",
  *         progress -> System.out.println("Progress: " + progress + "%")
@@ -243,6 +244,7 @@ public class HistoricalDataPrefetcher {
     ) throws Exception {
         TreeMap<Long, CandleData> candlesByTimestamp = new TreeMap<>();
         long startMillis = toEpochMillis(startTime);
+        long endMillis = toEpochMillis(endTime);
         int targetCandles = Math.max(MIN_CANDLES_FOR_BASIC_TEST, expectedCandles);
         int pagesNeeded = Math.max(1, (int) Math.ceil(targetCandles / 200.0) + 2);
         int maxPages = Math.min(MAX_FETCH_PAGES, pagesNeeded);
@@ -261,7 +263,7 @@ public class HistoricalDataPrefetcher {
 
             for (CandleData candle : cleanedPage) {
                 long timestamp = candleTimestampMillis(candle);
-                if (timestamp > 0L) {
+                if (timestamp > 0L && timestamp <= endMillis) {
                     candlesByTimestamp.put(timestamp, candle);
                 }
             }
@@ -380,7 +382,7 @@ public class HistoricalDataPrefetcher {
     /**
      * Helps the backtest engine know if enough candles exist for useful testing.
      */
-    public DataReadiness evaluateDataReadiness(int actualCandles, int expectedCandles) {
+    public static DataReadiness evaluateDataReadiness(int actualCandles, int expectedCandles) {
         if (actualCandles <= 0) {
             return DataReadiness.EMPTY;
         }
@@ -408,15 +410,16 @@ public class HistoricalDataPrefetcher {
         return DataReadiness.STRONG;
     }
 
-    public boolean hasEnoughDataForBasicTesting(int candleCount) {
+    @Contract(pure = true)
+    public static boolean hasEnoughDataForBasicTesting(int candleCount) {
         return candleCount >= MIN_CANDLES_FOR_BASIC_TEST;
     }
 
-    public boolean hasEnoughDataForGoodTesting(int candleCount) {
+    public static boolean hasEnoughDataForGoodTesting(int candleCount) {
         return candleCount >= MIN_CANDLES_FOR_GOOD_TEST;
     }
 
-    public boolean hasEnoughDataForStrongTesting(int candleCount) {
+    public static boolean hasEnoughDataForStrongTesting(int candleCount) {
         return candleCount >= MIN_CANDLES_FOR_STRONG_TEST;
     }
 

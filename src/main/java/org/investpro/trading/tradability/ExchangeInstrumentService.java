@@ -19,8 +19,8 @@ public interface ExchangeInstrumentService {
     /** Return the high-level trade status for a single pair. */
     CompletableFuture<InstrumentTradeStatus> getTradeStatus(TradePair pair);
 
-    /** Return a detailed tradeability report explaining why a pair is or isn't tradeable. */
-    CompletableFuture<InstrumentTradeabilityReport> explainTradeability(TradePair pair);
+    /** Return a detailed tradability report explaining why a pair is or isn't tradeable. */
+    CompletableFuture<InstrumentTradabilityReport> explainTradability(TradePair pair);
 
     /** The exchange identifier this service targets (e.g. "oanda", "coinbase", "binance-us"). */
     String getExchangeId();

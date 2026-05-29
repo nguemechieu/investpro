@@ -73,9 +73,9 @@ public class OandaInstrumentService implements ExchangeInstrumentService {
     }
 
     @Override
-    public CompletableFuture<InstrumentTradeabilityReport> explainTradeability(TradePair pair) {
+    public CompletableFuture<InstrumentTradabilityReport> explainTradability(TradePair pair) {
         return exchange.fetchTradabilityStatus(pair)
-                .thenApply(st -> InstrumentTradeabilityReport.from(
+                .thenApply(st -> InstrumentTradabilityReport.from(
                         st,
                         EXCHANGE_ID,
                         pair.toString('/'),

@@ -13,6 +13,8 @@ import javafx.scene.layout.BackgroundPosition;
 import javafx.scene.layout.BackgroundRepeat;
 import javafx.scene.layout.BackgroundSize;
 import javafx.stage.Stage;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -55,9 +57,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * - own risk logic
  * - own bot runtime logic
  */
+@EqualsAndHashCode(callSuper = true)
 @Slf4j
-@Getter
-@Setter
+@Data
 public class InvestPro extends Application {
 
     private static final double DEFAULT_WIDTH = 1530;

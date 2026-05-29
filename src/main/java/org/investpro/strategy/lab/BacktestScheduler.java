@@ -167,8 +167,7 @@ public final class BacktestScheduler {
                     Thread t = new Thread(r, "strategy-lab-worker");
                     t.setDaemon(true);
                     return t;
-                },
-                new ThreadPoolExecutor.DiscardPolicy());
+                });
 
         // Start the dispatch loop – dequeues jobs and submits them to executor
         startDispatchLoop();
@@ -225,6 +224,7 @@ public final class BacktestScheduler {
         BacktestJob job = new BacktestJob(request, priority, onComplete);
         allJobs.put(job.getJobId(), job);
         workQueue.add(job);
+        notifyStatsListeners();
 
         log.debug("Queued backtest job {} ({} {} {})",
                 job.getJobId().substring(0, 8),
@@ -256,6 +256,7 @@ public final class BacktestScheduler {
         if (cancelled) {
             workQueue.remove(job); // remove from queue if not yet started
             cancelledCount.incrementAndGet();
+            notifyStatsListeners();
         }
         return cancelled;
     }
@@ -274,6 +275,7 @@ public final class BacktestScheduler {
             }
         }
         log.info("BacktestScheduler: cancelled {} queued jobs", count);
+        notifyStatsListeners();
     }
 
     /**
@@ -283,6 +285,7 @@ public final class BacktestScheduler {
     public void pause() {
         paused.set(true);
         log.info("BacktestScheduler: paused");
+        notifyStatsListeners();
     }
 
     /**
@@ -294,6 +297,7 @@ public final class BacktestScheduler {
             paused.notifyAll();
         }
         log.info("BacktestScheduler: resumed");
+        notifyStatsListeners();
     }
 
     /**
@@ -315,6 +319,7 @@ public final class BacktestScheduler {
         }
         currentMaxWorkers = clamped;
         log.info("BacktestScheduler: maxWorkers adjusted to {}", clamped);
+        notifyStatsListeners();
     }
 
     /**
@@ -362,7 +367,9 @@ public final class BacktestScheduler {
      */
     @NotNull
     public Collection<BacktestJob> getAllJobs() {
-        return Collections.unmodifiableCollection(allJobs.values());
+        List<BacktestJob> jobs = new ArrayList<>(allJobs.values());
+        jobs.sort(Comparator.comparing(BacktestJob::getSubmittedAt).reversed());
+        return Collections.unmodifiableList(jobs);
     }
 
     /**
@@ -438,6 +445,11 @@ public final class BacktestScheduler {
                         continue;
                     }
 
+                    if (executor.getActiveCount() >= currentMaxWorkers) {
+                        Thread.sleep(50);
+                        continue;
+                    }
+
                     // Block until a job is available (timeout so we can check shutdown)
                     BacktestJob job = workQueue.poll(500, TimeUnit.MILLISECONDS);
                     if (job == null) {
@@ -451,7 +463,14 @@ public final class BacktestScheduler {
 
                     // Submit to executor – this will block if all worker slots are taken,
                     // providing back-pressure without spinning.
-                    executor.execute(() -> executeJob(job));
+                    try {
+                        executor.execute(() -> executeJob(job));
+                    } catch (RejectedExecutionException exception) {
+                        if (!shutdown.get() && job.getStatus() != BacktestJobStatus.CANCELLED) {
+                            workQueue.offer(job);
+                            Thread.sleep(100);
+                        }
+                    }
 
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -480,6 +499,7 @@ public final class BacktestScheduler {
         Thread currentThread = Thread.currentThread();
         job.markRunning(currentThread);
         runningJobIds.add(job.getJobId());
+        notifyStatsListeners();
 
         if (logEachBacktest) {
             log.info("Starting backtest: {} on {}/{} with {} candles",

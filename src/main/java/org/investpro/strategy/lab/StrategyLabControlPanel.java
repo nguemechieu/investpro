@@ -10,6 +10,7 @@ import javafx.scene.layout.*;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collection;
+import java.util.function.Consumer;
 
 /**
  * Professional monitoring panel for the {@link BacktestScheduler}.
@@ -29,6 +30,7 @@ import java.util.Collection;
  */
 @Slf4j
 public final class StrategyLabControlPanel extends BorderPane {
+    private static final int MAX_VISIBLE_JOBS = 500;
 
     // ─── Colour palette (matches StrategyLabPanel) ────────────────────────
     private static final String BG_PANEL   = "#0a0e27";
@@ -63,6 +65,7 @@ public final class StrategyLabControlPanel extends BorderPane {
     // ─── Scheduler reference ───────────────────────────────────────────────
     private final BacktestScheduler scheduler;
     private final ThrottledUIUpdater<SchedulerStats> statsUpdater;
+    private final Consumer<SchedulerStats> statsListener;
 
     // ─── Construction ──────────────────────────────────────────────────────
 
@@ -73,6 +76,7 @@ public final class StrategyLabControlPanel extends BorderPane {
     public StrategyLabControlPanel(BacktestScheduler scheduler) {
         this.scheduler = scheduler;
         this.statsUpdater = new ThrottledUIUpdater<>(this::applyStats);
+        this.statsListener = statsUpdater::enqueue;
 
         setStyle("-fx-background-color: " + BG_PANEL + ";");
         setPadding(new Insets(10));
@@ -82,7 +86,7 @@ public final class StrategyLabControlPanel extends BorderPane {
         setBottom(buildActionBar());
 
         // Subscribe to scheduler updates
-        scheduler.addStatsListener(statsUpdater::enqueue);
+        scheduler.addStatsListener(statsListener);
 
         // Initial paint with current stats
         applyStats(scheduler.getStats());
@@ -332,7 +336,8 @@ public final class StrategyLabControlPanel extends BorderPane {
             return;
         }
         Collection<BacktestJob> jobs = scheduler.getAllJobs();
-        jobTable.setItems(FXCollections.observableArrayList(jobs));
+        jobTable.setItems(FXCollections.observableArrayList(
+                jobs.stream().limit(MAX_VISIBLE_JOBS).toList()));
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────
@@ -340,7 +345,7 @@ public final class StrategyLabControlPanel extends BorderPane {
     /** Shuts down the throttled updater and unsubscribes from the scheduler. */
     public void dispose() {
         statsUpdater.shutdown();
-        scheduler.removeStatsListener(statsUpdater::enqueue);
+        scheduler.removeStatsListener(statsListener);
     }
 
     private static Label sectionLabel(String text) {

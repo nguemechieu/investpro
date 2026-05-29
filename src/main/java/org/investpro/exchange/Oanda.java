@@ -138,6 +138,8 @@ public class Oanda extends Exchange {
     private final ConcurrentHashMap<String, CacheEntry<Account>> accountCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CacheEntry<List<Position>>> positionsCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CacheEntry<List<OpenOrder>>> openOrdersCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CacheEntry<List<Order>>> orderHistoryCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> orderHistoryWarnAfterMs = new ConcurrentHashMap<>();
 
     // Request coalescing - reuse in-flight requests
     private CompletableFuture<Account> inflightAccountRequest = null;
@@ -1810,6 +1812,13 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
+        String cacheKey = account + "|" + (tradePair == null ? "ALL" : toInstrument(tradePair)) + "|"
+                + (since == null ? "ALL" : since.toEpochMilli());
+        List<Order> cached = getCached(cacheKey, orderHistoryCache);
+        if (cached != null) {
+            return CompletableFuture.completedFuture(cached);
+        }
+
         String instrumentQuery = tradePair == null ? "" : "&instrument=%s".formatted(toInstrument(tradePair));
         String url = "%s?state=ALL&count=100%s".formatted(oandaRoute(ACCOUNT_ORDERS_ROUTE, account),
                 instrumentQuery);
@@ -1818,47 +1827,75 @@ public class Oanda extends Exchange {
                 .GET()
                 .build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
+        return CompletableFuture.supplyAsync(() -> {
+            totalOandaRequests.incrementAndGet();
+            try {
+                HttpResponse<String> response = sendWithExponentialBackoffSync(request, 2, 1_000, 8_000);
+
+                if (response.statusCode() == 429) {
+                    oanda429Count.incrementAndGet();
+                    last429TimeMs = System.currentTimeMillis();
+                    last429Endpoint = "order-history";
+                }
+
                     if (!isSuccess(response)) {
-                        log.warn("OANDA order history failed HTTP {}: {}", response.statusCode(), response.body());
-                        return Collections.emptyList();
+                    List<Order> fallback = getCached(cacheKey + "|stale", orderHistoryCache);
+                    logOrderHistoryFailure(cacheKey, response.statusCode(), response.body(), fallback != null);
+                    return fallback == null ? Collections.emptyList() : fallback;
                     }
 
-                    try {
-                        JsonNode orders = OBJECT_MAPPER.readTree(response.body()).path("orders");
-                        if (!orders.isArray() || orders.isEmpty()) {
-                            return Collections.emptyList();
-                        }
+                JsonNode orders = OBJECT_MAPPER.readTree(response.body()).path("orders");
+                if (!orders.isArray() || orders.isEmpty()) {
+                    setCached(cacheKey, Collections.emptyList(), 30_000, orderHistoryCache);
+                    setCached(cacheKey + "|stale", Collections.emptyList(), 300_000, orderHistoryCache);
+                    return Collections.emptyList();
+                }
 
-                        List<Order> result = new ArrayList<>();
+                List<Order> result = new ArrayList<>();
 
-                        for (JsonNode node : orders) {
-                            Instant createdAt = parseInstant(node.path("createTime").asText(""));
+                for (JsonNode node : orders) {
+                    Instant createdAt = parseInstant(node.path("createTime").asText(""));
 
-                            if (since != null && createdAt.isBefore(since)) {
-                                continue;
-                            }
-
-                            double signedUnits = node.path("units").asDouble(0.0);
-                            Order order = new Order();
-                            order.setId(parseLong(node.path("id").asText("0")));
-                            order.setSymbol(node.path("instrument").asText(""));
-                            order.setQuantity(Math.abs(signedUnits));
-                            order.setPrice(node.path("price").asDouble(0.0));
-                            order.setType(node.path("type").asText(""));
-                            order.setSide(signedUnits < 0 ? Side.SELL : Side.BUY);
-                            order.setStatus(node.path("state").asText(""));
-                            order.setDate(java.util.Date.from(createdAt));
-                            result.add(order);
-                        }
-
-                        return result;
-
-                    } catch (Exception exception) {
-                        throw new RuntimeException(exception);
+                    if (since != null && createdAt.isBefore(since)) {
+                        continue;
                     }
-                });
+
+                    double signedUnits = node.path("units").asDouble(0.0);
+                    Order order = new Order();
+                    order.setId(parseLong(node.path("id").asText("0")));
+                    order.setSymbol(node.path("instrument").asText(""));
+                    order.setQuantity(Math.abs(signedUnits));
+                    order.setPrice(node.path("price").asDouble(0.0));
+                    order.setType(node.path("type").asText(""));
+                    order.setSide(signedUnits < 0 ? Side.SELL : Side.BUY);
+                    order.setStatus(node.path("state").asText(""));
+                    order.setDate(java.util.Date.from(createdAt));
+                    result.add(order);
+                }
+
+                List<Order> immutable = List.copyOf(result);
+                setCached(cacheKey, immutable, 30_000, orderHistoryCache);
+                setCached(cacheKey + "|stale", immutable, 300_000, orderHistoryCache);
+                return immutable;
+
+            } catch (Exception exception) {
+                List<Order> fallback = getCached(cacheKey + "|stale", orderHistoryCache);
+                logOrderHistoryFailure(cacheKey, -1, exception.getMessage(), fallback != null);
+                return fallback == null ? Collections.emptyList() : fallback;
+            }
+        }, oandaExecutor);
+    }
+
+    private void logOrderHistoryFailure(String cacheKey, int statusCode, String message, boolean usingCachedFallback) {
+        long now = System.currentTimeMillis();
+        long nextWarn = orderHistoryWarnAfterMs.getOrDefault(cacheKey, 0L);
+        String fallback = usingCachedFallback ? " using cached fallback" : "";
+        if (now >= nextWarn) {
+            log.warn("OANDA order history unavailable{} HTTP {}: {}", fallback, statusCode, safe(message));
+            orderHistoryWarnAfterMs.put(cacheKey, now + 120_000L);
+        } else {
+            log.debug("OANDA order history unavailable{} HTTP {}: {}", fallback, statusCode, safe(message));
+        }
     }
 
     // ---------------------------------------------------------------------

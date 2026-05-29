@@ -337,7 +337,7 @@ public abstract class Exchange implements
 
     /**
      * Returns the instrument service for this exchange, or null if not overridden.
-     * Override in exchange adapters to provide pair discovery and tradeability checks.
+     * Override in exchange adapters to provide pair discovery and tradability checks.
      */
     public ExchangeInstrumentService instrumentService() {
         return null;

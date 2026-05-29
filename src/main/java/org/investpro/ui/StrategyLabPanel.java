@@ -28,17 +28,20 @@ import org.investpro.strategy.lab.StrategyVote;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.UniversalTradabilityService;
 import org.investpro.enums.timeframe.Timeframe;
-import org.investpro.utils.CandleDataSupplier;
+import org.investpro.utils.HistoricalDataPrefetcher;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * JavaFX panel for InvestPro Strategy Lab.
@@ -64,6 +67,7 @@ public class StrategyLabPanel extends BorderPane {
     private String selectedSymbol = "EUR/USD";
     private Timeframe selectedTimeframe = Timeframe.H1;
     private volatile boolean running;
+    private final AtomicLong refreshSequence = new AtomicLong();
 
     private ComboBox<TradePair> symbolCombo;
     private ComboBox<Timeframe> timeframeCombo;
@@ -167,22 +171,8 @@ public class StrategyLabPanel extends BorderPane {
         if (systemCore.getExchange() != null) {
             List<TradePair> symbols = systemCore.getExchange().getTradePairSymbol();
             if (symbols != null) {
-                try {
-                    UniversalTradabilityService tradabilityService = new UniversalTradabilityService(
-                            systemCore.getExchange(),
-                            null);
-                    List<SymbolTradability> statuses = tradabilityService.getTradability(symbols).get(8, TimeUnit.SECONDS);
-                    List<TradePair> filtered = new ArrayList<>();
-                    for (SymbolTradability status : statuses) {
-                        if (status != null && status.tradePair() != null && status.marketDataAllowed()) {
-                            filtered.add(status.tradePair());
-                        }
-                    }
-                    symbolCombo.getItems().setAll(filtered.isEmpty() ? symbols : filtered);
-                } catch (Exception exception) {
-                    log.warn("Unable to apply tradability filter in StrategyLabPanel", exception);
-                    symbolCombo.getItems().setAll(symbols);
-                }
+                symbolCombo.getItems().setAll(symbols);
+                loadTradableSymbolsAsync(symbols);
             }
         }
 
@@ -360,6 +350,49 @@ public class StrategyLabPanel extends BorderPane {
 
         strategyCombo.getItems().setAll(all);
         selectDefaultStrategy(strategyCombo);
+    }
+
+    private void loadTradableSymbolsAsync(List<TradePair> symbols) {
+        if (symbols == null || symbols.isEmpty() || systemCore.getExchange() == null) {
+            return;
+        }
+
+        List<TradePair> snapshotSymbols = List.copyOf(symbols);
+        CompletableFuture
+                .supplyAsync(() -> {
+                    try {
+                        UniversalTradabilityService tradabilityService = new UniversalTradabilityService(
+                                systemCore.getExchange(),
+                                null);
+                        List<SymbolTradability> statuses = tradabilityService
+                                .getTradability(snapshotSymbols)
+                                .get(8, TimeUnit.SECONDS);
+                        List<TradePair> filtered = new ArrayList<>();
+                        for (SymbolTradability status : statuses) {
+                            if (status != null && status.tradePair() != null && status.marketDataAllowed()) {
+                                filtered.add(status.tradePair());
+                            }
+                        }
+                        return filtered.isEmpty() ? snapshotSymbols : filtered;
+                    } catch (Exception exception) {
+                        log.warn("Unable to apply tradability filter in StrategyLabPanel", exception);
+                        return snapshotSymbols;
+                    }
+                })
+                .thenAccept(filtered -> runOnFx(() -> {
+                    TradePair previous = symbolCombo.getValue();
+                    symbolCombo.getItems().setAll(filtered);
+                    if (previous != null && symbolCombo.getItems().contains(previous)) {
+                        symbolCombo.setValue(previous);
+                        return;
+                    }
+                    if (!symbolCombo.getItems().isEmpty()) {
+                        symbolCombo.getSelectionModel().selectFirst();
+                        TradePair selected = symbolCombo.getValue();
+                        selectedSymbol = selected == null ? selectedSymbol : selected.toString('/');
+                        refreshUI();
+                    }
+                }));
     }
 
     private List<String> loadStrategyChoices() {
@@ -798,33 +831,48 @@ public class StrategyLabPanel extends BorderPane {
     }
 
     private void refreshUI() {
-        runOnFx(() -> {
-            try {
-                if (rankingTable == null || votingTable == null) {
-                    return;
-                }
+        String symbol = selectedSymbol;
+        Timeframe timeframe = selectedTimeframe;
+        long requestId = refreshSequence.incrementAndGet();
 
-                snapshot = labService.getSnapshot(selectedSymbol, selectedTimeframe);
+        CompletableFuture
+                .supplyAsync(() -> labService.getSnapshot(symbol, timeframe))
+                .whenComplete((loadedSnapshot, throwable) -> runOnFx(() -> {
+                    if (requestId != refreshSequence.get()) {
+                        return;
+                    }
+                    try {
+                        if (rankingTable == null || votingTable == null) {
+                            return;
+                        }
 
-                if (snapshot == null) {
-                    clearSnapshotViews();
-                    statusLabel.setText("No strategy lab snapshot available.");
-                    return;
-                }
+                        if (throwable != null) {
+                            throw new IllegalStateException(rootMessage(throwable), throwable);
+                        }
 
-                rankingTable.setItems(FXCollections.observableArrayList(snapshot.getRankings()));
+                        snapshot = loadedSnapshot;
 
-                updateAssignmentView(snapshot);
-                updateConsensusView(snapshot);
+                        if (snapshot == null) {
+                            clearSnapshotViews();
+                            statusLabel.setText("No strategy lab snapshot available.");
+                            return;
+                        }
 
-                statusLabel.setText("Ready");
+                        rankingTable.setItems(FXCollections.observableArrayList(snapshot.getRankings()));
 
-            } catch (Exception exception) {
-                log.error("Failed to refresh Strategy Lab UI", exception);
-                appendLog("Refresh failed: " + rootMessage(exception));
-                statusLabel.setText("Refresh failed.");
-            }
-        });
+                        updateAssignmentView(snapshot);
+                        updateConsensusView(snapshot);
+
+                        if (!running) {
+                            statusLabel.setText("Ready");
+                        }
+
+                    } catch (Exception exception) {
+                        log.error("Failed to refresh Strategy Lab UI", exception);
+                        appendLog("Refresh failed: " + rootMessage(exception));
+                        statusLabel.setText("Refresh failed.");
+                    }
+                }));
     }
 
     private void updateConsensusView(@NotNull StrategyLabSnapshot snapshot) {
@@ -992,16 +1040,22 @@ public class StrategyLabPanel extends BorderPane {
 
     private void testAllTimeframes() {
         appendLog("Testing all strategies on all timeframes for " + selectedSymbol + "...");
-        setRunning(true, "Testing all timeframes...");
+        setRunning(true, "Fetching candles for all timeframes...");
 
-        labService.testAllStrategies(
-                selectedSymbol,
-                List.of(Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1))
-                .whenComplete((ignored, throwable) -> runOnFx(() -> {
+        fetchHistoricalCandlesByTimeframe(List.of(Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1))
+                .thenCompose(candlesByTimeframe -> labService.evaluateAndAssignBestAcrossTimeframes(
+                        selectedSymbol,
+                        candlesByTimeframe))
+                .whenComplete((assignment, throwable) -> runOnFx(() -> {
                     if (throwable != null) {
                         appendLog("Tests failed: " + rootMessage(throwable));
+                    } else if (assignment != null) {
+                        appendLog("All timeframe tests completed and assigned: " + assignment.getStrategyId()
+                                + " (score " + String.format("%.1f", assignment.getScoreAtAssignment()) + ").");
+                        refreshUI();
                     } else {
-                        appendLog("All timeframe tests completed.");
+                        appendLog("All timeframe tests completed, but no strategy could be assigned. "
+                                + "Check candle history and minimum score settings.");
                         refreshUI();
                     }
 
@@ -1148,25 +1202,87 @@ public class StrategyLabPanel extends BorderPane {
         }
 
         try {
-            CandleDataSupplier supplier = systemCore.getExchange()
-                    .getCandleDataSupplier(selectedTimeframe.getSeconds(), pair);
-            if (supplier == null) {
-                return CompletableFuture.failedFuture(new IllegalStateException(
-                        "No candle supplier for " + pair.toString('/') + " " + selectedTimeframe.getCode()));
-            }
-
-            Future<List<CandleData>> future = supplier.get();
-            return CompletableFuture.supplyAsync(() -> {
-                try {
-                    List<CandleData> candles = future.get(20, TimeUnit.SECONDS);
-                    return candles == null ? List.of() : candles;
-                } catch (Exception exception) {
-                    throw new IllegalStateException("Historical candle fetch failed", exception);
-                }
-            });
+            return fetchHistoricalCandles(pair, selectedTimeframe);
         } catch (Exception exception) {
             return CompletableFuture.failedFuture(exception);
         }
+    }
+
+    private CompletableFuture<Map<Timeframe, List<CandleData>>> fetchHistoricalCandlesByTimeframe(
+            List<Timeframe> timeframes) {
+        TradePair pair = symbolCombo == null ? null : symbolCombo.getValue();
+        if (pair == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Select a symbol first."));
+        }
+        if (systemCore.getExchange() == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Connect an exchange first."));
+        }
+
+        List<CompletableFuture<Map.Entry<Timeframe, List<CandleData>>>> futures = timeframes.stream()
+                .filter(Objects::nonNull)
+                .map(timeframe -> fetchHistoricalCandles(pair, timeframe)
+                        .thenApply(candles -> Map.entry(timeframe, candles)))
+                .toList();
+
+        return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
+                .thenApply(ignored -> {
+                    Map<Timeframe, List<CandleData>> candlesByTimeframe = new LinkedHashMap<>();
+                    for (CompletableFuture<Map.Entry<Timeframe, List<CandleData>>> future : futures) {
+                        Map.Entry<Timeframe, List<CandleData>> entry = future.join();
+                        if (!entry.getValue().isEmpty()) {
+                            candlesByTimeframe.put(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    return candlesByTimeframe;
+                });
+    }
+
+    private CompletableFuture<List<CandleData>> fetchHistoricalCandles(TradePair pair, Timeframe timeframe) {
+        if (timeframe == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Select a timeframe first."));
+        }
+        HistoricalDataPrefetcher preFetcher = HistoricalDataPrefetcher.forCurrentExchange(
+                systemCore.getExchange(),
+                systemCore.getHistoricalDataRepository());
+        LocalDateTime end = LocalDateTime.now();
+        LocalDateTime start = historicalWindowStart(end, timeframe);
+        appendLog("Fetching historical candles for " + pair.toString('/') + "/" + timeframe.getCode() + "...");
+
+        return preFetcher.fetchAndCacheData(
+                pair,
+                start,
+                end,
+                timeframe.getCode(),
+                progress -> {
+                    if (progress >= 0) {
+                        runOnFx(() -> setRunning(true, "Fetching " + timeframe.getCode() + " candles: " + progress + "%"));
+                    }
+                }).thenApply(candles -> validateBacktestDataDepth(pair, timeframe, candles));
+    }
+
+    private List<CandleData> validateBacktestDataDepth(
+            TradePair pair,
+            Timeframe timeframe,
+            List<CandleData> candles) {
+        List<CandleData> safeCandles = candles == null ? List.of() : candles;
+        int candleCount = safeCandles.size();
+        if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
+            throw new IllegalStateException("Not enough historical candles for "
+                    + pair.toString('/') + "/" + timeframe.getCode()
+                    + ": " + candleCount + " loaded. Basic backtesting requires at least 100.");
+        }
+        String quality = HistoricalDataPrefetcher.hasEnoughDataForStrongTesting(candleCount)
+                ? "strong"
+                : HistoricalDataPrefetcher.hasEnoughDataForGoodTesting(candleCount) ? "good" : "basic";
+        appendLog("Loaded " + candleCount + " candles for " + pair.toString('/') + "/"
+                + timeframe.getCode() + " (" + quality + " data depth).");
+        return safeCandles;
+    }
+
+    private LocalDateTime historicalWindowStart(LocalDateTime end, Timeframe timeframe) {
+        long seconds = Math.max(60L, timeframe.getSeconds());
+        long days = Math.max(30L, Math.min(730L, (seconds * 1_000L) / 86_400L + 14L));
+        return end.minusDays(days);
     }
 
     private void appendLog(String message) {

@@ -1,32 +1,38 @@
 package org.investpro.strategy.lab;
 
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.enums.MarketBehavior;
 import org.investpro.enums.TradingSessionStatus;
+import org.investpro.models.trading.TradePair;
 import org.investpro.strategy.*;
+import org.investpro.utils.HistoricalDataPrefetcher;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
 import java.util.*;
 
 /**
  * Executes backtest for a single strategy on a symbol/timeframe.
- *
+ * <p>
  * Responsibilities:
  * - Resolve strategy from registry
  * - Simulate strategy on historical candles
  * - Track entry/exit trades with P&L
  * - Calculate performance metrics
  * - Return StrategyPerformanceReport
- *
+ * <p>
  * This is BACKTESTING ONLY. No live orders are sent.
  */
 @Slf4j
+@Data
 public class StrategyBacktestRunner {
 
     private static final int MIN_LOOKBACK_BARS = 50;
+    private double totalLoss;
 
     /**
      * Run a backtest for one strategy on one symbol/timeframe.
@@ -64,8 +70,10 @@ public class StrategyBacktestRunner {
      * Validate backtest request.
      */
     private boolean validateRequest(StrategyBacktestRequest request) {
-        if (request.getCandles() == null || request.getCandles().size() < MIN_LOOKBACK_BARS) {
-            log.warn("Insufficient candles: {} < {}", request.getCandles().size(), MIN_LOOKBACK_BARS);
+        if (request.getCandles() == null
+                || !HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(request.getCandles().size())) {
+            int candleCount = request.getCandles() == null ? 0 : request.getCandles().size();
+            log.warn("Insufficient candles for basic backtest: {} < {}", candleCount, MIN_LOOKBACK_BARS);
             return false;
         }
 
@@ -106,7 +114,7 @@ public class StrategyBacktestRunner {
         List<String> warnings = new ArrayList<>();
         double equity = request.getInitialCapital();
         double peakEquity = equity;
-        double totalLoss = 0.0;
+        totalLoss = 0.0;
         int tradeCount = 0;
 
         // Simulation state
@@ -215,8 +223,9 @@ public class StrategyBacktestRunner {
             StrategyBacktestRequest request,
             List<CandleData> window) {
         try {
+            TradePair tradePair = parsePair(request.getSymbol());
             StrategyContext context = StrategyContext.builder()
-                    .symbol(null) // Not needed for backtest
+                    .symbol(tradePair)
                     .timeframe(request.getTimeframe())
                     .candles(window)
                     .currentPrice(window.isEmpty() ? 0 : window.get(window.size() - 1).closePrice())
@@ -232,6 +241,25 @@ public class StrategyBacktestRunner {
             return strategy.generateSignal(context);
         } catch (Exception e) {
             log.debug("Signal generation failed", e);
+            return null;
+        }
+    }
+
+    private TradePair parsePair(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return null;
+        }
+
+        String normalized = symbol.trim().replace('_', '/').replace('-', '/');
+        String[] parts = normalized.split("/");
+        if (parts.length < 2) {
+            return null;
+        }
+
+        try {
+            return new TradePair(parts[0], parts[1]);
+        } catch (Exception exception) {
+            log.debug("Unable to parse TradePair from backtest symbol {}", symbol, exception);
             return null;
         }
     }
@@ -329,7 +357,7 @@ public class StrategyBacktestRunner {
      */
     private StrategyPerformanceReport calculateReport(
             StrategyBacktestRequest request,
-            List<StrategyBacktestTrade> trades,
+            @NonNull List<StrategyBacktestTrade> trades,
             List<String> warnings,
             double finalEquity,
             double peakEquity) {

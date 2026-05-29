@@ -2,6 +2,7 @@ package org.investpro.exchange;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import javafx.beans.property.SimpleIntegerProperty;
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -94,10 +95,8 @@ import java.util.function.Supplier;
  *     <li>Live mode requires accountId = public G... account and apiSecret = secret S... seed.</li>
  * </ul>
  */
-@Getter
-@Setter
+@Data
 @Slf4j
-@SuppressWarnings({"SpellCheckingInspection", "unused"})
 public class StellarNetwork extends Exchange {
 
     private static final String STELLAR_API_URL = "https://horizon.stellar.org";
@@ -1587,10 +1586,11 @@ public class StellarNetwork extends Exchange {
     }
 
     public List<CandleData> getCandles(TradePair tradePair, Timeframe timeframe, int limit) {
-        int seconds = secondsFor(timeframe);
-        long end = Instant.now().getEpochSecond();
-        long start = end - (long) Math.max(1, limit) * seconds;
-        return getCandles(tradePair, timeframe, limit, start, end);
+        CandleDataSupplier supplier = new StellarCandleDataSupplier(
+                Math.max(1, limit),
+                secondsFor(timeframe),
+                pairOrDefault(tradePair));
+        return supplier.getCandleData();
     }
 
     public List<CandleData> getCandles(TradePair tradePair, Timeframe timeframe, int limit, Long startTime, Long endTime) {
@@ -1692,7 +1692,8 @@ public class StellarNetwork extends Exchange {
                         .toList();
 
                 if (!records.isEmpty()) {
-                    return denseCandlesFromAggregations(records, secondsPerCandle, limit, inverse);
+                    return normalizeCandlePage(denseCandlesFromAggregations(records, secondsPerCandle, limit, inverse),
+                            limit);
                 }
             } catch (Exception exception) {
                 log.debug("Failed to fetch Stellar {}trade aggregations for {} on {}: {}",
@@ -1728,7 +1729,7 @@ public class StellarNetwork extends Exchange {
             previousClose = close;
         }
 
-        return candles;
+        return normalizeCandlePage(candles, safeLimit);
     }
 
     private List<CandleData> denseCandlesFromAggregations(List<TradeAggregationResponse> records,
@@ -1763,7 +1764,32 @@ public class StellarNetwork extends Exchange {
             }
         }
 
-        return candles.stream().skip(Math.max(0, candles.size() - limit)).toList();
+        return normalizeCandlePage(candles, limit);
+    }
+
+    private List<CandleData> normalizeCandlePage(List<CandleData> candles, int limit) {
+        if (candles == null || candles.isEmpty()) {
+            return List.of();
+        }
+
+        int safeLimit = Math.max(1, Math.min(limit, 1_000));
+        TreeMap<Integer, CandleData> byOpenTime = candles.stream()
+                .filter(Objects::nonNull)
+                .filter(candle -> candle.openTime() > 0)
+                .filter(candle -> candle.openPrice() > 0.0
+                        && candle.highPrice() > 0.0
+                        && candle.lowPrice() > 0.0
+                        && candle.closePrice() > 0.0)
+                .collect(
+                        () -> new TreeMap<Integer, CandleData>(),
+                        (collector, candle) -> collector.put(candle.openTime(), candle),
+                        TreeMap::putAll);
+
+        return byOpenTime
+                .values()
+                .stream()
+                .skip(Math.max(0, byOpenTime.size() - safeLimit))
+                .toList();
     }
 
     private CandleData candleFromAggregation(TradeAggregationResponse record) {
@@ -2296,7 +2322,7 @@ public class StellarNetwork extends Exchange {
             Page<AssetResponse> page = activeMarketDataServer()
                     .assets()
                     .assetCode(normalized)
-                    .limit(20)
+                    .limit(100)
                     .execute();
 
             if (page == null || page.getRecords() == null || page.getRecords().isEmpty()) {
@@ -2419,7 +2445,7 @@ public class StellarNetwork extends Exchange {
                 .toList();
     }
 
-    private String normalizeCurrency(String code) {
+    private @NonNull String normalizeCurrency(String code) {
         if (code == null || code.isBlank()) {
             return "";
         }
@@ -2494,7 +2520,7 @@ public class StellarNetwork extends Exchange {
 
         @Override
         public Future<List<CandleData>> get() {
-            return CompletableFuture.completedFuture(getCandleData());
+            return supplyAsyncIo(this::loadAggregatedCandlePage);
         }
 
         @Override
@@ -2504,15 +2530,21 @@ public class StellarNetwork extends Exchange {
 
         @Override
         public List<CandleData> getCandleData() {
+            return loadAggregatedCandlePage();
+        }
+
+        private List<CandleData> loadAggregatedCandlePage() {
             int end = endTime.get();
-            List<CandleData> candles = buildCandlesFromTrades(tradePair, secondsPerCandle, numCandles, null, (long) end);
+            List<CandleData> candles = normalizeCandlePage(
+                    buildCandlesFromTrades(tradePair, secondsPerCandle, numCandles, null, (long) end),
+                    numCandles);
             if (!candles.isEmpty()) {
                 int firstOpenTime = candles.stream()
                         .mapToInt(CandleData::openTime)
                         .min()
                         .orElse(end);
                 if (firstOpenTime < end) {
-                    endTime.set(firstOpenTime);
+                    endTime.set(Math.max(0, firstOpenTime - 1));
                 }
             }
             return candles;
