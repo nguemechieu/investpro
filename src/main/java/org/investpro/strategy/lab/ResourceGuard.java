@@ -71,8 +71,8 @@ public final class ResourceGuard {
      * This is a hint only; the GC is not obligated to comply.
      */
     public void suggestGc() {
-        log.warn("ResourceGuard: memory critical ({:.1f}% heap used) – requesting GC",
-                getHeapUtilization() * 100);
+        log.warn("ResourceGuard: memory critical ({}% heap used) - requesting GC",
+                String.format("%.1f", getHeapUtilization() * 100));
         System.gc();
     }
 

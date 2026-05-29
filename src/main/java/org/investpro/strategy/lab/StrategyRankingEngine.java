@@ -50,12 +50,12 @@ public class StrategyRankingEngine {
         for (int i = 0; i < Math.min(5, sorted.size()); i++) {
             StrategyPerformanceReport report = sorted.get(i);
             log.info(
-                    "#{}: {} - Score: {:.1f}, WinRate: {:.1%}, Return: {:.1f}%, Trades: {}",
+                    "#{}: {} - Score: {}, WinRate: {}, Return: {}%, Trades: {}",
                     i + 1,
                     report.getStrategyName(),
-                    report.getScore(),
-                    report.getWinRate(),
-                    report.getTotalReturn(),
+                    String.format("%.1f", report.getScore()),
+                    String.format("%.1f%%", report.getWinRate() * 100),
+                    String.format("%.1f", report.getTotalReturn()),
                     report.getTotalTrades());
         }
 

@@ -106,11 +106,11 @@ public class StrategyAssignmentService {
         repository.save(assignment);
 
         log.info(
-                "Auto-assigned best strategy: {}/{} -> {} {}(score: {:.1f})",
+                "Auto-assigned best strategy: {}/{} -> {} (score: {})",
                 symbol,
                 timeframe.getCode(),
                 best.getStrategyName(),
-                best.getScore());
+                String.format("%.1f", best.getScore()));
 
         return assignment;
     }
@@ -140,11 +140,11 @@ public class StrategyAssignmentService {
         repository.save(assignment);
 
         log.info(
-                "Assigned from consensus: {}/{} -> {} {}(confidence: {:.1f%})",
+                "Assigned from consensus: {}/{} -> {} (confidence: {})",
                 consensus.getSymbol(),
                 consensus.getTimeframe().getCode(),
                 consensus.getSelectedStrategyName(),
-                consensus.getConsensusConfidence() * 100);
+                String.format("%.1f%%", consensus.getConsensusConfidence() * 100));
 
         return assignment;
     }

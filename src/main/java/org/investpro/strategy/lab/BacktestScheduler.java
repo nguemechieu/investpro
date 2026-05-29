@@ -216,8 +216,8 @@ public final class BacktestScheduler {
         }
 
         if (resourceProtection && resourceGuard.isMemoryCritical()) {
-            log.warn("BacktestScheduler: memory critical ({:.0f}% used) – pausing intake",
-                    resourceGuard.getHeapUtilization() * 100);
+            log.warn("BacktestScheduler: memory critical ({}% used) - pausing intake",
+                    String.format("%.0f", resourceGuard.getHeapUtilization() * 100));
             resourceGuard.suggestGc();
             // Allow the job but warn – do not hard-reject on memory alone
         }

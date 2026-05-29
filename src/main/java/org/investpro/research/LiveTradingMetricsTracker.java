@@ -270,8 +270,8 @@ public class LiveTradingMetricsTracker {
      */
     public void stopTracking() {
         isRunning = false;
-        log.info("Stopped tracking live trading metrics. Total trades: {}, Win rate: {:.1%}, Total P&L: {}",
-                executedTrades.size(), getWinRate(), getTotalProfitLoss());
+        log.info("Stopped tracking live trading metrics. Total trades: {}, Win rate: {}, Total P&L: {}",
+                executedTrades.size(), String.format("%.1f%%", getWinRate() * 100), getTotalProfitLoss());
     }
 
     /**
