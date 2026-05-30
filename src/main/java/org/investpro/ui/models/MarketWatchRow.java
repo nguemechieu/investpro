@@ -11,6 +11,8 @@ import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.core.agents.symbol.SymbolTradingMode;
 import org.investpro.models.currency.CurrencyRegistry;
 import org.investpro.models.trading.TradePair;
+import org.investpro.trading.tradability.ProductTradabilityStatus;
+import org.investpro.trading.tradability.SymbolTradability;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -22,8 +24,11 @@ import org.jetbrains.annotations.Nullable;
  * activeTimeframe, strategy Score)
  * - Live readiness (liveReady, issue)
  *
- * <p>Property accessor methods (e.g. {@code symbolProperty()}, {@code spreadProperty()})
- * are intentionally public — they are bound by JavaFX {@code PropertyValueFactory}
+ * <p>
+ * Property accessor methods (e.g. {@code symbolProperty()},
+ * {@code spreadProperty()})
+ * are intentionally public — they are bound by JavaFX
+ * {@code PropertyValueFactory}
  * via reflection for table column cell values and must not be removed.
  */
 @Getter
@@ -50,6 +55,14 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
     private final StringProperty issue = new SimpleStringProperty();
     private final StringProperty lastSignal = new SimpleStringProperty();
     private final StringProperty assignedStrategy = new SimpleStringProperty();
+    private final StringProperty tradabilityStatus = new SimpleStringProperty("UNKNOWN");
+    private final BooleanProperty tradable = new SimpleBooleanProperty(false);
+    private final StringProperty orderType = new SimpleStringProperty("No Orders");
+    private final StringProperty restrictions = new SimpleStringProperty("");
+    private final StringProperty productHealth = new SimpleStringProperty("Unknown");
+    private final StringProperty exchangeCapability = new SimpleStringProperty("Unknown");
+    private final BooleanProperty favorite = new SimpleBooleanProperty(false);
+    private final StringProperty lastUpdatedText = new SimpleStringProperty("");
 
     // Metadata
     private long lastUpdated;
@@ -194,6 +207,74 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
         return assignedStrategy.get();
     }
 
+    public StringProperty tradabilityStatusProperty() {
+        return tradabilityStatus;
+    }
+
+    public String getTradabilityStatus() {
+        return tradabilityStatus.get();
+    }
+
+    public BooleanProperty tradableProperty() {
+        return tradable;
+    }
+
+    public boolean isTradable() {
+        return tradable.get();
+    }
+
+    public StringProperty orderTypeProperty() {
+        return orderType;
+    }
+
+    public String getOrderType() {
+        return orderType.get();
+    }
+
+    public StringProperty restrictionsProperty() {
+        return restrictions;
+    }
+
+    public String getRestrictions() {
+        return restrictions.get();
+    }
+
+    public StringProperty productHealthProperty() {
+        return productHealth;
+    }
+
+    public String getProductHealth() {
+        return productHealth.get();
+    }
+
+    public StringProperty exchangeCapabilityProperty() {
+        return exchangeCapability;
+    }
+
+    public String getExchangeCapability() {
+        return exchangeCapability.get();
+    }
+
+    public BooleanProperty favoriteProperty() {
+        return favorite;
+    }
+
+    public boolean isFavorite() {
+        return favorite.get();
+    }
+
+    public void setFavorite(boolean value) {
+        favorite.set(value);
+    }
+
+    public StringProperty lastUpdatedTextProperty() {
+        return lastUpdatedText;
+    }
+
+    public String getLastUpdatedText() {
+        return lastUpdatedText.get();
+    }
+
     public String getBaseCodeBadge() {
         TradePair pair = getSymbol();
         return pair == null ? "" : pair.getBaseCode();
@@ -234,6 +315,30 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
         session.set(value);
     }
 
+    public void setTradabilityStatus(String value) {
+        tradabilityStatus.set(value == null || value.isBlank() ? "UNKNOWN" : value);
+    }
+
+    public void setTradable(boolean value) {
+        tradable.set(value);
+    }
+
+    public void setOrderType(String value) {
+        orderType.set(value == null || value.isBlank() ? "No Orders" : value);
+    }
+
+    public void setRestrictions(String value) {
+        restrictions.set(value == null ? "" : value);
+    }
+
+    public void setProductHealth(String value) {
+        productHealth.set(value == null || value.isBlank() ? "Unknown" : value);
+    }
+
+    public void setExchangeCapability(String value) {
+        exchangeCapability.set(value == null || value.isBlank() ? "Unknown" : value);
+    }
+
     // ===== Update from SymbolAgentState =====
 
     /**
@@ -253,7 +358,8 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
             return;
         }
 
-        // Guard against uninitialized state field (Lombok @Builder does not enforce @NotNull)
+        // Guard against uninitialized state field (Lombok @Builder does not enforce
+        // @NotNull)
         if (state.getState() != null) {
             agentState.set(state.getState().getDisplayName());
         } else {
@@ -314,7 +420,83 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
         }
 
         lastUpdated = System.currentTimeMillis();
+        lastUpdatedText.set(java.time.Instant.ofEpochMilli(lastUpdated).toString());
 
+    }
+
+    public void updateTradability(@Nullable ProductTradabilityStatus productStatus,
+            @Nullable SymbolTradability exchangeStatus,
+            @Nullable String exchangeCapabilityStatus) {
+        if (productStatus == null && exchangeStatus == null) {
+            setTradabilityStatus("UNKNOWN");
+            setTradable(false);
+            setOrderType("No Orders");
+            setRestrictions("Loading tradability status");
+            setProductHealth("Loading");
+            setExchangeCapability(exchangeCapabilityStatus);
+            return;
+        }
+
+        String status = productStatus != null ? productStatus.status()
+                : exchangeStatus == null || exchangeStatus.status() == null ? "UNKNOWN"
+                        : exchangeStatus.status().name();
+        boolean allowed = productStatus != null ? productStatus.isTradeable()
+                : exchangeStatus != null && exchangeStatus.isFullyTradable();
+
+        setTradabilityStatus(status);
+        setTradable(allowed);
+
+        if (productStatus != null) {
+            if (productStatus.isReadOnly()) {
+                setOrderType(productStatus.isLimitOnly() ? "Limit Only" : "View Only");
+            } else if (productStatus.postOnly()) {
+                setOrderType("Post Only");
+            } else if (productStatus.auctionMode()) {
+                setOrderType("Auction Mode");
+            } else {
+                setOrderType(productStatus.canPlaceMarketOrder() ? "Market + Limit" : "Limit Only");
+            }
+
+            setRestrictions(buildRestrictionSummary(productStatus));
+            setProductHealth(
+                    productStatus.statusMessage().isBlank() ? productStatus.status() : productStatus.statusMessage());
+        } else {
+            setOrderType(exchangeStatus != null && exchangeStatus.limitOrderAllowed()
+                    ? (exchangeStatus.marketOrderAllowed() ? "Market + Limit" : "Limit Only")
+                    : "No Orders");
+            setRestrictions(exchangeStatus == null ? "" : exchangeStatus.reason());
+            setProductHealth(exchangeStatus == null ? "Unknown" : exchangeStatus.reason());
+        }
+
+        setExchangeCapability(exchangeCapabilityStatus);
+        lastUpdated = System.currentTimeMillis();
+        lastUpdatedText.set(java.time.Instant.ofEpochMilli(lastUpdated).toString());
+    }
+
+    private String buildRestrictionSummary(@Nullable ProductTradabilityStatus status) {
+        if (status == null) {
+            return "";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        appendRestriction(builder, status.viewOnly(), "View Only");
+        appendRestriction(builder, status.tradingDisabled(), "Trading Disabled");
+        appendRestriction(builder, status.isDisabled(), "Disabled");
+        appendRestriction(builder, status.cancelOnly(), "Cancel Only");
+        appendRestriction(builder, status.limitOnly(), "Limit Only");
+        appendRestriction(builder, status.postOnly(), "Post Only");
+        appendRestriction(builder, status.auctionMode(), "Auction Mode");
+        return builder.length() == 0 ? status.statusMessage() : builder.toString();
+    }
+
+    private void appendRestriction(StringBuilder builder, boolean enabled, String label) {
+        if (!enabled) {
+            return;
+        }
+        if (builder.length() > 0) {
+            builder.append(", ");
+        }
+        builder.append(label);
     }
 
     private String resolveSessionLabel(@Nullable TradePair pair) {

@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,6 +49,21 @@ class CurrencyRegistryTest {
 
         Currency stillOriginal = registry.findByCode("USD").orElseThrow();
         assertThat(stillOriginal).isSameAs(original);
+    }
+
+    @Test
+    @DisplayName("reserved currency codes starting with 00 are ignored")
+    void reservedCurrencyCodesStartingWithZeroZeroAreIgnored() {
+        CurrencyRegistry registry = CurrencyRegistry.loadDefault();
+        int initialSize = registry.size();
+
+        registry.registerProvider(new ReservedZeroZeroProvider());
+
+        assertThat(registry.size()).isEqualTo(initialSize);
+        assertThat(registry.findByCode("00USD")).isNotPresent();
+        assertThat(registry.getAllCurrencies())
+                .noneMatch(currency -> currency != null && currency.getCode() != null
+                        && currency.getCode().startsWith("00"));
     }
 
     @Test
@@ -125,6 +139,29 @@ class CurrencyRegistryTest {
         @Override
         public Collection<Currency> getCurrencies() {
             return List.of(new SyntheticCurrency(CurrencyType.FIAT, "USD Duplicate", "USD Duplicate", "USD", 2, "$", "USD"));
+        }
+    }
+
+    private static final class ReservedZeroZeroProvider implements CurrencyProvider {
+
+        @Override
+        public String providerId() {
+            return "RESERVED_ZERO_ZERO";
+        }
+
+        @Override
+        public String displayName() {
+            return "Reserved Zero Zero Test Provider";
+        }
+
+        @Override
+        public Set<String> supportedCurrencyTypes() {
+            return Set.of("FOREX");
+        }
+
+        @Override
+        public Collection<Currency> getCurrencies() {
+            return List.of(new SyntheticCurrency(CurrencyType.FOREX, "Zero Zero Dollar", "Zero Zero Dollar", "00USD", 2, "00USD", "00USD"));
         }
     }
 }

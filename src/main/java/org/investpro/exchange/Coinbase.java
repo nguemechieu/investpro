@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.Data;
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.models.AuthCheckResult;
@@ -13,8 +14,6 @@ import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.MarketDepthType;
 import org.investpro.exchange.websocket.CoinbaseWebSocketClient;
 import org.investpro.models.trading.*;
-import lombok.Getter;
-import lombok.Setter;
 import org.investpro.models.Account;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.models.trading.OrderBook;
@@ -66,8 +65,7 @@ import java.util.stream.StreamSupport;
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
 @Slf4j
-@Getter
-@Setter
+@Data
 public class Coinbase extends Exchange {
 
     // Removed old logger field - @Slf4j provides static log field
@@ -697,8 +695,7 @@ public class Coinbase extends Exchange {
             return jwtSigner.buildAuthorizationHeader(
                     method,
                     uri.getHost(),
-                    pathOnly
-            );
+                    pathOnly);
         }
 
         String token = bearerToken();
@@ -808,7 +805,8 @@ public class Coinbase extends Exchange {
             if (marketRequest) {
                 marketRestLimiter.acquirePermit(route, productId);
                 permitAcquired = true;
-                log.debug("Coinbase REST request allowed by limiter route={} product={} attempt={}", route, productId, attempt + 1);
+                log.debug("Coinbase REST request allowed by limiter route={} product={} attempt={}", route, productId,
+                        attempt + 1);
             }
 
             HttpResponse<byte[]> httpResponse = httpClient.send(
@@ -925,12 +923,13 @@ public class Coinbase extends Exchange {
         CompletableFuture<Void> permitFuture = CompletableFuture.runAsync(() -> {
             if (marketRequest) {
                 marketRestLimiter.acquirePermit(route, productId);
-                log.debug("Coinbase REST request allowed by limiter route={} product={} attempt={}", route, productId, attempt + 1);
+                log.debug("Coinbase REST request allowed by limiter route={} product={} attempt={}", route, productId,
+                        attempt + 1);
             }
         });
 
-        return permitFuture.thenCompose(ignored ->
-                httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
+        return permitFuture
+                .thenCompose(ignored -> httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
                         .thenCompose(httpResponse -> {
                             String contentEncoding = httpResponse.headers()
                                     .firstValue("Content-Encoding")
@@ -1252,7 +1251,7 @@ public class Coinbase extends Exchange {
             }
 
             boolean disabled = product.path("is_disabled").asBoolean(false);
-            String status = product.path("status").asText("");
+            String status = product.path("status").asText("disabled");
 
             if (disabled || "offline".equalsIgnoreCase(status) || "delisted".equalsIgnoreCase(status)) {
                 continue;
@@ -1315,7 +1314,8 @@ public class Coinbase extends Exchange {
     @Override
     public CompletableFuture<SymbolTradability> fetchTradabilityStatus(TradePair pair) {
         if (pair == null) {
-            return CompletableFuture.completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+            return CompletableFuture
+                    .completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
         }
 
         return CompletableFuture.supplyAsync(() -> {
@@ -1323,6 +1323,7 @@ public class Coinbase extends Exchange {
             return mapCoinbaseTradability(pair, product);
         });
     }
+
     private Map<String, JsonNode> fetchCoinbaseProductsById() {
         String url = PUBLIC_PRODUCTS_URL + "?get_tradability_status=true";
 
@@ -1350,8 +1351,7 @@ public class Coinbase extends Exchange {
                             node -> node.path("product_id").asText(),
                             node -> node,
                             (left, right) -> left,
-                            LinkedHashMap::new
-                    ));
+                            LinkedHashMap::new));
 
         } catch (Exception exception) {
             log.warn("Failed to fetch Coinbase products with tradability status: {}", exception.getMessage());
@@ -1430,6 +1430,7 @@ public class Coinbase extends Exchange {
         }
 
         boolean supportsOrders = canSubmitOrders();
+        boolean hasOrderAuthorization = isPaperTrading() || supportsLiveTrading();
         boolean orderSubmissionAllowed = supportsOrders
                 && status != TradabilityStatus.VIEW_ONLY
                 && status != TradabilityStatus.DISABLED
@@ -1440,8 +1441,13 @@ public class Coinbase extends Exchange {
                 && status != TradabilityStatus.MIN_SIZE_INVALID;
 
         if (!supportsOrders && status == TradabilityStatus.FULLY_TRADABLE) {
-            status = TradabilityStatus.API_KEY_RESTRICTED;
-            reason = "Coinbase API key/account is not authorized for order submission";
+            if (!hasOrderAuthorization) {
+                status = TradabilityStatus.API_KEY_RESTRICTED;
+                reason = "Coinbase API key/account is not authorized for order submission";
+            } else {
+                status = TradabilityStatus.INACTIVE;
+                reason = "Coinbase trading is temporarily unavailable until exchange connection is active";
+            }
         }
 
         return new SymbolTradability(
@@ -1518,7 +1524,8 @@ public class Coinbase extends Exchange {
         String product = productId(tradePair);
         String cacheKey = product + ":50";
 
-        Optional<OrderBook> cachedFromService = marketDataService.getOrderBookFromCache(tradePair, Duration.ofSeconds(30));
+        Optional<OrderBook> cachedFromService = marketDataService.getOrderBookFromCache(tradePair,
+                Duration.ofSeconds(30));
         if (cachedFromService.isPresent()) {
             log.debug("Coinbase orderBook cache-hit pair={} source=MarketDataCache", tradePair);
             return CompletableFuture.completedFuture(cachedFromService.get());
@@ -1541,10 +1548,12 @@ public class Coinbase extends Exchange {
             return CompletableFuture.completedFuture(new OrderBook(tradePair));
         }
 
-        // Subscribe to WebSocket level2 stream on first access (keeps cache warm, avoids REST polling)
+        // Subscribe to WebSocket level2 stream on first access (keeps cache warm,
+        // avoids REST polling)
         subscribeLevel2IfNeeded(tradePair, product);
 
-        // Deduplicate: return the in-flight future if one is already running for this product
+        // Deduplicate: return the in-flight future if one is already running for this
+        // product
         CompletableFuture<OrderBook> existing = orderBookInFlight.get(cacheKey);
         if (existing != null && !existing.isDone()) {
             return existing;
@@ -1555,7 +1564,8 @@ public class Coinbase extends Exchange {
 
         CompletableFuture<OrderBook> future = sendAsync(request).thenApply(response -> {
             OrderBook orderBook = parseOrderBook(response, tradePair);
-            // Cache for 15 seconds — order books don't need sub-second freshness for display
+            // Cache for 15 seconds — order books don't need sub-second freshness for
+            // display
             orderBookCache.put(cacheKey, new CacheEntry<>(orderBook, System.currentTimeMillis() + 15_000L));
             marketDataService.onOrderBookUpdate(tradePair, orderBook);
             orderBookInFlight.remove(cacheKey);
@@ -1593,8 +1603,10 @@ public class Coinbase extends Exchange {
     }
 
     /**
-     * Subscribe to the Coinbase level2 WebSocket channel for the given product if not already subscribed.
-     * The handler parses snapshot/update events and updates the order book cache via
+     * Subscribe to the Coinbase level2 WebSocket channel for the given product if
+     * not already subscribed.
+     * The handler parses snapshot/update events and updates the order book cache
+     * via
      * {@link #updateOrderBookFromWebSocket}.
      */
     private void subscribeLevel2IfNeeded(TradePair tradePair, String product) {
@@ -1627,8 +1639,9 @@ public class Coinbase extends Exchange {
                     for (JsonNode u : updates) {
                         String side = u.path("side").asText("");
                         double price = u.path("price_level").asDouble(0);
-                        double qty   = u.path("new_quantity").asDouble(0);
-                        if (price <= 0) continue;
+                        double qty = u.path("new_quantity").asDouble(0);
+                        if (price <= 0)
+                            continue;
 
                         List<OrderBook.PriceLevel> levels = "bid".equalsIgnoreCase(side) ? snapshotBids : snapshotAsks;
 
@@ -1655,9 +1668,12 @@ public class Coinbase extends Exchange {
                     snapshotBids.sort((a, b) -> Double.compare(b.getPrice(), a.getPrice()));
                     snapshotAsks.sort(Comparator.comparingDouble(OrderBook.PriceLevel::getPrice));
                     int limit = 50;
-                    List<OrderBook.PriceLevel> bids = snapshotBids.size() > limit ? snapshotBids.subList(0, limit) : snapshotBids;
-                    List<OrderBook.PriceLevel> asks = snapshotAsks.size() > limit ? snapshotAsks.subList(0, limit) : snapshotAsks;
-                    updateOrderBookFromWebSocket(product, new OrderBook(tradePair, new ArrayList<>(bids), new ArrayList<>(asks)));
+                    List<OrderBook.PriceLevel> bids = snapshotBids.size() > limit ? snapshotBids.subList(0, limit)
+                            : snapshotBids;
+                    List<OrderBook.PriceLevel> asks = snapshotAsks.size() > limit ? snapshotAsks.subList(0, limit)
+                            : snapshotAsks;
+                    updateOrderBookFromWebSocket(product,
+                            new OrderBook(tradePair, new ArrayList<>(bids), new ArrayList<>(asks)));
                 }
             } catch (Exception e) {
                 log.warn("Failed to parse level2 event for {}: {}", product, e.getMessage());
@@ -1700,7 +1716,8 @@ public class Coinbase extends Exchange {
                 .build();
 
         CompletableFuture<Ticker> inFlight = CompletableFuture.supplyAsync(() -> {
-            @NotNull String httpResponse;
+            @NotNull
+            String httpResponse;
             try {
                 httpResponse = send(request);
             } catch (RuntimeException exception) {
@@ -2773,7 +2790,9 @@ public class Coinbase extends Exchange {
             long now = System.currentTimeMillis();
             if (now - lastOpenOrdersAuthWarningMs > 300_000L) {
                 lastOpenOrdersAuthWarningMs = now;
-                throw new RuntimeException("Coinbase open orders unavailable: credentials lack order-history access or are unauthorized.\n"+throwable);
+                throw new RuntimeException(
+                        "Coinbase open orders unavailable: credentials lack order-history access or are unauthorized.\n"
+                                + throwable);
             }
             return Collections.emptyList();
         }
@@ -2875,8 +2894,7 @@ public class Coinbase extends Exchange {
         return sendAsync(request).thenApply(response -> parseTradesFromFills(response, tradePair)).exceptionally(
                 throwable -> {
                     throw new RuntimeException(throwable);
-                }
-        );
+                });
     }
 
     @Override
@@ -2931,7 +2949,7 @@ public class Coinbase extends Exchange {
         createBracketOrder(tradePair, Side.BUY, size, 0.0, stopLoss, takeProfit)
                 .thenAccept(orderId -> log.info("Coinbase BUY submitted: {}", orderId))
                 .exceptionally(exception -> {
-                    throw  new RuntimeException("Coinbase BUY \n"+exception);
+                    throw new RuntimeException("Coinbase BUY \n" + exception);
 
                 });
     }
@@ -3616,18 +3634,6 @@ public class Coinbase extends Exchange {
         return openOrders;
     }
 
-    private @NotNull List<OpenOrder> parseOpenOrdersAll(String jsonResponse) {
-        List<OpenOrder> orders = new ArrayList<>();
-        try {
-            JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
-            JsonNode ordersNode = root.has("orders") ? root.get("orders") : root;
-            return parseOpenOrders(ordersNode);
-        } catch (Exception exception) {
-            log.error("Failed to parse all Coinbase open orders", exception);
-            return orders;
-        }
-    }
-
     /**
      * Parses a single Coinbase open order from JsonNode.
      * Extracts TradePair from product_id field.
@@ -3759,7 +3765,7 @@ public class Coinbase extends Exchange {
         return positions;
     }
 
-    private  Position parsePositionFromAccount(JsonNode accountNode, TradePair tradePair) {
+    private Position parsePositionFromAccount(JsonNode accountNode, TradePair tradePair) {
         try {
             double balance = accountBalance(accountNode);
 
@@ -3850,7 +3856,7 @@ public class Coinbase extends Exchange {
         return trades;
     }
 
-    private  Trade parseTradeFromFill(JsonNode fillNode, TradePair tradePair) {
+    private Trade parseTradeFromFill(JsonNode fillNode, TradePair tradePair) {
         try {
             double price = parseDouble(firstText(fillNode, "price"), 0.0);
             double size = parseDouble(firstText(fillNode, "size"), 0.0);
@@ -3878,7 +3884,7 @@ public class Coinbase extends Exchange {
             return trade;
         } catch (Exception exception) {
             log.debug("Failed to parse Coinbase trade from fill: {}", fillNode, exception);
-            return  new Trade();
+            return new Trade();
         }
     }
 

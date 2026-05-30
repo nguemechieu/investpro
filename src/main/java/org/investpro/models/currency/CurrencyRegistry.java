@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -106,6 +105,11 @@ public final class CurrencyRegistry {
             return existing;
         }
 
+        if (isReservedCode(normalized)) {
+            log.debug("Skipping reserved currency code: {}", normalized);
+            return UnknownCurrency.of(normalized);
+        }
+
         if (unknownLoggedCodes.add(normalized)) {
             log.info("Unknown currency encountered: {}", normalized);
         }
@@ -175,6 +179,11 @@ public final class CurrencyRegistry {
             return;
         }
 
+        if (isReservedCode(code)) {
+            log.info("Skipping reserved currency code {} from provider {}", code, provider.providerId());
+            return;
+        }
+
         Currency existing = currenciesByCode.putIfAbsent(code, currency);
         if (existing != null) {
             log.warn("Duplicate currency code {} from provider {} (keeping existing from earlier provider)",
@@ -239,5 +248,9 @@ public final class CurrencyRegistry {
             return "";
         }
         return symbol.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private boolean isReservedCode(String code) {
+        return code != null && code.startsWith("00");
     }
 }

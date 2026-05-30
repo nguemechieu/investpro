@@ -16,12 +16,24 @@ import org.investpro.core.SystemCore;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.models.trading.TradePair;
+import org.investpro.trading.tradability.ExchangeTradabilityProvider;
+import org.investpro.trading.tradability.MarketWatchTradabilityFilter;
+import org.investpro.trading.tradability.ProductTradabilityStatus;
+import org.investpro.trading.tradability.TradabilityProvider;
+import org.investpro.trading.tradability.TradabilityProviderRegistry;
+import org.investpro.trading.tradability.TradabilityRefreshScheduler;
+import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.ui.models.MarketWatchRow;
 import org.investpro.ui.utils.CurrencyIconLoader;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.Comparator;
+import java.util.stream.Collectors;
 
 /**
  * MarketWatch Panel displays symbol-level agent state and trading readiness.
@@ -43,8 +55,17 @@ public class MarketWatchPanel extends StackPane {
 
     private final SystemCore systemCore;
     private SymbolAgentManager symbolAgentManager;
+    private final TradabilityProvider tradabilityProvider;
     private final TableView<MarketWatchRow> table = new TableView<>();
     private final Map<TradePair, MarketWatchRow> rowCache = new LinkedHashMap<>();
+    private final Map<String, ProductTradabilityStatus> tradabilityCache = new ConcurrentHashMap<>();
+    private final Map<String, SymbolTradability> exchangeTradabilityCache = new ConcurrentHashMap<>();
+    private final Set<String> favoriteSymbols = ConcurrentHashMap.newKeySet();
+    private final ComboBox<MarketWatchTradabilityFilter> filterSelector = new ComboBox<>();
+    private final ComboBox<String> sortSelector = new ComboBox<>();
+    private final TradabilityRefreshScheduler refreshScheduler;
+    private final AtomicReference<MarketWatchTradabilityFilter> activeFilter = new AtomicReference<>(
+            MarketWatchTradabilityFilter.SHOW_ALL);
 
     private Timeline refreshTimer;
     private static final long REFRESH_INTERVAL_MS = 3000; // Refresh every 3 seconds
@@ -66,8 +87,32 @@ public class MarketWatchPanel extends StackPane {
 
         }
 
+        this.tradabilityProvider = resolveTradabilityProvider();
+        this.refreshScheduler = new TradabilityRefreshScheduler(() -> {
+            refreshMarketWatchData();
+            return null;
+        });
+
         initializeUI();
         startAutoRefresh();
+        refreshScheduler.start(5);
+    }
+
+    private TradabilityProvider resolveTradabilityProvider() {
+        TradabilityProvider provider = TradabilityProviderRegistry.getInstance().getProvider().orElse(null);
+        if (provider != null) {
+            return provider;
+        }
+
+        if (systemCore != null && systemCore.getExchange() != null) {
+            if (systemCore.getExchange() instanceof org.investpro.exchange.Coinbase coinbase) {
+                return new org.investpro.trading.tradability.CoinbaseTradabilityService(coinbase);
+            }
+            return new ExchangeTradabilityProvider(systemCore.getExchange(),
+                    systemCore.getUniversalTradabilityService());
+        }
+
+        return null;
     }
 
     private void initializeUI() {
@@ -315,7 +360,8 @@ public class MarketWatchPanel extends StackPane {
         });
         liveReadyCol.setPrefWidth(75);
 
-        // Assigned Strategy column — shows the strategy configured/evaluated for this symbol
+        // Assigned Strategy column — shows the strategy configured/evaluated for this
+        // symbol
         TableColumn<MarketWatchRow, String> assignedStrategyCol = new TableColumn<>("Assigned Strategy");
         assignedStrategyCol.setCellValueFactory(cellData -> cellData.getValue().assignedStrategyProperty());
         assignedStrategyCol.setPrefWidth(200);

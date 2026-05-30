@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.LiquidityProfile;
 import org.investpro.enums.AssetClass;
 import org.investpro.enums.ContractType;
-import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.currency.Currency;
 import org.investpro.models.currency.CurrencyRegistry;
@@ -83,8 +82,8 @@ public class TradePair extends Pair<Currency, Currency> {
             @NotNull String baseCurrency,
             @NotNull String counterCurrency) throws SQLException, ClassNotFoundException {
         this(
-            CurrencyRegistry.global().findOrUnknown(normalizeCode(baseCurrency)),
-            CurrencyRegistry.global().findOrUnknown(normalizeCode(counterCurrency)));
+                CurrencyRegistry.global().findOrUnknown(normalizeCode(baseCurrency)),
+                CurrencyRegistry.global().findOrUnknown(normalizeCode(counterCurrency)));
     }
 
     @Contract("_, _ -> new")
@@ -182,10 +181,10 @@ public class TradePair extends Pair<Currency, Currency> {
         }
 
         if (symbol.length() >= 6) {
-            return new String[]{symbol.substring(0, 3), symbol.substring(3)};
+            return new String[] { symbol.substring(0, 3), symbol.substring(3) };
         }
 
-        return new String[]{symbol, "USD"};
+        return new String[] { symbol, "USD" };
     }
 
     private static String @NotNull [] splitPair(String tradePair, @NotNull String separator) {
@@ -195,7 +194,7 @@ public class TradePair extends Pair<Currency, Currency> {
                         "Cannot parse compact trade pair shorter than 6 characters: %s".formatted(tradePair));
             }
 
-            return new String[]{
+            return new String[] {
                     tradePair.substring(0, 3),
                     tradePair.substring(3)
             };
@@ -271,12 +270,14 @@ public class TradePair extends Pair<Currency, Currency> {
         // Reject null/placeholder currency codes (XXX, ¤¤¤)
         if (baseCode.equals("XXX") || baseCode.equals("¤¤¤")) {
             throw new IllegalArgumentException(
-                    "Base currency code '%s' is a reserved null currency code and cannot be traded".formatted(baseCode));
+                    "Base currency code '%s' is a reserved null currency code and cannot be traded"
+                            .formatted(baseCode));
         }
 
         if (counterCode.equals("XXX") || counterCode.equals("¤¤¤")) {
             throw new IllegalArgumentException(
-                    "Counter currency code '%s' is a reserved null currency code and cannot be traded".formatted(counterCode));
+                    "Counter currency code '%s' is a reserved null currency code and cannot be traded"
+                            .formatted(counterCode));
         }
 
         if (baseCode.equalsIgnoreCase(counterCode)) {
@@ -550,7 +551,7 @@ public class TradePair extends Pair<Currency, Currency> {
      * Returns true if no session is defined (assume tradable).
      */
     public boolean isTradableNow() {
-        if (tradingSession == null) {
+        if (isCryptoPair() || tradingSession == null) {
             return true; // Assume tradable if no session rules defined
         }
 
@@ -572,6 +573,5 @@ public class TradePair extends Pair<Currency, Currency> {
     public void setContractType(ContractType contractType) {
         this.contractType = contractType != null ? contractType : ContractType.SPOT;
     }
-
 
 }

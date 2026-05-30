@@ -21,7 +21,7 @@
     -fx-background-insets: 0, 1;
 }
 .toggle-switch:hover .thumb {
-    -fx-color: -fx-hover-base
+    -fx-color: -fx-hover-base;
 }
 .toggle-switch:selected .thumb-area {
     -fx-background-color: linear-gradient(to bottom, derive(-fx-text-box-border, -20%), derive(-fx-text-box-border, -30%)),

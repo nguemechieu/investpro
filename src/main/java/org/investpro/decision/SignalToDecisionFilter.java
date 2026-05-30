@@ -1,6 +1,5 @@
 package org.investpro.decision;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.execution.TradeExecutionCoordinator;
 import org.investpro.models.trading.Ticker;
@@ -13,24 +12,21 @@ import java.util.Objects;
 /**
  * Signal filter that intercepts all signals and converts them to
  * BotTradeDecisions.
- * 
+ * <p>
  * The bot NEVER executes signals directly.
  * Every signal is validated and scored through the BotTradeDecisionEngine
  * before execution.
- * 
+ * <p>
  * This class sits between the strategy engine and the trade execution
  * coordinator.
  */
 @Slf4j
-@RequiredArgsConstructor
-public class SignalToDecisionFilter {
-
-    private final BotTradeDecisionEngine decisionEngine;
-    private final TradeExecutionCoordinator executionCoordinator;
+public record SignalToDecisionFilter(BotTradeDecisionEngine decisionEngine,
+                                     TradeExecutionCoordinator executionCoordinator) {
 
     /**
      * Evaluate signal and determine if trading should proceed.
-     * 
+     *
      * @param signal      Strategy signal to evaluate
      * @param riskContext Risk management context
      * @param ticker      Current market data

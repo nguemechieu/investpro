@@ -38,13 +38,7 @@ public abstract class CoinbaseExchange implements VenueAwareExchange {
             return connected = false;
         }
         
-        // Test WebSocket JWT generation
-        String jwt = authProvider.generateWebSocketToken();
-        if (jwt == null) {
-            logger.severe("Failed to generate WebSocket JWT");
-            return connected = false;
-        }
-        
+
         logger.info("Successfully connected to %s".formatted(venue.getDisplayName()));
         return connected = true;
     }

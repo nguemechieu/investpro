@@ -27,21 +27,21 @@ import org.investpro.core.SystemCore;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.data.CandleData;
+import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.i18n.LocalizationService;
 import org.investpro.models.trading.TradePair;
 import org.investpro.persistence.repository.HistoricalDataRepository;
 import org.investpro.persistence.repository.HistoricalDataRepositoryImpl;
+import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategyRegistry;
-import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategySelectionService;
 import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.TradingStrategy;
 import org.investpro.strategy.impl.UnifiedStrategy;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.UniversalTradabilityService;
-import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.HistoricalDataPrefetcher;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
@@ -54,6 +54,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.investpro.utils.MARKET_TYPES.STOP_LIMIT;
@@ -63,17 +64,6 @@ import static org.investpro.utils.Side.SELL;
 
 /**
  * Backtesting Panel.
- * <p>
- * Executes historical strategy backtests using:
- * - selected TradePair
- * - selected strategy
- * - selected timeframe
- * - selected order type: MARKET, LIMIT, STOP_LIMIT
- * - selected initial balance
- * <p>
- * Important:
- * This panel does not place live orders.
- * It only simulates strategy behavior against historical candle data.
  */
 @Slf4j
 @Getter
@@ -138,17 +128,13 @@ public class BacktestingPanel extends StackPane {
     private static final int MIN_ABSOLUTE_TEST_BARS = 150;
 
     public BacktestingPanel(SystemCore systemCore) {
-        this(HistoricalDataRepositoryImpl.getInstance(),
-                systemCore);
+        this(HistoricalDataRepositoryImpl.getInstance(), systemCore);
 
     }
 
-    public BacktestingPanel(
-            HistoricalDataRepository historicalDataRepository,
-            SystemCore systemCore) {
+    public BacktestingPanel(HistoricalDataRepository historicalDataRepository, SystemCore systemCore) {
 
-        this.historicalDataRepository = historicalDataRepository != null
-                ? historicalDataRepository
+        this.historicalDataRepository = historicalDataRepository != null ? historicalDataRepository
                 : HistoricalDataRepositoryImpl.getInstance();
         this.backtestingService = new BacktestingService();
 
@@ -185,12 +171,8 @@ public class BacktestingPanel extends StackPane {
     private @NotNull VBox createConfigurationSection() {
         VBox section = new VBox(10);
         section.setPadding(new Insets(12));
-        section.setStyle(
-                "-fx-background-color: #16213e; " +
-                        "-fx-border-color: #3b82f6; " +
-                        "-fx-border-width: 1; " +
-                        "-fx-border-radius: 6; " +
-                        "-fx-background-radius: 6;");
+        section.setStyle("-fx-background-color: #16213e; " + "-fx-border-color: #3b82f6; " + "-fx-border-width: 1; "
+                + "-fx-border-radius: 6; " + "-fx-background-radius: 6;");
 
         Label sectionTitle = new Label("Backtest Configuration");
         sectionTitle.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
@@ -203,18 +185,16 @@ public class BacktestingPanel extends StackPane {
         HBox strategyBox = createLabeledInput("Strategy:", strategyCombo);
 
         symbolCombo = new ComboBox<>();
-        loadSymbols();
+        symbolCombo.setPromptText("Loading symbols...");
+        symbolCombo.setDisable(true);
         symbolCombo.setPrefHeight(35);
         HBox symbolBox = createLabeledInput("Symbol:", symbolCombo);
+        loadSymbolsAsync();
 
         timeframeCombo = new ComboBox<>();
         timeframeCombo.getItems().setAll(loadSupportedTimeframes());
-        timeframeCombo.setValue(
-                timeframeCombo.getItems().contains(Timeframe.H1)
-                        ? Timeframe.H1
-                        : timeframeCombo.getItems().isEmpty()
-                                ? null
-                                : timeframeCombo.getItems().getFirst());
+        timeframeCombo.setValue(timeframeCombo.getItems().contains(Timeframe.H1) ? Timeframe.H1
+                : timeframeCombo.getItems().isEmpty() ? null : timeframeCombo.getItems().getFirst());
         timeframeCombo.setPrefHeight(35);
         timeframeCombo.setCellFactory(comboBox -> new ListCell<>() {
             @Override
@@ -293,20 +273,8 @@ public class BacktestingPanel extends StackPane {
         buttonBox.setAlignment(Pos.CENTER_LEFT);
         buttonBox.getChildren().addAll(runBacktestButton, prefetchButton, compareBtn, cancelBtn);
 
-        section.getChildren().addAll(
-                sectionTitle,
-                strategyBox,
-                symbolBox,
-                timeframeBox,
-                orderTypeBox,
-                startDateBox,
-                endDateBox,
-                barCountBox,
-                initialBalanceBox,
-                buttonBox,
-                statusLabel,
-                dataQualityLabel,
-                progressBar);
+        section.getChildren().addAll(sectionTitle, strategyBox, symbolBox, timeframeBox, orderTypeBox, startDateBox,
+                endDateBox, barCountBox, initialBalanceBox, buttonBox, statusLabel, dataQualityLabel, progressBar);
 
         return section;
     }
@@ -314,12 +282,8 @@ public class BacktestingPanel extends StackPane {
     private VBox createResultsSection() {
         VBox section = new VBox(10);
         section.setPadding(new Insets(12));
-        section.setStyle(
-                "-fx-background-color: #16213e; " +
-                        "-fx-border-color: #10b981; " +
-                        "-fx-border-width: 1; " +
-                        "-fx-border-radius: 6; " +
-                        "-fx-background-radius: 6;");
+        section.setStyle("-fx-background-color: #16213e; " + "-fx-border-color: #10b981; " + "-fx-border-width: 1; "
+                + "-fx-border-radius: 6; " + "-fx-background-radius: 6;");
 
         Label sectionTitle = new Label("Backtest Results");
         sectionTitle.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
@@ -360,9 +324,8 @@ public class BacktestingPanel extends StackPane {
         reportPanel = new BacktestReportPanel();
 
         // Create tabs for traditional and professional views
-        Tab standardTab = new Tab("Standard View",
-                createStandardResultsView(metricsBox, priceActionLabel, priceActionChart, equityLabel, equityCurveChart,
-                        tradesLabel, tradesScrollPane));
+        Tab standardTab = new Tab("Standard View", createStandardResultsView(metricsBox, priceActionLabel,
+                priceActionChart, equityLabel, equityCurveChart, tradesLabel, tradesScrollPane));
         standardTab.setClosable(false);
 
         Tab professionalTab = new Tab("Professional Report", reportPanel);
@@ -371,34 +334,22 @@ public class BacktestingPanel extends StackPane {
         TabPane resultsTabPane = new TabPane(standardTab, professionalTab);
         resultsTabPane.setStyle("-fx-background-color: #0f3460;");
 
-        section.getChildren().addAll(
-                sectionTitle,
-                resultsTabPane,
-                resultActions);
+        section.getChildren().addAll(sectionTitle, resultsTabPane, resultActions);
 
         VBox.setVgrow(resultsTabPane, Priority.ALWAYS);
 
         return section;
     }
 
-    private VBox createStandardResultsView(HBox metricsBox,
-            Label priceActionLabel,
-            LineChart<Number, Number> priceActionChart,
-            Label equityLabel,
-            AreaChart<Number, Number> equityCurveChart,
+    private VBox createStandardResultsView(HBox metricsBox, Label priceActionLabel,
+            LineChart<Number, Number> priceActionChart, Label equityLabel, AreaChart<Number, Number> equityCurveChart,
             Label tradesLabel, ScrollPane tradesScrollPane) {
         VBox view = new VBox(10);
         view.setPadding(new Insets(8));
         view.setStyle("-fx-background-color: #0f3460;");
 
-        view.getChildren().addAll(
-                metricsBox,
-                priceActionLabel,
-                priceActionChart,
-                equityLabel,
-                equityCurveChart,
-                tradesLabel,
-                tradesScrollPane);
+        view.getChildren().addAll(metricsBox, priceActionLabel, priceActionChart, equityLabel, equityCurveChart,
+                tradesLabel, tradesScrollPane);
 
         VBox.setVgrow(priceActionChart, Priority.ALWAYS);
         VBox.setVgrow(equityCurveChart, Priority.SOMETIMES);
@@ -519,15 +470,7 @@ public class BacktestingPanel extends StackPane {
         reasonCol.setCellValueFactory(new PropertyValueFactory<>("reason"));
         reasonCol.setPrefWidth(240);
 
-        table.getColumns().addAll(
-                dateCol,
-                sideCol,
-                orderTypeCol,
-                entryCol,
-                exitCol,
-                pnlCol,
-                returnCol,
-                reasonCol);
+        table.getColumns().addAll(dateCol, sideCol, orderTypeCol, entryCol, exitCol, pnlCol, returnCol, reasonCol);
 
         return table;
     }
@@ -571,9 +514,7 @@ public class BacktestingPanel extends StackPane {
         if (strategies == null || strategies.isEmpty()) {
             return StrategyCatalog.defaultStrategyName();
         }
-        return strategies.stream()
-                .filter(StrategyCatalog.defaultStrategyName()::equalsIgnoreCase)
-                .findFirst()
+        return strategies.stream().filter(StrategyCatalog.defaultStrategyName()::equalsIgnoreCase).findFirst()
                 .orElse(strategies.getFirst());
     }
 
@@ -592,26 +533,29 @@ public class BacktestingPanel extends StackPane {
             }
         }
 
-        return List.of(
-                Timeframe.M1,
-                Timeframe.M5,
-                Timeframe.M15,
-                Timeframe.M30,
-                Timeframe.H1,
-                Timeframe.H4,
+        return List.of(Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.M30, Timeframe.H1, Timeframe.H4,
                 Timeframe.D1);
     }
 
-    private void loadSymbols() {
+    private void loadSymbolsAsync() {
+        CompletableFuture.supplyAsync(this::resolveBacktestingSymbols)
+                .thenAccept(symbols -> Platform.runLater(() -> applyLoadedSymbols(symbols)))
+                .exceptionally(exception -> {
+                    log.warn("Failed to load backtesting symbols asynchronously: {}", exception.getMessage());
+                    Platform.runLater(() -> applyLoadedSymbols(loadFallbackSymbols()));
+                    return null;
+                });
+    }
 
+    private List<TradePair> resolveBacktestingSymbols() {
+        List<TradePair> symbols = new ArrayList<>();
         SymbolAgentManager manager = symbolAgentManager;
 
-        List<TradePair> symbols = new ArrayList<>();
-
-        if (systemCore != null) {
+        if (systemCore != null && systemCore.getExchange() != null) {
             try {
-                if (systemCore.getExchange() != null && systemCore.getExchange().getTradePairSymbol() != null) {
-                    symbols.addAll(systemCore.getExchange().getTradePairSymbol());
+                List<TradePair> exchangePairs = systemCore.getExchange().getTradePairSymbol();
+                if (exchangePairs != null) {
+                    symbols.addAll(exchangePairs);
                 }
             } catch (Exception exception) {
                 log.warn("Failed to load trade pair symbols from exchange: {}", exception.getMessage());
@@ -620,61 +564,34 @@ public class BacktestingPanel extends StackPane {
 
         if (manager != null) {
             try {
-                symbols.addAll(
-                        manager.getAllStates()
-                                .stream()
-                                .map(SymbolAgentState::getSymbol)
-
-                                .distinct()
-                                .toList());
+                symbols.addAll(manager.getAllStates().stream().map(SymbolAgentState::getSymbol).filter(Objects::nonNull)
+                        .distinct().toList());
             } catch (Exception exception) {
                 log.warn("Failed to load symbols from SymbolAgentManager: {}", exception.getMessage());
             }
         }
 
-        if (symbols.isEmpty() && systemCore != null) {
+        if (symbols.isEmpty() && systemCore != null && systemCore.getExchange() != null) {
             try {
-                if (systemCore.getExchange() != null && systemCore.getExchange().getTradablePairs() != null) {
-                    symbols.addAll(systemCore.getExchange().getTradablePairs());
+                List<TradePair> tradablePairs = systemCore.getExchange().getTradablePairs();
+                if (tradablePairs != null) {
+                    symbols.addAll(tradablePairs);
                 }
             } catch (Exception exception) {
                 log.warn("Failed to load symbols from exchange: {}", exception.getMessage());
             }
         }
 
-        if (symbols.isEmpty() && systemCore != null) {
-            try {
-                if (systemCore.getExchange() != null) {
-                    symbols.addAll(systemCore.getExchange().getTradePairSymbol());
-                }
-            } catch (Exception exception) {
-                log.warn("Failed to load trade pair symbols from exchange: {}", exception.getMessage());
-            }
-        }
-
         if (symbols.isEmpty()) {
-            try {
-                symbols.addAll(List.of(
-                        TradePair.fromSymbol("BTC_USD"),
-                        TradePair.fromSymbol("ETH_USD"),
-                        TradePair.fromSymbol("EUR_USD"),
-                        TradePair.fromSymbol("GBP_USD"),
-                        TradePair.fromSymbol("USD_JPY")));
-            } catch (Exception exception) {
-                log.warn("Failed to create fallback TradePair list: {}", exception.getMessage());
-            }
+            symbols.addAll(loadFallbackSymbols());
         }
 
-        symbols = symbols.stream()
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
+        symbols = symbols.stream().filter(Objects::nonNull).distinct().toList();
 
         if (!symbols.isEmpty() && systemCore != null && systemCore.getExchange() != null) {
             try {
                 UniversalTradabilityService tradabilityService = new UniversalTradabilityService(
-                        systemCore.getExchange(),
-                        null);
+                        systemCore.getExchange(), null);
 
                 List<SymbolTradability> statuses = tradabilityService.getTradability(symbols).get();
                 Set<String> marketDataSymbols = new HashSet<>();
@@ -692,10 +609,26 @@ public class BacktestingPanel extends StackPane {
             }
         }
 
-        symbolCombo.setItems(FXCollections.observableArrayList(symbols));
+        return symbols;
+    }
 
-        if (!symbols.isEmpty()) {
-            symbolCombo.setValue(symbols.getFirst());
+    private List<TradePair> loadFallbackSymbols() {
+        try {
+            return List.of(TradePair.fromSymbol("BTC_USD"), TradePair.fromSymbol("ETH_USD"),
+                    TradePair.fromSymbol("EUR_USD"), TradePair.fromSymbol("GBP_USD"), TradePair.fromSymbol("USD_JPY"));
+        } catch (Exception exception) {
+            log.warn("Failed to create fallback TradePair list: {}", exception.getMessage());
+            return List.of();
+        }
+    }
+
+    private void applyLoadedSymbols(List<TradePair> symbols) {
+        List<TradePair> safeSymbols = symbols == null ? List.of()
+                : symbols.stream().filter(Objects::nonNull).distinct().toList();
+
+        symbolCombo.setItems(FXCollections.observableArrayList(safeSymbols));
+        if (!safeSymbols.isEmpty()) {
+            symbolCombo.setValue(safeSymbols.getFirst());
         }
 
         symbolCombo.setCellFactory(comboBox -> new ListCell<>() {
@@ -713,6 +646,9 @@ public class BacktestingPanel extends StackPane {
                 setText(empty || item == null ? null : displayTradePair(item));
             }
         });
+
+        symbolCombo.setDisable(false);
+        symbolCombo.setPromptText("Select a symbol");
     }
 
     /**
@@ -766,20 +702,16 @@ public class BacktestingPanel extends StackPane {
     /**
      * Perform historical data prefetch and caching.
      */
-    private void prefetchHistoricalData(
-            @NotNull TradePair pair,
-            @NotNull Timeframe timeframe,
-            @NotNull LocalDate startDate,
-            @NotNull LocalDate endDate) {
+    private void prefetchHistoricalData(@NotNull TradePair pair, @NotNull Timeframe timeframe,
+            @NotNull LocalDate startDate, @NotNull LocalDate endDate) {
 
         try {
             String timeframeCode = timeframe.getCode();
             LocalDateTime start = startDate.atStartOfDay();
             LocalDateTime end = endDate.atTime(23, 59, 59);
 
-            Platform.runLater(() -> statusLabel.setText(
-                    "Fetching " + displayTradePair(pair) + " " + timeframeCode
-                            + " data from " + startDate + " to " + endDate + "..."));
+            Platform.runLater(() -> statusLabel.setText("Fetching " + displayTradePair(pair) + " " + timeframeCode
+                    + " data from " + startDate + " to " + endDate + "..."));
 
             if (systemCore == null || systemCore.getExchange() == null) {
                 Platform.runLater(() -> {
@@ -794,20 +726,15 @@ public class BacktestingPanel extends StackPane {
             }
 
             // Create pre-fetcher for the active exchange.
-            HistoricalDataPrefetcher preFetcher = HistoricalDataPrefetcher
-                    .forCurrentExchange(systemCore.getExchange(), historicalDataRepository);
+            HistoricalDataPrefetcher preFetcher = HistoricalDataPrefetcher.forCurrentExchange(systemCore.getExchange(),
+                    historicalDataRepository);
 
             // Fetch and cache data with progress updates
-            List<CandleData> fetchedData = preFetcher.fetchAndCacheDataSync(
-                    pair,
-                    start,
-                    end,
-                    timeframeCode,
+            List<CandleData> fetchedData = preFetcher.fetchAndCacheDataSync(pair, start, end, timeframeCode,
                     progress -> Platform.runLater(() -> {
                         if (progress >= 0) {
                             progressBar.setProgress(progress / 100.0);
-                            statusLabel.setText(
-                                    "Fetching data... " + progress + "%");
+                            statusLabel.setText("Fetching data... " + progress + "%");
                         } else {
                             statusLabel.setText("Prefetch completed with errors");
                         }
@@ -819,12 +746,10 @@ public class BacktestingPanel extends StackPane {
                     dataQualityLabel.setText("Data quality: failed");
                 } else {
                     backtestingService.storeHistoricalData(pair, start, end, timeframeCode, fetchedData);
-                    statusLabel.setText(
-                            "Successfully cached " + fetchedData.size() + " real candles for "
-                                    + displayTradePair(pair) + " " + timeframeCode
-                                    + ". Ready for backtesting!");
-                    dataQualityLabel.setText("Data quality: real historical data cached (" + fetchedData.size()
-                            + " candles)");
+                    statusLabel.setText("Successfully cached " + fetchedData.size() + " real candles for "
+                            + displayTradePair(pair) + " " + timeframeCode + ". Ready for backtesting!");
+                    dataQualityLabel
+                            .setText("Data quality: real historical data cached (" + fetchedData.size() + " candles)");
                     progressBar.setProgress(1.0);
                 }
                 backtestRunning.set(false);
@@ -899,16 +824,8 @@ public class BacktestingPanel extends StackPane {
             return BacktestInput.invalid("Invalid date range");
         }
 
-        return new BacktestInput(
-                strategyName,
-                selectedPair,
-                selectedTimeframe,
-                orderType,
-                initialBalance,
-                startDate,
-                endDate,
-                requestedBars,
-                "");
+        return new BacktestInput(strategyName, selectedPair, selectedTimeframe, orderType, initialBalance, startDate,
+                endDate, requestedBars, "");
     }
 
     private void runBacktest(@NotNull BacktestInput input) {
@@ -923,20 +840,15 @@ public class BacktestingPanel extends StackPane {
             int requestedBars = input.requestedBars();
             String timeframeCode = selectedTimeframe.getCode();
 
-            Platform.runLater(() -> statusLabel.setText(
-                    "Updating historical data from exchange for " + displayTradePair(selectedPair) + " "
-                            + timeframeCode));
+            Platform.runLater(() -> statusLabel.setText("Updating historical data from exchange for "
+                    + displayTradePair(selectedPair) + " " + timeframeCode));
 
             refreshHistoricalDataCache(input);
 
             Platform.runLater(() -> statusLabel.setText(
                     "Loading saved historical data for " + displayTradePair(selectedPair) + " " + timeframeCode));
 
-            List<CandleData> candles = loadEnoughCandles(
-                    selectedPair,
-                    selectedTimeframe,
-                    startDate,
-                    endDate,
+            List<CandleData> candles = loadEnoughCandles(selectedPair, selectedTimeframe, startDate, endDate,
                     requestedBars);
 
             TradingStrategy strategy = resolveStrategy(strategyName);
@@ -961,19 +873,10 @@ public class BacktestingPanel extends StackPane {
             }
 
             List<CandleData> finalCandles = candles;
-            Platform.runLater(() -> statusLabel.setText(
-                    "Executing strategy backtest with "
-                            + finalCandles.size()
-                            + " candles and initial balance $"
-                            + String.format(Locale.ROOT, "%.2f", initialBalance)
-                            + "..."));
+            Platform.runLater(() -> statusLabel.setText("Executing strategy backtest with " + finalCandles.size()
+                    + " candles and initial balance $" + String.format(Locale.ROOT, "%.2f", initialBalance) + "..."));
 
-            List<BacktestTrade> trades = executeBacktest(
-                    strategyName,
-                    selectedPair,
-                    timeframeCode,
-                    orderType,
-                    candles,
+            List<BacktestTrade> trades = executeBacktest(strategyName, selectedPair, timeframeCode, orderType, candles,
                     initialBalance);
 
             InstitutionalBacktestMetrics metrics = calculateInstitutionalMetrics(trades, initialBalance);
@@ -996,17 +899,9 @@ public class BacktestingPanel extends StackPane {
                     assignResultButton.setDisable(false);
                 }
 
-                statusLabel.setText(
-                        "Backtest complete for "
-                                + displayTradePair(selectedPair)
-                                + " using "
-                                + strategyName
-                                + " / "
-                                + orderType
-                                + " | Initial Balance: $"
-                                + String.format(Locale.ROOT, "%.2f", initialBalance)
-                                + " | Trades: "
-                                + trades.size());
+                statusLabel.setText("Backtest complete for " + displayTradePair(selectedPair) + " using " + strategyName
+                        + " / " + orderType + " | Initial Balance: $"
+                        + String.format(Locale.ROOT, "%.2f", initialBalance) + " | Trades: " + trades.size());
 
                 progressBar.setProgress(1.0);
                 backtestRunning.set(false);
@@ -1044,15 +939,11 @@ public class BacktestingPanel extends StackPane {
             LocalDateTime fetchStart = fetchStartDate.atStartOfDay();
             LocalDateTime fetchEnd = endDate.atTime(23, 59, 59);
 
-            HistoricalDataPrefetcher preFetcher = HistoricalDataPrefetcher
-                    .forCurrentExchange(systemCore.getExchange(), historicalDataRepository);
+            HistoricalDataPrefetcher preFetcher = HistoricalDataPrefetcher.forCurrentExchange(systemCore.getExchange(),
+                    historicalDataRepository);
 
-            List<CandleData> fetched = preFetcher.fetchAndCacheDataSync(
-                    input.selectedPair(),
-                    fetchStart,
-                    fetchEnd,
-                    timeframeCode,
-                    progress -> Platform.runLater(() -> {
+            List<CandleData> fetched = preFetcher.fetchAndCacheDataSync(input.selectedPair(), fetchStart, fetchEnd,
+                    timeframeCode, progress -> Platform.runLater(() -> {
                         if (progress >= 0) {
                             progressBar.setProgress(progress / 100.0);
                             statusLabel.setText("Updating historical data... " + progress + "%");
@@ -1063,20 +954,16 @@ public class BacktestingPanel extends StackPane {
                 if (fetched.isEmpty()) {
                     dataQualityLabel.setText("Data quality: using existing cached data - exchange returned no candles");
                 } else {
-                    backtestingService.storeHistoricalData(
-                            input.selectedPair(),
-                            fetchStart,
-                            fetchEnd,
-                            timeframeCode,
+                    backtestingService.storeHistoricalData(input.selectedPair(), fetchStart, fetchEnd, timeframeCode,
                             fetched);
-                    dataQualityLabel.setText("Data quality: saved/updated " + fetched.size()
-                            + " exchange candles before backtest");
+                    dataQualityLabel.setText(
+                            "Data quality: saved/updated " + fetched.size() + " exchange candles before backtest");
                 }
             });
         } catch (Exception exception) {
             log.warn("Historical data refresh failed; continuing with cached data: {}", exception.getMessage());
-            Platform.runLater(() -> dataQualityLabel.setText(
-                    "Data quality: cached data - refresh failed: " + exception.getMessage()));
+            Platform.runLater(() -> dataQualityLabel
+                    .setText("Data quality: cached data - refresh failed: " + exception.getMessage()));
         }
     }
 
@@ -1144,18 +1031,11 @@ public class BacktestingPanel extends StackPane {
      * enough candles,
      * automatically expands the request range backward.
      */
-    private List<CandleData> loadEnoughCandles(
-            TradePair pair,
-            Timeframe timeframe,
-            LocalDate startDate,
-            LocalDate endDate,
-            int requestedBars) {
+    private List<CandleData> loadEnoughCandles(TradePair pair, Timeframe timeframe, LocalDate startDate,
+            LocalDate endDate, int requestedBars) {
         String timeframeCode = timeframe.getCode();
 
-        List<CandleData> candles = loadHistoricalCandles(
-                pair,
-                startDate.atStartOfDay(),
-                endDate.atTime(23, 59, 59),
+        List<CandleData> candles = loadHistoricalCandles(pair, startDate.atStartOfDay(), endDate.atTime(23, 59, 59),
                 timeframeCode);
 
         if (candles.size() >= requestedBars) {
@@ -1165,14 +1045,11 @@ public class BacktestingPanel extends StackPane {
         int estimatedDaysNeeded = estimateDaysNeeded(timeframe, requestedBars);
         LocalDate expandedStart = endDate.minusDays(Math.max(estimatedDaysNeeded, 365));
 
-        Platform.runLater(() -> statusLabel.setText(
-                "Not enough data in selected range. Expanding lookup to " + expandedStart + "..."));
+        Platform.runLater(() -> statusLabel
+                .setText("Not enough data in selected range. Expanding lookup to " + expandedStart + "..."));
 
-        List<CandleData> expandedCandles = loadHistoricalCandles(
-                pair,
-                expandedStart.atStartOfDay(),
-                endDate.atTime(23, 59, 59),
-                timeframeCode);
+        List<CandleData> expandedCandles = loadHistoricalCandles(pair, expandedStart.atStartOfDay(),
+                endDate.atTime(23, 59, 59), timeframeCode);
 
         if (expandedCandles.size() > candles.size()) {
             candles = expandedCandles;
@@ -1181,8 +1058,8 @@ public class BacktestingPanel extends StackPane {
         if (candles.size() < requestedBars) {
             int sampleCount = Math.max(requestedBars, MIN_ABSOLUTE_TEST_BARS + 100);
 
-            Platform.runLater(() -> statusLabel.setText(
-                    "Historical data still insufficient. Using sample data with " + sampleCount + " bars."));
+            Platform.runLater(() -> statusLabel
+                    .setText("Historical data still insufficient. Using sample data with " + sampleCount + " bars."));
 
             candles = generateSampleData(sampleCount, 100.0, timeframe);
         }
@@ -1190,42 +1067,27 @@ public class BacktestingPanel extends StackPane {
         return candles;
     }
 
-    private List<CandleData> loadHistoricalCandles(
-            TradePair pair,
-            LocalDateTime start,
-            LocalDateTime end,
+    private List<CandleData> loadHistoricalCandles(TradePair pair, LocalDateTime start, LocalDateTime end,
             String timeframeCode) {
         try {
-            Optional<List<CandleData>> storedCandles = backtestingService.getStoredHistoricalData(
-                    pair,
-                    start,
-                    end,
+            Optional<List<CandleData>> storedCandles = backtestingService.getStoredHistoricalData(pair, start, end,
                     timeframeCode);
 
             if (storedCandles.isPresent() && !storedCandles.get().isEmpty()) {
-                return storedCandles.get()
-                        .stream()
-                        .filter(Objects::nonNull)
-                        .sorted(Comparator.comparingLong(this::candleTimestamp))
-                        .toList();
+                return storedCandles.get().stream().filter(Objects::nonNull)
+                        .sorted(Comparator.comparingLong(this::candleTimestamp)).toList();
             }
         } catch (Exception exception) {
             log.debug("BacktestingService lookup failed, falling back to repository: {}", exception.getMessage());
         }
 
         try {
-            Optional<List<CandleData>> historicalCandles = historicalDataRepository.getHistoricalData(
-                    pair,
-                    start,
-                    end,
+            Optional<List<CandleData>> historicalCandles = historicalDataRepository.getHistoricalData(pair, start, end,
                     timeframeCode);
 
             if (historicalCandles.isPresent() && !historicalCandles.get().isEmpty()) {
-                return historicalCandles.get()
-                        .stream()
-                        .filter(Objects::nonNull)
-                        .sorted(Comparator.comparingLong(this::candleTimestamp))
-                        .toList();
+                return historicalCandles.get().stream().filter(Objects::nonNull)
+                        .sorted(Comparator.comparingLong(this::candleTimestamp)).toList();
             }
 
         } catch (Exception exception) {
@@ -1254,51 +1116,26 @@ public class BacktestingPanel extends StackPane {
         };
     }
 
-    private DataReadiness evaluateDataReadiness(
-            List<CandleData> candles,
-            int warmupBars,
-            int requestedBars) {
+    private DataReadiness evaluateDataReadiness(List<CandleData> candles, int warmupBars, int requestedBars) {
         int actualBars = candles == null ? 0 : candles.size();
         int minimumRequired = Math.max(MIN_ABSOLUTE_TEST_BARS, warmupBars + MIN_TESTING_BARS_AFTER_WARMUP);
 
         if (actualBars < minimumRequired) {
-            return new DataReadiness(
-                    false,
-                    "Not enough data for proper testing. Need at least "
-                            + minimumRequired
-                            + " candles. Available: "
-                            + actualBars
-                            + ".");
+            return new DataReadiness(false, "Not enough data for proper testing. Need at least " + minimumRequired
+                    + " candles. Available: " + actualBars + ".");
         }
 
         if (actualBars < requestedBars) {
-            return new DataReadiness(
-                    true,
-                    "Data quality: usable but below requested bars. Requested "
-                            + requestedBars
-                            + ", available "
-                            + actualBars
-                            + ".");
+            return new DataReadiness(true, "Data quality: usable but below requested bars. Requested " + requestedBars
+                    + ", available " + actualBars + ".");
         }
 
-        return new DataReadiness(
-                true,
-                "Data quality: ready. Available candles: "
-                        + actualBars
-                        + ", warmup: "
-                        + warmupBars
-                        + ", requested: "
-                        + requestedBars
-                        + ".");
+        return new DataReadiness(true, "Data quality: ready. Available candles: " + actualBars + ", warmup: "
+                + warmupBars + ", requested: " + requestedBars + ".");
     }
 
-    private List<BacktestTrade> executeBacktest(
-            String strategyName,
-            TradePair selectedPair,
-            String timeframeCode,
-            MARKET_TYPES orderType,
-            List<CandleData> candles,
-            double initialBalance) {
+    private List<BacktestTrade> executeBacktest(String strategyName, TradePair selectedPair, String timeframeCode,
+            MARKET_TYPES orderType, List<CandleData> candles, double initialBalance) {
         List<BacktestTrade> trades = new ArrayList<>();
 
         if (strategyName == null || strategyName.isBlank()) {
@@ -1351,23 +1188,15 @@ public class BacktestingPanel extends StackPane {
                 continue;
             }
 
-            StrategyContext context = buildStrategyContext(
-                    selectedPair,
-                    timeframe,
-                    window,
-                    current.closePrice());
+            StrategyContext context = buildStrategyContext(selectedPair, timeframe, window, current.closePrice());
 
             StrategySignal signal;
 
             try {
                 signal = strategy.generateSignal(context);
             } catch (Exception exception) {
-                log.warn(
-                        "Strategy {} failed during backtest for {} at candle {}: {}",
-                        strategyName,
-                        displayTradePair(selectedPair),
-                        i,
-                        exception.getMessage());
+                log.warn("Strategy {} failed during backtest for {} at candle {}: {}", strategyName,
+                        displayTradePair(selectedPair), i, exception.getMessage());
                 updateProgress(i, candles.size());
                 continue;
             }
@@ -1379,11 +1208,7 @@ public class BacktestingPanel extends StackPane {
 
             if (!inPosition) {
                 if (signal.getSide() == BUY || signal.getSide() == SELL) {
-                    Optional<Double> fillPrice = resolveEntryFillPrice(
-                            orderType,
-                            signal.getSide(),
-                            signal,
-                            current);
+                    Optional<Double> fillPrice = resolveEntryFillPrice(orderType, signal.getSide(), signal, current);
 
                     if (fillPrice.isEmpty()) {
                         updateProgress(i, candles.size());
@@ -1401,34 +1226,17 @@ public class BacktestingPanel extends StackPane {
                     inPosition = true;
                 }
             } else {
-                ExitDecision exit = shouldExitPosition(
-                        positionSide,
-                        current,
-                        signal,
-                        stopLoss,
-                        takeProfit,
-                        entryIndex,
+                ExitDecision exit = shouldExitPosition(positionSide, current, signal, stopLoss, takeProfit, entryIndex,
                         i);
 
                 if (exit.exit()) {
                     double exitPrice = exit.exitPrice();
                     double profit = calculateProfit(positionSide, entryPrice, exitPrice, quantity);
-                    double returnPercent = entryPrice > 0.0
-                            ? (profit / (entryPrice * quantity)) * 100.0
-                            : 0.0;
+                    double returnPercent = entryPrice > 0.0 ? (profit / (entryPrice * quantity)) * 100.0 : 0.0;
 
-                    trades.add(new BacktestTrade(
-                            entryDate == null ? candleDate(current) : entryDate,
-                            positionSide,
-                            orderType,
-                            entryPrice,
-                            exitPrice,
-                            quantity,
-                            cleanNumber(profit),
-                            cleanNumber(returnPercent),
-                            exit.reason(),
-                            entryIndex,
-                            i));
+                    trades.add(new BacktestTrade(entryDate == null ? candleDate(current) : entryDate, positionSide,
+                            orderType, entryPrice, exitPrice, quantity, cleanNumber(profit), cleanNumber(returnPercent),
+                            exit.reason(), entryIndex, i));
 
                     inPosition = false;
                     positionSide = HOLD;
@@ -1501,16 +1309,9 @@ public class BacktestingPanel extends StackPane {
         }
     }
 
-    private StrategyContext buildStrategyContext(
-            TradePair pair,
-            Timeframe timeframe,
-            List<CandleData> candles,
+    private StrategyContext buildStrategyContext(TradePair pair, Timeframe timeframe, List<CandleData> candles,
             double currentPrice) {
-        return StrategyContext.builder()
-                .symbol(pair)
-                .timeframe(timeframe)
-                .candles(candles)
-                .currentPrice(currentPrice)
+        return StrategyContext.builder().symbol(pair).timeframe(timeframe).candles(candles).currentPrice(currentPrice)
                 .build();
     }
 
@@ -1528,14 +1329,9 @@ public class BacktestingPanel extends StackPane {
         };
     }
 
-    private Optional<Double> resolveEntryFillPrice(
-            MARKET_TYPES orderType,
-            Side side,
-            StrategySignal signal,
+    private Optional<Double> resolveEntryFillPrice(MARKET_TYPES orderType, Side side, StrategySignal signal,
             CandleData candle) {
-        double requestedEntry = signal.getEntryPrice() > 0.0
-                ? signal.getEntryPrice()
-                : candle.closePrice();
+        double requestedEntry = signal.getEntryPrice() > 0.0 ? signal.getEntryPrice() : candle.closePrice();
 
         if (orderType == MARKET_TYPES.MARKET) {
             return Optional.of(candle.closePrice());
@@ -1568,14 +1364,8 @@ public class BacktestingPanel extends StackPane {
         return Optional.of(candle.closePrice());
     }
 
-    private @NotNull ExitDecision shouldExitPosition(
-            Side positionSide,
-            @NotNull CandleData current,
-            StrategySignal latestSignal,
-            double stopLoss,
-            double takeProfit,
-            int entryIndex,
-            int currentIndex) {
+    private @NotNull ExitDecision shouldExitPosition(Side positionSide, @NotNull CandleData current,
+            StrategySignal latestSignal, double stopLoss, double takeProfit, int entryIndex, int currentIndex) {
         double high = current.highPrice();
         double low = current.lowPrice();
         double close = current.closePrice();
@@ -1706,9 +1496,7 @@ public class BacktestingPanel extends StackPane {
                 timestamp *= 1000L;
             }
 
-            return Instant.ofEpochMilli(timestamp)
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDate();
+            return Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate();
         } catch (Exception ignored) {
             return LocalDate.now();
         }
@@ -1762,9 +1550,7 @@ public class BacktestingPanel extends StackPane {
                 epochMillis *= 1000L;
             }
             try {
-                return Instant.ofEpochMilli(epochMillis)
-                        .atZone(ZoneId.systemDefault())
-                        .format(PRICE_CHART_TIME_FORMAT);
+                return Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(PRICE_CHART_TIME_FORMAT);
             } catch (Exception ignored) {
                 return "";
             }
@@ -1819,12 +1605,7 @@ public class BacktestingPanel extends StackPane {
             double high = Math.max(open, close) + Math.random();
             double low = Math.max(0.0001, Math.min(open, close) - Math.random());
 
-            candles.add(new CandleData(
-                    open,
-                    close,
-                    high,
-                    low,
-                    (int) (timestampSeconds + (i * stepSeconds)),
+            candles.add(new CandleData(open, close, high, low, (int) (timestampSeconds + (i * stepSeconds)),
                     1_000 + Math.random() * 5_000));
         }
 
@@ -1914,8 +1695,7 @@ public class BacktestingPanel extends StackPane {
                         trade.getSide() == BUY ? "#22c55e" : "#ef4444",
                         "%s entry @ %.5f".formatted(trade.getSide(), trade.getPrice()));
 
-                addTradeMarker(exitX, trade.getExitPrice(), "EXIT",
-                        trade.getProfit() >= 0.0 ? "#38bdf8" : "#f59e0b",
+                addTradeMarker(exitX, trade.getExitPrice(), "EXIT", trade.getProfit() >= 0.0 ? "#38bdf8" : "#f59e0b",
                         "Exit @ %.5f | P&L %.2f | %s".formatted(trade.getExitPrice(), trade.getProfit(),
                                 trade.getReason()));
 
@@ -1939,10 +1719,8 @@ public class BacktestingPanel extends StackPane {
 
         Platform.runLater(() -> {
             if (point.getNode() != null) {
-                point.getNode().setStyle(
-                        "-fx-background-color: " + color + ", white; " +
-                                "-fx-background-radius: 7px; " +
-                                "-fx-padding: 6px;");
+                point.getNode().setStyle("-fx-background-color: " + color + ", white; " + "-fx-background-radius: 7px; "
+                        + "-fx-padding: 6px;");
                 Tooltip.install(point.getNode(), new Tooltip(tooltipText));
             }
             if (marker.getNode() != null) {
@@ -2067,25 +1845,17 @@ public class BacktestingPanel extends StackPane {
             String timestamp = java.time.LocalDateTime.now()
                     .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
 
-            String safeSymbol = symbol != null
-                    ? symbol.toString().replace("/", "").replace("\\", "").replace(":", "")
+            String safeSymbol = symbol != null ? symbol.toString().replace("/", "").replace("\\", "").replace(":", "")
                     : "unknown";
 
-            String safeStrategy = strategy == null
-                    ? "strategy"
-                    : strategy.replaceAll("[^a-zA-Z0-9._-]", "_");
+            String safeStrategy = strategy == null ? "strategy" : strategy.replaceAll("[^a-zA-Z0-9._-]", "_");
 
-            String filename = String.format(
-                    "backtest_%s_%s_%s.csv",
-                    safeSymbol,
-                    safeStrategy,
-                    timestamp);
+            String filename = String.format("backtest_%s_%s_%s.csv", safeSymbol, safeStrategy, timestamp);
 
             FileChooser fileChooser = new FileChooser();
             fileChooser.setTitle("Export Backtest Results");
             fileChooser.setInitialFileName(filename);
-            fileChooser.getExtensionFilters().addAll(
-                    new FileChooser.ExtensionFilter("CSV Files", "*.csv"),
+            fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("CSV Files", "*.csv"),
                     new FileChooser.ExtensionFilter("All Files", "*.*"));
 
             File file = fileChooser.showSaveDialog(this.getScene().getWindow());
@@ -2093,9 +1863,7 @@ public class BacktestingPanel extends StackPane {
             if (file != null) {
                 java.nio.file.Files.writeString(file.toPath(), csvContent.toString());
                 statusLabel.setText("✓ Results exported to: " + file.getName());
-                showAlert(
-                        "Export Successful",
-                        "Backtest results exported to:\n" + file.getAbsolutePath(),
+                showAlert("Export Successful", "Backtest results exported to:\n" + file.getAbsolutePath(),
                         Alert.AlertType.INFORMATION);
                 log.info("Backtest results exported to: {}", file.getAbsolutePath());
             }
@@ -2114,18 +1882,9 @@ public class BacktestingPanel extends StackPane {
                 continue;
             }
 
-            csvContent.append(String.format(
-                    Locale.ROOT,
-                    "%s,%s,%s,%.5f,%.5f,%.2f,%.2f,%.2f,%s\n",
-                    trade.getDate(),
-                    trade.getSide(),
-                    trade.getOrderType(),
-                    trade.getPrice(),
-                    trade.getExitPrice(),
-                    trade.getQuantity(),
-                    trade.getProfit(),
-                    trade.getReturnPercent(),
-                    sanitizeCsv(trade.getReason())));
+            csvContent.append(String.format(Locale.ROOT, "%s,%s,%s,%.5f,%.5f,%.2f,%.2f,%.2f,%s\n", trade.getDate(),
+                    trade.getSide(), trade.getOrderType(), trade.getPrice(), trade.getExitPrice(), trade.getQuantity(),
+                    trade.getProfit(), trade.getReturnPercent(), sanitizeCsv(trade.getReason())));
         }
 
         csvContent.append("\n\nMetrics Summary\n");
@@ -2165,13 +1924,11 @@ public class BacktestingPanel extends StackPane {
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
         confirm.setTitle("Assign Backtested Strategy");
         confirm.setHeaderText("Assign this strategy to " + symbol + " / " + input.selectedTimeframe().getCode() + "?");
-        confirm.setContentText(
-                "Strategy: " + strategyId + "\n" +
-                        "Trades: " + trades + "\n" +
-                        "Return: " + String.format(Locale.ROOT, "%.2f%%", totalReturn) + "\n" +
-                        "Win Rate: " + String.format(Locale.ROOT, "%.1f%%", winRate) + "\n" +
-                        "Max Drawdown: " + String.format(Locale.ROOT, "%.2f%%", drawdown) + "\n" +
-                        "Score: " + String.format(Locale.ROOT, "%.1f", score));
+        confirm.setContentText("Strategy: " + strategyId + "\n" + "Trades: " + trades + "\n" + "Return: "
+                + String.format(Locale.ROOT, "%.2f%%", totalReturn) + "\n" + "Win Rate: "
+                + String.format(Locale.ROOT, "%.1f%%", winRate) + "\n" + "Max Drawdown: "
+                + String.format(Locale.ROOT, "%.2f%%", drawdown) + "\n" + "Score: "
+                + String.format(Locale.ROOT, "%.1f", score));
 
         confirm.showAndWait().ifPresent(result -> {
             if (result != ButtonType.OK) {
@@ -2179,24 +1936,17 @@ public class BacktestingPanel extends StackPane {
             }
 
             try {
-                StrategyAssignment assignment = StrategySelectionService.getInstance()
-                        .manuallyAssign(
-                                symbol,
-                                input.selectedTimeframe(),
-                                strategyId,
-                                true,
-                                "Assigned from Backtesting panel after user-reviewed backtest: "
-                                        + String.format(Locale.ROOT,
-                                                "return %.2f%%, win rate %.1f%%, max drawdown %.2f%%, trades %d",
-                                                totalReturn, winRate, drawdown, trades),
-                                score);
+                StrategyAssignment assignment = StrategySelectionService.getInstance().manuallyAssign(symbol,
+                        input.selectedTimeframe(), strategyId, true,
+                        "Assigned from Backtesting panel after user-reviewed backtest: " + String.format(Locale.ROOT,
+                                "return %.2f%%, win rate %.1f%%, max drawdown %.2f%%, trades %d", totalReturn, winRate,
+                                drawdown, trades),
+                        score);
 
-                statusLabel.setText("Assigned " + assignment.getStrategyId() + " to "
-                        + symbol + " " + input.selectedTimeframe().getCode());
-                showAlert("Strategy Assigned",
-                        assignment.getStrategyId() + " is now assigned to "
-                                + symbol + " / " + input.selectedTimeframe().getCode() + ".",
-                        Alert.AlertType.INFORMATION);
+                statusLabel.setText("Assigned " + assignment.getStrategyId() + " to " + symbol + " "
+                        + input.selectedTimeframe().getCode());
+                showAlert("Strategy Assigned", assignment.getStrategyId() + " is now assigned to " + symbol + " / "
+                        + input.selectedTimeframe().getCode() + ".", Alert.AlertType.INFORMATION);
             } catch (Exception exception) {
                 log.error("Failed to assign backtested strategy", exception);
                 showAlert("Assignment Failed", exception.getMessage(), Alert.AlertType.ERROR);
@@ -2217,9 +1967,7 @@ public class BacktestingPanel extends StackPane {
     private void compareResults() {
         try {
             if (tradesTable.getItems().isEmpty()) {
-                showAlert(
-                        "No Results",
-                        "No backtest results to compare. Please run a backtest first.",
+                showAlert("No Results", "No backtest results to compare. Please run a backtest first.",
                         Alert.AlertType.WARNING);
                 return;
             }
@@ -2254,12 +2002,7 @@ public class BacktestingPanel extends StackPane {
             scrollPane.setFitToWidth(true);
             scrollPane.setStyle("-fx-background-color: #0f172a; -fx-control-inner-background: #0f172a;");
 
-            mainBox.getChildren().addAll(
-                    titleLabel,
-                    new Separator(),
-                    scrollPane,
-                    new Separator(),
-                    buttonBox);
+            mainBox.getChildren().addAll(titleLabel, new Separator(), scrollPane, new Separator(), buttonBox);
 
             VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
@@ -2277,12 +2020,8 @@ public class BacktestingPanel extends StackPane {
     private VBox createParametersSection() {
         VBox section = new VBox(10);
         section.setPadding(new Insets(12));
-        section.setStyle(
-                "-fx-background-color: #1e293b; " +
-                        "-fx-border-color: #3b82f6; " +
-                        "-fx-border-width: 1; " +
-                        "-fx-border-radius: 6; " +
-                        "-fx-background-radius: 6;");
+        section.setStyle("-fx-background-color: #1e293b; " + "-fx-border-color: #3b82f6; " + "-fx-border-width: 1; "
+                + "-fx-border-radius: 6; " + "-fx-background-radius: 6;");
 
         Label sectionTitle = new Label("Test Parameters");
         sectionTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #60a5fa;");
@@ -2308,12 +2047,8 @@ public class BacktestingPanel extends StackPane {
     private VBox createMetricsSection() {
         VBox section = new VBox(10);
         section.setPadding(new Insets(12));
-        section.setStyle(
-                "-fx-background-color: #1e293b; " +
-                        "-fx-border-color: #10b981; " +
-                        "-fx-border-width: 1; " +
-                        "-fx-border-radius: 6; " +
-                        "-fx-background-radius: 6;");
+        section.setStyle("-fx-background-color: #1e293b; " + "-fx-border-color: #10b981; " + "-fx-border-width: 1; "
+                + "-fx-border-radius: 6; " + "-fx-background-radius: 6;");
 
         Label sectionTitle = new Label("Performance Metrics");
         sectionTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #10b981;");
@@ -2361,12 +2096,8 @@ public class BacktestingPanel extends StackPane {
     private VBox createTradeSummarySection() {
         VBox section = new VBox(10);
         section.setPadding(new Insets(12));
-        section.setStyle(
-                "-fx-background-color: #1e293b; " +
-                        "-fx-border-color: #f59e0b; " +
-                        "-fx-border-width: 1; " +
-                        "-fx-border-radius: 6; " +
-                        "-fx-background-radius: 6;");
+        section.setStyle("-fx-background-color: #1e293b; " + "-fx-border-color: #f59e0b; " + "-fx-border-width: 1; "
+                + "-fx-border-radius: 6; " + "-fx-background-radius: 6;");
 
         Label sectionTitle = new Label("Trade Summary");
         sectionTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #f59e0b;");
@@ -2375,40 +2106,20 @@ public class BacktestingPanel extends StackPane {
         grid.setHgap(30);
         grid.setVgap(12);
 
-        List<BacktestTrade> trades = tradesTable == null || tradesTable.getItems() == null
-                ? List.of()
-                : tradesTable.getItems()
-                        .stream()
-                        .filter(Objects::nonNull)
-                        .toList();
+        List<BacktestTrade> trades = tradesTable == null || tradesTable.getItems() == null ? List.of()
+                : tradesTable.getItems().stream().filter(Objects::nonNull).toList();
 
         int totalTrades = trades.size();
 
-        long winningTrades = trades.stream()
-                .filter(trade -> trade.getProfit() > 0)
-                .count();
+        long winningTrades = trades.stream().filter(trade -> trade.getProfit() > 0).count();
 
-        long losingTrades = trades.stream()
-                .filter(trade -> trade.getProfit() < 0)
-                .count();
+        long losingTrades = trades.stream().filter(trade -> trade.getProfit() < 0).count();
 
-        double avgProfit = cleanNumber(
-                trades.stream()
-                        .mapToDouble(BacktestTrade::getProfit)
-                        .average()
-                        .orElse(0.0));
+        double avgProfit = cleanNumber(trades.stream().mapToDouble(BacktestTrade::getProfit).average().orElse(0.0));
 
-        double bestTrade = cleanNumber(
-                trades.stream()
-                        .mapToDouble(BacktestTrade::getProfit)
-                        .max()
-                        .orElse(0.0));
+        double bestTrade = cleanNumber(trades.stream().mapToDouble(BacktestTrade::getProfit).max().orElse(0.0));
 
-        double worstTrade = cleanNumber(
-                trades.stream()
-                        .mapToDouble(BacktestTrade::getProfit)
-                        .min()
-                        .orElse(0.0));
+        double worstTrade = cleanNumber(trades.stream().mapToDouble(BacktestTrade::getProfit).min().orElse(0.0));
 
         addMetricRow(grid, 0, "Total Trades:", String.valueOf(totalTrades), "#ffffff");
         addMetricRow(grid, 1, "Winning Trades:", String.valueOf(winningTrades), "#10b981");
@@ -2470,12 +2181,8 @@ public class BacktestingPanel extends StackPane {
     }
 
     private String primaryButtonStyle(String color) {
-        return "-fx-padding: 10px 25px; " +
-                "-fx-font-size: 14px; " +
-                "-fx-background-color: " + color + "; " +
-                "-fx-text-fill: white; " +
-                "-fx-background-radius: 6; " +
-                "-fx-cursor: hand;";
+        return "-fx-padding: 10px 25px; " + "-fx-font-size: 14px; " + "-fx-background-color: " + color + "; "
+                + "-fx-text-fill: white; " + "-fx-background-radius: 6; " + "-fx-cursor: hand;";
     }
 
     private record DataReadiness(boolean ready, String message) {
@@ -2484,20 +2191,13 @@ public class BacktestingPanel extends StackPane {
     private record ExitDecision(boolean exit, double exitPrice, String reason) {
     }
 
-    private record BacktestInput(
-            String strategyName,
-            TradePair selectedPair,
-            Timeframe selectedTimeframe,
-            MARKET_TYPES orderType,
-            double initialBalance,
-            LocalDate startDate,
-            LocalDate endDate,
-            int requestedBars,
+    private record BacktestInput(String strategyName, TradePair selectedPair, Timeframe selectedTimeframe,
+            MARKET_TYPES orderType, double initialBalance, LocalDate startDate, LocalDate endDate, int requestedBars,
             String validationMessage) {
 
         static BacktestInput invalid(String validationMessage) {
-            return new BacktestInput(null, null, null, MARKET_TYPES.MARKET, DEFAULT_INITIAL_EQUITY,
-                    null, null, MIN_ABSOLUTE_TEST_BARS, validationMessage);
+            return new BacktestInput(null, null, null, MARKET_TYPES.MARKET, DEFAULT_INITIAL_EQUITY, null, null,
+                    MIN_ABSOLUTE_TEST_BARS, validationMessage);
         }
 
         boolean isValid() {

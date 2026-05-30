@@ -6,6 +6,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.stage.Window;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -314,7 +315,8 @@ public class ThemeCustomizationPanel extends VBox {
         VBox swatch = new VBox(4);
         swatch.setAlignment(javafx.geometry.Pos.CENTER);
         swatch.setPrefSize(60, 60);
-        swatch.setStyle("-fx-background-color: " + color + "; -fx-border-color: -border-strong; -fx-border-width: 1;");
+        swatch.setStyle("-fx-background-color: " + normalizePaintValue(color, "#2563eb") +
+                "; -fx-border-color: -border-strong; -fx-border-width: 1;");
 
         Label swatchLabel = new Label(label);
         swatchLabel.setStyle("-fx-font-size: 10; -fx-text-fill: -text-secondary;");
@@ -339,7 +341,8 @@ public class ThemeCustomizationPanel extends VBox {
         resetButton.setOnAction(e -> resetTheme());
 
         Button applyButton = new Button("Apply Theme");
-        applyButton.setStyle("-fx-padding: 8 16; -fx-font-size: 12; -fx-background-color: -primary-color;");
+        applyButton.setStyle("-fx-padding: 8 16; -fx-font-size: 12; -fx-text-fill: white; -fx-background-color: " +
+                normalizePaintValue(currentTheme.getPrimaryColor(), "#2563eb") + ";");
         applyButton.setOnAction(e -> applyTheme());
 
         buttonBox.getChildren().addAll(resetButton, applyButton);
@@ -360,11 +363,40 @@ public class ThemeCustomizationPanel extends VBox {
     }
 
     private void applyTheme() {
-        // Apply theme variables to root CSS
-        Scene scene = getScene();
-        if (scene != null) {
-            log.info("Theme applied");
+        String inlineThemeVariables = buildInlineThemeVariables();
+        if (inlineThemeVariables.isBlank()) {
+            showAlert("Warning", "No theme variables available to apply.");
+            return;
+        }
+
+        int appliedCount = 0;
+        for (Window window : Window.getWindows()) {
+            if (window == null || !window.isShowing() || window.getScene() == null
+                    || window.getScene().getRoot() == null) {
+                continue;
+            }
+            var root = window.getScene().getRoot();
+            root.setStyle(mergeThemeVariables(root.getStyle(), inlineThemeVariables));
+            root.applyCss();
+            root.requestLayout();
+            appliedCount++;
+        }
+
+        if (appliedCount == 0) {
+            Scene scene = getScene();
+            if (scene != null && scene.getRoot() != null) {
+                scene.getRoot().setStyle(mergeThemeVariables(scene.getRoot().getStyle(), inlineThemeVariables));
+                scene.getRoot().applyCss();
+                scene.getRoot().requestLayout();
+                appliedCount = 1;
+            }
+        }
+
+        if (appliedCount > 0) {
+            log.info("Theme applied to {} window(s)", appliedCount);
             showAlert("Success", "Theme applied successfully!");
+        } else {
+            showAlert("Warning", "Theme was not applied because no active scene was found.");
         }
     }
 
@@ -421,5 +453,62 @@ public class ThemeCustomizationPanel extends VBox {
 
     private static double extractNumeric(String value) {
         return Double.parseDouble(value.replaceAll("[^0-9.]", ""));
+    }
+
+    private String buildInlineThemeVariables() {
+        String css = currentTheme.toCSSVariables();
+        int openBrace = css.indexOf('{');
+        int closeBrace = css.lastIndexOf('}');
+        if (openBrace < 0 || closeBrace <= openBrace) {
+            return "";
+        }
+        String block = css.substring(openBrace + 1, closeBrace);
+        // Inline style doesn't support comments reliably; strip them before applying.
+        block = block.replaceAll("(?s)/\\*.*?\\*/", " ");
+        return block.replace("\r", " ").replace("\n", " ").replaceAll("\\s+", " ").trim();
+    }
+
+    private static String mergeThemeVariables(String existingStyle, String themeVariables) {
+        String base = existingStyle == null ? "" : existingStyle;
+        // Remove previously injected theme variables so repeat apply does not bloat
+        // inline style.
+        base = base.replaceAll("-dark-bg\\s*:[^;]*;", "")
+                .replaceAll("-workspace-bg\\s*:[^;]*;", "")
+                .replaceAll("-surface-bg\\s*:[^;]*;", "")
+                .replaceAll("-panel-bg\\s*:[^;]*;", "")
+                .replaceAll("-elevated-bg\\s*:[^;]*;", "")
+                .replaceAll("-header-bg\\s*:[^;]*;", "")
+                .replaceAll("-terminal-bg\\s*:[^;]*;", "")
+                .replaceAll("-text-primary\\s*:[^;]*;", "")
+                .replaceAll("-text-secondary\\s*:[^;]*;", "")
+                .replaceAll("-text-muted\\s*:[^;]*;", "")
+                .replaceAll("-buy-color\\s*:[^;]*;", "")
+                .replaceAll("-sell-color\\s*:[^;]*;", "")
+                .replaceAll("-profit-color\\s*:[^;]*;", "")
+                .replaceAll("-primary-color\\s*:[^;]*;", "")
+                .replaceAll("-accent-color\\s*:[^;]*;", "")
+                .replaceAll("-warning\\s*:[^;]*;", "")
+                .trim();
+
+        if (!base.isBlank() && !base.endsWith(";")) {
+            base = base + ";";
+        }
+        return (base + " " + themeVariables).trim();
+    }
+
+    private static String normalizePaintValue(String value, String fallback) {
+        String candidate = value == null ? "" : value.trim();
+        if (candidate.startsWith("\"") && candidate.endsWith("\"") && candidate.length() > 1) {
+            candidate = candidate.substring(1, candidate.length() - 1).trim();
+        }
+        if (candidate.startsWith("'") && candidate.endsWith("'") && candidate.length() > 1) {
+            candidate = candidate.substring(1, candidate.length() - 1).trim();
+        }
+        try {
+            Color.web(candidate);
+            return candidate;
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 }

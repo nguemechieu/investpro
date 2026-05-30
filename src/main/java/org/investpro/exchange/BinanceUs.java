@@ -1553,7 +1553,8 @@ public class BinanceUs extends Exchange {
     @Override
     public CompletableFuture<SymbolTradability> fetchTradabilityStatus(TradePair pair) {
         if (pair == null) {
-            return CompletableFuture.completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+            return CompletableFuture
+                    .completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
         }
 
         return CompletableFuture.supplyAsync(() -> {
@@ -1642,9 +1643,11 @@ public class BinanceUs extends Exchange {
             status = TradabilityStatus.MIN_SIZE_INVALID;
         }
 
-        boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE && canSubmitOrders();
-        if (!canSubmitOrders() && status == TradabilityStatus.FULLY_TRADABLE) {
-            status = TradabilityStatus.API_KEY_RESTRICTED;
+        boolean canSubmit = canSubmitOrders();
+        boolean hasOrderAuthorization = isPaperTrading() || supportsLiveTrading();
+        boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE && canSubmit;
+        if (!canSubmit && status == TradabilityStatus.FULLY_TRADABLE) {
+            status = hasOrderAuthorization ? TradabilityStatus.INACTIVE : TradabilityStatus.API_KEY_RESTRICTED;
         }
 
         boolean marginAllowed = symbolNode.path("isMarginTradingAllowed").asBoolean(false);
@@ -1867,7 +1870,12 @@ public class BinanceUs extends Exchange {
                     if (response.statusCode() == 429 || response.statusCode() == 418) {
                         activatePublicRestCooldown(response);
                     }
-                    logger.warn("Failed to fetch order book: HTTP {}", response.statusCode());
+                    if (response.statusCode() >= 400 && response.statusCode() < 500) {
+                        logger.debug("Skipping Binance US order book for {}: HTTP {}",
+                                tradePair, response.statusCode());
+                    } else {
+                        logger.warn("Failed to fetch order book: HTTP {}", response.statusCode());
+                    }
                     return new OrderBook(tradePair);
                 }
 
@@ -2175,7 +2183,8 @@ public class BinanceUs extends Exchange {
                 throw exception;
             }
 
-            logger.warn("Binance US signed request timestamp drift detected on {}. Syncing server time and retrying once.",
+            logger.warn(
+                    "Binance US signed request timestamp drift detected on {}. Syncing server time and retrying once.",
                     path);
             syncBinanceUsServerTime(true);
             return sendSignedBinanceUsRequestOnce(method, path, params);
@@ -2275,8 +2284,8 @@ public class BinanceUs extends Exchange {
             String message = current.getMessage();
             if (message != null
                     && (message.contains("\"code\":-1021")
-                    || message.contains("outside of the recvWindow")
-                    || message.contains("Timestamp for this request"))) {
+                            || message.contains("outside of the recvWindow")
+                            || message.contains("Timestamp for this request"))) {
                 return true;
             }
             current = current.getCause();

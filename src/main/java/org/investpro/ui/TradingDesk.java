@@ -333,6 +333,7 @@ public class TradingDesk extends BorderPane {
     private StrategyStats cachedStrategyStats = StrategyStats.empty();
     private Instant cachedStrategyStatsAt = Instant.EPOCH;
     private final Map<String, BrokerSession> brokerSessions = new HashMap<>();
+    private final Map<String, SystemCore> botSystemCores = new java.util.concurrent.ConcurrentHashMap<>();
     private SystemCore systemCore;
     private boolean systemCoreEventsSubscribed;
     private final AtomicBoolean botTradingOperationInFlight = new AtomicBoolean(false);
@@ -384,6 +385,9 @@ public class TradingDesk extends BorderPane {
     private final Map<String, Stage> openIndependentWindows = new java.util.HashMap<>();
 
     private record BrokerSession(Exchange exchange, boolean accessGranted, Account account) {
+    }
+
+    private record BotRuntimeStartResult(String runtimeKey, String exchangeName, int symbolCount) {
     }
 
     private record AssetBalanceRow(String asset, double balance, double equity, double margin, double freeMargin) {
@@ -964,7 +968,8 @@ public class TradingDesk extends BorderPane {
         botSymbolScopeSelector.getItems().setAll(
                 "Market Watch",
                 "Best Today",
-                "Selected Symbol");
+                "Selected Symbol",
+                "All Connected Exchanges");
 
         String savedScope = preferences.get("bot_symbol_scope", "Market Watch");
         if (savedScope == null || savedScope.isBlank() || "Watchlist".equals(savedScope)) {
@@ -6172,6 +6177,7 @@ public class TradingDesk extends BorderPane {
                 TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
                 yield selected == null ? List.of() : List.of(selected);
             }
+            case "All Connected Exchanges" -> connectedBotSymbols();
             case "Watchlist", "Market Watch" -> displayedMarketWatchSymbols();
             default -> symbolSelector.getItems();
         };
@@ -6182,10 +6188,15 @@ public class TradingDesk extends BorderPane {
         if (tableItems != null && !tableItems.isEmpty()) {
             return tableItems.stream()
                     .filter(Objects::nonNull)
+                    .filter(this::isAllowedMarketWatchSymbol)
                     .distinct()
                     .toList();
         }
-        return List.copyOf(marketWatchItems);
+        return marketWatchItems.stream()
+                .filter(Objects::nonNull)
+                .filter(this::isAllowedMarketWatchSymbol)
+                .distinct()
+                .toList();
     }
 
     private List<TradePair> filterBotTradableSymbols(List<TradePair> rawSymbols) {
@@ -6368,6 +6379,7 @@ public class TradingDesk extends BorderPane {
         SymbolTradability status = selected == null ? null : tradabilityBySymbol.get(symbolKey(selected));
         String scope = safe(botSymbolScopeSelector.getValue());
         boolean disableForTradability = !botTradingEnabled
+                && !isAllConnectedExchangesScope()
                 && "Selected Symbol".equals(scope)
                 && selected != null
                 && status != null
@@ -6517,7 +6529,8 @@ public class TradingDesk extends BorderPane {
 
         List<TradePair> filtered = new ArrayList<>(pairs.size());
         for (TradePair pair : pairs) {
-            if (pair != null && isAllowedByMarketWatchFilter(pair, selectedFilter)) {
+            if (pair != null && isAllowedMarketWatchSymbol(pair)
+                    && isAllowedByMarketWatchFilter(pair, selectedFilter)) {
                 filtered.add(pair);
             }
         }
@@ -6596,6 +6609,9 @@ public class TradingDesk extends BorderPane {
         if (status == null) {
             showWarning("Order Blocked", "Tradability could not be verified for %s."
                     .formatted(pair == null ? "selected symbol" : pair.toString('/')));
+            String diagnostics = buildTradabilityDiagnostics(pair, null, orderType);
+            journal("Tradability diagnostics: " + diagnostics);
+            log.warn("Order blocked: tradability unavailable. {}", diagnostics);
             return false;
         }
 
@@ -6615,10 +6631,43 @@ public class TradingDesk extends BorderPane {
             journal("Trade blocked: %s is %s on %s. %s"
                     .formatted(symbol, status.status(), exchange == null ? "broker" : exchange.getDisplayName(),
                             reason));
+            String diagnostics = buildTradabilityDiagnostics(pair, status, orderType);
+            journal("Tradability diagnostics: " + diagnostics);
+            log.warn("Order blocked by tradability. {}", diagnostics);
             return false;
         }
 
         return true;
+    }
+
+    private String buildTradabilityDiagnostics(TradePair pair, SymbolTradability status,
+            OpenOrder.OrderType orderType) {
+        String symbol = pair == null ? "-" : pair.toString('/');
+        String exchangeName = exchange == null ? "-" : exchange.getDisplayName();
+
+        String typeAllowance = status == null || orderType == null
+                ? "unknown"
+                : switch (orderType) {
+                    case MARKET -> Boolean.toString(status.marketOrderAllowed());
+                    case LIMIT -> Boolean.toString(status.limitOrderAllowed());
+                    case STOP_LOSS, TAKE_PROFIT, TRAILING_STOP -> Boolean.toString(status.stopOrderAllowed());
+                    default -> Boolean.toString(status.orderSubmissionAllowed());
+                };
+
+        return "symbol=" + symbol
+                + ", exchange=" + exchangeName
+                + ", connected=" + (exchange != null && Boolean.TRUE.equals(exchange.isConnected()))
+                + ", mode=" + (exchange == null ? "-" : exchange.getResolvedTradingMode())
+                + ", paper=" + (exchange != null && exchange.isPaperTrading())
+                + ", supportsLive=" + (exchange != null && exchange.supportsLiveTrading())
+                + ", supportsPaper=" + (exchange != null && exchange.supportsPaperTradingMode())
+                + ", canSubmitLiveOrders=" + (exchange != null && exchange.canSubmitLiveOrders())
+                + ", canSubmitOrders=" + (exchange != null && exchange.canSubmitOrders())
+                + ", requestedOrderType=" + (orderType == null ? "-" : orderType)
+                + ", status=" + (status == null ? "UNKNOWN" : status.status())
+                + ", reason=" + (status == null ? "unavailable" : safe(status.reason()))
+                + ", orderSubmissionAllowed=" + (status != null && status.orderSubmissionAllowed())
+                + ", typeAllowed=" + typeAllowance;
     }
 
     private void updateOrderActionAvailability(TradePair selected) {
@@ -6722,6 +6771,7 @@ public class TradingDesk extends BorderPane {
         }
 
         tradePairs = filterPaperSymbolsForExchange(tradePairs);
+        tradePairs = filterReservedMarketWatchSymbols(tradePairs);
 
         refreshTradabilitySnapshot(tradePairs);
         marketWatchUniverse.addAll(tradePairs);
@@ -6828,12 +6878,37 @@ public class TradingDesk extends BorderPane {
                         .anyMatch(code -> symbol.startsWith(code + "/") || symbol.endsWith("/" + code));
     }
 
+    private boolean isReservedMarketWatchSymbol(TradePair pair) {
+        if (pair == null) {
+            return false;
+        }
+        return isReservedSymbolCode(pair.getBaseCode()) || isReservedSymbolCode(pair.getCounterCode());
+    }
+
+    private boolean isAllowedMarketWatchSymbol(TradePair pair) {
+        return pair != null && !isReservedMarketWatchSymbol(pair);
+    }
+
+    private boolean isReservedSymbolCode(String code) {
+        return safe(code).trim().startsWith("00");
+    }
+
     private boolean isStellarExchangeSelected() {
         if (exchange != null && "stellar".equalsIgnoreCase(exchange.getExchangeId())) {
             return true;
         }
         String selected = safe(exchangeSelector.getValue());
         return selected.toLowerCase(Locale.ROOT).contains("stellar");
+    }
+
+    private @NotNull List<TradePair> filterReservedMarketWatchSymbols(List<TradePair> tradePairs) {
+        if (tradePairs == null || tradePairs.isEmpty()) {
+            return List.of();
+        }
+        return tradePairs.stream()
+                .filter(Objects::nonNull)
+                .filter(this::isAllowedMarketWatchSymbol)
+                .toList();
     }
 
     private void showStellarTrustlinePrompt(String message) {
@@ -7409,16 +7484,24 @@ public class TradingDesk extends BorderPane {
         autoRefreshExecutor.scheduleAtFixedRate(() -> {
             try {
                 if (exchange != null && hasBrokerAccess() && !marketWatchItems.isEmpty()) {
-                    List<Ticker> tickers = exchange.fetchTickers(new ArrayList<>(marketWatchItems)).join();
-                    if (tickers != null) {
-                        for (int i = 0; i < tickers.size() && i < marketWatchItems.size(); i++) {
-                            Ticker ticker = tickers.get(i);
-                            TradePair pair = marketWatchItems.get(i);
-                            if (ticker != null && pair != null) {
-                                runOnFx(() -> updateTickerFromStream(pair, ticker));
-                            }
-                        }
-                    }
+                    exchange.fetchTickers(new ArrayList<>(marketWatchItems))
+                            .orTimeout(5, TimeUnit.SECONDS)
+                            .thenAccept(tickers -> {
+                                if (tickers == null) {
+                                    return;
+                                }
+                                for (int i = 0; i < tickers.size() && i < marketWatchItems.size(); i++) {
+                                    Ticker ticker = tickers.get(i);
+                                    TradePair pair = marketWatchItems.get(i);
+                                    if (ticker != null && pair != null) {
+                                        runOnFx(() -> updateTickerFromStream(pair, ticker));
+                                    }
+                                }
+                            })
+                            .exceptionally(exception -> {
+                                log.debug("Failed to update market watch tickers", exception);
+                                return null;
+                            });
                 }
             } catch (Exception e) {
                 log.debug("Failed to update market watch tickers", e);
@@ -10600,6 +10683,11 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
+        if (isAllConnectedExchangesScope()) {
+            startBotTradingAcrossConnectedExchangesAsync();
+            return;
+        }
+
         if (!hasBrokerAccess()) {
             showWarning("Bot Trading", "Validate broker credentials before starting the bot.");
             return;
@@ -10619,9 +10707,23 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
+        List<TradePair> tradableSymbols = filterBotTradableSymbols(symbols);
+        if (tradableSymbols.isEmpty()) {
+            if (!isAllConnectedExchangesScope()
+                    && !"Selected Symbol".equalsIgnoreCase(safe(botSymbolScopeSelector.getValue()))
+                    && connectedBotSessions().size() > 1) {
+                appendAgentActivity("Selected bot scope has no tradable symbols; falling back to connected exchanges.");
+                startBotTradingAcrossConnectedExchangesAsync();
+                return;
+            }
+
+            showWarning("Bot Trading", botTradabilityFailureMessage(symbols));
+            return;
+        }
+
         startBotTradingAsync(
-                symbols,
-                "%d symbol(s) using %s".formatted(symbols.size(), botSymbolScopeSelector.getValue()),
+                tradableSymbols,
+                "%d symbol(s) using %s".formatted(tradableSymbols.size(), botSymbolScopeSelector.getValue()),
                 () -> withActiveChart(chart -> chart.setAutoTradeEnabled(true)));
     }
 
@@ -10697,11 +10799,78 @@ public class TradingDesk extends BorderPane {
                 }));
     }
 
+    private void startBotTradingAcrossConnectedExchangesAsync() {
+        if (!botTradingOperationInFlight.compareAndSet(false, true)) {
+            appendAgentActivity("Bot operation already in progress.");
+            return;
+        }
+
+        botTradeButton.setDisable(true);
+        appendAgentActivity("Starting SystemCore bots across connected exchanges...");
+
+        List<BrokerSession> sessions = connectedBotSessions();
+        if (sessions.isEmpty()) {
+            botTradingOperationInFlight.set(false);
+            botTradeButton.setDisable(false);
+            showWarning("Bot Trading", "No connected exchanges are available for multi-exchange bot trading.");
+            refreshBotTradeButton();
+            return;
+        }
+
+        CompletableFuture
+                .supplyAsync(() -> {
+                    List<CompletableFuture<BotRuntimeStartResult>> futures = sessions.stream()
+                            .map(session -> CompletableFuture.supplyAsync(() -> startBotRuntimeForExchange(session)))
+                            .toList();
+
+                    List<BotRuntimeStartResult> results = futures.stream()
+                            .map(CompletableFuture::join)
+                            .filter(Objects::nonNull)
+                            .toList();
+
+                    if (results.isEmpty()) {
+                        throw new IllegalStateException(
+                                "No connected exchanges had tradable symbols for bot trading.");
+                    }
+
+                    return results;
+                }, botOperationExecutor)
+                .thenAccept(results -> runOnFx(() -> {
+                    botTradingEnabled = true;
+                    boolean currentExchangeStarted = results.stream()
+                            .anyMatch(result -> isCurrentExchangeRuntime(result.runtimeKey()));
+                    if (currentExchangeStarted) {
+                        withActiveChart(chart -> chart.setAutoTradeEnabled(true));
+                    }
+
+                    int totalSymbols = results.stream().mapToInt(BotRuntimeStartResult::symbolCount).sum();
+                    appendAgentActivity("SystemCore bots enabled across " + results.size()
+                            + " connected exchange(s); streaming " + totalSymbols + " tradable symbol(s).");
+                    refreshBotTradeButton();
+                    saveAppState();
+                }))
+                .exceptionally(exception -> {
+                    Throwable root = unwrapCompletionException(exception);
+                    log.error("Failed to start multi-exchange bot trading", exception);
+                    runOnFx(() -> showWarning("Bot Trading", "%s".formatted(rootMessage(root))));
+                    return null;
+                })
+                .whenComplete((unused, exception) -> runOnFx(() -> {
+                    botTradingOperationInFlight.set(false);
+                    botTradeButton.setDisable(false);
+                    refreshBotTradeButton();
+                }));
+    }
+
     private List<TradePair> prepareLiveStrategyAssignments(List<TradePair> symbols) {
+        return prepareLiveStrategyAssignments(exchange, symbols);
+    }
+
+    private List<TradePair> prepareLiveStrategyAssignments(Exchange targetExchange, List<TradePair> symbols) {
         if (symbols == null || symbols.isEmpty()) {
             return List.of();
         }
-        if (exchange == null) {
+        if (targetExchange == null) {
             throw new IllegalStateException("Exchange is not available for strategy backtesting.");
         }
 
@@ -10731,7 +10900,8 @@ public class TradingDesk extends BorderPane {
                 continue;
             }
 
-            Map<Timeframe, List<CandleData>> candlesByTimeframe = loadBacktestCandlesForAllTimeframes(symbol);
+            Map<Timeframe, List<CandleData>> candlesByTimeframe = loadBacktestCandlesForAllTimeframes(targetExchange,
+                    symbol);
             if (candlesByTimeframe.isEmpty()) {
                 String message = "No historical candles available for " + symbolText;
                 log.warn("Skipping live bot symbol: {}", message);
@@ -10862,11 +11032,44 @@ public class TradingDesk extends BorderPane {
         return "No symbols are currently bot tradable for the selected scope. " + details;
     }
 
-    private Map<Timeframe, List<CandleData>> loadBacktestCandlesForAllTimeframes(TradePair symbol) {
+    private Map<Timeframe, List<CandleData>> loadBacktestCandlesForAllTimeframes(Exchange targetExchange,
+            TradePair symbol) {
+        if (targetExchange == null) {
+            return Map.of();
+        }
+
+        Exchange resolvedExchange = Objects.requireNonNull(targetExchange, "targetExchange");
         Map<Timeframe, List<CandleData>> candlesByTimeframe = new LinkedHashMap<>();
-        for (Timeframe timeframe : liveStrategyAssignmentTimeframes()) {
+        int maxTimeframes = Math.max(1, AppConfig.getInt("strategy.lab.assignment.maxTimeframes", 2));
+        List<Timeframe> preferred = List.of(Timeframe.H1, Timeframe.H4, Timeframe.M15, Timeframe.D1);
+        List<Timeframe> available = resolvedExchange.getSupportedTimeframes() != null
+                ? new ArrayList<>(resolvedExchange.getSupportedTimeframes())
+                : new ArrayList<>(MT5_TIMEFRAMES);
+        LinkedHashSet<Timeframe> selectedTimeframes = new LinkedHashSet<>();
+        Timeframe current = timeframeSelector.getValue();
+        if (current != null && available.contains(current) && !current.isLongTerm()) {
+            selectedTimeframes.add(current);
+        }
+        for (Timeframe timeframe : preferred) {
+            if (available.contains(timeframe)) {
+                selectedTimeframes.add(timeframe);
+            }
+            if (selectedTimeframes.size() >= maxTimeframes) {
+                break;
+            }
+        }
+        if (selectedTimeframes.isEmpty()) {
+            for (Timeframe timeframe : available) {
+                if (timeframe != null && !timeframe.isLongTerm()) {
+                    selectedTimeframes.add(timeframe);
+                    break;
+                }
+            }
+        }
+
+        for (Timeframe timeframe : List.copyOf(selectedTimeframes)) {
             try {
-                CandleDataSupplier supplier = exchange.getCandleDataSupplier(timeframe.getSeconds(), symbol);
+                CandleDataSupplier supplier = resolvedExchange.getCandleDataSupplier(timeframe.getSeconds(), symbol);
                 if (supplier == null) {
                     log.debug("No candle supplier for {} {}", symbol.toString('/'), timeframe.getCode());
                     continue;
@@ -10895,34 +11098,180 @@ public class TradingDesk extends BorderPane {
         return candlesByTimeframe;
     }
 
-    private List<Timeframe> liveStrategyAssignmentTimeframes() {
-        int maxTimeframes = Math.max(1, AppConfig.getInt("strategy.lab.assignment.maxTimeframes", 2));
-        List<Timeframe> preferred = List.of(Timeframe.H1, Timeframe.H4, Timeframe.M15, Timeframe.D1);
-        List<Timeframe> available = exchange != null && exchange.getSupportedTimeframes() != null
-                ? new ArrayList<>(exchange.getSupportedTimeframes())
-                : new ArrayList<>(MT5_TIMEFRAMES);
-        LinkedHashSet<Timeframe> selected = new LinkedHashSet<>();
-        Timeframe current = timeframeSelector.getValue();
-        if (current != null && available.contains(current) && !current.isLongTerm()) {
-            selected.add(current);
+    private boolean isAllConnectedExchangesScope() {
+        return "All Connected Exchanges".equalsIgnoreCase(safe(botSymbolScopeSelector.getValue()));
+    }
+
+    private boolean isCurrentExchangeRuntime(String runtimeKey) {
+        return Objects.equals(runtimeKey, botRuntimeKey(exchange));
+    }
+
+    private String botRuntimeKey(Exchange targetExchange) {
+        if (targetExchange == null) {
+            return "";
         }
-        for (Timeframe timeframe : preferred) {
-            if (available.contains(timeframe)) {
-                selected.add(timeframe);
-            }
-            if (selected.size() >= maxTimeframes) {
-                break;
-            }
+        return safe(
+                firstNonBlank(targetExchange.getExchangeId(), targetExchange.getName(), targetExchange.getDisplayName(),
+                        targetExchange.getClass().getSimpleName()))
+                .toUpperCase(Locale.ROOT);
+    }
+
+    private List<BrokerSession> connectedBotSessions() {
+        return brokerSessions.entrySet().stream()
+                .map(Map.Entry::getValue)
+                .filter(Objects::nonNull)
+                .filter(BrokerSession::accessGranted)
+                .filter(session -> session.exchange() != null)
+                .filter(session -> Boolean.TRUE.equals(session.exchange().isConnected()))
+                .filter(session -> Boolean.TRUE.equals(session.exchange().canSubmitOrders()))
+                .toList();
+    }
+
+    private List<TradePair> connectedBotSymbols() {
+        return connectedBotSessions().stream()
+                .map(BrokerSession::exchange)
+                .filter(Objects::nonNull)
+                .flatMap(sessionExchange -> loadBotSymbolsForExchange(sessionExchange).stream())
+                .filter(Objects::nonNull)
+                .filter(this::isAllowedMarketWatchSymbol)
+                .distinct()
+                .toList();
+    }
+
+    private List<TradePair> loadBotSymbolsForExchange(Exchange targetExchange) {
+        if (targetExchange == null) {
+            return List.of();
         }
-        if (selected.isEmpty()) {
-            for (Timeframe timeframe : available) {
-                if (timeframe != null && !timeframe.isLongTerm()) {
-                    selected.add(timeframe);
-                    break;
+
+        try {
+            List<TradePair> symbols = targetExchange.getTradePairSymbol();
+            if (symbols != null && !symbols.isEmpty()) {
+                return symbols;
+            }
+        } catch (Exception exception) {
+            log.debug("Unable to load trade symbols for {}", targetExchange.getDisplayName(), exception);
+        }
+
+        try {
+            List<TradePair> tradablePairs = targetExchange.getTradablePairs();
+            return tradablePairs == null ? List.of() : tradablePairs;
+        } catch (Exception exception) {
+            log.debug("Unable to load tradable pairs for {}", targetExchange.getDisplayName(), exception);
+            return List.of();
+        }
+    }
+
+    private List<TradePair> filterBotTradableSymbolsForExchange(Exchange targetExchange, List<TradePair> rawSymbols) {
+        if (targetExchange == null || rawSymbols == null || rawSymbols.isEmpty()) {
+            return List.of();
+        }
+
+        if (Objects.equals(targetExchange, exchange)) {
+            return filterBotTradableSymbols(rawSymbols);
+        }
+
+        UniversalTradabilityService tradabilityService = new UniversalTradabilityService(targetExchange,
+                marketDataEngine);
+        Map<String, SymbolTradability> localCache = new HashMap<>();
+        List<TradePair> allowed = new ArrayList<>();
+
+        for (TradePair pair : rawSymbols) {
+            if (pair == null) {
+                continue;
+            }
+
+            String cacheKey = botRuntimeKey(targetExchange) + ":" + symbolKey(pair);
+            SymbolTradability cached = localCache.get(cacheKey);
+            if (cached != null) {
+                if (cached.canBeUsedForBotTrading()) {
+                    allowed.add(pair);
                 }
+                continue;
+            }
+
+            try {
+                SymbolTradability status = tradabilityService.getTradability(pair, TradabilityScope.BOT_TRADING, true)
+                        .get(10, TimeUnit.SECONDS);
+                if (status != null) {
+                    localCache.put(cacheKey, status);
+                    if (status.canBeUsedForBotTrading()) {
+                        allowed.add(status.tradePair());
+                    }
+                }
+            } catch (Exception exception) {
+                log.debug("Unable to validate {} for multi-exchange bot trading: {}",
+                        pair.toString('/'), rootMessage(exception));
+                allowed.add(pair);
             }
         }
-        return List.copyOf(selected);
+
+        return allowed;
+    }
+
+    private List<TradePair> resolveStreamingSymbolsForExchange(Exchange targetExchange,
+            List<TradePair> selectedSymbols) {
+        if (targetExchange == null || Objects.equals(targetExchange, exchange)) {
+            return resolveStreamingSymbolsForEverythingMode(selectedSymbols);
+        }
+        return selectedSymbols == null ? List.of() : selectedSymbols;
+    }
+
+    private BotRuntimeStartResult startBotRuntimeForExchange(BrokerSession session) {
+        if (session == null || session.exchange() == null || !session.accessGranted()) {
+            return null;
+        }
+
+        Exchange sessionExchange = session.exchange();
+        List<TradePair> requestedSymbols = filterReservedMarketWatchSymbols(loadBotSymbolsForExchange(sessionExchange));
+        requestedSymbols = filterBotTradableSymbolsForExchange(sessionExchange, requestedSymbols);
+
+        if (requestedSymbols.isEmpty()) {
+            log.info("Skipping {} for multi-exchange bot trading: no tradable symbols",
+                    sessionExchange.getDisplayName());
+            return null;
+        }
+
+        List<TradePair> assignedSymbols = prepareLiveStrategyAssignments(sessionExchange, requestedSymbols);
+        if (assignedSymbols.isEmpty()) {
+            log.info("Skipping {} for multi-exchange bot trading: no strategy assignments",
+                    sessionExchange.getDisplayName());
+            return null;
+        }
+
+        List<TradePair> streamingSymbols = resolveStreamingSymbolsForExchange(sessionExchange, assignedSymbols);
+        if (streamingSymbols.isEmpty()) {
+            streamingSymbols = assignedSymbols;
+        }
+
+        TradePair primarySymbol = assignedSymbols.getFirst();
+        String runtimeKey = botRuntimeKey(sessionExchange);
+
+        if (isCurrentExchangeRuntime(runtimeKey)) {
+            ensureSystemCoreStarted(primarySymbol);
+            if (systemCore != null) {
+                systemCore.setAutoTradingEnabled(true);
+                systemCore.startStreaming(streamingSymbols, SystemCore.StreamingMode.SAFE_DEFAULT);
+            }
+        } else {
+            SystemCore runtimeCore;
+            try {
+                runtimeCore = createSystemCore(sessionExchange);
+            } catch (SQLException | ClassNotFoundException e) {
+                throw new RuntimeException(
+                        "Failed to initialize trading system for %s".formatted(sessionExchange.getDisplayName()), e);
+            }
+
+            botSystemCores.put(runtimeKey, runtimeCore);
+            TradingService runtimeTradingService = new TradingService(runtimeCore, this.tradeService, this.orderService,
+                    this.currencyService);
+            runtimeCore.start(runtimeTradingService, primarySymbol);
+            runtimeCore.getSmartBot().setSelectedTradePair(primarySymbol);
+            runtimeCore.getSmartBot().setAiReasoningEnabled(true);
+            runtimeCore.setAutoTradingEnabled(true);
+            runtimeCore.startStreaming(streamingSymbols, SystemCore.StreamingMode.SAFE_DEFAULT);
+        }
+
+        return new BotRuntimeStartResult(runtimeKey, sessionExchange.getDisplayName(), streamingSymbols.size());
     }
 
     private void stopBotTradingAsync() {
@@ -10946,6 +11295,16 @@ public class TradingDesk extends BorderPane {
                         systemCore.setAutoTradingEnabled(false);
                         systemCore.stopStreaming();
                     }
+                    for (SystemCore runtimeCore : List.copyOf(botSystemCores.values())) {
+                        try {
+                            runtimeCore.setAutoTradingEnabled(false);
+                            runtimeCore.stopStreaming();
+                            runtimeCore.stop();
+                        } catch (Exception exception) {
+                            log.debug("Failed to stop multi-exchange bot runtime", exception);
+                        }
+                    }
+                    botSystemCores.clear();
                 }, botOperationExecutor)
                 .thenRun(() -> runOnFx(() -> {
                     botTradingEnabled = false;

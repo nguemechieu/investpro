@@ -1,5 +1,7 @@
 package org.investpro.exchange.coinbase;
 
+import org.jspecify.annotations.NonNull;
+
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -188,7 +190,7 @@ public class CoinbaseRestRateLimiter {
 		nextAllowedAtMs = now + MIN_SPACING_MS;
 	}
 
-	private static String queryParam(URI uri, String key) {
+	private static String queryParam(@NonNull URI uri, String key) {
 		String query = uri.getRawQuery();
 		if (query == null || query.isBlank()) {
 			return null;

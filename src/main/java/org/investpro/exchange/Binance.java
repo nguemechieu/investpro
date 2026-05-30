@@ -987,7 +987,8 @@ public class Binance extends Exchange {
     @Override
     public CompletableFuture<SymbolTradability> fetchTradabilityStatus(TradePair pair) {
         if (pair == null) {
-            return CompletableFuture.completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+            return CompletableFuture
+                    .completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
         }
 
         return CompletableFuture.supplyAsync(() -> {
@@ -1086,12 +1087,15 @@ public class Binance extends Exchange {
             status = TradabilityStatus.MIN_SIZE_INVALID;
         }
 
-        boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE && canSubmitOrders();
-        if (!canSubmitOrders() && status == TradabilityStatus.FULLY_TRADABLE) {
-            status = TradabilityStatus.API_KEY_RESTRICTED;
+        boolean canSubmit = canSubmitOrders();
+        boolean hasOrderAuthorization = isPaperTrading() || supportsLiveTrading();
+        boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE && canSubmit;
+        if (!canSubmit && status == TradabilityStatus.FULLY_TRADABLE) {
+            status = hasOrderAuthorization ? TradabilityStatus.INACTIVE : TradabilityStatus.API_KEY_RESTRICTED;
         }
 
-        boolean marginAllowed = permissions.contains("MARGIN") || symbolNode.path("isMarginTradingAllowed").asBoolean(false);
+        boolean marginAllowed = permissions.contains("MARGIN")
+                || symbolNode.path("isMarginTradingAllowed").asBoolean(false);
 
         return new SymbolTradability(
                 getExchangeId(),
@@ -1370,7 +1374,7 @@ public class Binance extends Exchange {
             order.setOrderId(node.path("orderId").asText());
 
             String symbol = node.path("symbol").asText();
-            TradePair tradePair = tradePairFromSymbol(symbol,"USDT");
+            TradePair tradePair = tradePairFromSymbol(symbol, "USDT");
             order.setTradePair(tradePair);
 
             String side = node.path("side").asText();
@@ -1576,7 +1580,6 @@ public class Binance extends Exchange {
         return body;
     }
 
-
     @Contract("null, _ -> fail")
     private static @NotNull TradePair tradePairFromSymbol(String symbol, String defaultQuote) {
         if (symbol == null || symbol.isBlank()) {
@@ -1586,7 +1589,6 @@ public class Binance extends Exchange {
         String normalized = symbol.trim().replace("-", "/").toUpperCase(java.util.Locale.ROOT);
         String base;
         String quote;
-
 
         if (normalized.contains("/")) {
             String[] parts = normalized.split("/", 2);

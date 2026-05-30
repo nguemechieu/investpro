@@ -95,10 +95,11 @@
 .label:hover {
     -fx-background-color: #e0e0e0;
 }
-		-fx-background-color:derive(#2959ea,20.0%);
-		-fx-opacity:0.9;
 
-		-fx-border-radius: 10.0;
+#settingTabPane .tab:selected {
+    -fx-background-color: derive(#2959ea,20.0%);
+    -fx-opacity: 0.9;
+    -fx-border-radius: 10.0;
 }
  
 #settingTabPane .tab:hover{

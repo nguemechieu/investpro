@@ -1,5 +1,6 @@
 package org.investpro.decision;
 
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.execution.TradeCostEstimator;
 import org.investpro.execution.TradePlanGenerator;
@@ -32,6 +33,7 @@ import java.util.List;
  * Service-driven pre-trade decision pipeline.
  * Signal and decision outcomes are not trades. Only broker-confirmed fills are trades.
  */
+@Data
 @Slf4j
 public class BotTradeDecisionEngine {
 
@@ -151,7 +153,6 @@ public class BotTradeDecisionEngine {
                     reasons.add("Indicator setup fit quality: excellent");
                 }
             } else {
-                setupSource = SetupSource.NONE;
                 if (indicatorSetupScore.isPoorFit()) {
                     warnings.add("Indicator setup fit quality is poor for the current market context");
                 }
@@ -224,7 +225,7 @@ public class BotTradeDecisionEngine {
         String fullAnalysisSummary = buildFullAnalysisSummary(
                 context.tradePair(), context.side(), regimeAnalysis.regime(), assetType,
                 setupSource, selectedStrategyName, bestStrategyScore, indicatorSetupScore,
-                costEstimate, expectation, tradePlan, reasons, warnings, blockers);
+                costEstimate, expectation, tradePlan, warnings, blockers);
 
         return new BotTradeDecision(
                 context.tradePair(),
@@ -374,7 +375,6 @@ public class BotTradeDecisionEngine {
             @NotNull TradeCostEstimate costEstimate,
             @NotNull TradeExpectation expectation,
             @NotNull TradePlan tradePlan,
-            @NotNull List<String> reasons,
             @NotNull List<String> warnings,
             @NotNull List<String> blockers) {
 

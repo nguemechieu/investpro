@@ -163,24 +163,22 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
         String suffix = "";
         String decimalPointSeparator = "";
 
-        // Build currency prefix or suffix
-        switch (currencyPosition) {
-            case BEFORE_AMOUNT:
-                prefix = defaultMoney.currency().getCode();
-                if (currencyStyle == CurrencyStyle.SYMBOL && defaultMoney.currency().getSymbol() != null
-                        && !defaultMoney.currency().getSymbol().isEmpty()) {
-                    prefix = defaultMoney.currency().getSymbol();
-                }
-                break;
-            case AFTER_AMOUNT:
-                suffix = defaultMoney.currency().getCode();
-                if (currencyStyle == CurrencyStyle.SYMBOL && defaultMoney.currency().getSymbol() != null
-                        && !defaultMoney.currency().getSymbol().isEmpty()) {
-                    suffix = defaultMoney.currency().getSymbol();
-                }
-                break;
-            default:
-                throw new IllegalArgumentException("unknown currency position: " + currencyPosition);
+        // Build currency prefix or suffix without an enum switch so we do not
+        // rely on a synthetic switch-map inner class at runtime.
+        if (currencyPosition == CurrencyPosition.BEFORE_AMOUNT) {
+            prefix = defaultMoney.currency().getCode();
+            if (currencyStyle == CurrencyStyle.SYMBOL && defaultMoney.currency().getSymbol() != null
+                    && !defaultMoney.currency().getSymbol().isEmpty()) {
+                prefix = defaultMoney.currency().getSymbol();
+            }
+        } else if (currencyPosition == CurrencyPosition.AFTER_AMOUNT) {
+            suffix = defaultMoney.currency().getCode();
+            if (currencyStyle == CurrencyStyle.SYMBOL && defaultMoney.currency().getSymbol() != null
+                    && !defaultMoney.currency().getSymbol().isEmpty()) {
+                suffix = defaultMoney.currency().getSymbol();
+            }
+        } else {
+            throw new IllegalArgumentException("unknown currency position: " + currencyPosition);
         }
 
         // Calculate number of digits before decimal point
@@ -353,17 +351,27 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
      * @return the pattern string
      */
     private String buildPattern(String number, String prefix, String suffix) {
+        String quotedPrefix = quotePatternLiteral(prefix);
+        String quotedSuffix = quotePatternLiteral(suffix);
+
         if (prefix.isEmpty() && suffix.isEmpty()) {
             return number;
         } else if (prefix.isEmpty()) {
             return putSpaceBetweenCurrencyAndAmount
-                    ? number + ' ' + suffix
-                    : number + suffix;
+                    ? number + " " + quotedSuffix
+                    : number + quotedSuffix;
         } else {
             return putSpaceBetweenCurrencyAndAmount
-                    ? prefix + ' ' + number
-                    : prefix + number;
+                    ? quotedPrefix + " " + number
+                    : quotedPrefix + number;
         }
+    }
+
+    private String quotePatternLiteral(String value) {
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        return "'" + value.replace("'", "''") + "'";
     }
 
     /**

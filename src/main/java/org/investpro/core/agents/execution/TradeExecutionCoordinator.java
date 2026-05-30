@@ -15,6 +15,7 @@ import org.investpro.core.execution.SymbolTradeLockManager;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.Position;
+import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.TradePair;
 import org.investpro.risk.RiskDecision;
 import org.investpro.risk.RiskManagementSystem;
@@ -156,11 +157,21 @@ public class TradeExecutionCoordinator {
 
             if (riskContext.getSymbol() != null
                     && riskContext.getSymbol().getTradingSession() != null
-                    && riskContext.getSymbol().isTradableNow()) {
+                    && !riskContext.getSymbol().isTradableNow()) {
                 String message = "Trading session is not open: " + riskContext.getSymbol().getTradingSessionStatus();
                 log.warn("TradeExecutionCoordinator: Rejecting locally before live order. symbol={} {}",
                         riskContext.getSymbol(), message);
                 return completed(TradeExecutionResult.rejected(message));
+            }
+
+            if (signal != null && systemCore != null && systemCore.getSignalToDecisionFilter() != null) {
+                Ticker ticker = buildTickerSnapshot(signal, riskContext);
+                boolean approvedByDecisionFilter = systemCore.getSignalToDecisionFilter()
+                        .shouldExecuteSignal(signal, riskContext, ticker);
+                if (!approvedByDecisionFilter) {
+                    return completed(TradeExecutionResult.rejected(
+                            "Signal blocked by decision filter (shouldExecuteSignal)."));
+                }
             }
 
             return executeWithTransitionGuards(signal, side, riskContext);
@@ -169,6 +180,22 @@ public class TradeExecutionCoordinator {
             log.error("TradeExecutionCoordinator: Unexpected error while processing signal", exception);
             return completed(TradeExecutionResult.failed(rootMessage(exception)));
         }
+    }
+
+    private @NotNull Ticker buildTickerSnapshot(
+            @NotNull StrategySignal signal,
+            @NotNull TradeRiskContext riskContext) {
+        double entryPrice = signal.getEntryPrice() > 0.0 ? signal.getEntryPrice() : riskContext.getEntryPrice();
+        if (!Double.isFinite(entryPrice) || entryPrice <= 0.0) {
+            entryPrice = 0.0;
+        }
+
+        Ticker ticker = new Ticker(entryPrice, entryPrice, entryPrice, 0.0, System.currentTimeMillis());
+        TradePair pair = riskContext.getSymbol();
+        if (pair != null) {
+            ticker.setTradePair(pair);
+        }
+        return ticker;
     }
 
     private CompletableFuture<TradeExecutionResult> executeWithTransitionGuards(
@@ -264,8 +291,8 @@ public class TradeExecutionCoordinator {
         try {
             TradeRiskContext validatedContext = applyPreTradeValidation(side, riskContext, symbolText);
             if (validatedContext == null) {
-            return completed(TradeExecutionResult.rejected(
-                "Pre-trade validation rejected execution for " + symbolText));
+                return completed(TradeExecutionResult.rejected(
+                        "Pre-trade validation rejected execution for " + symbolText));
             }
 
             RiskDecision riskDecision = riskManagementSystem.evaluateTrade(validatedContext);
@@ -277,7 +304,7 @@ public class TradeExecutionCoordinator {
 
             AiTradeReviewRequest aiRequest = AiTradeReviewRequest.from(
                     side,
-                validatedContext,
+                    validatedContext,
                     riskDecision);
 
             AiTradeReviewResponse aiResponse = aiReasoningService.reviewTrade(aiRequest);
@@ -292,8 +319,8 @@ public class TradeExecutionCoordinator {
 
             if (finalDecision.isApproved()) {
                 CompletableFuture<ExecutionEngine.PositionExecutionResult> executionFuture = signal != null
-                    ? executionEngine.executeApprovedOrder(signal, validatedContext, finalDecision)
-                    : executionEngine.executeApprovedOrder(side, validatedContext, finalDecision);
+                        ? executionEngine.executeApprovedOrder(signal, validatedContext, finalDecision)
+                        : executionEngine.executeApprovedOrder(side, validatedContext, finalDecision);
 
                 return executionFuture
                         .thenApply(executionResult -> {
@@ -400,8 +427,7 @@ public class TradeExecutionCoordinator {
                 requestedPrice,
                 Math.max(1.0, riskContext.getRequestedLeverage()),
                 !aiEnabled,
-                !liveTrading
-        );
+                !liveTrading);
     }
 
     private PreTradeValidationEngine.TradingContext toTradingContext(@NotNull TradeRiskContext riskContext) {
@@ -437,12 +463,14 @@ public class TradeExecutionCoordinator {
 
                     @Override
                     public double equity() {
-                        return firstPositive(riskContext.getAccountEquity(), account == null ? 0.0 : account.getEquity());
+                        return firstPositive(riskContext.getAccountEquity(),
+                                account == null ? 0.0 : account.getEquity());
                     }
 
                     @Override
                     public double freeMargin() {
-                        return firstPositive(riskContext.getFreeMargin(), account == null ? 0.0 : account.getFreeMargin());
+                        return firstPositive(riskContext.getFreeMargin(),
+                                account == null ? 0.0 : account.getFreeMargin());
                     }
 
                     @Override
@@ -519,12 +547,14 @@ public class TradeExecutionCoordinator {
                         return new PreTradeValidationEngine.QuoteView() {
                             @Override
                             public double bid() {
-                                return firstPositive(riskContext.getBidPrice(), riskContext.getCurrentPrice(), riskContext.getEntryPrice());
+                                return firstPositive(riskContext.getBidPrice(), riskContext.getCurrentPrice(),
+                                        riskContext.getEntryPrice());
                             }
 
                             @Override
                             public double ask() {
-                                return firstPositive(riskContext.getAskPrice(), riskContext.getCurrentPrice(), riskContext.getEntryPrice());
+                                return firstPositive(riskContext.getAskPrice(), riskContext.getCurrentPrice(),
+                                        riskContext.getEntryPrice());
                             }
 
                             @Override
@@ -797,8 +827,7 @@ public class TradeExecutionCoordinator {
                 side,
                 finalDecision.getSummary(),
                 finalDecision.getExplanation(),
-                riskDecision,aiResponse
-                );
+                riskDecision, aiResponse);
 
         /*
          * Later:

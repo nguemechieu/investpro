@@ -206,8 +206,10 @@ public class MarketDataEngine {
      */
     public boolean isTradableNow(@NotNull TradePair tradePair) {
         var metadata = instrumentRegistry.get(tradePair);
-        // Assume tradable if not registered
-        return metadata.map(tradingSessionService::isTradableNow).orElse(true);
+        // Assume tradable if not registered; crypto stays 24/7 even when session
+        // metadata is incomplete.
+        return metadata.map(state -> tradingSessionService.isTradableNow(state) || tradePair.isTradableNow())
+                .orElse(tradePair.isTradableNow());
 
     }
 

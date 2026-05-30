@@ -104,7 +104,7 @@ import static org.investpro.ui.charts.ChartColors.PLACE_HOLDER_FILL_COLOR;
 @Getter
 @Setter
 @Slf4j
-@SuppressWarnings({"unused", "SameParameterValue"})
+@SuppressWarnings({ "unused", "SameParameterValue" })
 public class CandleStickChart extends Region {
     private static final DateTimeFormatter SCREENSHOT_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
     private static final DateTimeFormatter CROSSHAIR_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
@@ -128,6 +128,7 @@ public class CandleStickChart extends Region {
 
     private static final double VOLUME_AREA_RATIO = 0.20;
     private static final double PRICE_PADDING_RATIO = 0.12;
+    private static final double MAX_LIVE_TRADE_PRICE_DEVIATION_RATIO = 0.12;
     private static final long LOADING_TIMEOUT_MS = 30_000L;
     private static final int MAX_PERSISTED_DRAWINGS = 250;
     private static final String DRAWING_FORMAT_VERSION = "v1";
@@ -171,7 +172,8 @@ public class CandleStickChart extends Region {
     private final Text loadingStatusText = new Text("Loading...");
     private final VBox loadingIndicatorContainer = new VBox(8, progressIndicator, loadingStatusText);
     private final ToggleGroup leftToolToggleGroup = new ToggleGroup();
-    private final EnumMap<ChartInteractionTool, ToggleButton> leftToolButtons = new EnumMap<>(ChartInteractionTool.class);
+    private final EnumMap<ChartInteractionTool, ToggleButton> leftToolButtons = new EnumMap<>(
+            ChartInteractionTool.class);
     private ScrollPane leftToolPalette;
 
     private final AtomicBoolean loading = new AtomicBoolean(false);
@@ -358,7 +360,8 @@ public class CandleStickChart extends Region {
                     chartOptions.isVerticalGridLinesVisible()));
             chartOptions.setHorizontalGridLinesVisible(CHART_PREFERENCES.getBoolean(prefKey("grid.horizontal"),
                     chartOptions.isHorizontalGridLinesVisible()));
-            chartOptions.setShowVolume(CHART_PREFERENCES.getBoolean(prefKey("showVolume"), chartOptions.isShowVolume()));
+            chartOptions
+                    .setShowVolume(CHART_PREFERENCES.getBoolean(prefKey("showVolume"), chartOptions.isShowVolume()));
             chartOptions.setAlignOpenClose(
                     CHART_PREFERENCES.getBoolean(prefKey("alignOpenClose"), chartOptions.isAlignOpenClose()));
 
@@ -367,7 +370,8 @@ public class CandleStickChart extends Region {
             showChartEvents = CHART_PREFERENCES.getBoolean(prefKey("showChartEvents"), showChartEvents);
             showTradeOverlay = CHART_PREFERENCES.getBoolean(prefKey("showTradeOverlay"), showTradeOverlay);
             autoTradeEnabled = CHART_PREFERENCES.getBoolean(prefKey("autoTrade"), autoTradeEnabled);
-            backgroundImageOpacity = clamp(CHART_PREFERENCES.getDouble(prefKey("backgroundOpacity"), backgroundImageOpacity),
+            backgroundImageOpacity = clamp(
+                    CHART_PREFERENCES.getDouble(prefKey("backgroundOpacity"), backgroundImageOpacity),
                     0.0,
                     1.0);
 
@@ -376,7 +380,8 @@ public class CandleStickChart extends Region {
                     MIN_VISIBLE_CANDLES,
                     MAX_VISIBLE_CANDLES);
 
-            String interactionTool = CHART_PREFERENCES.get(prefKey("interactionTool"), ChartInteractionTool.CURSOR.name());
+            String interactionTool = CHART_PREFERENCES.get(prefKey("interactionTool"),
+                    ChartInteractionTool.CURSOR.name());
             try {
                 activeInteractionTool = ChartInteractionTool.valueOf(interactionTool);
             } catch (IllegalArgumentException ignored) {
@@ -470,7 +475,7 @@ public class CandleStickChart extends Region {
 
     private String serializeDrawing(ChartDrawing drawing) {
         return DRAWING_FORMAT_VERSION
-            + "|" + drawing.type().name()
+                + "|" + drawing.type().name()
                 + "|" + drawing.startTime()
                 + "|" + drawing.startPrice()
                 + "|" + drawing.endTime()
@@ -518,12 +523,13 @@ public class CandleStickChart extends Region {
         setFocusTraversable(true);
         setMinSize(MIN_CHART_WIDTH, MIN_CHART_HEIGHT);
     }
+
     private void configureAxes() {
         String axisStyle = """
-            -fx-background-color: #0f172a;
-            -fx-border-color: #334155;
-            -fx-tick-label-fill: #cbd5e1;
-            """;
+                -fx-background-color: #0f172a;
+                -fx-border-color: #334155;
+                -fx-tick-label-fill: #cbd5e1;
+                """;
 
         Font axisFont = Font.font(FXUtils.getMonospacedFont(), 12);
 
@@ -574,19 +580,17 @@ public class CandleStickChart extends Region {
         extraAxis.setSide(Side.LEFT);
 
         xAxis.setTickLabelFormatter(
-                InstantAxisFormatter.of(DateTimeFormatter.ofPattern("MM-dd HH:mm"))
-        );
+                InstantAxisFormatter.of(DateTimeFormatter.ofPattern("MM-dd HH:mm")));
 
-        // Price axis: use instrument display precision so labels always match quoted decimals.
+        // Price axis: use instrument display precision so labels always match quoted
+        // decimals.
         yAxis.setTickLabelFormatter(
-                new MoneyAxisFormatter(tradePair.getCounterCurrency(), pricePrecision)
-        );
+                new MoneyAxisFormatter(tradePair.getCounterCurrency(), pricePrecision));
         yAxis.setPrecision(pricePrecision);
 
         // Extra (volume/base) axis: use base currency fractional digits.
         extraAxis.setTickLabelFormatter(
-                new MoneyAxisFormatter(tradePair.getCounterCurrency())
-        );
+                new MoneyAxisFormatter(tradePair.getCounterCurrency()));
 
         xAxis.setStyle(axisStyle);
         yAxis.setStyle(axisStyle);
@@ -607,7 +611,6 @@ public class CandleStickChart extends Region {
         yAxis.setTickLabelsVisible(true);
         yAxis.setTickMarkVisible(true);
         yAxis.setMinorTickVisible(false);
-
 
         extraAxis.setTickLabelsVisible(true);
         extraAxis.setTickMarkVisible(true);
@@ -649,15 +652,19 @@ public class CandleStickChart extends Region {
                 createToolAction("\u2573", "Crosshair", this::toggleCrosshair),
                 new Separator(),
                 createToolToggle("/", "Trendline", this::activateTrendlineTool, ChartInteractionTool.TRENDLINE),
-                createToolToggle("\u2500", "Horizontal Line", this::activateHorizontalLineTool, ChartInteractionTool.HORIZONTAL_LINE),
-                createToolToggle("\u2502", "Vertical Line", this::activateVerticalLineTool, ChartInteractionTool.VERTICAL_LINE),
+                createToolToggle("\u2500", "Horizontal Line", this::activateHorizontalLineTool,
+                        ChartInteractionTool.HORIZONTAL_LINE),
+                createToolToggle("\u2502", "Vertical Line", this::activateVerticalLineTool,
+                        ChartInteractionTool.VERTICAL_LINE),
                 createToolToggle("\u25ad", "Rectangle", this::activateRectangleTool, ChartInteractionTool.RECTANGLE),
                 createToolToggle("\u25b3", "Triangle", this::activateTriangleTool, ChartInteractionTool.TRIANGLE),
                 createToolToggle("\u25ef", "Circle", this::activateCircleTool, ChartInteractionTool.CIRCLE),
                 createToolToggle("F", "Fibonacci", this::activateFibonacciTool, ChartInteractionTool.FIBONACCI),
                 createToolToggle("M", "Measure", this::activateMeasureTool, ChartInteractionTool.MEASURE),
-                createToolToggle("R", "Long/Short (Risk/Reward)", this::activateRiskRewardTool, ChartInteractionTool.RISK_REWARD),
-                createToolToggle("E", "Erase Objects", this::activateEraseObjectsTool, ChartInteractionTool.ERASE_OBJECTS),
+                createToolToggle("R", "Long/Short (Risk/Reward)", this::activateRiskRewardTool,
+                        ChartInteractionTool.RISK_REWARD),
+                createToolToggle("E", "Erase Objects", this::activateEraseObjectsTool,
+                        ChartInteractionTool.ERASE_OBJECTS),
                 new Separator(),
                 createToolAction("T", "Text (coming soon)", () -> showTransientNotice("Text tool is coming soon")),
                 createToolAction("A", "Arrow (coming soon)", () -> showTransientNotice("Arrow tool is coming soon")),
@@ -665,8 +672,7 @@ public class CandleStickChart extends Region {
                 createToolAction("P", "Path (coming soon)", () -> showTransientNotice("Path tool is coming soon")),
                 createToolAction("G", "Magnet (coming soon)", () -> showTransientNotice("Magnet mode is coming soon")),
                 new Separator(),
-                createToolAction("C", "Clear drawings", this::clearChartDrawings)
-        );
+                createToolAction("C", "Clear drawings", this::clearChartDrawings));
 
         leftToolPalette = new ScrollPane(buttonColumn);
         leftToolPalette.setManaged(false);
@@ -825,9 +831,9 @@ public class CandleStickChart extends Region {
         });
         chartOptions.alignOpenCloseProperty().addListener((observable,
                 oldValue, newValue) -> {
-                    persistChartPreferences();
-                    requestChartRedraw();
-                });
+            persistChartPreferences();
+            requestChartRedraw();
+        });
     }
 
     private void initializeEventHandlers() {
@@ -1128,8 +1134,6 @@ public class CandleStickChart extends Region {
         showLoadingStatus("Refreshing chart...");
         startChartDataLoading();
     }
-
-
 
     private void setVisibleCandleCount(int requestedVisible) {
         int previousVisible = visibleCandles;
@@ -1634,9 +1638,11 @@ public class CandleStickChart extends Region {
             double y2 = priceToY(drawing.endPrice());
 
             switch (drawing.type()) {
-                case TRENDLINE -> graphicsContext.strokeLine(snapPixel(x1), snapPixel(y1), snapPixel(x2), snapPixel(y2));
+                case TRENDLINE ->
+                    graphicsContext.strokeLine(snapPixel(x1), snapPixel(y1), snapPixel(x2), snapPixel(y2));
                 case HORIZONTAL_LINE -> graphicsContext.strokeLine(0, snapPixel(y1), canvas.getWidth(), snapPixel(y1));
-                case VERTICAL_LINE -> graphicsContext.strokeLine(snapPixel(x1), HEADER_HEIGHT, snapPixel(x1), canvas.getHeight());
+                case VERTICAL_LINE ->
+                    graphicsContext.strokeLine(snapPixel(x1), HEADER_HEIGHT, snapPixel(x1), canvas.getHeight());
                 case RECTANGLE -> drawDrawingRectangle(x1, y1, x2, y2, drawing.color());
                 case TRIANGLE -> drawDrawingTriangle(x1, y1, x2, y2, drawing.color());
                 case CIRCLE -> drawDrawingCircle(x1, y1, x2, y2, drawing.color());
@@ -1702,8 +1708,8 @@ public class CandleStickChart extends Region {
         double bottom = Math.max(y1, y2);
         double apexX = left + ((right - left) / 2.0);
 
-        double[] xPoints = {apexX, right, left};
-        double[] yPoints = {top, bottom, bottom};
+        double[] xPoints = { apexX, right, left };
+        double[] yPoints = { top, bottom, bottom };
         graphicsContext.setGlobalAlpha(0.12);
         graphicsContext.setFill(color);
         graphicsContext.fillPolygon(xPoints, yPoints, 3);
@@ -1735,7 +1741,7 @@ public class CandleStickChart extends Region {
             return;
         }
 
-        double[] levels = {0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0};
+        double[] levels = { 0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0 };
         graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(), 10));
         graphicsContext.setTextAlign(TextAlignment.LEFT);
         graphicsContext.setTextBaseline(VPos.CENTER);
@@ -1807,9 +1813,11 @@ public class CandleStickChart extends Region {
                 Math.max(112, label.length() * 7.2), 22, Color.web("#e2e8f0"));
     }
 
-    private void drawLabelBadge(String text, double centerX, double centerY, double width, double height, Color accent) {
+    private void drawLabelBadge(String text, double centerX, double centerY, double width, double height,
+            Color accent) {
         double x = clamp(centerX - width / 2.0, 4, Math.max(4, canvas.getWidth() - width - 4));
-        double y = clamp(centerY - height / 2.0, HEADER_HEIGHT, Math.max(HEADER_HEIGHT, canvas.getHeight() - height - 4));
+        double y = clamp(centerY - height / 2.0, HEADER_HEIGHT,
+                Math.max(HEADER_HEIGHT, canvas.getHeight() - height - 4));
         graphicsContext.setFill(Color.rgb(2, 6, 23, 0.86));
         graphicsContext.fillRoundRect(x, y, width, height, 8, 8);
         graphicsContext.setStroke(accent);
@@ -2178,6 +2186,19 @@ public class CandleStickChart extends Region {
         int candleOpenTime = (int) ((trade.getTimestamp().getEpochSecond() / secondsPerCandle) * secondsPerCandle);
 
         CandleData existing = data.get(candleOpenTime);
+        if (existing == null) {
+            return;
+        }
+
+        double referencePrice = existing.closePrice() > 0.0 ? existing.closePrice() : existing.openPrice();
+        if (!isPlausibleLiveTradePrice(price, referencePrice)) {
+            log.debug("Ignoring implausible live trade price for {}. reference={} incoming={} candleOpenTime={}",
+                    tradePair,
+                    referencePrice,
+                    price,
+                    candleOpenTime);
+            return;
+        }
 
         CandleData candleData = new CandleData(
 
@@ -2192,6 +2213,17 @@ public class CandleStickChart extends Region {
                 false);
 
         data.put(candleOpenTime, candleData);
+    }
+
+    private boolean isPlausibleLiveTradePrice(double tradePrice, double referencePrice) {
+        if (!Double.isFinite(tradePrice) || tradePrice <= 0.0) {
+            return false;
+        }
+        if (!Double.isFinite(referencePrice) || referencePrice <= 0.0) {
+            return true;
+        }
+        double deviation = Math.abs(tradePrice - referencePrice) / referencePrice;
+        return deviation <= MAX_LIVE_TRADE_PRICE_DEVIATION_RATIO;
     }
 
     private void drawCurrentPriceBadge(CandleData candle) {
@@ -2931,20 +2963,20 @@ public class CandleStickChart extends Region {
             boolean preview) {
 
         private static ChartDrawing persisted(
-            ChartInteractionTool type,
-            long startTime,
-            double startPrice,
-            long endTime,
-            double endPrice) {
+                ChartInteractionTool type,
+                long startTime,
+                double startPrice,
+                long endTime,
+                double endPrice) {
             ChartInteractionTool safeType = type == null ? ChartInteractionTool.CURSOR : type;
             return new ChartDrawing(
-                safeType,
-                startTime,
-                startPrice,
-                endTime,
-                endPrice,
-                colorFor(safeType),
-                false);
+                    safeType,
+                    startTime,
+                    startPrice,
+                    endTime,
+                    endPrice,
+                    colorFor(safeType),
+                    false);
         }
 
         private static ChartDrawing from(
@@ -3000,8 +3032,10 @@ public class CandleStickChart extends Region {
             double newEndPrice = Math.max(0.0, endPrice + deltaPrice);
 
             return switch (type) {
-                case HORIZONTAL_LINE -> new ChartDrawing(type, startTime, newStartPrice, endTime, newStartPrice, color, preview);
-                case VERTICAL_LINE -> new ChartDrawing(type, newStartTime, startPrice, newStartTime, endPrice, color, preview);
+                case HORIZONTAL_LINE ->
+                    new ChartDrawing(type, startTime, newStartPrice, endTime, newStartPrice, color, preview);
+                case VERTICAL_LINE ->
+                    new ChartDrawing(type, newStartTime, startPrice, newStartTime, endPrice, color, preview);
                 default -> new ChartDrawing(type, newStartTime, newStartPrice, newEndTime, newEndPrice, color, preview);
             };
         }
@@ -3044,7 +3078,8 @@ public class CandleStickChart extends Region {
             return Math.hypot(px - projectionX, py - projectionY);
         }
 
-        private static boolean containsRectangle(double px, double py, double x1, double y1, double x2, double y2, double tolerance) {
+        private static boolean containsRectangle(double px, double py, double x1, double y1, double x2, double y2,
+                double tolerance) {
             double left = Math.min(x1, x2) - tolerance;
             double right = Math.max(x1, x2) + tolerance;
             double top = Math.min(y1, y2) - tolerance;
@@ -3139,7 +3174,6 @@ public class CandleStickChart extends Region {
             return false;
         }
     }
-
 
     @Data
     private static final class PriceLine {
@@ -3263,8 +3297,8 @@ public class CandleStickChart extends Region {
                     "VWAP",
                     "Clear Indicators");
 
-            javafx.scene.control.ChoiceDialog<String> dialog =
-                    new javafx.scene.control.ChoiceDialog<>("SMA 20", choices);
+            javafx.scene.control.ChoiceDialog<String> dialog = new javafx.scene.control.ChoiceDialog<>("SMA 20",
+                    choices);
             dialog.setTitle("Indicators");
             dialog.setHeaderText("Add chart indicator");
             dialog.setContentText("Indicator");
@@ -3309,7 +3343,7 @@ public class CandleStickChart extends Region {
         return List.copyOf(indicators);
     }
 
-    public void setBackgroundImage( Image image) {
+    public void setBackgroundImage(Image image) {
         this.backgroundImage = image;
         persistChartPreferences();
         requestChartRedraw();

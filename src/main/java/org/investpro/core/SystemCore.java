@@ -12,7 +12,6 @@ import org.investpro.core.agents.execution.ExecutionEngine;
 import org.investpro.core.agents.execution.SymbolExecutionFilter;
 import org.investpro.core.agents.execution.TradeExecutionCoordinator;
 import org.investpro.core.agents.modules.DefaultTradingAgentModule;
-import org.investpro.core.agents.symbol.SymbolAgent;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.core.bot.SmartBot;
 import org.investpro.core.controller.BotRuntimeController;
@@ -265,12 +264,12 @@ public class SystemCore {
 
             if (!openaiApiKey.isBlank()) {
                 telegramNotifier.initializeChatGPT(openaiApiKey);
-                log.info("\u2705 ChatGPT integration initialized for Telegram bot");
+                log.info("✅ ChatGPT integration initialized for Telegram bot");
             } else {
-                log.info("\u2139\uFE0F OpenAI API key not configured - ChatGPT features disabled");
+                log.info("ℹ️ OpenAI API key not configured - ChatGPT features disabled");
             }
 
-            log.info("\u2705 Telegram notifier configured");
+            log.info("✅ Telegram notifier configured");
         }
 
         // Initialize the system event recorder and monitor service after all components
@@ -296,18 +295,18 @@ public class SystemCore {
             if (Files.exists(configFile)) {
                 try (FileInputStream fis = new FileInputStream(configFile.toFile())) {
                     this.config.load(fis);
-                    String apiKeyStatus = this.config.getProperty("openai.api_key") != null ? "\u2705 (loaded)"
-                            : "\u274C (not found)";
-                    log.info("\u2705 Loaded configuration from {}", configFile.toAbsolutePath());
+                    String apiKeyStatus = this.config.getProperty("openai.api_key") != null ? "✅ (loaded)"
+                            : "❌ (not found)";
+                    log.info("✅ Loaded configuration from {}", configFile.toAbsolutePath());
                     log.info("   OpenAI API key status: {}", apiKeyStatus);
                 }
             } else {
-                log.info("\u2139\uFE0F Configuration file not found at {}; using defaults",
+                log.info("ℹ️ Configuration file not found at {}; using defaults",
                         configFile.toAbsolutePath());
                 log.info("   To persist settings, use /setapikey command or set OPENAI_API_KEY environment variable");
             }
         } catch (IOException e) {
-            log.warn("\u26A0\uFE0F Failed to load properties from file: {}", e.getMessage());
+            log.warn("⚠️ Failed to load properties from file: {}", e.getMessage());
         }
     }
 
@@ -323,18 +322,18 @@ public class SystemCore {
             // Create directory if it doesn't exist
             if (!Files.exists(configDir)) {
                 Files.createDirectories(configDir);
-                log.info("\u2705 Created configuration directory: {}", configDir.toAbsolutePath());
+                log.info("✅ Created configuration directory: {}", configDir.toAbsolutePath());
             }
 
             try (FileOutputStream fos = new FileOutputStream(configFile.toFile())) {
                 this.config.store(fos, "InvestPro Configuration - DO NOT EDIT MANUALLY");
-                log.info("\u2705 Saved configuration to {}", configFile.toAbsolutePath());
+                log.info("✅ Saved configuration to {}", configFile.toAbsolutePath());
                 log.info("   OpenAI API key: {}",
                         this.config.getProperty("openai.api_key") != null &&
-                                !this.config.getProperty("openai.api_key").isBlank() ? "\u2705 Set" : "\u274C Not set");
+                                !this.config.getProperty("openai.api_key").isBlank() ? "✅ Set" : "❌ Not set");
             }
         } catch (IOException e) {
-            log.warn("\u26A0\uFE0F Failed to save properties to file: {}", e.getMessage());
+            log.warn("⚠️ Failed to save properties to file: {}", e.getMessage());
         }
     }
 
@@ -350,14 +349,14 @@ public class SystemCore {
             // Reinitialize ChatGPT with the new key
             if (this.telegramNotifier != null) {
                 this.telegramNotifier.initializeChatGPT(apiKey);
-                log.info("\u2705 ChatGPT reinitialized with new API key");
+                log.info("✅ ChatGPT reinitialized with new API key");
             } else {
-                log.warn("\u26A0\uFE0F TelegramNotifier not initialized; unable to reinitialize ChatGPT");
+                log.warn("⚠️ TelegramNotifier not initialized; unable to reinitialize ChatGPT");
             }
 
-            log.info("\u2705 OpenAI API key configured and persisted");
+            log.info("✅ OpenAI API key configured and persisted");
         } else {
-            log.warn("\u26A0\uFE0F Invalid API key provided (empty or null)");
+            log.warn("⚠️ Invalid API key provided (empty or null)");
         }
     }
 
@@ -471,13 +470,13 @@ public class SystemCore {
         // Wire Symbol Agent Updater to SmartBot's event bus
         if (symbolAgentUpdater != null) {
             symbolAgentUpdater.start();
-            log.info("\u2705 Symbol agent updater wired to SmartBot - Real-time UI updates enabled");
+            log.info("✅ Symbol agent updater wired to SmartBot - Real-time UI updates enabled");
         }
 
         // Wire Telegram event listener to SmartBot's event bus
         if (telegramEventListener != null) {
             telegramEventListener.start();
-            log.info("\u2705 Telegram event listener wired to SmartBot");
+            log.info("✅ Telegram event listener wired to SmartBot");
         }
 
         // Auto-detect and set Telegram chat ID
@@ -546,13 +545,13 @@ public class SystemCore {
         // Stop symbol agent updater
         if (symbolAgentUpdater != null) {
             symbolAgentUpdater.stop();
-            log.info("\u2705 Symbol agent updater stopped");
+            log.info("✅ Symbol agent updater stopped");
         }
 
         // Stop Telegram event listener
         if (telegramEventListener != null) {
             telegramEventListener.stop();
-            log.info("\u2705 Telegram event listener stopped");
+            log.info("✅ Telegram event listener stopped");
         }
 
         // Stop Telegram polling
@@ -567,6 +566,8 @@ public class SystemCore {
             eventBusManager.shutdown();
             log.info("✅ EventBusManager shutdown complete - Event-driven architecture stopped");
         }
+
+        closeAiReasoningService();
 
         botRuntimeController.stop();
 
@@ -598,24 +599,6 @@ public class SystemCore {
                 && aiReasoningService != null
                 && tradeExecutionCoordinator != null
                 && strategyEngine != null;
-    }
-
-    /**
-     * Record a completed trade into the live metrics tracker.
-     * Called by TradingService after every executed or closed trade.
-     */
-    public void recordCompletedTrade(Trade trade) {
-        if (trade != null) {
-            liveMetricsTracker.recordTrade(trade);
-        }
-    }
-
-    /**
-     * Update the live metrics tracker with the latest account balance.
-     * Called periodically to keep drawdown and equity curve accurate.
-     */
-    public void updatePerformanceBalance(double balance) {
-        liveMetricsTracker.updateBalance(balance);
     }
 
     // ---------------------------------------------------------------------
@@ -746,7 +729,7 @@ public class SystemCore {
             log.warn("Cannot start streaming: tradePair is null.");
             notifyAllChannels(
                     "Streaming not started",
-                    "\u26A0\uFE0F Streaming was not started because no symbol is selected.");
+                    "⚠️ Streaming was not started because no symbol is selected.");
             return;
         }
 
@@ -816,7 +799,7 @@ public class SystemCore {
             publishErrorEvent("SystemCore", exception, "Failed to start exchange streaming.");
             notifyAllChannels(
                     "Streaming failed",
-                    "\u274C Failed to start streaming: %s".formatted(rootMessage(exception)));
+                    "❌ Failed to start streaming: %s".formatted(rootMessage(exception)));
             log.error("Failed to start streaming", exception);
         }
     }
@@ -1152,7 +1135,7 @@ public class SystemCore {
                         exchangeName,
                         Map.of()));
 
-                notifyAllChannels("Stream connected", "\u2705 Stream connected: " + exchangeName);
+                notifyAllChannels("Stream connected", "✅ Stream connected: " + exchangeName);
             }
 
             @Override
@@ -1165,7 +1148,7 @@ public class SystemCore {
 
                 notifyAllChannels(
                         "Stream disconnected",
-                        "\u26A0\uFE0F Stream disconnected: %s | Reason: %s".formatted(exchangeName, reason));
+                        "⚠️ Stream disconnected: %s | Reason: %s".formatted(exchangeName, reason));
             }
 
             @Override
@@ -1180,7 +1163,7 @@ public class SystemCore {
 
                 notifyAllChannels(
                         "Stream error",
-                        "\u274C Stream error on %s: %s".formatted(exchangeName, rootMessage(throwable)));
+                        "❌ Stream error on %s: %s".formatted(exchangeName, rootMessage(throwable)));
             }
 
             @Override
@@ -1334,7 +1317,7 @@ public class SystemCore {
                         orderId,
                         Map.of("orderId", safe(orderId))));
 
-                notifyAllChannels("Order accepted", "\u2705 Order accepted: " + orderId);
+                notifyAllChannels("Order accepted", "✅ Order accepted: " + orderId);
             }
 
             @Override
@@ -1348,7 +1331,7 @@ public class SystemCore {
 
                 notifyAllChannels(
                         "Order rejected",
-                        "\u274C Order rejected: %s | Reason: %s".formatted(clientOrderId, reason));
+                        "❌ Order rejected: %s | Reason: %s".formatted(clientOrderId, reason));
             }
 
             @Override
@@ -1410,7 +1393,7 @@ public class SystemCore {
 
         if (configuredEmail.isEnabled()) {
             this.emailNotifier = configuredEmail;
-            log.info("\u2705 Email notifier configured: {}", configuredEmail.configurationSummary());
+            log.info("✅ Email notifier configured: {}", configuredEmail.configurationSummary());
         }
     }
 
@@ -1643,17 +1626,51 @@ public class SystemCore {
             return null;
         }
 
-        // Only return selectedTradePair if symbol matches
-        if (selectedTradePair != null) {
-            String selectedSymbol = selectedTradePair.getSymbol();
-            if (selectedSymbol != null && selectedSymbol.equalsIgnoreCase(symbol.trim())) {
-                return selectedTradePair;
+        String normalized = normalizeSymbol(symbol);
+
+        try {
+            Exchange exchange = getExchange();
+            if (exchange == null) {
+                return null;
             }
+
+            List<TradePair> pairs = exchange.getTradablePairs();
+
+            if (pairs == null || pairs.isEmpty()) {
+                return null;
+            }
+
+            for (TradePair pair : pairs) {
+                if (pair == null) {
+                    continue;
+                }
+
+                String pairSymbol = normalizeSymbol(pair.getSymbol());
+
+                if (pairSymbol.equals(normalized)) {
+                    return pair;
+                }
+
+                String slashSymbol = normalizeSymbol(pair.toString('/'));
+
+                if (slashSymbol.equals(normalized)) {
+                    return pair;
+                }
+            }
+
+        } catch (Exception e) {
+            return null;
         }
 
-        // TODO: search tradingService for symbol if available
-        // For now, return null for non-matching symbols
         return null;
+    }
+
+    private static String normalizeSymbol(String symbol) {
+        return symbol == null ? ""
+                : symbol.trim()
+                        .replace("-", "/")
+                        .replace("_", "/")
+                        .toUpperCase();
     }
 
     /**
@@ -1782,6 +1799,19 @@ public class SystemCore {
                         "error", rootMessage(throwable))));
     }
 
+    private void closeAiReasoningService() {
+        if (!(aiReasoningService instanceof AutoCloseable closeable)) {
+            return;
+        }
+
+        try {
+            closeable.close();
+            log.info("AI reasoning service closed");
+        } catch (Exception exception) {
+            log.debug("Unable to close AI reasoning service", exception);
+        }
+    }
+
     // ---------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------
@@ -1871,12 +1901,12 @@ public class SystemCore {
 
                 // Component readiness
                 "*Component Status*\n" +
-                "Strategy Engine: " + (strategyEngine != null ? "\u2705 Ready" : "\u274C N/A") + "\n" +
-                "Risk System: " + (riskManagementSystem != null ? "\u2705 Ready" : "\u274C N/A") + "\n" +
-                "Execution Coordinator: " + (tradeExecutionCoordinator != null ? "\u2705 Ready" : "\u274C N/A") +
+                "Strategy Engine: " + (strategyEngine != null ? "✅ Ready" : "❌ N/A") + "\n" +
+                "Risk System: " + (riskManagementSystem != null ? "✅ Ready" : "❌ N/A") + "\n" +
+                "Execution Coordinator: " + (tradeExecutionCoordinator != null ? "✅ Ready" : "❌ N/A") +
                 "\n" +
-                "  \u251C\u2500 Position Transition Policy: \u2705 Internal\n" +
-                "  \u2514\u2500 Symbol Lock Manager: \u2705 Internal\n\n" +
+                "  ├─ Position Transition Policy: ✅ Internal\n" +
+                "  └─ Symbol Lock Manager: ✅ Internal\n\n" +
 
                 // Small account config
                 "*Small Account Mode*\n" +
@@ -1886,7 +1916,7 @@ public class SystemCore {
 
                 // Telegram status
                 "*Telegram*\n" +
-                "Token Configured: " + (!telegramToken.isBlank() ? "\u2705 YES" : "\u274C NO") + "\n" +
+                "Token Configured: " + (!telegramToken.isBlank() ? "✅ YES" : "❌ NO") + "\n" +
                 "Polling Active: " + (isTelegramPollingActive() ? "\uD83D\uDFE2 YES" : "\uD83D\uDD34 NO") + "\n";
     }
 
