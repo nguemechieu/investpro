@@ -5,10 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.Agent;
 import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
+import org.investpro.config.AppConfig;
+import org.investpro.config.AppConfigKeys;
 import org.investpro.data.CandleData;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.TradePair;
+import org.investpro.persistence.repository.StrategyAssignmentRepository;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.lab.StrategyLabService;
 import org.investpro.utils.CandleDataSupplier;
@@ -61,6 +64,13 @@ public class SymbolAgent implements Agent {
         this.context = context;
         running.set(true);
         SymbolAgentState state = manager.ensureSymbol(symbol);
+
+        if (restoreRecoveredAssignment(state)) {
+            log.info("SymbolAgent restored recovered assignment for {} and skipped startup re-evaluation",
+                    symbol.toString('/'));
+            return;
+        }
+
         if (state.getState() == SymbolEvaluationState.NOT_STARTED) {
             state.setState(SymbolEvaluationState.COLLECTING_DATA);
             state.setLastIssue("Collecting market data...");
@@ -160,6 +170,47 @@ public class SymbolAgent implements Agent {
                     markFailed(rootMessage(exception));
                     return null;
                 });
+    }
+
+    private boolean restoreRecoveredAssignment(SymbolAgentState state) {
+        boolean recoverOnStartup = AppConfig.getBoolean(AppConfigKeys.STRATEGY_ASSIGNMENT_RECOVER_ON_STARTUP, true);
+        if (!recoverOnStartup) {
+            return false;
+        }
+
+        StrategyAssignment assignment = StrategyAssignmentRepository.getInstance().getAssignment(symbol.toString('/'),
+                Timeframe.H1);
+        if (assignment == null || !assignment.isValid() || assignment.isExpired()) {
+            return false;
+        }
+
+        boolean requirePaperTrading = Boolean.parseBoolean(
+                System.getProperty("investpro.strategy.requirePaperTradingBeforeLive", "true"));
+
+        SymbolEvaluationState previous = state.getState();
+        state.setState(requirePaperTrading ? SymbolEvaluationState.PAPER_TRADING : SymbolEvaluationState.LIVE_READY);
+        state.setActiveStrategyName(assignment.getStrategyId());
+        state.setAssignedStrategyName(assignment.getStrategyId());
+        state.setActiveTimeframe(assignment.getTimeframe());
+        state.setStrategyScore(assignment.getScoreAtAssignment());
+        state.setCanTradeLive(!requirePaperTrading);
+        state.setBlockReason(
+                requirePaperTrading ? "Recovered assignment requires paper validation before live trading" : null);
+        state.setLastIssue("Recovered persisted assignment after restart; automatic replacement disabled");
+        manager.updateState(symbol, state);
+        publishStateChange(previous, state);
+
+        evaluationStarted.set(true);
+
+        if (context != null && context.getEventBus() != null) {
+            context.getEventBus().publish(AgentEvent.of(
+                    AgentEvent.STRATEGY_ASSIGNMENT_RECOVERED,
+                    name(),
+                    assignment,
+                    Map.of("tradePairObject", symbol, "startupRecovery", true)));
+        }
+
+        return true;
     }
 
     private CompletableFuture<List<CandleData>> fetchHistoricalCandles(Timeframe timeframe) {

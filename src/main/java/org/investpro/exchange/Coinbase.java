@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.models.AuthCheckResult;
@@ -64,6 +65,7 @@ import java.util.stream.StreamSupport;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
+@EqualsAndHashCode(callSuper = true)
 @Slf4j
 @Data
 public class Coinbase extends Exchange {
@@ -3590,7 +3592,7 @@ public class Coinbase extends Exchange {
         }
     }
 
-    private List<OpenOrder> parseOpenOrders(String jsonResponse) {
+    protected List<OpenOrder> parseOpenOrders(String jsonResponse) {
         List<OpenOrder> orders = new ArrayList<>();
         try {
             JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);

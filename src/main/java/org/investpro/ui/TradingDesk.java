@@ -81,6 +81,7 @@ import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategySelectionService;
 import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.lab.StrategyLabService;
+import org.investpro.strategy.management.StrategyAssignmentManager;
 import org.investpro.spi.ExchangeProvider;
 import org.investpro.spi.PluginRegistry;
 import org.investpro.trading.tradability.MarketWatchTradabilityFilter;
@@ -10953,6 +10954,10 @@ public class TradingDesk extends BorderPane {
             return null;
         }
 
+        boolean autoReassignOnStartup = AppConfig.getBoolean(
+                AppConfigKeys.STRATEGY_ASSIGNMENT_AUTO_REASSIGN_ON_STARTUP,
+                false);
+
         List<StrategyAssignment> assignments = StrategyAssignmentRepository.getInstance()
                 .getForSymbolAllTimeframes(symbolText).stream()
                 .filter(Objects::nonNull)
@@ -10993,6 +10998,23 @@ public class TradingDesk extends BorderPane {
                     best.getTimeframe().getCode(),
                     best.getScoreAtAssignment(),
                     reassignBelowScore);
+            return best;
+        }
+
+        if (!autoReassignOnStartup) {
+            log.warn(
+                    "Auto-reassignment on startup disabled. Keeping existing assignment for {} despite low score: {} {} score={} < {}",
+                    symbolText,
+                    best.getStrategyId(),
+                    best.getTimeframe().getCode(),
+                    best.getScoreAtAssignment(),
+                    reassignBelowScore);
+            appendAgentActivity("Keeping existing strategy for " + symbolText
+                    + " after restart (score " + String.format("%.1f", best.getScoreAtAssignment())
+                    + "). Marked for manual review instead of auto-reassignment.");
+            StrategyAssignmentManager.getInstance().markNeedsReview(
+                    best.getAssignmentId(),
+                    "Startup recovery policy kept low-score assignment; manual review required");
             return best;
         }
 

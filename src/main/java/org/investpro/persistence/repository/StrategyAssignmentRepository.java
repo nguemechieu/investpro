@@ -1,29 +1,47 @@
 package org.investpro.persistence.repository;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.config.AppConfig;
+import org.investpro.config.AppConfigKeys;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.sql.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Repository for managing strategy assignments.
  *
- * Current implementation is in-memory. It is suitable for desktop/runtime usage,
+ * Current implementation is in-memory. It is suitable for desktop/runtime
+ * usage,
  * but can later be backed by SQLite, Postgres, or another persistent store.
  */
 @Slf4j
 public final class StrategyAssignmentRepository {
 
     private static volatile StrategyAssignmentRepository instance;
+    private static final String DEFAULT_DB_URL = "jdbc:sqlite:data/strategy-assignments.db";
+    private static final Path JSON_FALLBACK_FILE = Path.of(System.getProperty("user.home"), ".investpro", "assignments",
+            "strategy-assignments.json");
 
     private final Map<String, StrategyAssignment> assignmentsById = new ConcurrentHashMap<>();
     private final Map<String, List<StrategyAssignment>> assignmentsBySymbolTimeframe = new ConcurrentHashMap<>();
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final String dbUrl;
 
     private StrategyAssignmentRepository() {
+        this.dbUrl = System.getProperty("investpro.strategy.assignment.dbUrl", DEFAULT_DB_URL);
+        initSchema();
+        recoverPersistedAssignments();
     }
 
     public static StrategyAssignmentRepository getInstance() {
@@ -68,8 +86,9 @@ public final class StrategyAssignmentRepository {
                 assignment.getAssignmentId(),
                 assignment.getSymbol(),
                 assignment.getTimeframe(),
-                assignment.getStrategyId()
-        );
+                assignment.getStrategyId());
+
+        persistIfEnabled();
     }
 
     /**
@@ -134,8 +153,7 @@ public final class StrategyAssignmentRepository {
     @NotNull
     public List<StrategyAssignment> getForSymbolAndTimeframe(
             @NotNull String symbol,
-            @NotNull Timeframe timeframe
-    ) {
+            @NotNull Timeframe timeframe) {
         Objects.requireNonNull(symbol, "symbol must not be null");
         Objects.requireNonNull(timeframe, "timeframe must not be null");
 
@@ -214,6 +232,7 @@ public final class StrategyAssignmentRepository {
 
         removeFromSymbolTimeframeIndex(removed);
         log.info("Deleted strategy assignment: {}", assignmentId);
+        persistIfEnabled();
     }
 
     /**
@@ -223,6 +242,7 @@ public final class StrategyAssignmentRepository {
         assignmentsById.clear();
         assignmentsBySymbolTimeframe.clear();
         log.info("Cleared all strategy assignments");
+        persistIfEnabled();
     }
 
     /**
@@ -248,10 +268,8 @@ public final class StrategyAssignmentRepository {
         }
 
         synchronized (assignments) {
-            assignments.removeIf(existing ->
-                    existing != null
-                            && Objects.equals(existing.getAssignmentId(), assignment.getAssignmentId())
-            );
+            assignments.removeIf(existing -> existing != null
+                    && Objects.equals(existing.getAssignmentId(), assignment.getAssignmentId()));
 
             if (assignments.isEmpty()) {
                 assignmentsBySymbolTimeframe.remove(key);
@@ -281,5 +299,138 @@ public final class StrategyAssignmentRepository {
         }
 
         throw new IllegalArgumentException("Unsupported timeframe: " + timeframe);
+    }
+
+    private void recoverPersistedAssignments() {
+        if (!AppConfig.getBoolean(AppConfigKeys.STRATEGY_ASSIGNMENT_RECOVER_ON_STARTUP, true)) {
+            return;
+        }
+
+        List<StrategyAssignment> recovered = loadFromSqlite();
+        if (recovered.isEmpty()) {
+            recovered = loadFromJsonFallback();
+        }
+
+        for (StrategyAssignment assignment : recovered) {
+            if (assignment == null || assignment.getAssignmentId() == null || assignment.getAssignmentId().isBlank()) {
+                continue;
+            }
+            assignmentsById.put(assignment.getAssignmentId(), assignment);
+            String key = getSymbolTimeframeKey(assignment.getSymbol(), assignment.getTimeframe());
+            assignmentsBySymbolTimeframe
+                    .computeIfAbsent(key, ignored -> Collections.synchronizedList(new ArrayList<>()))
+                    .add(assignment);
+        }
+
+        if (!recovered.isEmpty()) {
+            log.info("Recovered {} persisted strategy assignments", recovered.size());
+        }
+    }
+
+    private void persistIfEnabled() {
+        if (!AppConfig.getBoolean(AppConfigKeys.STRATEGY_ASSIGNMENT_PERSIST, true)) {
+            return;
+        }
+
+        List<StrategyAssignment> snapshot = getAll();
+        boolean sqliteSaved = saveToSqlite(snapshot);
+        if (!sqliteSaved) {
+            saveToJsonFallback(snapshot);
+        }
+    }
+
+    private void initSchema() {
+        String ddl = """
+                CREATE TABLE IF NOT EXISTS strategy_assignments_runtime (
+                    assignment_id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """;
+        try (Connection conn = DriverManager.getConnection(dbUrl); Statement stmt = conn.createStatement()) {
+            stmt.execute(ddl);
+        } catch (SQLException ex) {
+            log.warn("Unable to initialize strategy assignment runtime schema: {}", ex.getMessage());
+        }
+    }
+
+    private boolean saveToSqlite(List<StrategyAssignment> assignments) {
+        String upsertSql = """
+                INSERT INTO strategy_assignments_runtime (assignment_id, payload_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(assignment_id) DO UPDATE SET
+                    payload_json = excluded.payload_json,
+                    updated_at = excluded.updated_at
+                """;
+
+        try (Connection conn = DriverManager.getConnection(dbUrl)) {
+            conn.setAutoCommit(false);
+            try (Statement deleteStmt = conn.createStatement()) {
+                deleteStmt.executeUpdate("DELETE FROM strategy_assignments_runtime");
+            }
+
+            try (PreparedStatement ps = conn.prepareStatement(upsertSql)) {
+                String now = java.time.Instant.now().toString();
+                for (StrategyAssignment assignment : assignments) {
+                    ps.setString(1, assignment.getAssignmentId());
+                    ps.setString(2, objectMapper.writeValueAsString(assignment));
+                    ps.setString(3, now);
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+            }
+            conn.commit();
+            return true;
+        } catch (Exception ex) {
+            log.warn("Failed to persist strategy assignments to SQLite: {}", ex.getMessage());
+            return false;
+        }
+    }
+
+    private List<StrategyAssignment> loadFromSqlite() {
+        String sql = "SELECT payload_json FROM strategy_assignments_runtime";
+        List<StrategyAssignment> assignments = new ArrayList<>();
+        try (Connection conn = DriverManager.getConnection(dbUrl);
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String json = rs.getString("payload_json");
+                if (json == null || json.isBlank()) {
+                    continue;
+                }
+                assignments.add(objectMapper.readValue(json, StrategyAssignment.class));
+            }
+        } catch (Exception ex) {
+            log.debug("No SQLite strategy assignments recovered: {}", ex.getMessage());
+        }
+        return assignments;
+    }
+
+    private void saveToJsonFallback(List<StrategyAssignment> assignments) {
+        try {
+            Files.createDirectories(JSON_FALLBACK_FILE.getParent());
+            byte[] payload = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(assignments);
+            Files.write(
+                    JSON_FALLBACK_FILE,
+                    payload,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE);
+        } catch (Exception ex) {
+            log.error("Failed to persist strategy assignments JSON fallback: {}", ex.getMessage());
+        }
+    }
+
+    private List<StrategyAssignment> loadFromJsonFallback() {
+        try {
+            if (!Files.exists(JSON_FALLBACK_FILE)) {
+                return List.of();
+            }
+            return objectMapper.readValue(JSON_FALLBACK_FILE.toFile(), new TypeReference<List<StrategyAssignment>>() {
+            });
+        } catch (Exception ex) {
+            log.debug("No JSON fallback assignments recovered: {}", ex.getMessage());
+            return List.of();
+        }
     }
 }

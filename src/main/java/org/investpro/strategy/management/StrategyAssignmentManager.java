@@ -5,6 +5,7 @@ import org.investpro.core.agents.AgentEvent;
 import org.investpro.decision.MarketRegime;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.event.EventBusManager;
+import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.ai.AIReplacementEngine;
 import org.investpro.strategy.ai.AIStrategyHealthEngine;
 import org.investpro.strategy.lifecycle.*;
@@ -354,6 +355,127 @@ public class StrategyAssignmentManager {
             StrategyLifecycleStatus newStatus,
             String reason) {
         return transitionStatus(assignmentId, newStatus, reason, null, false, false);
+    }
+
+    /**
+     * Recovers assignment metadata on startup without automatic replacement.
+     *
+     * @param activeAssignments active strategy assignments recovered from
+     *                          repository
+     * @return number of assignments recovered or synced
+     */
+    public int recoverAssignmentsOnStartup(List<StrategyAssignment> activeAssignments) {
+        if (activeAssignments == null || activeAssignments.isEmpty()) {
+            return 0;
+        }
+
+        int recoveredCount = 0;
+        for (StrategyAssignment assignment : activeAssignments) {
+            if (assignment == null || assignment.getAssignmentId() == null || assignment.getAssignmentId().isBlank()) {
+                continue;
+            }
+
+            StrategyLifecycleRecord existing = lifecycleRecords.get(assignment.getAssignmentId());
+            if (existing != null) {
+                transitionStatus(
+                        assignment.getAssignmentId(),
+                        StrategyLifecycleStatus.RECOVERED,
+                        "Recovered existing assignment metadata on startup",
+                        AgentEvent.STRATEGY_ASSIGNMENT_RECOVERED,
+                        false,
+                        false);
+                recoveredCount++;
+                continue;
+            }
+
+            StrategyLifecycleRecord recovered = StrategyLifecycleRecord.builder()
+                    .assignmentId(assignment.getAssignmentId())
+                    .symbol(assignment.getSymbol())
+                    .timeframe(assignment.getTimeframe() != null ? assignment.getTimeframe().getCode() : "UNKNOWN")
+                    .strategyId(assignment.getStrategyId())
+                    .strategyName(assignment.getStrategyId())
+                    .assignmentScore(assignment.getScoreAtAssignment())
+                    .confidence(Math.max(0.0, Math.min(1.0, assignment.getScoreAtAssignment() / 100.0)))
+                    .assignedAt(assignment.getAssignedAt())
+                    .assignedBy(assignment.getAssignedBy() != null ? assignment.getAssignedBy().name() : SOURCE)
+                    .assignmentReason(assignment.getReason())
+                    .marketRegime(MarketRegime.UNKNOWN)
+                    .lifecycleStatus(StrategyLifecycleStatus.RECOVERED)
+                    .assignmentMode(assignment.getMode() != null ? assignment.getMode().name() : "AUTO")
+                    .promotionHistory(new ArrayList<>())
+                    .demotionHistory(new ArrayList<>())
+                    .createdAt(assignment.getAssignedAt() != null ? assignment.getAssignedAt() : Instant.now())
+                    .updatedAt(Instant.now())
+                    .build();
+
+            lifecycleRecords.put(recovered.getAssignmentId(), recovered);
+            persistence.upsert(recovered);
+            persistence.logLifecycleEvent(recovered.getAssignmentId(), null, StrategyLifecycleStatus.RECOVERED,
+                    "Recovered from assignment repository on startup");
+            eventBus.publish(AgentEvent.of(AgentEvent.STRATEGY_ASSIGNMENT_RECOVERED, SOURCE, recovered));
+            recoveredCount++;
+        }
+
+        return recoveredCount;
+    }
+
+    /**
+     * Resumes a recovered or paused assignment while preserving ownership.
+     */
+    public StrategyLifecycleRecord resumeAssignment(String assignmentId, String reason) {
+        StrategyLifecycleRecord existing = lifecycleRecords.get(assignmentId);
+        if (existing == null) {
+            log.warn("resumeAssignment: assignment not found: {}", assignmentId);
+            return null;
+        }
+        StrategyLifecycleStatus target = existing.getLifecycleStatus() == StrategyLifecycleStatus.PAUSED
+                ? StrategyLifecycleStatus.RESUMED
+                : StrategyLifecycleStatus.RESUMED;
+        return transitionStatus(assignmentId, target, reason,
+                AgentEvent.STRATEGY_ASSIGNMENT_RESUMED, false, false);
+    }
+
+    /**
+     * Marks assignment for controlled re-evaluation by supervisor.
+     */
+    public StrategyLifecycleRecord requestReevaluation(String assignmentId, String reason) {
+        return transitionStatus(assignmentId, StrategyLifecycleStatus.NEEDS_REVIEW,
+                reason != null ? reason : "Controlled re-evaluation requested",
+                AgentEvent.STRATEGY_REEVALUATION_REQUESTED,
+                false, false);
+    }
+
+    /**
+     * Performs safety-aware replacement. If blocked, assignment enters
+     * REPLACEMENT_PENDING and emits STRATEGY_REPLACEMENT_BLOCKED.
+     */
+    public StrategyLifecycleRecord replaceAssignmentSafely(String assignmentId,
+            String newStrategyId,
+            String newStrategyName,
+            boolean hasOpenPosition,
+            String reason) {
+        if (hasOpenPosition) {
+            transitionStatus(assignmentId, StrategyLifecycleStatus.REPLACEMENT_PENDING,
+                    reason != null ? reason : "Replacement blocked: open position ownership exists",
+                    AgentEvent.STRATEGY_REPLACEMENT_BLOCKED,
+                    false, false);
+            return null;
+        }
+        return replace(assignmentId, newStrategyId, newStrategyName, reason);
+    }
+
+    public StrategyLifecycleRecord markNeedsReview(String assignmentId, String reason) {
+        return transitionStatus(assignmentId, StrategyLifecycleStatus.NEEDS_REVIEW,
+                reason != null ? reason : "Manual review required",
+                AgentEvent.STRATEGY_ASSIGNMENT_NEEDS_REVIEW,
+                false, false);
+    }
+
+    public StrategyLifecycleRecord markOrphanedPosition(String assignmentId, String reason) {
+        return transitionStatus(assignmentId, StrategyLifecycleStatus.ORPHANED_POSITION,
+                reason != null ? reason : "Orphaned broker position detected",
+                AgentEvent.STRATEGY_ORPHANED_POSITION_DETECTED,
+                false, false);
     }
 
     // =========================================================================

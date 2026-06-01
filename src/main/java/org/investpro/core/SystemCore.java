@@ -44,6 +44,7 @@ import org.investpro.event.EventBusManager;
 import org.investpro.research.LiveTradingMetricsTracker;
 import org.investpro.strategy.*;
 import org.investpro.strategy.lab.StrategyLabService;
+import org.investpro.strategy.recovery.AssignmentRecoveryService;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.TradabilityScope;
 import org.investpro.trading.tradability.UniversalTradabilityService;
@@ -244,6 +245,7 @@ public class SystemCore {
                 riskManagementSystem, aiReasoningService, executionEngine, tradeExecutionCoordinator);
 
         this.labService = StrategyLabService.getInstance();
+        new AssignmentRecoveryService().recoverAssignmentsOnStartup();
         // Wire symbol agent state updates for real-time UI
         this.symbolAgentUpdater = new SymbolAgentUpdater(smartBot.getEventBus(), getSymbolAgentManager());
 

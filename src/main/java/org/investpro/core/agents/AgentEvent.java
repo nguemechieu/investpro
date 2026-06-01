@@ -154,6 +154,27 @@ public record AgentEvent(
     public static final String STRATEGY_RISK_ALERT = "STRATEGY_RISK_ALERT";
     /** Emitted on any lifecycle status transition. */
     public static final String LIFECYCLE_STATE_CHANGED = "LIFECYCLE_STATE_CHANGED";
+    /** Emitted when persisted strategy assignments are loaded during startup. */
+    public static final String STRATEGY_ASSIGNMENTS_LOADED = "STRATEGY_ASSIGNMENTS_LOADED";
+    /** Emitted when an assignment is recovered from persisted state. */
+    public static final String STRATEGY_ASSIGNMENT_RECOVERED = "STRATEGY_ASSIGNMENT_RECOVERED";
+    /** Emitted when an assignment is resumed after startup recovery. */
+    public static final String STRATEGY_ASSIGNMENT_RESUMED = "STRATEGY_ASSIGNMENT_RESUMED";
+    /**
+     * Emitted when an assignment is flagged as needing review before live actions.
+     */
+    public static final String STRATEGY_ASSIGNMENT_NEEDS_REVIEW = "STRATEGY_ASSIGNMENT_NEEDS_REVIEW";
+    /** Emitted when broker reconciliation detects an orphaned position. */
+    public static final String STRATEGY_ORPHANED_POSITION_DETECTED = "STRATEGY_ORPHANED_POSITION_DETECTED";
+    /** Emitted when reevaluation has been requested for an assignment/symbol. */
+    public static final String STRATEGY_REEVALUATION_REQUESTED = "STRATEGY_REEVALUATION_REQUESTED";
+    /**
+     * Emitted when replacement is blocked by open-position ownership or safety
+     * gates.
+     */
+    public static final String STRATEGY_REPLACEMENT_BLOCKED = "STRATEGY_REPLACEMENT_BLOCKED";
+    /** Emitted whenever a strategy checkpoint is written. */
+    public static final String STRATEGY_CHECKPOINT_SAVED = "STRATEGY_CHECKPOINT_SAVED";
 
     // ── AI review events
     // ────────────────────────────────────────────────────────────────
