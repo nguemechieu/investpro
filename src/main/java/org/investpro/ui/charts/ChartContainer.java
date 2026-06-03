@@ -235,7 +235,7 @@ public class ChartContainer extends Region {
         try {
             CandleStickChart nextChart = createChart(durationSeconds);
             applyChartBindings(nextChart);
-            toolbar.registerEventHandlers(nextChart, secondsPerCandle);
+            toolbar.registerEventHandlers(nextChart);
             toolbar.setChartOptions(nextChart.getChartOptions());
             toolbar.setActiveToolbarButton(secondsPerCandle);
             showChart(nextChart, animate);

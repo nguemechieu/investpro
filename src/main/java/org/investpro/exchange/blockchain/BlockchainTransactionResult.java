@@ -54,17 +54,11 @@ public record BlockchainTransactionResult(
     /** Returns the on-chain signature or hash if available. */
     public Optional<String> getSignature() { return Optional.ofNullable(signature); }
 
-    /** Returns the fee units consumed (lamports/stroops/gas) if reported. */
-    public Optional<Long> getFeeUnitsConsumed() { return Optional.ofNullable(feeUnitsConsumed); }
-
     /** Returns the error code if the transaction failed. */
     public Optional<String> getErrorCode() { return Optional.ofNullable(errorCode); }
 
     /** Returns the error message if the transaction failed. */
     public Optional<String> getErrorMessage() { return Optional.ofNullable(errorMessage); }
-
-    /** Returns the confirmation timestamp if confirmed. */
-    public Optional<Instant> getConfirmedAt() { return Optional.ofNullable(confirmedAt); }
 
     /** Returns true if the transaction is confirmed on-chain. */
     public boolean isConfirmed() { return outcome == TransactionOutcome.CONFIRMED; }

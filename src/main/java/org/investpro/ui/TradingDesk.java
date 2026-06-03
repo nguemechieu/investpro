@@ -540,7 +540,7 @@ public class TradingDesk extends BorderPane {
 
         if (preferences.getBoolean("remember_console_visible", true)
                 && !preferences.getBoolean("console_visible", true)) {
-            toggleConsoleVisibility();
+            setConsoleVisible(false);
         }
 
         setupKeyboardShortcuts();
@@ -794,7 +794,6 @@ public class TradingDesk extends BorderPane {
                 menuItem("Settings", new KeyCodeCombination(KeyCode.COMMA, KeyCombination.CONTROL_DOWN),
                         this::openSettingsPanel),
                 new SeparatorMenuItem(),
-                menuItem(t("menu.exchangeCredentials"), null, this::showSettingsDialog),
                 menuItem(t("menu.tradingProfile"), null, this::showTradingProfileSettings),
                 new SeparatorMenuItem(),
                 menuItem("Plugin Manager", null, this::openPluginManagerPanel),
@@ -1240,16 +1239,15 @@ public class TradingDesk extends BorderPane {
         systemConsole = createTradingConsoleSurface();
         marketWatchWrapper = createLeftSidebar();
         orderBookWrapper = createOrderBookPaneSurface();
-        createChartWorkspaceSurface();
+        Node centerWorkspace = createCenterWorkspace();
 
         dockManager = new DockManager();
         dockManager.registerPane(new SimpleDockablePane(DOCK_LEFT_SIDEBAR_ID, "Market Watch", marketWatchWrapper),
                 DockRegionType.LEFT);
-        dockManager.registerPane(dockableChartPanel, DockRegionType.CENTER);
+        dockManager.registerPane(new SimpleDockablePane(DOCK_CENTER_CHARTS_ID, "Charts", centerWorkspace),
+                DockRegionType.CENTER);
         dockManager.registerPane(new SimpleDockablePane(DOCK_RIGHT_ORDERBOOK_ID, "Order Book", orderBookWrapper),
                 DockRegionType.RIGHT);
-        dockManager.registerPane(new SimpleDockablePane(DOCK_BOTTOM_CONSOLE_ID, "System Console", systemConsole),
-                DockRegionType.BOTTOM);
         restoreDockLayout();
         syncDockVisibilityFlags();
 
@@ -1259,10 +1257,7 @@ public class TradingDesk extends BorderPane {
         mainVerticalWorkbench.getItems().setAll(dockManager.getView());
 
         horizontalWorkbench = null;
-        centerSplit = null;
-        consoleVisible = true;
-        marketWatchVisible = true;
-        orderBookVisible = true;
+        syncDockVisibilityFlags();
 
         return mainVerticalWorkbench;
     }
@@ -2425,12 +2420,91 @@ public class TradingDesk extends BorderPane {
     }
 
     private void syncDockVisibilityFlags() {
-        if (dockManager == null) {
+        if (!isDockLayoutActive()) {
             return;
         }
         marketWatchVisible = dockManager.isDocked(DOCK_LEFT_SIDEBAR_ID);
         orderBookVisible = dockManager.isDocked(DOCK_RIGHT_ORDERBOOK_ID);
-        consoleVisible = dockManager.isDocked(DOCK_BOTTOM_CONSOLE_ID) || dockManager.isFloating(DOCK_BOTTOM_CONSOLE_ID);
+        consoleVisible = centerSplit != null && systemConsole != null && centerSplit.getItems().contains(systemConsole);
+    }
+
+    private boolean isDockLayoutActive() {
+        return dockManager != null && useDockManagerLayout();
+    }
+
+    private boolean isConsoleVisible() {
+        if (detachedSystemConsoleStage != null && detachedSystemConsoleStage.isShowing()) {
+            return true;
+        }
+        return centerSplit != null && systemConsole != null && centerSplit.getItems().contains(systemConsole);
+    }
+
+    private void setConsoleVisible(boolean visible) {
+        if (visible) {
+            showConsole();
+        } else {
+            hideConsole();
+        }
+    }
+
+    private void showConsole() {
+        if (centerSplit == null || systemConsole == null) {
+            openDetachedConsolePanel();
+            showWarning("System Console", "Embedded console is unavailable, opened detached console instead.");
+            return;
+        }
+
+        if (detachedSystemConsoleStage != null && detachedSystemConsoleStage.isShowing()) {
+            reattachConsole();
+            return;
+        }
+
+        terminalTabPane.setVisible(true);
+        terminalTabPane.setManaged(true);
+        systemConsole.setVisible(true);
+        systemConsole.setManaged(true);
+
+        if (!centerSplit.getItems().contains(systemConsole)) {
+            centerSplit.getItems().add(systemConsole);
+        }
+        centerSplit.setDividerPositions(0.72);
+        consoleVisible = true;
+        centerSplit.layout();
+        if (mainVerticalWorkbench != null) {
+            mainVerticalWorkbench.layout();
+        }
+        if (horizontalWorkbench != null) {
+            horizontalWorkbench.layout();
+        }
+        systemConsole.requestFocus();
+        terminalTabPane.requestFocus();
+        saveAppState();
+    }
+
+    private void hideConsole() {
+        if (detachedSystemConsoleStage != null && detachedSystemConsoleStage.isShowing()) {
+            detachedSystemConsoleStage.setOnCloseRequest(null);
+            detachedSystemConsoleStage.close();
+            detachedSystemConsoleStage = null;
+            consoleVisible = false;
+            saveAppState();
+            return;
+        }
+
+        if (centerSplit == null || systemConsole == null) {
+            return;
+        }
+
+        centerSplit.getItems().remove(systemConsole);
+        consoleVisible = false;
+        centerSplit.layout();
+        if (mainVerticalWorkbench != null) {
+            mainVerticalWorkbench.layout();
+        }
+        if (horizontalWorkbench != null) {
+            horizontalWorkbench.layout();
+        }
+        saveAppState();
     }
 
     private void restoreDockLayout() {
@@ -2561,11 +2635,25 @@ public class TradingDesk extends BorderPane {
                 createTerminalTab("Signals", createSignalTab().getContent()),
                 createTerminalTab("Risk Monitor", createPositionRiskMonitorTab().getContent()));
 
-        VBox console = new VBox(0, header, terminalTabPane);
+        Node terminalTabStrip = createTerminalTabStrip(terminalTabPane);
+
+        VBox terminalSurface = new VBox(0, header, terminalTabStrip, terminalTabPane);
+        terminalSurface.getStyleClass().add("terminal-scroll-content");
+        VBox.setVgrow(terminalTabPane, Priority.ALWAYS);
+
+        ScrollPane terminalScrollPane = new ScrollPane(terminalSurface);
+        terminalScrollPane.getStyleClass().add("terminal-scroll-pane");
+        terminalScrollPane.setFitToWidth(true);
+        terminalScrollPane.setFitToHeight(true);
+        terminalScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        terminalScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        terminalScrollPane.setPannable(true);
+
+        VBox console = new VBox(terminalScrollPane);
         console.setMinHeight(0);
         console.setMaxHeight(Double.MAX_VALUE);
         console.getStyleClass().addAll("system-console", "bottom-terminal", "mt5-terminal");
-        VBox.setVgrow(terminalTabPane, Priority.ALWAYS);
+        VBox.setVgrow(terminalScrollPane, Priority.ALWAYS);
         return console;
     }
 
@@ -2766,7 +2854,9 @@ public class TradingDesk extends BorderPane {
                 createDetachableTerminalTab(TabName.ALERTS, createAlertsTab().getContent()),
                 createDetachableTerminalTab(TabName.JOURNAL, createJournalTab().getContent()));
 
-        VBox terminalSurface = new VBox(6, header, terminalTabPane);
+        Node terminalTabStrip = createTerminalTabStrip(terminalTabPane);
+
+        VBox terminalSurface = new VBox(6, header, terminalTabStrip, terminalTabPane);
         terminalSurface.getStyleClass().add("terminal-scroll-content");
         VBox.setVgrow(terminalTabPane, Priority.ALWAYS);
 
@@ -2785,51 +2875,58 @@ public class TradingDesk extends BorderPane {
         return console;
     }
 
+    private @NotNull Node createTerminalTabStrip(@NotNull TabPane sourceTabPane) {
+        HBox tabButtons = new HBox(6);
+        tabButtons.getStyleClass().add("mt5-terminal-tab-strip");
+
+        ToggleGroup toggleGroup = new ToggleGroup();
+        java.util.Map<Tab, ToggleButton> buttonsByTab = new java.util.LinkedHashMap<>();
+
+        for (Tab tab : sourceTabPane.getTabs()) {
+            ToggleButton button = new ToggleButton(tab.getText());
+            button.getStyleClass().add("mt5-terminal-tab-button");
+            button.setFocusTraversable(false);
+            button.setToggleGroup(toggleGroup);
+            button.setOnAction(event -> sourceTabPane.getSelectionModel().select(tab));
+            buttonsByTab.put(tab, button);
+            tabButtons.getChildren().add(button);
+        }
+
+        Tab selectedTab = sourceTabPane.getSelectionModel().getSelectedItem();
+        if (selectedTab != null) {
+            ToggleButton selectedButton = buttonsByTab.get(selectedTab);
+            if (selectedButton != null) {
+                selectedButton.setSelected(true);
+            }
+        }
+
+        sourceTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
+            ToggleButton selectedButton = buttonsByTab.get(newTab);
+            if (selectedButton != null) {
+                selectedButton.setSelected(true);
+            }
+        });
+
+        ScrollPane scroller = new ScrollPane(tabButtons);
+        scroller.getStyleClass().add("mt5-terminal-tab-strip-scroll");
+        scroller.setFitToHeight(true);
+        scroller.setFitToWidth(false);
+        scroller.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scroller.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroller.setPannable(true);
+        return scroller;
+    }
+
     private void toggleConsoleVisibility() {
-        if (dockManager != null) {
-            boolean docked = dockManager.isDocked(DOCK_BOTTOM_CONSOLE_ID);
-            boolean floating = dockManager.isFloating(DOCK_BOTTOM_CONSOLE_ID);
-            if (docked || floating) {
-                dockManager.hidePane(DOCK_BOTTOM_CONSOLE_ID);
-                consoleVisible = false;
+        if (isDockLayoutActive()) {
+            if (consoleVisible) {
+                hideConsole();
             } else {
-                dockManager.showPane(DOCK_BOTTOM_CONSOLE_ID, DockRegionType.BOTTOM);
-                consoleVisible = true;
+                showConsole();
             }
-            saveAppState();
             return;
         }
-
-        if (centerSplit == null || systemConsole == null) {
-            return;
-        }
-
-        if (detachedSystemConsoleStage != null && detachedSystemConsoleStage.isShowing()) {
-            reattachConsole();
-            return;
-        }
-
-        if (consoleVisible) {
-            // Hide terminal - remove from centerSplit so chart expands
-            centerSplit.getItems().remove(systemConsole);
-            consoleVisible = false;
-        } else {
-            // Show terminal - add back to centerSplit
-            if (!centerSplit.getItems().contains(systemConsole)) {
-                centerSplit.getItems().add(systemConsole);
-            }
-            centerSplit.setDividerPositions(0.72);
-            consoleVisible = true;
-        }
-
-        centerSplit.layout();
-        if (mainVerticalWorkbench != null) {
-            mainVerticalWorkbench.layout();
-        }
-        if (horizontalWorkbench != null) {
-            horizontalWorkbench.layout();
-        }
-        saveAppState();
+        setConsoleVisible(!isConsoleVisible());
     }
 
     private void toggleMarketWatchVisibility() {
@@ -2897,14 +2994,6 @@ public class TradingDesk extends BorderPane {
     }
 
     private void detachConsoleWindow() {
-        if (dockManager != null) {
-            dockManager.detachPane(DOCK_BOTTOM_CONSOLE_ID);
-            consoleVisible = false;
-            journal("Console detached.");
-            saveAppState();
-            return;
-        }
-
         if (centerSplit == null || systemConsole == null || !centerSplit.getItems().contains(systemConsole)) {
             return;
         }
@@ -2937,14 +3026,6 @@ public class TradingDesk extends BorderPane {
     }
 
     private void reattachConsole() {
-        if (dockManager != null) {
-            dockManager.showPane(DOCK_BOTTOM_CONSOLE_ID, DockRegionType.BOTTOM);
-            consoleVisible = true;
-            journal("Console re-attached.");
-            saveAppState();
-            return;
-        }
-
         if (centerSplit == null || systemConsole == null) {
             return;
         }
@@ -3112,48 +3193,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private void openSystemConsolePanel() {
-        if (dockManager != null) {
-            dockManager.showPane(DOCK_BOTTOM_CONSOLE_ID, DockRegionType.BOTTOM);
-            consoleVisible = true;
-            if (systemConsole != null) {
-                systemConsole.setVisible(true);
-                systemConsole.setManaged(true);
-                systemConsole.requestFocus();
-            }
-            saveAppState();
-            return;
-        }
-
-        if (centerSplit == null || systemConsole == null) {
-            openDetachedConsolePanel();
-            showWarning("System Console", "Embedded console is unavailable, opened detached console instead.");
-            return;
-        }
-
-        if (detachedSystemConsoleStage != null && detachedSystemConsoleStage.isShowing()) {
-            reattachConsole();
-        }
-
-        terminalTabPane.setVisible(true);
-        terminalTabPane.setManaged(true);
-        systemConsole.setVisible(true);
-        systemConsole.setManaged(true);
-
-        if (!centerSplit.getItems().contains(systemConsole)) {
-            centerSplit.getItems().add(systemConsole);
-        }
-        centerSplit.setDividerPositions(0.72);
-        consoleVisible = true;
-        centerSplit.layout();
-        if (mainVerticalWorkbench != null) {
-            mainVerticalWorkbench.layout();
-        }
-        if (horizontalWorkbench != null) {
-            horizontalWorkbench.layout();
-        }
-        systemConsole.requestFocus();
-        terminalTabPane.requestFocus();
-        saveAppState();
+        showConsole();
     }
 
     private void openDetachedConsolePanel() {
@@ -4108,26 +4148,6 @@ public class TradingDesk extends BorderPane {
                 tableColumn("Price", order -> price(order.getPrice()), 90),
                 tableColumn("Status", Order::getStatus, 90)));
         return table;
-    }
-
-    private @NotNull Node buildFillsPane() {
-        VBox root = new VBox(0);
-        root.setStyle("-fx-background-color: #0a0e17;");
-
-        HBox toolbar = new HBox(10);
-        toolbar.setPadding(new Insets(8, 12, 8, 12));
-        toolbar.setAlignment(Pos.CENTER_LEFT);
-        toolbar.setStyle("-fx-background-color: #0f1724; -fx-border-color: #1e2d42; -fx-border-width: 0 0 1 0;");
-
-        Label title = new Label("Order Fills / History");
-        title.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #e2e8f0;");
-
-        toolbar.getChildren().add(title);
-
-        TableView<Order> table = buildOrderHistoryTable();
-        VBox.setVgrow(table, Priority.ALWAYS);
-        root.getChildren().addAll(toolbar, table);
-        return root;
     }
 
     // Account Summary pane fields (observable so updateAccountSummary can refresh

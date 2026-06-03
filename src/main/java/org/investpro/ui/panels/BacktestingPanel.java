@@ -46,7 +46,6 @@ import org.investpro.utils.HistoricalDataPrefetcher;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
-
 import java.io.File;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -561,7 +560,7 @@ public class BacktestingPanel extends StackPane {
 
         if (manager != null) {
             try {
-                symbols.addAll(manager.getAllStates().stream().map(SymbolAgentState::getSymbol).filter(Objects::nonNull)
+                symbols.addAll(manager.getAllStates().stream().map(SymbolAgentState::getSymbol)
                         .distinct().toList());
             } catch (Exception exception) {
                 log.warn("Failed to load symbols from SymbolAgentManager: {}", exception.getMessage());
@@ -1759,28 +1758,6 @@ public class BacktestingPanel extends StackPane {
                 point.getNode().setStyle("-fx-background-color: transparent; -fx-padding: 0;");
             }
         }
-    }
-
-    private @NotNull String formatMetricValue(Object value, boolean isPercent, boolean forceNegativePrefix) {
-        double numValue = cleanNumber(asDouble(value));
-
-        if (isPercent) {
-            if (forceNegativePrefix && numValue > 0) {
-                return String.format(Locale.ROOT, "-%.2f%%", numValue);
-            }
-
-            return String.format(Locale.ROOT, "%.2f%%", numValue);
-        }
-
-        return String.format(Locale.ROOT, "%.2f", numValue);
-    }
-
-    private double asDouble(Object value) {
-        if (value instanceof Number number) {
-            return number.doubleValue();
-        }
-
-        return 0.0;
     }
 
     private double cleanNumber(double value) {

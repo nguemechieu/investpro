@@ -12,6 +12,7 @@ import java.util.Objects;
 public final class FloatingWindow {
     private final DockablePane pane;
     private final Stage stage;
+    private boolean reattachOnHide = true;
 
     public FloatingWindow(DockablePane pane, Runnable onClose) {
         this.pane = Objects.requireNonNull(pane, "pane must not be null");
@@ -21,9 +22,10 @@ public final class FloatingWindow {
         stage.setTitle(pane.getTitle());
         stage.setScene(new Scene(root, 920, 620));
         stage.setOnHidden(event -> {
-            if (onClose != null) {
+            if (reattachOnHide && onClose != null) {
                 onClose.run();
             }
+            reattachOnHide = true;
         });
     }
 
@@ -36,6 +38,20 @@ public final class FloatingWindow {
     }
 
     public void close() {
+        close(true);
+    }
+
+    public void close(boolean reattachOnClose) {
+        this.reattachOnHide = reattachOnClose;
         stage.close();
+    }
+
+    public boolean isShowing() {
+        return stage.isShowing();
+    }
+
+    public void focus() {
+        stage.toFront();
+        stage.requestFocus();
     }
 }
