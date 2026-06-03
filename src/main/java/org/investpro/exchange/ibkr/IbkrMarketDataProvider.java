@@ -8,9 +8,11 @@ import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
+import org.investpro.utils.Side;
 import org.investpro.utils.CandleDataSupplier;
 import org.jetbrains.annotations.NotNull;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,17 +27,51 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class IbkrMarketDataProvider {
 
     private final IbkrConnectionManager connectionManager;
+    private final IbkrClientPortalClient clientPortalClient;
     private final ConcurrentHashMap<String, Double> lastPriceBySymbol = new ConcurrentHashMap<>();
 
-    public IbkrMarketDataProvider(IbkrConnectionManager connectionManager) {
+    public IbkrMarketDataProvider(IbkrConnectionManager connectionManager, IbkrClientPortalClient clientPortalClient) {
         this.connectionManager = connectionManager;
+        this.clientPortalClient = clientPortalClient;
     }
 
     public CompletableFuture<Ticker> fetchTicker(TradePair pair) {
         return CompletableFuture.supplyAsync(() -> {
+            if (connectionManager.getMode() == IbkrConnectionManager.Mode.LIVE && clientPortalClient != null) {
+                Optional<Ticker> liveTicker = clientPortalClient.fetchTicker(pair);
+                if (liveTicker.isPresent()) {
+                    connectionManager.markMarketDataAvailable(true);
+                    return liveTicker.get();
+                }
+            }
+
             double nextPrice = nextPrice(pair);
             connectionManager.markMarketDataAvailable(true);
             return new Ticker(nextPrice, nextPrice - 0.01, nextPrice + 0.01, 1_000.0, System.currentTimeMillis());
+        });
+    }
+
+    public CompletableFuture<org.investpro.models.trading.OrderBook> fetchOrderBook(TradePair pair) {
+        return CompletableFuture.supplyAsync(() -> {
+            if (connectionManager.getMode() == IbkrConnectionManager.Mode.LIVE && clientPortalClient != null) {
+                Optional<org.investpro.models.trading.OrderBook> liveOrderBook = clientPortalClient
+                        .fetchOrderBook(pair);
+                if (liveOrderBook.isPresent()) {
+                    connectionManager.markMarketDataAvailable(true);
+                    return liveOrderBook.get();
+                }
+            }
+
+            Ticker ticker = tickerSync(pair);
+            org.investpro.models.trading.OrderBook fallback = new org.investpro.models.trading.OrderBook(pair);
+            double bid = ticker.getBidPrice() > 0.0 ? ticker.getBidPrice()
+                    : Math.max(0.01, ticker.getMidPrice() - 0.01);
+            double ask = ticker.getAskPrice() > 0.0 ? ticker.getAskPrice() : Math.max(bid, ticker.getMidPrice() + 0.01);
+            fallback.setBids(List.of(new org.investpro.models.trading.OrderBook.PriceLevel(bid, 1_000.0, 1)));
+            fallback.setAsks(List.of(new org.investpro.models.trading.OrderBook.PriceLevel(ask, 1_000.0, 1)));
+            fallback.setTimestamp(Instant.now());
+            fallback.setSequence("ibkr-fallback-" + System.currentTimeMillis());
+            return fallback;
         });
     }
 
@@ -70,9 +106,7 @@ public final class IbkrMarketDataProvider {
                     int secondsPerCandle) {
                 return IbkrMarketDataProvider.this.fetchCandleDataForInProgressCandle(
                         tradePair,
-                        currentCandleStartedAt,
-                        secondsIntoCurrentCandle,
-                        secondsPerCandle).thenApply(value -> Optional.of(value));
+                        currentCandleStartedAt).thenApply(Optional::of);
             }
 
             @Override
@@ -84,9 +118,7 @@ public final class IbkrMarketDataProvider {
 
     public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
             @NotNull TradePair pair,
-            Instant currentCandleStartedAt,
-            long secondsIntoCurrentCandle,
-            int secondsPerCandle) {
+            Instant currentCandleStartedAt) {
         return fetchTicker(pair).thenApply(ticker -> {
             InProgressCandleData data = new InProgressCandleData(
                     (int) currentCandleStartedAt.getEpochSecond(),
@@ -101,7 +133,54 @@ public final class IbkrMarketDataProvider {
     }
 
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair pair, Instant stopAt) {
-        return CompletableFuture.completedFuture(List.of());
+        return CompletableFuture.supplyAsync(() -> {
+            if (pair == null) {
+                return List.of();
+            }
+
+            Instant now = Instant.now();
+            if (stopAt != null && stopAt.isAfter(now)) {
+                return List.of();
+            }
+
+            // Keep the request bounded so UI refreshes stay responsive.
+            Instant lowerBound = stopAt != null ? stopAt : now.minusSeconds(120);
+            long windowSeconds = Math.max(1L, Duration.between(lowerBound, now).getSeconds());
+            int count = (int) Math.min(500L, Math.max(20L, windowSeconds / 5L));
+
+            Ticker ticker = tickerSync(pair);
+            double anchorPrice = ticker.getLastPrice() > 0.0
+                    ? ticker.getLastPrice()
+                    : ticker.getMidPrice() > 0.0 ? ticker.getMidPrice() : nextPrice(pair);
+
+            List<Trade> trades = new ArrayList<>(count);
+            ThreadLocalRandom random = ThreadLocalRandom.current();
+            double runningPrice = Math.max(0.01, anchorPrice);
+            long baseTradeId = System.currentTimeMillis() * 1_000L;
+
+            for (int index = count - 1; index >= 0; index--) {
+                Instant tradeTime = now.minusSeconds((long) index * 5L);
+                if (tradeTime.isBefore(lowerBound)) {
+                    continue;
+                }
+
+                double drift = random.nextDouble(-0.0015, 0.0015) * Math.max(1.0, runningPrice);
+                runningPrice = Math.max(0.01, runningPrice + drift);
+                double size = random.nextDouble(1.0, 250.0);
+                Side side = random.nextBoolean() ? Side.BUY : Side.SELL;
+
+                trades.add(new Trade(
+                        pair,
+                        runningPrice,
+                        size,
+                        side,
+                        baseTradeId + (count - index),
+                        tradeTime));
+            }
+
+            trades.sort(Comparator.comparing(Trade::getTimestamp));
+            return trades;
+        });
     }
 
     public List<Timeframe> supportedTimeframes() {

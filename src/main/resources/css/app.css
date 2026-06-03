@@ -305,9 +305,42 @@ GridPane {
     -fx-translate-y: 1;
 }
 
+.button:focused,
+.toggle-button:focused,
+.menu-button:focused {
+    -fx-border-color: -primary-light;
+    -fx-effect: dropshadow(gaussian, rgba(96, 165, 250, 0.35), 8, 0, 0, 0);
+}
+
 .button:disabled {
     -fx-opacity: 0.45;
     -fx-cursor: default;
+}
+
+.toggle-button,
+.menu-button {
+    -fx-background-color: linear-gradient(to bottom, #334155, #1e293b);
+    -fx-text-fill: -text-primary;
+    -fx-font-weight: 700;
+    -fx-font-size: 12px;
+    -fx-padding: 7 14 7 14;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-border-color: #475569;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+}
+
+.toggle-button:hover,
+.menu-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #475569, #334155);
+    -fx-border-color: #60a5fa;
+}
+
+.toggle-button:selected {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #60a5fa;
+    -fx-text-fill: white;
 }
 
 .mt5-toolbar-button,
@@ -426,6 +459,50 @@ GridPane {
 .chart-timeframe-selector:focused {
     -fx-border-color: -primary-light;
     -fx-effect: dropshadow(gaussian, rgba(96, 165, 250, 0.35), 8, 0, 0, 0);
+}
+
+
+/* ============================================================================
+   CHECKBOXES
+   ============================================================================ */
+
+.check-box {
+    -fx-text-fill: -text-secondary;
+    -fx-font-size: 12px;
+    -fx-padding: 2 0 2 0;
+}
+
+.check-box > .box {
+    -fx-background-color: #0f172a;
+    -fx-border-color: -border-strong;
+    -fx-border-width: 1;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-padding: 2;
+}
+
+.check-box:hover > .box {
+    -fx-border-color: -primary-light;
+}
+
+.check-box:selected > .box,
+.check-box:indeterminate > .box {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #60a5fa;
+}
+
+.check-box:selected > .box > .mark,
+.check-box:indeterminate > .box > .mark {
+    -fx-background-color: white;
+}
+
+.check-box:focused > .box {
+    -fx-border-color: -primary-light;
+    -fx-effect: dropshadow(gaussian, rgba(96, 165, 250, 0.35), 7, 0, 0, 0);
+}
+
+.check-box:disabled {
+    -fx-opacity: 0.5;
 }
 
 .combo-box .list-cell,
@@ -1132,8 +1209,8 @@ GridPane {
    ============================================================================ */
 
 .chart-options-pane {
-    -fx-background-color: #0b1220;
-    -fx-border-color: #263449;
+    -fx-background-color: linear-gradient(to bottom, #101827, #0b1220);
+    -fx-border-color: #3b4d66;
     -fx-border-width: 1;
     -fx-background-radius: 8;
     -fx-border-radius: 8;
@@ -1147,7 +1224,7 @@ GridPane {
 }
 
 .chart-options-label {
-    -fx-text-fill: #dbeafe;
+    -fx-text-fill: #f8fafc;
     -fx-font-size: 12px;
     -fx-font-weight: 600;
 }
@@ -1157,12 +1234,30 @@ GridPane {
 }
 
 .chart-options-switch .text {
-    -fx-fill: #94a3b8;
+    -fx-fill: #f1f5f9;
     -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+.chart-options-switch .thumb-area {
+    -fx-background-color: #1e293b;
+    -fx-border-color: #64748b;
+    -fx-border-width: 1;
+    -fx-border-radius: 999;
+    -fx-background-radius: 999;
+}
+
+.chart-options-switch .thumb {
+    -fx-background-color: linear-gradient(to bottom, #f8fafc, #cbd5e1);
 }
 
 .chart-options-switch:selected .thumb-area {
     -fx-background-color: #2563eb;
+    -fx-border-color: #93c5fd;
+}
+
+.chart-options-switch:hover .thumb-area {
+    -fx-border-color: #93c5fd;
 }
 
 

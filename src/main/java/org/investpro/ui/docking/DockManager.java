@@ -10,7 +10,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.prefs.Preferences;
 
 /**
@@ -19,6 +18,7 @@ import java.util.prefs.Preferences;
 public final class DockManager {
     private static final String HORIZONTAL_DIVIDERS_SUFFIX = "dividers.horizontal";
     private static final String VERTICAL_DIVIDER_SUFFIX = "dividers.vertical";
+    private static final double DEFAULT_VERTICAL_DIVIDER = 0.72;
 
     private final SplitPane horizontalSplit = new SplitPane();
     private final SplitPane rootSplit = new SplitPane();
@@ -27,11 +27,12 @@ public final class DockManager {
     private final Map<String, DockRegionType> paneRegion = new LinkedHashMap<>();
     private final Map<String, DockRegionType> lastDockedRegion = new LinkedHashMap<>();
     private final Map<String, FloatingWindow> floatingById = new LinkedHashMap<>();
+    private double lastVisibleBottomDivider = DEFAULT_VERTICAL_DIVIDER;
 
     public DockManager() {
         for (DockRegionType regionType : DockRegionType.values()) {
             DockRegion region = new DockRegion(regionType);
-            region.setPaneMoveHandler((paneId, targetRegion) -> movePane(paneId, targetRegion));
+            region.setPaneMoveHandler(this::movePane);
             regions.put(regionType, region);
         }
 
@@ -44,7 +45,7 @@ public final class DockManager {
 
         rootSplit.setOrientation(Orientation.VERTICAL);
         rootSplit.getItems().setAll(horizontalSplit, regions.get(DockRegionType.BOTTOM));
-        rootSplit.setDividerPositions(0.72);
+        rootSplit.setDividerPositions(DEFAULT_VERTICAL_DIVIDER);
 
         DockRegion leftRegion = regions.get(DockRegionType.LEFT);
         DockRegion rightRegion = regions.get(DockRegionType.RIGHT);
@@ -56,8 +57,10 @@ public final class DockManager {
             rightRegion.setMinWidth(220);
         }
         if (bottomRegion != null) {
-            bottomRegion.setMinHeight(140);
+            bottomRegion.setMinHeight(0);
         }
+
+        updateBottomRegionVisibility();
     }
 
     public Node getView() {
@@ -74,14 +77,6 @@ public final class DockManager {
 
         panesById.put(pane.getId(), pane);
         attachPane(pane.getId(), initialRegion);
-    }
-
-    public Optional<DockablePane> findPane(String paneId) {
-        return Optional.ofNullable(panesById.get(paneId));
-    }
-
-    public Optional<DockRegionType> getPaneRegion(String paneId) {
-        return Optional.ofNullable(paneRegion.get(paneId));
     }
 
     public void movePane(String paneId, DockRegionType fromRegion, DockRegionType toRegion) {
@@ -102,6 +97,7 @@ public final class DockManager {
         to.addPane(pane);
         paneRegion.put(paneId, toRegion);
         lastDockedRegion.put(paneId, toRegion);
+        updateBottomRegionVisibility();
     }
 
     public void movePane(String paneId, DockRegionType toRegion) {
@@ -116,6 +112,15 @@ public final class DockManager {
     }
 
     public void detachPane(String paneId) {
+        if (paneId == null) {
+            return;
+        }
+        FloatingWindow existingFloating = floatingById.get(paneId);
+        if (existingFloating != null) {
+            existingFloating.focus();
+            return;
+        }
+
         DockablePane pane = panesById.get(paneId);
         DockRegionType regionType = paneRegion.get(paneId);
         if (pane == null || regionType == null) {
@@ -133,6 +138,7 @@ public final class DockManager {
                 () -> attachPane(paneId, lastDockedRegion.getOrDefault(paneId, DockRegionType.CENTER)));
         floatingById.put(paneId, floatingWindow);
         floatingWindow.show();
+        updateBottomRegionVisibility();
     }
 
     public void attachPane(String paneId, DockRegionType regionType) {
@@ -144,7 +150,7 @@ public final class DockManager {
 
         FloatingWindow floatingWindow = floatingById.remove(paneId);
         if (floatingWindow != null) {
-            floatingWindow.close();
+            floatingWindow.close(false);
         }
 
         for (DockRegion existingRegion : regions.values()) {
@@ -157,22 +163,34 @@ public final class DockManager {
         region.addPane(pane);
         paneRegion.put(paneId, regionType);
         lastDockedRegion.put(paneId, regionType);
+        updateBottomRegionVisibility();
     }
 
     public boolean isDocked(String paneId) {
         return paneRegion.containsKey(paneId);
     }
 
+    public boolean isFloating(String paneId) {
+        return paneId != null && floatingById.containsKey(paneId);
+    }
+
     public void hidePane(String paneId) {
         DockRegionType regionType = paneRegion.remove(paneId);
-        if (regionType == null) {
+        if (regionType != null) {
+            DockRegion region = regions.get(regionType);
+            if (region != null) {
+                region.removePane(paneId);
+            }
+            lastDockedRegion.put(paneId, regionType);
+            updateBottomRegionVisibility();
             return;
         }
-        DockRegion region = regions.get(regionType);
-        if (region != null) {
-            region.removePane(paneId);
+
+        FloatingWindow floatingWindow = floatingById.remove(paneId);
+        if (floatingWindow != null) {
+            floatingWindow.close(false);
         }
-        lastDockedRegion.put(paneId, regionType);
+        updateBottomRegionVisibility();
     }
 
     public void showPane(String paneId, DockRegionType fallbackRegion) {
@@ -240,6 +258,8 @@ public final class DockManager {
                 }
             }
         }
+
+        updateBottomRegionVisibility();
     }
 
     public void loadLayout(Preferences preferences, String keyPrefix) {
@@ -255,7 +275,7 @@ public final class DockManager {
             }
             List<String> paneIds = new ArrayList<>();
             for (String token : csv.split(",")) {
-                String paneId = token == null ? "" : token.trim();
+                String paneId = token.trim();
                 if (!paneId.isBlank()) {
                     paneIds.add(paneId);
                 }
@@ -284,10 +304,45 @@ public final class DockManager {
         String verticalValue = preferences.get(keyPrefix + VERTICAL_DIVIDER_SUFFIX, "");
         if (!verticalValue.isBlank()) {
             try {
-                rootSplit.setDividerPositions(Double.parseDouble(verticalValue.trim()));
+                double parsedDivider = Double.parseDouble(verticalValue.trim());
+                if (parsedDivider > 0.0 && parsedDivider < 1.0) {
+                    lastVisibleBottomDivider = parsedDivider;
+                }
+                if (hasDockedPanes()) {
+                    rootSplit.setDividerPositions(parsedDivider);
+                }
             } catch (NumberFormatException ignored) {
                 // Keep defaults when persisted divider value is invalid.
             }
         }
+
+        updateBottomRegionVisibility();
+    }
+
+    private boolean hasDockedPanes() {
+        for (DockRegionType current : paneRegion.values()) {
+            if (current == DockRegionType.BOTTOM) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void updateBottomRegionVisibility() {
+        double[] dividerPositions = rootSplit.getDividerPositions();
+        if (dividerPositions.length > 0) {
+            double current = dividerPositions[0];
+            if (current > 0.0 && current < 0.999) {
+                lastVisibleBottomDivider = current;
+            }
+        }
+
+        if (hasDockedPanes()) {
+            if (dividerPositions.length == 0 || dividerPositions[0] >= 0.999) {
+                rootSplit.setDividerPositions(lastVisibleBottomDivider);
+            }
+            return;
+        }
+        rootSplit.setDividerPositions(1.0);
     }
 }

@@ -31,6 +31,7 @@ import java.util.function.BooleanSupplier;
 public class IbkrExchange extends InteractiveBrokers {
 
     private final IbkrConnectionManager connectionManager;
+    private final IbkrClientPortalClient clientPortalClient;
     private final IbkrContractMapper contractMapper;
     private final IbkrMarketDataProvider marketDataProvider;
     private final IbkrPersistenceStore persistenceStore;
@@ -47,10 +48,15 @@ public class IbkrExchange extends InteractiveBrokers {
     public IbkrExchange(ExchangeCredentials credentials) {
         super(credentials);
         this.connectionManager = new IbkrConnectionManager();
+        this.clientPortalClient = new IbkrClientPortalClient(credentials);
         this.contractMapper = new IbkrContractMapper();
-        this.marketDataProvider = new IbkrMarketDataProvider(connectionManager);
+        this.marketDataProvider = new IbkrMarketDataProvider(connectionManager, clientPortalClient);
         this.persistenceStore = new IbkrPersistenceStore();
-        this.accountService = new IbkrAccountService(connectionManager, persistenceStore, modeRequestsPaperNetwork());
+        this.accountService = new IbkrAccountService(
+                connectionManager,
+                persistenceStore,
+                clientPortalClient,
+                modeRequestsPaperNetwork());
         this.positionService = new IbkrPositionService(persistenceStore);
         this.portfolioService = new IbkrPortfolioService(positionService, accountService);
         this.orderService = new IbkrOrderService(positionService, accountService, marketDataProvider, persistenceStore);
@@ -75,21 +81,6 @@ public class IbkrExchange extends InteractiveBrokers {
 
     public void setLiveRiskApprovalGate(BooleanSupplier riskApprovalGate) {
         this.liveRiskApprovalGate = riskApprovalGate == null ? () -> false : riskApprovalGate;
-    }
-
-    @Override
-    public String getName() {
-        return "INTERACTIVE BROKERS";
-    }
-
-    @Override
-    public String getDisplayName() {
-        return "Interactive Brokers";
-    }
-
-    @Override
-    public String getExchangeId() {
-        return "interactive_brokers";
     }
 
     @Override
@@ -131,7 +122,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
-        if (!canTradeNow(true)) {
+        if (canTradeNow()) {
             return CompletableFuture
                     .failedFuture(new IllegalStateException("IBKR live trading gate denied market order"));
         }
@@ -141,7 +132,7 @@ public class IbkrExchange extends InteractiveBrokers {
     @Override
     public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
             double limitPrice) {
-        if (!canTradeNow(true)) {
+        if (canTradeNow()) {
             return CompletableFuture
                     .failedFuture(new IllegalStateException("IBKR live trading gate denied limit order"));
         }
@@ -150,7 +141,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice) {
-        if (!canTradeNow(true)) {
+        if (canTradeNow()) {
             return CompletableFuture
                     .failedFuture(new IllegalStateException("IBKR live trading gate denied stop order"));
         }
@@ -164,7 +155,7 @@ public class IbkrExchange extends InteractiveBrokers {
             double entryPrice,
             double stopLoss,
             double takeProfit) {
-        if (!canTradeNow(true)) {
+        if (canTradeNow()) {
             return CompletableFuture
                     .failedFuture(new IllegalStateException("IBKR live trading gate denied bracket order"));
         }
@@ -286,9 +277,8 @@ public class IbkrExchange extends InteractiveBrokers {
             int secondsPerCandle) {
         return marketDataProvider.fetchCandleDataForInProgressCandle(
                 tradePair,
-                currentCandleStartedAt,
-                secondsIntoCurrentCandle,
-                secondsPerCandle);
+                currentCandleStartedAt
+        );
     }
 
     @Override
@@ -313,13 +303,13 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
-        return CompletableFuture.completedFuture(accountService.toAccount(this));
+        return CompletableFuture.completedFuture(accountService.toAccount(this, currentSnapshot()));
     }
 
     @Override
     public CompletableFuture<Double> fetchAvailableBalance(String currencyCode) {
         return CompletableFuture.completedFuture(
-                accountService.snapshot().balances().getOrDefault(normalize(currencyCode), 0.0));
+                currentSnapshot().balances().getOrDefault(normalize(currencyCode), 0.0));
     }
 
     @Override
@@ -329,17 +319,22 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<Double> fetchEquity() {
-        return CompletableFuture.completedFuture(accountService.snapshot().equity());
+        return CompletableFuture.completedFuture(currentSnapshot().equity());
     }
 
     @Override
     public CompletableFuture<Double> fetchMarginUsed() {
-        return CompletableFuture.completedFuture(accountService.snapshot().marginUsed());
+        return CompletableFuture.completedFuture(currentSnapshot().marginUsed());
     }
 
     @Override
     public CompletableFuture<Double> fetchFreeMargin() {
-        return CompletableFuture.completedFuture(accountService.snapshot().availableFunds());
+        return CompletableFuture.completedFuture(currentSnapshot().availableFunds());
+    }
+
+    @Override
+    public CompletableFuture<org.investpro.models.trading.OrderBook> fetchOrderBook(TradePair tradePair) {
+        return marketDataProvider.fetchOrderBook(tradePair);
     }
 
     public void synchronizePortfolio() {
@@ -351,26 +346,34 @@ public class IbkrExchange extends InteractiveBrokers {
     }
 
     public TradePair parsePair(String symbol) throws SQLException, ClassNotFoundException {
-        return TradePair.fromSymbol(symbol);
+        TradePair tradePair = TradePair.fromSymbol(symbol);
+        tradePair.setTradingSession(IbkrTradingSessionFactory.forInstrument(symbol));
+        return tradePair;
     }
 
     public IbkrConnectionManager.ConnectionHealth connectionHealth() {
         return connectionManager.snapshotHealth();
     }
 
-    private boolean canTradeNow(boolean riskApproved) {
+    private boolean canTradeNow() {
         if (isPaperTrading()) {
-            return true;
+            return false;
         }
-        return connectionManager.isConnected()
-                && marketDataProvider.isMarketDataHealthy()
-                && riskApproved
-                && liveRiskApprovalGate.getAsBoolean()
-                && liveTradingLicenseGate.getAsBoolean();
+        return !connectionManager.isConnected()
+                || !marketDataProvider.isMarketDataHealthy()
+                || !liveRiskApprovalGate.getAsBoolean()
+                || !liveTradingLicenseGate.getAsBoolean();
     }
 
     private double quantityFor(TradePair pair) {
         return positionService.fetchOne(pair).map(Position::getQuantity).orElse(1.0);
+    }
+
+    private IbkrAccountSnapshot currentSnapshot() {
+        if (modeRequestsPaperNetwork()) {
+            return accountService.snapshot();
+        }
+        return accountService.refreshFromBrokerIfAvailable();
     }
 
     private String normalize(String currency) {
@@ -378,26 +381,6 @@ public class IbkrExchange extends InteractiveBrokers {
             return "USD";
         }
         return currency.trim().toUpperCase(Locale.ROOT);
-    }
-
-    @Override
-    public boolean supportsDerivatives() {
-        return true;
-    }
-
-    @Override
-    public boolean supportsForex() {
-        return true;
-    }
-
-    @Override
-    public boolean supportsStocks() {
-        return true;
-    }
-
-    @Override
-    public boolean supportsPaperTradingMode() {
-        return true;
     }
 
     @Override

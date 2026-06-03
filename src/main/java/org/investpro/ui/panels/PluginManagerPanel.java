@@ -15,8 +15,10 @@ import org.investpro.spi.InvestProPlugin;
 import org.investpro.spi.PluginRegistry;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
+import org.investpro.strategy.StrategyCatalog;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
 
 
 public class PluginManagerPanel extends BorderPane {
@@ -93,12 +95,27 @@ public class PluginManagerPanel extends BorderPane {
     }
 
     private Collection<PluginRow> strategyRows() {
-        return pluginRegistry.strategyProviders().stream()
-                .map(provider -> row(
+        LinkedHashMap<String, PluginRow> rows = new LinkedHashMap<>();
+
+        pluginRegistry.strategyProviders().forEach(provider -> rows.putIfAbsent(
+                provider.id(),
+                row(
                         provider,
                         provider.category(),
-                        String.join(", ", provider.supportedMarketTypes())))
-                .toList();
+                        String.join(", ", provider.supportedMarketTypes()))));
+
+        for (String strategyName : StrategyCatalog.availableStrategyNames()) {
+            String normalized = StrategyCatalog.normalizeStrategyName(strategyName);
+            rows.putIfAbsent(normalized, new PluginRow(
+                    normalized,
+                    strategyName,
+                    "catalog",
+                    "true",
+                    StrategyCatalog.resolveBaseStrategyName(strategyName),
+                    "Built-in strategy catalog entry"));
+        }
+
+        return rows.values();
     }
 
     private Collection<PluginRow> indicatorRows() {

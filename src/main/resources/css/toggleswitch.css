@@ -1,37 +1,51 @@
 .toggle-switch {
-    -thumb-move-animation-time: 300;
+    -thumb-move-animation-time: 240;
 }
+
 .toggle-switch .text {
     -fx-font-size: 1em;
-    -fx-text-fill: -fx-text-base-color;
+    -fx-text-fill: #f1f5f9;
+    -fx-font-weight: 700;
 }
+
 .toggle-switch .thumb {
-    -fx-background-color: linear-gradient(to bottom, derive(-fx-text-box-border, -20%), derive(-fx-text-box-border, -30%)),
-                            -fx-inner-border,
-                            -fx-body-color;
-    -fx-background-insets: 0, 1, 2;
+    -fx-background-color: linear-gradient(to bottom, #f8fafc, #cbd5e1);
+    -fx-background-insets: 0;
     -fx-background-radius: 1.0em; /* large value to make sure this remains circular */
     -fx-padding: 0.75em;
     -fx-alignment: CENTER;
     -fx-content-display: LEFT;
 }
+
 .toggle-switch .thumb-area {
     -fx-background-radius: 1em;
-    -fx-background-color: linear-gradient(to bottom, derive(-fx-text-box-border, -20%), derive(-fx-text-box-border, -30%)), #f5f5f5;
+    -fx-background-color: #0f172a;
+    -fx-border-color: #64748b;
+    -fx-border-width: 1;
+    -fx-border-radius: 1em;
     -fx-background-insets: 0, 1;
-}
-.toggle-switch:hover .thumb {
-    -fx-color: -fx-hover-base;
-}
-.toggle-switch:selected .thumb-area {
-    -fx-background-color: linear-gradient(to bottom, derive(-fx-text-box-border, -20%), derive(-fx-text-box-border, -30%)),
-                            linear-gradient(to bottom, derive(#0b99c9, 30%), #0b99c9);
-    -fx-background-insets: 0, 1;
-}
-.toggle-switch .thumb-area {
     -fx-padding: 0.75em 1.333333em 0.75em 1.333333em; /* 7 16 7 16 */
     -fx-alignment: CENTER;
 }
+
+.toggle-switch:hover .thumb {
+    -fx-background-color: linear-gradient(to bottom, #ffffff, #e2e8f0);
+}
+
+.toggle-switch:hover .thumb-area {
+    -fx-border-color: #93c5fd;
+}
+
+.toggle-switch:selected .thumb-area {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #dbeafe;
+}
+
+.toggle-switch:focused .thumb-area {
+    -fx-border-color: #dbeafe;
+    -fx-effect: dropshadow(gaussian, rgba(96, 165, 250, 0.35), 7, 0, 0, 0);
+}
+
 .toggle-switch:disabled {
-    -fx-opacity: 0.4;
+    -fx-opacity: 0.45;
 }

@@ -9,6 +9,7 @@ import org.investpro.models.Account;
 import org.investpro.data.CandleData;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.exchange.credentials.ExchangeCredentials;
+import org.investpro.exchange.ibkr.IbkrTradingSessionFactory;
 import org.investpro.exchange.infrastructure.StreamTransport;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
@@ -168,8 +169,7 @@ public class InteractiveBrokers extends Exchange {
             "MSTR",
             "IBIT",
             "FBTC",
-            "BITO"
-    );
+            "BITO");
     private static final List<String> DEFAULT_FOREX_SYMBOLS = List.of(
             // Major pairs
             "EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF",
@@ -181,8 +181,7 @@ public class InteractiveBrokers extends Exchange {
             "AUD/JPY", "AUD/CHF", "AUD/CAD", "AUD/NZD",
             "NZD/JPY", "NZD/CHF", "NZD/CAD",
             "CAD/JPY", "CAD/CHF",
-            "CHF/JPY"
-    );
+            "CHF/JPY");
 
     // Paper trading state
     private final java.util.Map<String, Double> balances = new java.util.concurrent.ConcurrentHashMap<>();
@@ -991,7 +990,9 @@ public class InteractiveBrokers extends Exchange {
 
     @Override
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
-        return TradePair.fromSymbol("AAPL_USD");
+        TradePair tradePair = TradePair.fromSymbol("AAPL_USD");
+        tradePair.setTradingSession(IbkrTradingSessionFactory.forInstrument("AAPL_USD"));
+        return tradePair;
     }
 
     @Override
@@ -1553,7 +1554,9 @@ public class InteractiveBrokers extends Exchange {
 
     private void addPair(List<TradePair> pairs, String base, String quote) {
         try {
-            pairs.add(TradePair.fromSymbol(base + "_" + quote));
+            TradePair tradePair = TradePair.fromSymbol(base + "_" + quote);
+            tradePair.setTradingSession(IbkrTradingSessionFactory.forInstrument(base + "_" + quote));
+            pairs.add(tradePair);
         } catch (Exception exception) {
             log.debug("Unable to create Interactive Brokers pair {}/{}: {}", base, quote, exception.getMessage());
         }
@@ -1625,7 +1628,7 @@ public class InteractiveBrokers extends Exchange {
     }
 
     private long firstLong(JsonNode node) {
-        String text = firstText(node, new String[]{"t", "time"}).replace(",", "");
+        String text = firstText(node, new String[] { "t", "time" }).replace(",", "");
         if (text.isBlank()) {
             return 0L;
         }

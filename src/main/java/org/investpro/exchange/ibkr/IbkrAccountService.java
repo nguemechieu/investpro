@@ -14,18 +14,36 @@ public final class IbkrAccountService {
 
     private final IbkrConnectionManager connectionManager;
     private final IbkrPersistenceStore persistenceStore;
+    private final IbkrClientPortalClient clientPortalClient;
+    private final boolean paper;
     private final AtomicReference<IbkrAccountSnapshot> snapshotRef;
 
     public IbkrAccountService(IbkrConnectionManager connectionManager, IbkrPersistenceStore persistenceStore,
+            IbkrClientPortalClient clientPortalClient,
             boolean paper) {
         this.connectionManager = connectionManager;
         this.persistenceStore = persistenceStore;
+        this.clientPortalClient = clientPortalClient;
+        this.paper = paper;
         this.snapshotRef = new AtomicReference<>(
                 IbkrAccountSnapshot.paperDefault(paper ? "DU-PAPER" : "U-LIVE"));
     }
 
     public IbkrAccountSnapshot snapshot() {
         return snapshotRef.get();
+    }
+
+    public IbkrAccountSnapshot refreshFromBrokerIfAvailable() {
+        if (paper || clientPortalClient == null || !connectionManager.isConnected()) {
+            return snapshot();
+        }
+
+        clientPortalClient.fetchAccountSnapshot(false)
+                .ifPresent(snapshot -> {
+                    snapshotRef.set(snapshot);
+                    persistenceStore.persistAccount(snapshot);
+                });
+        return snapshot();
     }
 
     public void setBalance(String currency, double total, double available) {
@@ -54,24 +72,24 @@ public final class IbkrAccountService {
         setBalance("USD", usd, usd - current.marginUsed());
     }
 
-    public Account toAccount(Exchange exchange) {
-        IbkrAccountSnapshot snapshot = snapshot();
+    public Account toAccount(Exchange exchange, IbkrAccountSnapshot snapshot) {
+        IbkrAccountSnapshot effectiveSnapshot = snapshot == null ? snapshot() : snapshot;
         Account account = new Account(exchange, "ibkr", "");
-        account.setAccountId(snapshot.accountId());
-        account.setAccount(snapshot.accountId());
-        account.setBrokerName(snapshot.broker());
+        account.setAccountId(effectiveSnapshot.accountId());
+        account.setAccount(effectiveSnapshot.accountId());
+        account.setBrokerName(effectiveSnapshot.broker());
         account.setExchangeId("interactive_brokers");
         account.setConnected(connectionManager.isConnected());
-        account.setPaperTrading(snapshot.paper());
-        account.setSandbox(snapshot.paper());
-        account.setEquity(snapshot.equity());
-        account.setTotalBalance(snapshot.equity());
-        account.setAvailableBalance(snapshot.availableFunds());
-        account.setBuyingPower(snapshot.buyingPower());
-        account.setMarginUsed(snapshot.marginUsed());
-        account.setFreeMargin(snapshot.availableFunds());
-        account.setBalances(snapshot.balances());
-        account.setUpdatedAt(snapshot.updatedAt());
+        account.setPaperTrading(effectiveSnapshot.paper());
+        account.setSandbox(effectiveSnapshot.paper());
+        account.setEquity(effectiveSnapshot.equity());
+        account.setTotalBalance(effectiveSnapshot.equity());
+        account.setAvailableBalance(effectiveSnapshot.availableFunds());
+        account.setBuyingPower(effectiveSnapshot.buyingPower());
+        account.setMarginUsed(effectiveSnapshot.marginUsed());
+        account.setFreeMargin(effectiveSnapshot.availableFunds());
+        account.setBalances(effectiveSnapshot.balances());
+        account.setUpdatedAt(effectiveSnapshot.updatedAt());
         return account;
     }
 

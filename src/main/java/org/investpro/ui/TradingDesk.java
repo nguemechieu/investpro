@@ -2430,7 +2430,7 @@ public class TradingDesk extends BorderPane {
         }
         marketWatchVisible = dockManager.isDocked(DOCK_LEFT_SIDEBAR_ID);
         orderBookVisible = dockManager.isDocked(DOCK_RIGHT_ORDERBOOK_ID);
-        consoleVisible = dockManager.isDocked(DOCK_BOTTOM_CONSOLE_ID);
+        consoleVisible = dockManager.isDocked(DOCK_BOTTOM_CONSOLE_ID) || dockManager.isFloating(DOCK_BOTTOM_CONSOLE_ID);
     }
 
     private void restoreDockLayout() {
@@ -2562,8 +2562,7 @@ public class TradingDesk extends BorderPane {
                 createTerminalTab("Risk Monitor", createPositionRiskMonitorTab().getContent()));
 
         VBox console = new VBox(0, header, terminalTabPane);
-        console.setPrefHeight(CONSOLE_HEIGHT);
-        console.setMinHeight(120);
+        console.setMinHeight(0);
         console.setMaxHeight(Double.MAX_VALUE);
         console.getStyleClass().addAll("system-console", "bottom-terminal", "mt5-terminal");
         VBox.setVgrow(terminalTabPane, Priority.ALWAYS);
@@ -2779,8 +2778,7 @@ public class TradingDesk extends BorderPane {
         terminalScrollPane.setPannable(true);
 
         VBox console = new VBox(terminalScrollPane);
-        console.setPrefHeight(CONSOLE_HEIGHT);
-        console.setMinHeight(120);
+        console.setMinHeight(0);
         console.setMaxHeight(Double.MAX_VALUE);
         console.getStyleClass().addAll("system-console", "bottom-terminal");
         VBox.setVgrow(terminalScrollPane, Priority.ALWAYS);
@@ -2789,7 +2787,9 @@ public class TradingDesk extends BorderPane {
 
     private void toggleConsoleVisibility() {
         if (dockManager != null) {
-            if (consoleVisible) {
+            boolean docked = dockManager.isDocked(DOCK_BOTTOM_CONSOLE_ID);
+            boolean floating = dockManager.isFloating(DOCK_BOTTOM_CONSOLE_ID);
+            if (docked || floating) {
                 dockManager.hidePane(DOCK_BOTTOM_CONSOLE_ID);
                 consoleVisible = false;
             } else {
@@ -5095,7 +5095,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private void configureChartArea() {
-        chartTabPane.setSide(Side.BOTTOM);
+        chartTabPane.setSide(Side.TOP);
         chartTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
         chartTabPane.setMinHeight(400);
         DraggableTab.registerTabPane(chartTabPane);

@@ -601,6 +601,20 @@
     -fx-border-color: -primary-color;
 }
 
+.terminal-button:pressed {
+    -fx-background-color: -primary-dark;
+    -fx-translate-y: 1;
+}
+
+.terminal-button:focused {
+    -fx-border-color: -primary-light;
+    -fx-effect: dropshadow(gaussian, rgba(96, 165, 250, 0.35), 8, 0, 0, 0);
+}
+
+.terminal-button:disabled {
+    -fx-opacity: 0.45;
+}
+
 .console-close-button {
     -fx-font-size: 14px;
     -fx-padding: 2px 8px;

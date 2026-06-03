@@ -196,18 +196,15 @@ public class BacktestingPanel extends StackPane {
         timeframeCombo.setValue(timeframeCombo.getItems().contains(Timeframe.H1) ? Timeframe.H1
                 : timeframeCombo.getItems().isEmpty() ? null : timeframeCombo.getItems().getFirst());
         timeframeCombo.setPrefHeight(35);
-        timeframeCombo.setCellFactory(comboBox -> new ListCell<>() {
+        timeframeCombo.setConverter(new StringConverter<>() {
             @Override
-            protected void updateItem(Timeframe item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : displayTimeframe(item));
+            public String toString(Timeframe timeframe) {
+                return timeframe == null ? "" : displayTimeframe(timeframe);
             }
-        });
-        timeframeCombo.setButtonCell(new ListCell<>() {
+
             @Override
-            protected void updateItem(Timeframe item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : displayTimeframe(item));
+            public Timeframe fromString(String string) {
+                return timeframeCombo.getValue();
             }
         });
         HBox timeframeBox = createLabeledInput("Timeframe:", timeframeCombo);
@@ -631,19 +628,15 @@ public class BacktestingPanel extends StackPane {
             symbolCombo.setValue(safeSymbols.getFirst());
         }
 
-        symbolCombo.setCellFactory(comboBox -> new ListCell<>() {
+        symbolCombo.setConverter(new StringConverter<>() {
             @Override
-            protected void updateItem(TradePair item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : displayTradePair(item));
+            public String toString(TradePair pair) {
+                return pair == null ? "" : displayTradePair(pair);
             }
-        });
 
-        symbolCombo.setButtonCell(new ListCell<>() {
             @Override
-            protected void updateItem(TradePair item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : displayTradePair(item));
+            public TradePair fromString(String string) {
+                return symbolCombo.getValue();
             }
         });
 
@@ -774,7 +767,7 @@ public class BacktestingPanel extends StackPane {
         }
 
         BacktestInput input = readBacktestInput();
-        if (!input.isValid()) {
+        if (input.isValid()) {
             statusLabel.setText(input.validationMessage());
             progressBar.setProgress(0);
             return;
@@ -811,10 +804,10 @@ public class BacktestingPanel extends StackPane {
         TradePair selectedPair = symbolCombo.getValue();
         Timeframe selectedTimeframe = timeframeCombo.getValue();
         MARKET_TYPES orderType = resolveOrderType(orderTypeCombo.getValue());
-        double initialBalance = readDoubleSpinner(initialBalanceSpinner, DEFAULT_INITIAL_EQUITY);
+        double initialBalance = readDoubleSpinner(initialBalanceSpinner);
         LocalDate startDate = startDatePicker.getValue();
         LocalDate endDate = endDatePicker.getValue();
-        int requestedBars = Math.max(MIN_ABSOLUTE_TEST_BARS, readIntegerSpinner(barCountSpinner, 2_000));
+        int requestedBars = Math.max(MIN_ABSOLUTE_TEST_BARS, readIntegerSpinner(barCountSpinner));
 
         if (strategyName == null || strategyName.isBlank() || selectedPair == null || selectedTimeframe == null) {
             return BacktestInput.invalid("Please select strategy, symbol, and timeframe");
@@ -968,7 +961,7 @@ public class BacktestingPanel extends StackPane {
     }
 
     private double getInitialBalance() {
-        double value = readDoubleSpinner(initialBalanceSpinner, DEFAULT_INITIAL_EQUITY);
+        double value = readDoubleSpinner(initialBalanceSpinner);
 
         if (Double.isNaN(value) || Double.isInfinite(value) || value <= 0.0) {
             return DEFAULT_INITIAL_EQUITY;
@@ -977,9 +970,9 @@ public class BacktestingPanel extends StackPane {
         return value;
     }
 
-    private int readIntegerSpinner(Spinner<Integer> spinner, int fallback) {
+    private int readIntegerSpinner(Spinner<Integer> spinner) {
         if (spinner == null) {
-            return fallback;
+            return 2000;
         }
 
         try {
@@ -991,12 +984,12 @@ public class BacktestingPanel extends StackPane {
             // fallback below
         }
 
-        return spinner.getValue() == null ? fallback : spinner.getValue();
+        return spinner.getValue() == null ? 2000 : spinner.getValue();
     }
 
-    private double readDoubleSpinner(Spinner<Double> spinner, double fallback) {
+    private double readDoubleSpinner(Spinner<Double> spinner) {
         if (spinner == null) {
-            return fallback;
+            return BacktestingPanel.DEFAULT_INITIAL_EQUITY;
         }
 
         try {
@@ -1008,7 +1001,7 @@ public class BacktestingPanel extends StackPane {
             // fallback below
         }
 
-        return spinner.getValue() == null ? fallback : spinner.getValue();
+        return spinner.getValue() == null ? BacktestingPanel.DEFAULT_INITIAL_EQUITY : spinner.getValue();
     }
 
     private void setRunningUi(boolean running) {
@@ -1061,7 +1054,7 @@ public class BacktestingPanel extends StackPane {
             Platform.runLater(() -> statusLabel
                     .setText("Historical data still insufficient. Using sample data with " + sampleCount + " bars."));
 
-            candles = generateSampleData(sampleCount, 100.0, timeframe);
+            candles = generateSampleData(sampleCount, timeframe);
         }
 
         return candles;
@@ -1590,9 +1583,9 @@ public class BacktestingPanel extends StackPane {
         }
     }
 
-    private @NotNull List<CandleData> generateSampleData(int count, double startPrice, Timeframe timeframe) {
+    private @NotNull List<CandleData> generateSampleData(int count, Timeframe timeframe) {
         List<CandleData> candles = new ArrayList<>();
-        double price = startPrice;
+        double price = 100.0;
         long timestampSeconds = System.currentTimeMillis() / 1000L;
         long stepSeconds = timeframeStepSeconds(timeframe);
 
@@ -1908,7 +1901,7 @@ public class BacktestingPanel extends StackPane {
 
     private void assignTestedStrategy() {
         BacktestInput input = lastSuccessfulBacktestInput;
-        if (input == null || !input.isValid()) {
+        if (input == null || input.isValid()) {
             showAlert("No Backtest Selected", "Run a backtest before assigning a strategy.", Alert.AlertType.WARNING);
             return;
         }
@@ -2201,7 +2194,7 @@ public class BacktestingPanel extends StackPane {
         }
 
         boolean isValid() {
-            return validationMessage == null || validationMessage.isBlank();
+            return validationMessage != null && !validationMessage.isBlank();
         }
     }
 

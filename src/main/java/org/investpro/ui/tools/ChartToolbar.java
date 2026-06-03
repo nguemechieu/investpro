@@ -18,12 +18,18 @@ import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Separator;
 import javafx.scene.control.Tooltip;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
+import javafx.scene.shape.Polygon;
+import javafx.scene.shape.Rectangle;
+import javafx.scene.shape.SVGPath;
+import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.text.Font;
 import javafx.util.Duration;
 import lombok.Getter;
@@ -31,7 +37,6 @@ import org.controlsfx.control.PopOver;
 import org.investpro.ui.charts.CandleStickChart;
 import org.investpro.utils.DelayedSizeChangeListener;
 
-import java.io.InputStream;
 import java.util.Objects;
 import java.util.Set;
 
@@ -72,6 +77,7 @@ public class ChartToolbar extends Region {
     private static final int LARGE_WIDTH_BREAKPOINT = 900;
     private static final int MEDIUM_WIDTH_BREAKPOINT = 680;
     private static final int COMPACT_WIDTH_BREAKPOINT = 480;
+    private static final Color TOOLBAR_ICON_COLOR = Color.web("#e5edf7");
 
     private final HBox toolbar;
     private final PopOver optionsPopOver;
@@ -95,10 +101,11 @@ public class ChartToolbar extends Region {
     public ChartToolbar(
             ObservableNumberValue containerWidth,
             ObservableNumberValue containerHeight,
-            Set<Integer> granularities) {
+            Set<Integer> granularity) {
         this(containerWidth, containerHeight);
+        this.granularity=granularity;
     }
-
+private Set<Integer> granularity;
     public ChartToolbar(
             ObservableNumberValue containerWidth,
             ObservableNumberValue containerHeight) {
@@ -284,8 +291,7 @@ public class ChartToolbar extends Region {
     }
 
     public void registerEventHandlers(
-            CandleStickChart candleStickChart,
-            javafx.beans.property.IntegerProperty secondsPerCandle) {
+            CandleStickChart candleStickChart) {
         Objects.requireNonNull(candleStickChart, "candleStickChart must not be null");
 
         for (Node childNode : toolbar.getChildren()) {
@@ -411,37 +417,35 @@ public class ChartToolbar extends Region {
     }
 
     enum Tool {
-        CURSOR("/img/mouse-pointer-solid.png", "↖", "Cursor"),
-        CROSSHAIR("/img/crosshairs-solid.png", "⌖", "Crosshair"),
+        CURSOR("↖", "Cursor"),
+        CROSSHAIR("⌖", "Crosshair"),
 
-        TRENDLINE("/img/trendline.png", "╱", "Trendline"),
-        HORIZONTAL_LINE("/img/horizontal-line.png", "─", "Horizontal Line"),
-        VERTICAL_LINE("/img/vertical-line.png", "│", "Vertical Line"),
-        RECTANGLE("/img/rectangle.png", "▭", "Rectangle"),
-        TRIANGLE("/img/triangle.png", "△", "Triangle"),
-        CIRCLE("/img/circle.png", "○", "Circle"),
-        FIBONACCI("/img/fibonacci.png", "Φ", "Fibonacci Retracement"),
-        MEASURE("/img/ruler-solid.png", "↔", "Measure"),
-        RISK_REWARD("/img/sliders-solid.png", "RR", "Risk Reward"),
-        ERASE_OBJECTS("/img/eraser-solid.png", "⌫", "Erase Chart Objects"),
+        TRENDLINE("╱", "Trendline"),
+        HORIZONTAL_LINE("─", "Horizontal Line"),
+        VERTICAL_LINE("│", "Vertical Line"),
+        RECTANGLE("▭", "Rectangle"),
+        TRIANGLE("△", "Triangle"),
+        CIRCLE("○", "Circle"),
+        FIBONACCI("φ", "Fibonacci Retracement"),
+        MEASURE("↔", "Measure"),
+        RISK_REWARD("◫", "Risk Reward"),
+        ERASE_OBJECTS("⌫", "Erase Chart Objects"),
 
-        ZOOM_IN("/img/search-plus-solid.png", "+", "Zoom In"),
-        ZOOM_OUT("/img/search-minus-solid.png", "−", "Zoom Out"),
-        FIT_CHART("/img/expand-solid.png", "⛶", "Fit Chart"),
-        CHART_TYPE("/img/chart-line-solid.png", "Ty", "Cycle Chart Type"),
+        ZOOM_IN("+", "Zoom In"),
+        ZOOM_OUT("−", "Zoom Out"),
+        FIT_CHART("⛶", "Fit Chart"),
+        CHART_TYPE("◨", "Cycle Chart Type"),
 
-        EVENTS("/img/calendar-days-solid.png", "Ev", "Toggle Events"),
-        INDICATORS("/img/chart-line-solid.png", "ƒ", "Indicators"),
-        SCREENSHOT("/img/screenshot.png", "▣", "Screenshot"),
-        PRINT("/img/print-solid.png", "⎙", "Print Chart"),
-        OPTIONS("/img/cog-solid.png", "⚙", "Chart Options");
+        EVENTS("☷", "Toggle Events"),
+        INDICATORS("ƒ", "Indicators"),
+        SCREENSHOT("▣", "Screenshot"),
+        PRINT("⎙", "Print Chart"),
+        OPTIONS("⚙", "Chart Options");
 
-        private final String img;
         private final String fallbackText;
         private final String label;
 
-        Tool(String img, String fallbackText, String label) {
-            this.img = img;
+        Tool(String fallbackText, String label) {
             this.fallbackText = fallbackText;
             this.label = label;
         }
@@ -506,10 +510,7 @@ public class ChartToolbar extends Region {
                     toolbarButton.setPrefHeight(MIN_BUTTON_SIZE);
                     toolbarButton.setPadding(buttonPadding);
 
-                    if (toolbarButton.iconNode instanceof ImageView imageView) {
-                        imageView.setFitHeight(glyphFont.getSize());
-                        imageView.setFitWidth(glyphFont.getSize());
-                    } else if (toolbarButton.iconNode instanceof Label iconLabel) {
+                    if (toolbarButton.iconNode instanceof Label iconLabel) {
                         iconLabel.setStyle("-fx-font-size: " + glyphFont.getSize() + "px;");
                     }
                 }
@@ -532,16 +533,7 @@ public class ChartToolbar extends Region {
 
             this.tool = tool;
 
-            ImageView loadedGraphic = tryLoadIcon(tool.img);
-
-            if (loadedGraphic != null) {
-                this.iconNode = loadedGraphic;
-            } else {
-                Label fallbackGlyph = new Label(tool.fallbackText);
-                fallbackGlyph.getStyleClass().add("candle-chart-toolbar-glyph");
-                fallbackGlyph.setMouseTransparent(true);
-                this.iconNode = fallbackGlyph;
-            }
+            this.iconNode = createIcon(tool);
 
             setGraphic(iconNode);
             setText("");
@@ -554,29 +546,268 @@ public class ChartToolbar extends Region {
             setTooltip(new Tooltip(tool.label));
 
             getStyleClass().add("candle-chart-toolbar-button");
+            if (tool.isDrawingTool()) {
+                getStyleClass().add("drawing-tool-button");
+            }
+            if (tool == Tool.ERASE_OBJECTS) {
+                getStyleClass().add("erase-objects-button");
+            }
         }
 
-        private static ImageView tryLoadIcon(String img) {
-            try (InputStream stream = ToolbarButton.class.getResourceAsStream(img)) {
-                if (stream == null) {
-                    return null;
-                }
+        private static Node createIcon(Tool tool) {
+            return switch (tool) {
+                case CURSOR -> glyph(tool.fallbackText);
+                case CROSSHAIR -> crosshairIcon();
+                case TRENDLINE -> singleLine(-5, 5, 5, -5);
+                case HORIZONTAL_LINE -> singleLine(-5, 0, 5, 0);
+                case VERTICAL_LINE -> singleLine(0, -5, 0, 5);
+                case RECTANGLE -> strokedRectangle(10, 8, 1.8);
+                case TRIANGLE -> triangleIcon();
+                case CIRCLE -> strokedCircle(4.5, 1.8);
+                case FIBONACCI -> glyph(tool.fallbackText);
+                case MEASURE -> measureIcon();
+                case RISK_REWARD -> riskRewardIcon();
+                case ERASE_OBJECTS -> eraseIcon();
+                case ZOOM_IN -> magnifierIcon(true);
+                case ZOOM_OUT -> magnifierIcon(false);
+                case FIT_CHART -> fitChartIcon();
+                case CHART_TYPE -> chartTypeIcon();
+                case EVENTS -> calendarIcon();
+                case INDICATORS -> indicatorIcon();
+                case SCREENSHOT -> screenshotIcon();
+                case PRINT -> printIcon();
+                case OPTIONS -> glyph(tool.fallbackText);
+            };
+        }
 
-                Image image = new Image(stream);
+        private static Label glyph(String text) {
+            Label glyph = new Label(text);
+            glyph.getStyleClass().add("candle-chart-toolbar-glyph");
+            glyph.setTextFill(TOOLBAR_ICON_COLOR);
+            glyph.setMouseTransparent(true);
+            glyph.setAlignment(Pos.CENTER);
+            glyph.setMinSize(14, 14);
+            return glyph;
+        }
 
-                if (image.isError()) {
-                    return null;
-                }
+        private static StackPane iconPane(Node... nodes) {
+            StackPane iconPane = new StackPane(nodes);
+            iconPane.getStyleClass().add("candle-chart-toolbar-icon");
+            iconPane.setMouseTransparent(true);
+            iconPane.setMinSize(14, 14);
+            iconPane.setPrefSize(14, 14);
+            iconPane.setMaxSize(14, 14);
+            return iconPane;
+        }
 
-                ImageView imageView = new ImageView(image);
-                imageView.setPreserveRatio(true);
-                imageView.setSmooth(true);
-                imageView.setMouseTransparent(true);
-                return imageView;
+        private static Line strokeLine(double startX, double startY, double endX, double endY) {
+            Line line = new Line(startX, startY, endX, endY);
+            line.setStroke(TOOLBAR_ICON_COLOR);
+            line.setStrokeWidth(1.8);
+            line.setStrokeLineCap(StrokeLineCap.ROUND);
+            line.setMouseTransparent(true);
+            return line;
+        }
 
-            } catch (Exception ignored) {
-                return null;
+        private static Node singleLine(double startX, double startY, double endX, double endY) {
+            return iconPane(strokeLine(startX, startY, endX, endY));
+        }
+
+        private static Rectangle strokedRectangle(double width, double height, double strokeWidth) {
+            Rectangle rectangle = new Rectangle(width, height);
+            rectangle.setFill(Color.TRANSPARENT);
+            rectangle.setStroke(TOOLBAR_ICON_COLOR);
+            rectangle.setStrokeWidth(strokeWidth);
+            rectangle.setArcWidth(2);
+            rectangle.setArcHeight(2);
+            rectangle.setMouseTransparent(true);
+            return rectangle;
+        }
+
+        private static Node triangleIcon() {
+            Polygon polygon = new Polygon(
+                    0.0, -4.5,
+                    -5.0, 4.5,
+                    5.0, 4.5);
+            polygon.setFill(Color.TRANSPARENT);
+            polygon.setStroke(TOOLBAR_ICON_COLOR);
+            polygon.setStrokeWidth(1.8);
+            polygon.setMouseTransparent(true);
+            return iconPane(polygon);
+        }
+
+        private static Node strokedCircle(double radius, double strokeWidth) {
+            Circle circle = new Circle(radius);
+            circle.setFill(Color.TRANSPARENT);
+            circle.setStroke(TOOLBAR_ICON_COLOR);
+            circle.setStrokeWidth(strokeWidth);
+            circle.setMouseTransparent(true);
+            return iconPane(circle);
+        }
+
+        private static Node crosshairIcon() {
+            Circle circle = new Circle(4.3);
+            circle.setFill(Color.TRANSPARENT);
+            circle.setStroke(TOOLBAR_ICON_COLOR);
+            circle.setStrokeWidth(1.5);
+            return iconPane(
+                    circle,
+                    strokeLine(-6, 0, 6, 0),
+                    strokeLine(0, -6, 0, 6));
+        }
+
+        private static Node measureIcon() {
+            return iconPane(
+                    strokeLine(-5, 0, 5, 0),
+                    strokeLine(-5, -3.5, -5, 3.5),
+                    strokeLine(5, -3.5, 5, 3.5));
+        }
+
+        private static Node riskRewardIcon() {
+            Rectangle risk = new Rectangle(4, 8);
+            risk.setTranslateX(-2.5);
+            risk.setTranslateY(1.5);
+            risk.setFill(Color.TRANSPARENT);
+            risk.setStroke(TOOLBAR_ICON_COLOR);
+            risk.setStrokeWidth(1.6);
+            Rectangle reward = new Rectangle(4, 5);
+            reward.setTranslateX(2.5);
+            reward.setTranslateY(-1.0);
+            reward.setFill(Color.TRANSPARENT);
+            reward.setStroke(TOOLBAR_ICON_COLOR);
+            reward.setStrokeWidth(1.6);
+            return iconPane(risk, reward, strokeLine(0, -5.5, 0, 5.5));
+        }
+
+        private static Node eraseIcon() {
+            Polygon eraser = new Polygon(
+                    -4.5, 1.5,
+                    -1.5, -4.5,
+                    4.5, -4.5,
+                    1.5, 1.5);
+            eraser.setFill(Color.TRANSPARENT);
+            eraser.setStroke(TOOLBAR_ICON_COLOR);
+            eraser.setStrokeWidth(1.6);
+            return iconPane(eraser, strokeLine(-5.5, 4.5, 5.5, 4.5));
+        }
+
+        private static Node magnifierIcon(boolean zoomIn) {
+            Circle lens = new Circle(3.8);
+            lens.setFill(Color.TRANSPARENT);
+            lens.setStroke(TOOLBAR_ICON_COLOR);
+            lens.setStrokeWidth(1.6);
+            lens.setTranslateX(-1.5);
+            lens.setTranslateY(-1.5);
+
+            Line handle = strokeLine(2, 2, 5.5, 5.5);
+            Line horizontal = strokeLine(-3.5, 0, -0.2, 0);
+            horizontal.setTranslateX(-1.4);
+            horizontal.setTranslateY(-1.5);
+            if (!zoomIn) {
+                return iconPane(lens, handle, horizontal);
             }
+            Line vertical = strokeLine(0, -3.3, 0, -0.1);
+            vertical.setTranslateX(-1.4);
+            vertical.setTranslateY(1.8);
+            return iconPane(lens, handle, horizontal, vertical);
+        }
+
+        private static Node fitChartIcon() {
+            return iconPane(
+                    strokeLine(-5.5, -2.0, -5.5, -5.5),
+                    strokeLine(-5.5, -5.5, -2.0, -5.5),
+                    strokeLine(5.5, -2.0, 5.5, -5.5),
+                    strokeLine(5.5, -5.5, 2.0, -5.5),
+                    strokeLine(-5.5, 2.0, -5.5, 5.5),
+                    strokeLine(-5.5, 5.5, -2.0, 5.5),
+                    strokeLine(5.5, 2.0, 5.5, 5.5),
+                    strokeLine(5.5, 5.5, 2.0, 5.5));
+        }
+
+        private static Node chartTypeIcon() {
+            Rectangle leftBar = new Rectangle(2.4, 5.5);
+            leftBar.setTranslateX(-4.2);
+            leftBar.setTranslateY(1.7);
+            leftBar.setFill(Color.TRANSPARENT);
+            leftBar.setStroke(TOOLBAR_ICON_COLOR);
+            leftBar.setStrokeWidth(1.4);
+
+            Rectangle middleBar = new Rectangle(2.4, 8.5);
+            middleBar.setTranslateX(-0.4);
+            middleBar.setTranslateY(0.2);
+            middleBar.setFill(Color.TRANSPARENT);
+            middleBar.setStroke(TOOLBAR_ICON_COLOR);
+            middleBar.setStrokeWidth(1.4);
+
+            Rectangle rightBar = new Rectangle(2.4, 3.8);
+            rightBar.setTranslateX(3.4);
+            rightBar.setTranslateY(2.5);
+            rightBar.setFill(Color.TRANSPARENT);
+            rightBar.setStroke(TOOLBAR_ICON_COLOR);
+            rightBar.setStrokeWidth(1.4);
+
+            Line line = strokeLine(-5.5, 3.5, -1.5, -2.0);
+            Line line2 = strokeLine(-1.5, -2.0, 5.5, 1.0);
+            return iconPane(leftBar, middleBar, rightBar, line, line2);
+        }
+
+        private static Node calendarIcon() {
+            Rectangle frame = new Rectangle(10, 9);
+            frame.setFill(Color.TRANSPARENT);
+            frame.setStroke(TOOLBAR_ICON_COLOR);
+            frame.setStrokeWidth(1.5);
+            frame.setArcWidth(2);
+            frame.setArcHeight(2);
+            frame.setTranslateY(0.5);
+            return iconPane(
+                    frame,
+                    strokeLine(-5, -2.5, 5, -2.5),
+                    strokeLine(-2.5, -5, -2.5, -2.0),
+                    strokeLine(2.5, -5, 2.5, -2.0),
+                    strokeLine(-3, 1.0, 3, 1.0));
+        }
+
+        private static Node indicatorIcon() {
+            SVGPath path = new SVGPath();
+            path.setContent("M -6 3 C -4 -4 -1 -4 1 0 S 5 5 6 -2");
+            path.setStroke(TOOLBAR_ICON_COLOR);
+            path.setFill(Color.TRANSPARENT);
+            path.setStrokeWidth(1.7);
+            path.setStrokeLineCap(StrokeLineCap.ROUND);
+            path.setMouseTransparent(true);
+            return iconPane(path);
+        }
+
+        private static Node screenshotIcon() {
+            Rectangle frame = new Rectangle(10, 8);
+            frame.setFill(Color.TRANSPARENT);
+            frame.setStroke(TOOLBAR_ICON_COLOR);
+            frame.setStrokeWidth(1.5);
+            frame.setArcWidth(2);
+            frame.setArcHeight(2);
+            Circle shutter = new Circle(2.0);
+            shutter.setFill(Color.TRANSPARENT);
+            shutter.setStroke(TOOLBAR_ICON_COLOR);
+            shutter.setStrokeWidth(1.4);
+            shutter.setTranslateX(0.5);
+            shutter.setTranslateY(0.3);
+            return iconPane(frame, shutter, strokeLine(-4.5, -4.5, -1.5, -4.5));
+        }
+
+        private static Node printIcon() {
+            Rectangle printerBody = new Rectangle(10, 5.5);
+            printerBody.setFill(Color.TRANSPARENT);
+            printerBody.setStroke(TOOLBAR_ICON_COLOR);
+            printerBody.setStrokeWidth(1.5);
+            printerBody.setTranslateY(1.5);
+
+            Rectangle paper = new Rectangle(7, 4.5);
+            paper.setFill(Color.TRANSPARENT);
+            paper.setStroke(TOOLBAR_ICON_COLOR);
+            paper.setStrokeWidth(1.4);
+            paper.setTranslateY(-3.5);
+
+            return iconPane(printerBody, paper, strokeLine(-2.5, 1.5, 2.5, 1.5));
         }
 
         private final BooleanProperty active = new BooleanPropertyBase(false) {

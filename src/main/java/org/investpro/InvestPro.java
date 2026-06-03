@@ -194,7 +194,7 @@ public class InvestPro extends Application {
                     orderRepository,
                     currencyRepository);
 
-            setRootContent(tradingDesk);
+            setRootContent(tradingDesk.getView());
 
             primaryStage.setTitle(buildWindowTitle("Trading Desk"));
 
