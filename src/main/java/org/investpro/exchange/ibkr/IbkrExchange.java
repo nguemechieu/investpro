@@ -103,6 +103,7 @@ public class IbkrExchange extends InteractiveBrokers {
     public void connect() {
         connectionManager.connect(
                 modeRequestsPaperNetwork() ? IbkrConnectionManager.Mode.PAPER : IbkrConnectionManager.Mode.LIVE);
+        accountService.refreshFromBrokerIfAvailable();
     }
 
     @Override

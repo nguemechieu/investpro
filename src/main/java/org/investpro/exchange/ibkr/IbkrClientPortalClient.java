@@ -31,6 +31,7 @@ public final class IbkrClientPortalClient {
 
     private final ExchangeCredentials credentials;
     private final Map<String, String> conidCache = new ConcurrentHashMap<>();
+    private volatile String discoveredAccountId;
 
     public IbkrClientPortalClient(ExchangeCredentials credentials) {
         this.credentials = credentials;
@@ -214,13 +215,73 @@ public final class IbkrClientPortalClient {
 
     private String resolveAccountId() {
         String accountId = firstNonBlank(
+                discoveredAccountId,
                 credentials == null ? null : credentials.accountId(),
                 System.getenv("IBKR_ACCOUNT_ID"),
                 System.getProperty("investpro.ibkr.accountId"));
         if (!notBlank(accountId)) {
+            accountId = discoverAccountId().orElse(null);
+        }
+        if (!notBlank(accountId)) {
             throw new IllegalStateException("IBKR account id is not configured for live mode.");
         }
-        return accountId.trim();
+        discoveredAccountId = accountId.trim();
+        return discoveredAccountId;
+    }
+
+    private Optional<String> discoverAccountId() {
+        for (String path : List.of("/portfolio/accounts", "/portfolio/subaccounts")) {
+            try {
+                HttpResponse<String> response = HTTP_CLIENT.send(
+                        request(path).GET().build(),
+                        HttpResponse.BodyHandlers.ofString());
+                if (!isSuccess(response.statusCode())) {
+                    continue;
+                }
+
+                JsonNode root = OBJECT_MAPPER.readTree(response.body());
+                String accountId = firstAccountId(root);
+                if (notBlank(accountId)) {
+                    log.debug("Discovered IBKR account id from {}", path);
+                    return Optional.of(accountId.trim());
+                }
+            } catch (Exception exception) {
+                log.debug("Unable to discover IBKR account id from {}: {}", path, exception.getMessage());
+            }
+        }
+        return Optional.empty();
+    }
+
+    private String firstAccountId(JsonNode root) {
+        if (root == null || root.isNull() || root.isMissingNode()) {
+            return "";
+        }
+        if (root.isTextual()) {
+            return root.asText("");
+        }
+        if (root.isArray()) {
+            for (JsonNode child : root) {
+                String value = firstAccountId(child);
+                if (notBlank(value)) {
+                    return value;
+                }
+            }
+            return "";
+        }
+        if (root.isObject()) {
+            String direct = firstText(root, "accountId", "acctId", "account", "id");
+            if (notBlank(direct)) {
+                return direct;
+            }
+            for (var fields = root.fields(); fields.hasNext();) {
+                Map.Entry<String, JsonNode> entry = fields.next();
+                String value = firstAccountId(entry.getValue());
+                if (notBlank(value)) {
+                    return value;
+                }
+            }
+        }
+        return "";
     }
 
     private String ibkrSymbol(TradePair tradePair) {

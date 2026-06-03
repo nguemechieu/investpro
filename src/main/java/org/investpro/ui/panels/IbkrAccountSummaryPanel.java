@@ -33,7 +33,7 @@ public class IbkrAccountSummaryPanel extends VBox {
     }
 
     private void refresh(IbkrExchange exchange) {
-        IbkrAccountSnapshot snapshot = exchange.getAccountService().snapshot();
+        IbkrAccountSnapshot snapshot = exchange.getAccountService().refreshFromBrokerIfAvailable();
         accountLabel.setText("Account: " + snapshot.accountId() + " (" + (snapshot.paper() ? "PAPER" : "LIVE") + ")");
         equityLabel.setText(String.format("Equity: %.2f", snapshot.equity()));
         availableLabel.setText(String.format("Available: %.2f", snapshot.availableFunds()));
