@@ -62,28 +62,11 @@ class UserStrategySystemAcceptanceTest {
         registry.unregister(strategyId);
     }
 
-    private static final class TestUserStrategy implements UserStrategy {
-        private final String id;
-        private final String name;
-
-        private TestUserStrategy(String id, String name) {
-            this.id = id;
-            this.name = name;
-        }
+    private record TestUserStrategy(String id, String name) implements UserStrategy {
 
         @Override
-        public String getId() {
-            return id;
+            public StrategySignal generateSignal(StrategyContext context) {
+                return StrategySignal.hold("BTC/USD", "1h", id, "test");
+            }
         }
-
-        @Override
-        public String getName() {
-            return name;
-        }
-
-        @Override
-        public StrategySignal generateSignal(StrategyContext context) {
-            return StrategySignal.hold("BTC/USD", "1h", id, "test");
-        }
-    }
 }

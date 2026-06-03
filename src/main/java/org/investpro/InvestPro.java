@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.ai.local.grpc.LocalAiRuntimeLauncher;
 import org.investpro.config.AppConfig;
 import org.investpro.config.AppConfigKeys;
+import org.investpro.config.ProductionStartupValidator;
 import org.investpro.persistence.repository.CurrencyRepository;
 import org.investpro.persistence.repository.OrderRepository;
 import org.investpro.persistence.repository.RepositoryFactory;
@@ -84,7 +85,7 @@ public class InvestPro extends Application {
     private CurrencyRepository currencyRepository;
 
     public static void main(String[] args) {
-        installGlobalExceptionDialog();
+        initializeGlobalExceptionHandling();
         launch(args);
     }
 
@@ -92,7 +93,7 @@ public class InvestPro extends Application {
         super();
     }
 
-    private static void installGlobalExceptionDialog() {
+    static void initializeGlobalExceptionHandling() {
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
             log.error("Uncaught exception on {}", thread == null ? "unknown thread" : thread.getName(), throwable);
             showExceptionDialog(
@@ -106,6 +107,12 @@ public class InvestPro extends Application {
     public void init() {
         try {
             AppConfig.logStartupSummary();
+            ProductionStartupValidator.StartupValidationReport startupValidationReport = ProductionStartupValidator
+                    .validateCurrentEnvironment();
+            startupValidationReport.logSummary();
+            if (!startupValidationReport.isValid()) {
+                throw new IllegalStateException(startupValidationReport.failureMessage());
+            }
 
             tradeRepository = RepositoryFactory.createTradeRepository();
             orderRepository = RepositoryFactory.createOrderRepository();

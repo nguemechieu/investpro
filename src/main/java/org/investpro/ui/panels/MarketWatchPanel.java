@@ -26,13 +26,10 @@ import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.ui.models.MarketWatchRow;
 import org.investpro.ui.utils.CurrencyIconLoader;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.Comparator;
 import java.util.stream.Collectors;
 
 /**
@@ -57,7 +54,7 @@ public class MarketWatchPanel extends StackPane {
     private SymbolAgentManager symbolAgentManager;
     private final TradabilityProvider tradabilityProvider;
     private final TableView<MarketWatchRow> table = new TableView<>();
-    private final Map<TradePair, MarketWatchRow> rowCache = new LinkedHashMap<>();
+    private final Map<String, MarketWatchRow> rowCache = new LinkedHashMap<>();
     private final Map<String, ProductTradabilityStatus> tradabilityCache = new ConcurrentHashMap<>();
     private final Map<String, SymbolTradability> exchangeTradabilityCache = new ConcurrentHashMap<>();
     private final Set<String> favoriteSymbols = ConcurrentHashMap.newKeySet();
@@ -69,7 +66,7 @@ public class MarketWatchPanel extends StackPane {
 
     private Timeline refreshTimer;
     private static final long REFRESH_INTERVAL_MS = 3000; // Refresh every 3 seconds
-    private int lastRowCount = -1; // Track last row count to avoid unnecessary updates
+    private Set<String> lastSymbolKeys = Set.of();
 
     public MarketWatchPanel(@NotNull SystemCore systemCore) {
         this.systemCore = systemCore;
@@ -95,6 +92,7 @@ public class MarketWatchPanel extends StackPane {
 
         initializeUI();
         startAutoRefresh();
+        refreshMarketWatchData();
         refreshScheduler.start(5);
     }
 
@@ -428,7 +426,7 @@ public class MarketWatchPanel extends StackPane {
                                 "-fx-cursor: hand;");
             } else {
                 startAutoRefresh();
-                pauseButton.setText("\u23F8 Pause");
+                pauseButton.setText("⏸ Pause");
                 pauseButton.setStyle(
                         "-fx-padding: 6 12; " +
                                 "-fx-background-color: #8b5cf6; " +
@@ -497,11 +495,15 @@ public class MarketWatchPanel extends StackPane {
 
                 log.debug("Refreshing market watch with {} states", allStates.size());
 
-                // Remove rows for symbols no longer in the manager
-                rowCache.keySet().retainAll(
-                        allStates.stream()
-                                .map(SymbolAgentState::getSymbol)
-                                .toList());
+                Set<String> currentSymbolKeys = allStates.stream()
+                        .filter(Objects::nonNull)
+                        .map(SymbolAgentState::getSymbol)
+
+                        .map(MarketWatchPanel::symbolKey)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+
+                // Remove rows for symbols no longer in the manager.
+                rowCache.keySet().retainAll(currentSymbolKeys);
 
                 // Always update all rows — MarketWatchRow uses JavaFX Property types
                 // so property changes auto-notify the table cells without table.refresh().
@@ -510,8 +512,9 @@ public class MarketWatchPanel extends StackPane {
                 for (SymbolAgentState state : allStates) {
                     if (state != null) {
                         TradePair symbol = state.getSymbol();
+                        String symbolKey = symbolKey(symbol);
                         MarketWatchRow row = rowCache.computeIfAbsent(
-                                symbol,
+                                symbolKey,
                                 key -> MarketWatchRow.builder()
                                         .symbol(symbol)
                                         .build());
@@ -519,35 +522,16 @@ public class MarketWatchPanel extends StackPane {
                     }
                 }
 
-                // Re-populate table items list only when the set of symbols changes
-                int newRowCount = rowCache.size();
-                if (newRowCount != lastRowCount) {
+                // Re-populate table items when the symbol set changes. Row properties update
+                // cells in-place between set changes.
+                if (!currentSymbolKeys.equals(lastSymbolKeys)) {
                     table.getItems().setAll(new java.util.ArrayList<>(rowCache.values()));
-                    lastRowCount = newRowCount;
-                    log.debug("Refreshed MarketWatch with {} symbols", newRowCount);
+                    lastSymbolKeys = Set.copyOf(currentSymbolKeys);
+                    log.debug("Refreshed MarketWatch with {} symbols", rowCache.size());
                 }
             } catch (Exception e) {
                 log.error("Error refreshing market watch data", e);
             }
-        });
-    }
-
-    /**
-     * Update a specific symbol's row.
-     */
-    public void updateSymbol(@NotNull TradePair symbol, @Nullable SymbolAgentState state) {
-        Platform.runLater(() -> {
-            if (state == null) {
-                rowCache.remove(symbol);
-            } else {
-                MarketWatchRow row = rowCache.computeIfAbsent(
-                        symbol,
-                        key -> MarketWatchRow.builder()
-                                .symbol(symbol)
-                                .build());
-                row.updateSymbolState(state);
-            }
-            table.refresh();
         });
     }
 
@@ -558,6 +542,7 @@ public class MarketWatchPanel extends StackPane {
         if (refreshTimer != null) {
             refreshTimer.stop();
         }
+        refreshScheduler.stop();
     }
 
     /**
@@ -596,5 +581,9 @@ public class MarketWatchPanel extends StackPane {
         } catch (Exception e) {
             log.error("Failed to export market watch data", e);
         }
+    }
+
+    private static @NotNull String symbolKey(@NotNull TradePair symbol) {
+        return symbol.toString('/').trim().toUpperCase(Locale.ROOT);
     }
 }

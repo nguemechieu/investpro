@@ -25,9 +25,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>Thread safety: must be called on the JavaFX Application Thread.
  */
-public final class ExchangeCapabilityUiGate {
-
-    private final ExchangeCapability capability;
+public record ExchangeCapabilityUiGate(ExchangeCapability capability) {
 
     public ExchangeCapabilityUiGate(@NotNull ExchangeCapability capability) {
         this.capability = capability;
@@ -38,9 +36,9 @@ public final class ExchangeCapabilityUiGate {
     /**
      * Hides the node (managed=false, visible=false) if {@code supported} is false.
      *
-     * @param node        the UI node to gate
-     * @param supported   whether the capability is supported
-     * @param reason      tooltip text explaining why the control is hidden
+     * @param node      the UI node to gate
+     * @param supported whether the capability is supported
+     * @param reason    tooltip text explaining why the control is hidden
      */
     public void hideUnless(@NotNull Node node, boolean supported, @Nullable String reason) {
         if (!supported) {
@@ -55,9 +53,9 @@ public final class ExchangeCapabilityUiGate {
     /**
      * Disables the node and dims it if {@code supported} is false.
      *
-     * @param node        the UI node to gate
-     * @param supported   whether the capability is supported
-     * @param reason      tooltip text explaining why the control is disabled
+     * @param node      the UI node to gate
+     * @param supported whether the capability is supported
+     * @param reason    tooltip text explaining why the control is disabled
      */
     public void disableUnless(@NotNull Node node, boolean supported, @Nullable String reason) {
         if (!supported) {
@@ -74,9 +72,9 @@ public final class ExchangeCapabilityUiGate {
      * if {@code supported} is false. Useful for collapsing panels without
      * removing them from the scene graph.
      *
-     * @param region      the region to collapse
-     * @param supported   whether to keep it expanded
-     * @param reason      tooltip text
+     * @param region    the region to collapse
+     * @param supported whether to keep it expanded
+     * @param reason    tooltip text
      */
     public void collapseUnless(@NotNull Region region, boolean supported, @Nullable String reason) {
         if (!supported) {
@@ -157,8 +155,11 @@ public final class ExchangeCapabilityUiGate {
                 "Live trading is not enabled on " + capability.getDisplayName());
     }
 
-    /** Returns the capability this gate was constructed with. */
-    public @NotNull ExchangeCapability getCapability() {
+    /**
+     * Returns the capability this gate was constructed with.
+     */
+    @Override
+    public @NotNull ExchangeCapability capability() {
         return capability;
     }
 }

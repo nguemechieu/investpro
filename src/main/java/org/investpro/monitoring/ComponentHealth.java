@@ -1,7 +1,9 @@
 package org.investpro.monitoring;
 
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
+
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -14,8 +16,9 @@ import java.util.Map;
  * Health information for a single component.
  */
 @Slf4j
-@Getter
+@Data
 @Builder
+@ToString
 public class ComponentHealth {
     @NotNull
     private final String componentName;

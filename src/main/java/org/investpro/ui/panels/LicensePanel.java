@@ -176,7 +176,7 @@ public final class LicensePanel extends VBox {
                 """.formatted(ACCENT_COLOR));
         activateButton.setOnAction(event -> showActivationDialog());
 
-        Button viewButton = new Button("📋 View Details");
+        var viewButton = new Button("📋 View Details");
         viewButton.getStyleClass().addAll("terminal-button", "license-details-button");
         viewButton.setMaxWidth(Double.MAX_VALUE);
         viewButton.setStyle("""

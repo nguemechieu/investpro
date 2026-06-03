@@ -2,6 +2,8 @@ package org.investpro.monitoring;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.investpro.config.AppConfig;
+import org.investpro.config.AppConfigKeys;
 import org.investpro.core.SystemCore;
 
 import java.time.Instant;
@@ -39,6 +41,10 @@ public class SystemMonitorService {
     public SystemHealthSnapshot checkNow() {
         try {
             Instant checkTime = Instant.now();
+            SystemEventRecorder recorder = systemCore.getSystemEventRecorder();
+            if (recorder != null) {
+                recorder.recordHeartbeat("system-monitor");
+            }
 
             ComponentHealth exchange = checkExchangeHealth();
             ComponentHealth marketData = checkMarketDataHealth();
@@ -49,13 +55,14 @@ public class SystemMonitorService {
             ComponentHealth agents = checkAgentsHealth();
             ComponentHealth ai = checkAiHealth();
             ComponentHealth notifications = checkNotificationsHealth();
+            ComponentHealth systemResources = checkSystemResourcesHealth(checkTime, recorder);
 
             // Aggregate issues
             List<String> blockers = new ArrayList<>();
             List<String> warnings = new ArrayList<>();
 
             for (ComponentHealth component : List.of(exchange, marketData, account, strategy, risk, execution, agents,
-                    ai, notifications)) {
+                    ai, notifications, systemResources)) {
                 blockers.addAll(component.getBlockers());
                 warnings.addAll(component.getWarnings());
             }
@@ -63,15 +70,19 @@ public class SystemMonitorService {
             // Overall status determination
             ComponentStatus overallStatus = ComponentStatus.HEALTHY;
 
-            if (exchange.getStatus() == ComponentStatus.FAILED || risk.getStatus() == ComponentStatus.FAILED) {
+            if (exchange.getStatus() == ComponentStatus.FAILED
+                    || risk.getStatus() == ComponentStatus.FAILED
+                    || systemResources.getStatus() == ComponentStatus.FAILED) {
                 overallStatus = ComponentStatus.FAILED;
             } else if (!blockers.isEmpty()) {
                 overallStatus = ComponentStatus.WARNING;
             } else if (strategy.getStatus() == ComponentStatus.WARNING
-                    || marketData.getStatus() == ComponentStatus.WARNING) {
+                    || marketData.getStatus() == ComponentStatus.WARNING
+                    || systemResources.getStatus() == ComponentStatus.WARNING) {
                 overallStatus = ComponentStatus.WARNING;
             } else if (exchange.getStatus() == ComponentStatus.DEGRADED
-                    || marketData.getStatus() == ComponentStatus.DEGRADED) {
+                    || marketData.getStatus() == ComponentStatus.DEGRADED
+                    || systemResources.getStatus() == ComponentStatus.DEGRADED) {
                 overallStatus = ComponentStatus.DEGRADED;
             }
 
@@ -91,7 +102,7 @@ public class SystemMonitorService {
                     overallStatus.getDisplayName(),
                     canTrade ? "✅ ALLOWED" : "❌ BLOCKED");
 
-            return SystemHealthSnapshot.builder()
+            return new SystemHealthSnapshot.Builder()
                     .overallStatus(overallStatus)
                     .canTrade(canTrade)
                     .summary(summary)
@@ -104,12 +115,15 @@ public class SystemMonitorService {
                     .agents(agents)
                     .ai(ai)
                     .notifications(notifications)
+                    .systemResources(systemResources)
                     .blockers(blockers)
                     .warnings(warnings)
                     .details(Map.of(
                             "subscriptionSummary", safeCall(systemCore::getSubscriptionSummary),
                             "activeStrategy", safeCall(systemCore::getActiveStrategyName),
-                            "riskMetrics", safeCall(systemCore::getRiskMetrics)))
+                            "riskMetrics", safeCall(systemCore::getRiskMetrics),
+                            "heartbeat", heartbeatDetails(recorder),
+                            "eventMetrics", recorder == null ? Map.of() : recorder.snapshotCounters()))
                     .timestamp(checkTime)
                     .build();
         } catch (Exception e) {
@@ -269,6 +283,74 @@ public class SystemMonitorService {
         }
     }
 
+    private ComponentHealth checkSystemResourcesHealth(Instant checkedAt, SystemEventRecorder recorder) {
+        try {
+            Runtime runtime = Runtime.getRuntime();
+            double maxMb = runtime.maxMemory() / 1024.0 / 1024.0;
+            double usedMb = (runtime.totalMemory() - runtime.freeMemory()) / 1024.0 / 1024.0;
+            double usagePercent = maxMb > 0 ? (usedMb / maxMb) * 100.0 : 0.0;
+
+            long heartbeatAgeSeconds = recorder == null ? Long.MAX_VALUE : recorder.getSecondsSinceLastHeartbeat();
+            Map<String, Long> counters = recorder == null ? Map.of() : recorder.snapshotCounters();
+            long executionErrors = counters.getOrDefault("executionErrorCount", 0L);
+            long accountErrors = counters.getOrDefault("accountErrorCount", 0L);
+            long socketDisconnects = counters.getOrDefault("webSocketDisconnectCount", 0L);
+            long staleHeartbeatThreshold = AppConfig.getLong(AppConfigKeys.APP_HEARTBEAT_STALE_SECONDS, 120L);
+
+            ComponentStatus status = ComponentStatus.HEALTHY;
+            List<String> warnings = new ArrayList<>();
+            List<String> blockers = new ArrayList<>();
+
+            if (usagePercent >= 95.0) {
+                status = ComponentStatus.FAILED;
+                blockers.add("JVM memory usage is above 95%.");
+            } else if (usagePercent >= 85.0) {
+                status = ComponentStatus.WARNING;
+                warnings.add("JVM memory usage is above 85%.");
+            }
+
+            if (heartbeatAgeSeconds > staleHeartbeatThreshold) {
+                status = status == ComponentStatus.FAILED ? status : ComponentStatus.WARNING;
+                warnings.add("System heartbeat is stale (" + heartbeatAgeSeconds + "s).");
+            }
+
+            if (executionErrors > 0 || accountErrors > 0 || socketDisconnects > 0) {
+                if (status == ComponentStatus.HEALTHY) {
+                    status = ComponentStatus.DEGRADED;
+                }
+                warnings.add("Recent runtime errors detected: execution=" + executionErrors
+                        + ", account=" + accountErrors + ", websocketDisconnects=" + socketDisconnects + ".");
+            }
+
+            return ComponentHealth.builder()
+                    .componentName("System Resources")
+                    .status(status)
+                    .summary(String.format("Heap %.1f/%.1f MB (%.1f%%)", usedMb, maxMb, usagePercent))
+                    .warnings(warnings)
+                    .blockers(blockers)
+                    .lastCheckedAt(checkedAt)
+                    .details(Map.of(
+                            "heapUsedMb", usedMb,
+                            "heapMaxMb", maxMb,
+                            "heapUsagePercent", usagePercent,
+                            "heartbeatAgeSeconds", heartbeatAgeSeconds,
+                            "eventMetrics", counters))
+                    .build();
+        } catch (Exception exception) {
+            return failedComponent("System Resources", exception.getMessage());
+        }
+    }
+
+    private Map<String, Object> heartbeatDetails(SystemEventRecorder recorder) {
+        if (recorder == null) {
+            return Map.of();
+        }
+        return Map.of(
+                "lastHeartbeatAt", recorder.getLastHeartbeatAt(),
+                "lastHeartbeatSource", safeText(recorder.getLastHeartbeatSource(), "unknown"),
+                "heartbeatAgeSeconds", recorder.getSecondsSinceLastHeartbeat());
+    }
+
     private ComponentHealth failedComponent(String name, String issue) {
         return ComponentHealth.builder()
                 .componentName(name)
@@ -281,7 +363,7 @@ public class SystemMonitorService {
     }
 
     private SystemHealthSnapshot buildFailedSnapshot(String issue) {
-        return SystemHealthSnapshot.builder()
+        return new SystemHealthSnapshot.Builder()
                 .overallStatus(ComponentStatus.FAILED)
                 .canTrade(false)
                 .summary("❌ Health check failed")

@@ -36,6 +36,7 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
+    private static final long OANDA_CLOCK_SKEW_BUFFER_SECONDS = 30L;
     private static final String OANDA_LIVE_API_URL = "https://api-fxtrade.oanda.com";
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
             .connectTimeout(java.time.Duration.ofSeconds(20))
@@ -101,34 +102,24 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
         }
 
         if (endTime.get() == -1) {
-            // Set end time to current time minus 5 seconds to ensure it's in the past
-            // OANDA API rejects 'to' times that are in the future or too close to "now"
-            endTime.set((int) ((Instant.now().toEpochMilli() / 1000L) - 5));
+            endTime.set(safeCurrentEndTime());
+        } else {
+            endTime.set(Math.min(endTime.get(), safeCurrentEndTime()));
         }
 
-        String endDateString = DateTimeFormatter.ISO_INSTANT
-                .format(Instant.ofEpochSecond(endTime.get()));
-
-        int startTime = Math.max(endTime.get() - (numCandles * secondsPerCandle), EARLIEST_DATA);
-        String startDateString = DateTimeFormatter.ISO_INSTANT
-                .format(Instant.ofEpochSecond(startTime));
-
-        String uriStr = "%s/v3/instruments/%s/candles?granularity=%s&from=%s&to=%s&price=M"
-                .formatted(
-                        apiBaseUrl,
-                        urlEncode(toOandaInstrument(tradePair)),
-                        toOandaGranularity(secondsPerCandle),
-                        urlEncode(startDateString),
-                        urlEncode(endDateString));
-
-        if (startTime == EARLIEST_DATA) {
+        CandleRequest request = buildRequest(endTime.get());
+        if (request.startTime() == EARLIEST_DATA) {
             // signal more data is false
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
+        return fetchCandles(request, true);
+    }
+
+    private CompletableFuture<List<CandleData>> fetchCandles(CandleRequest candleRequest, boolean allowFutureTimeRetry) {
         return HTTP_CLIENT.sendAsync(
                 HttpRequest.newBuilder()
-                        .uri(URI.create(uriStr))
+                        .uri(URI.create(candleRequest.uri()))
                         .timeout(java.time.Duration.ofSeconds(30))
                         .header("Authorization", "Bearer " + apiToken)
                         .header("Accept-Datetime-Format", "RFC3339")
@@ -138,6 +129,14 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
                 HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                        if (allowFutureTimeRetry && isFutureTimeError(response.body())) {
+                            int retryEndTime = safeCurrentEndTime();
+                            endTime.set(retryEndTime);
+                            logger.warn(
+                                    "OANDA candle request used a future 'to' timestamp; retrying with clamped endTime={}",
+                                    retryEndTime);
+                            return fetchCandles(buildRequest(retryEndTime), false).join();
+                        }
                         logger.warn("OANDA candles failed HTTP {}: {}", response.statusCode(), response.body());
                         return Collections.emptyList();
                     }
@@ -153,13 +152,46 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
 
                     if (candles.isArray() && !candles.isEmpty()) {
                         List<CandleData> candleData = parseCandles(candles);
-                        endTime.set(startTime);
+                        endTime.set(candleRequest.startTime());
                         return candleData;
                     } else {
                         logger.warn("OANDA candle response contained no candles: {}", response.body());
                         return Collections.emptyList();
                     }
                 });
+    }
+
+    private CandleRequest buildRequest(int requestedEndTime) {
+        int clampedEndTime = Math.min(requestedEndTime, safeCurrentEndTime());
+        String endDateString = DateTimeFormatter.ISO_INSTANT
+                .format(Instant.ofEpochSecond(clampedEndTime));
+
+        int startTime = Math.max(clampedEndTime - (numCandles * secondsPerCandle), EARLIEST_DATA);
+        String startDateString = DateTimeFormatter.ISO_INSTANT
+                .format(Instant.ofEpochSecond(startTime));
+
+        String uri = "%s/v3/instruments/%s/candles?granularity=%s&from=%s&to=%s&price=M"
+                .formatted(
+                        apiBaseUrl,
+                        urlEncode(toOandaInstrument(tradePair)),
+                        toOandaGranularity(secondsPerCandle),
+                        urlEncode(startDateString),
+                        urlEncode(endDateString));
+
+        return new CandleRequest(uri, startTime);
+    }
+
+    private static int safeCurrentEndTime() {
+        return Math.toIntExact(Instant.now().minusSeconds(OANDA_CLOCK_SKEW_BUFFER_SECONDS).getEpochSecond());
+    }
+
+    private static boolean isFutureTimeError(String responseBody) {
+        String text = responseBody == null ? "" : responseBody.toLowerCase(Locale.ROOT);
+        return text.contains("time is in the future")
+                || text.contains("invalid value specified for 'to'");
+    }
+
+    private record CandleRequest(String uri, int startTime) {
     }
 
     /**

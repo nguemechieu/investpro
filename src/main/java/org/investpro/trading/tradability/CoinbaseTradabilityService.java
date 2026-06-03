@@ -30,6 +30,10 @@ public final class CoinbaseTradabilityService implements TradabilityProvider {
         boolean expired() {
             return System.currentTimeMillis() >= expiresAtMs;
         }
+
+        boolean fresh() {
+            return !expired();
+        }
     }
 
     public CoinbaseTradabilityService(@NotNull Coinbase coinbase) {
@@ -40,7 +44,7 @@ public final class CoinbaseTradabilityService implements TradabilityProvider {
     public CompletableFuture<ProductTradabilityStatus> getTradabilityStatus(String productId) {
         String normalized = normalizeProductId(productId);
         CacheEntry cached = cache.get(normalized);
-        if (cached != null && !cached.expired()) {
+        if (cached != null && cached.fresh()) {
             return CompletableFuture.completedFuture(cached.status());
         }
 

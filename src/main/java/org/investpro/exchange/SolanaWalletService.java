@@ -1,6 +1,7 @@
 package org.investpro.exchange;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,6 +24,7 @@ import java.util.regex.Pattern;
  *
  * <p>Private keys and seed phrases are NEVER handled, stored, or logged by this service.
  */
+@Data
 public class SolanaWalletService {
 
     private static final Logger log = LoggerFactory.getLogger(SolanaWalletService.class);
@@ -36,8 +38,8 @@ public class SolanaWalletService {
             Pattern.compile("^[1-9A-HJ-NP-Za-km-z]{32,44}$");
 
     private final SolanaNetworkClient rpc;
-    @SuppressWarnings("unused")
-    private final SolanaNetworkConfig config;
+
+    private  SolanaNetworkConfig config;
 
     public SolanaWalletService(SolanaNetworkClient rpc, SolanaNetworkConfig config) {
         this.rpc    = rpc;
@@ -56,18 +58,8 @@ public class SolanaWalletService {
      * @return true if address matches the expected format
      */
     public boolean validateAddress(String address) {
-        if (address == null || address.isBlank()) return false;
-        return ADDRESS_PATTERN.matcher(address.trim()).matches();
-    }
-
-    /**
-     * Returns the configured wallet address.
-     *
-     * <p>The address is read from {@code solana.walletAddress} in config.
-     * Returns an empty string if not configured.
-     */
-    public String getWalletAddress() {
-        return org.investpro.config.AppConfig.get("solana.walletAddress", "");
+        if (address == null || address.isBlank()) return true;
+        return !ADDRESS_PATTERN.matcher(address.trim()).matches();
     }
 
     // ── SOL balance ───────────────────────────────────────────────────────────
@@ -79,7 +71,7 @@ public class SolanaWalletService {
      * @return SOL balance (lamports converted to SOL with 9 decimal places)
      */
     public CompletableFuture<BigDecimal> getSOLBalance(String address) {
-        if (!validateAddress(address)) {
+        if (validateAddress(address)) {
             return CompletableFuture.failedFuture(
                     new SolanaException.InvalidAddressException(address));
         }
@@ -102,7 +94,7 @@ public class SolanaWalletService {
      * @return list of token balances (may be empty)
      */
     public CompletableFuture<List<SolanaTokenBalance>> getTokenBalances(String ownerAddress) {
-        if (!validateAddress(ownerAddress)) {
+        if (validateAddress(ownerAddress)) {
             return CompletableFuture.failedFuture(
                     new SolanaException.InvalidAddressException(ownerAddress));
         }

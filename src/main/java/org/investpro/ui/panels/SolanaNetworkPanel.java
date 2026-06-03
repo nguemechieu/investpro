@@ -195,7 +195,7 @@ public class SolanaNetworkPanel extends VBox {
             showError("Please enter a wallet address.");
             return;
         }
-        if (!adapter.getWalletService().validateAddress(address)) {
+        if (adapter.getWalletService().validateAddress(address)) {
             showError("Invalid Solana address format.");
             return;
         }

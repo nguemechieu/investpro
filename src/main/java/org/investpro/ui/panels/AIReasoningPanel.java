@@ -9,8 +9,7 @@ import javafx.scene.control.Separator;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
+
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.event.EventBusManager;
 import org.investpro.strategy.lifecycle.*;
@@ -41,7 +40,6 @@ public class AIReasoningPanel extends VBox {
     private static final DateTimeFormatter FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
 
-    private final Label titleLabel;
     private final Label statusLabel;
     private final Label confidenceLabel;
     private final Label decisionLabel;
@@ -62,7 +60,7 @@ public class AIReasoningPanel extends VBox {
         setSpacing(12);
 
         // ---- Header ----
-        titleLabel = new Label("AI Reasoning & Decisions");
+        Label titleLabel = new Label("AI Reasoning & Decisions");
         titleLabel.setStyle("-fx-text-fill: #40c4ff; -fx-font-size: 16px; -fx-font-weight: bold;");
 
         lastUpdatedLabel = new Label("Last updated: —");

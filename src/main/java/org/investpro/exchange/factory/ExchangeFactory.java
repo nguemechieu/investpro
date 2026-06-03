@@ -2,6 +2,7 @@ package org.investpro.exchange.factory;
 
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.*;
+import org.investpro.exchange.ibkr.IbkrExchange;
 import org.investpro.exchange.contracts.CredentialProvider;
 import org.investpro.exchange.core.BrokerVenue;
 import org.investpro.exchange.core.InstrumentType;
@@ -30,7 +31,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ExchangeFactory {
 
     private static final Map<String, String> EXCHANGE_ALIASES = buildExchangeAliases();
-
 
     private final CredentialProvider credentialProvider;
     private final ExchangeCredentialResolver credentialResolver;
@@ -131,7 +131,8 @@ public final class ExchangeFactory {
 
     /**
      * Force-create a fresh adapter.
-     * Use this only when credentials changed or the user explicitly resets the exchange.
+     * Use this only when credentials changed or the user explicitly resets the
+     * exchange.
      */
 
     public Exchange recreate(@NotNull String exchangeId) {
@@ -189,7 +190,6 @@ public final class ExchangeFactory {
         brokerRouter.closeAll();
     }
 
-
     public boolean hasCached(@NotNull String exchangeId) {
         Objects.requireNonNull(exchangeId, "exchangeId must not be null");
         return exchangeCache.containsKey(cacheKeyFor(exchangeId));
@@ -203,7 +203,6 @@ public final class ExchangeFactory {
     public int cachedCount() {
         return exchangeCache.size();
     }
-
 
     private Exchange createUncached(@NotNull String exchangeId) {
         Optional<ExchangeProvider> provider = pluginRegistry.findExchangeProvider(exchangeId);
@@ -227,7 +226,7 @@ public final class ExchangeFactory {
             case BINANCE_US -> new BinanceUs(credentials);
             case BITFINEX, BITFINEX_US -> new Bitfinex(credentials);
             case COINBASE -> new Coinbase(credentials);
-            case INTERACTIVE_BROKERS -> new InteractiveBrokers(credentials);
+            case INTERACTIVE_BROKERS -> new IbkrExchange(credentials);
             case OANDA -> new Oanda(credentials);
             case STELLAR_NETWORK -> new StellarNetwork(credentials);
             case SOLANA_NETWORK -> new SolanaNetwork(credentials);
@@ -264,7 +263,6 @@ public final class ExchangeFactory {
             log.warn("Failed to disconnect exchange adapter: {}", exchangeId, exception);
         }
     }
-
 
     private ENUM_EXCHANGE_LIST toEnum(String exchangeId) {
         String compact = exchangeId

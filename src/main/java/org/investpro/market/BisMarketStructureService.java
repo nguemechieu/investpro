@@ -156,7 +156,7 @@ public class BisMarketStructureService implements MarketStructureService {
     // =========================================================================
 
     private final Map<String, MarketStructureProfile> cache = new ConcurrentHashMap<>();
-    private volatile long lastRefreshEpochMs = Instant.now().toEpochMilli();
+    private final long lastRefreshEpochMs = Instant.now().toEpochMilli();
     private volatile int unknownCount = 0;
 
     // =========================================================================

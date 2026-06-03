@@ -37,7 +37,7 @@ public interface UserStrategy {
      * @return non-blank unique strategy ID
      */
     @NotNull
-    String getId();
+    String id();
 
     /**
      * Human-readable name for this strategy.
@@ -47,7 +47,7 @@ public interface UserStrategy {
      * @return non-blank strategy name
      */
     @NotNull
-    String getName();
+    String name();
 
     /**
      * Optional description of what this strategy does.

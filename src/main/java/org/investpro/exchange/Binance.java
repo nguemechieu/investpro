@@ -1088,14 +1088,16 @@ public class Binance extends Exchange {
         }
 
         boolean canSubmit = canSubmitOrders();
-        boolean hasOrderAuthorization = isPaperTrading() || supportsLiveTrading();
         boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE && canSubmit;
-        if (!canSubmit && status == TradabilityStatus.FULLY_TRADABLE) {
-            status = hasOrderAuthorization ? TradabilityStatus.INACTIVE : TradabilityStatus.API_KEY_RESTRICTED;
-        }
 
         boolean marginAllowed = permissions.contains("MARGIN")
                 || symbolNode.path("isMarginTradingAllowed").asBoolean(false);
+
+        String reason = status == TradabilityStatus.FULLY_TRADABLE
+                ? (orderSubmissionAllowed
+                        ? "Binance symbol is tradable"
+                        : "Binance symbol is tradable; order submission is unavailable until exchange session is active")
+                : "Binance symbol status=" + statusValue;
 
         return new SymbolTradability(
                 getExchangeId(),
@@ -1115,9 +1117,7 @@ public class Binance extends Exchange {
                 false,
                 marginAllowed,
                 supportsLeverage(),
-                status == TradabilityStatus.FULLY_TRADABLE
-                        ? "Binance symbol is tradable"
-                        : "Binance symbol status=" + statusValue,
+                reason,
                 Instant.now(),
                 Map.of(
                         "status", statusValue,

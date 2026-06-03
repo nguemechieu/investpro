@@ -1,9 +1,6 @@
 package org.investpro.risk;
 
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.Value;
+import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.RiskProfile;
 import org.investpro.enums.MarketBehavior;
@@ -20,20 +17,20 @@ import org.investpro.models.trading.TradePair;
  * Immutable context capturing all risk inputs for a potential trade.
  * <p>
  * This object is the risk snapshot passed into:
- * - RiskManagementSystem.evaluateTrade(...)
- * - AiTradeReviewRequest.from(...)
- * - TradeExecutionCoordinator.processSignal(...)
- * - ExecutionEngine.executeApprovedOrder(...)
+ * - RiskManagementSystem.evaluateTrade(…)
+ * - AiTradeReviewRequest.from(…)
+ * - TradeExecutionCoordinator.processSignal(…)
+ * - ExecutionEngine.executeApprovedOrder(…)
  * <p>
  * It is intentionally immutable and server-capable so it can later be sent to
  * an
  * authoritative backend decision service.
  */
-@Setter
-@Getter
+@Data
 @Slf4j
 @Value
 @Builder(toBuilder = true)
+
 public class TradeRiskContext {
 
     // =========================================================================
@@ -298,7 +295,7 @@ public class TradeRiskContext {
      * winRate * reward - lossRate * risk - estimatedFee
      */
     public double calculateExpectedValue() {
-        double winRate = clamp(expectedWinRate, 0.0, 1.0);
+        double winRate = clampProbability(expectedWinRate);
         double lossRate = 1.0 - winRate;
 
         double reward = calculateTradeReward();
@@ -768,10 +765,10 @@ public class TradeRiskContext {
                 .bidPrice(safePositive(bidPrice))
                 .askPrice(safePositive(askPrice))
                 .currentPrice(safePositive(currentPrice))
-                .expectedWinRate(clamp(expectedWinRate, 0.0, 1.0))
+                .expectedWinRate(clampProbability(expectedWinRate))
                 .expectedRewardRiskRatio(safePositive(expectedRewardRiskRatio))
                 .expectedValue(Double.isFinite(expectedValue) ? expectedValue : 0.0)
-                .volatility(clamp(volatility, 0.0, 1.0))
+                .volatility(clampProbability(volatility))
                 .maxRiskPerTrade(safePositive(maxRiskPerTrade))
                 .maxCumulativeRisk(safePositive(maxCumulativeRisk))
                 .maxAllowedLeverage(safePositive(maxAllowedLeverage))
@@ -791,12 +788,12 @@ public class TradeRiskContext {
         return value;
     }
 
-    private static double clamp(double value, double min, double max) {
+    private static double clampProbability(double value) {
         if (!Double.isFinite(value)) {
-            return min;
+            return 0.0;
         }
 
-        return Math.max(min, Math.min(max, value));
+        return Math.max(0.0, Math.min(1.0, value));
     }
 
     double requestedSize;

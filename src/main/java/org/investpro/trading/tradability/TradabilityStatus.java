@@ -23,6 +23,6 @@ public enum TradabilityStatus {
     MAX_SIZE_INVALID,
     LIQUIDITY_UNAVAILABLE,
     INACTIVE,
-    UNKNOWN;
+    UNKNOWN
 
 }

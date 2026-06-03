@@ -29,7 +29,7 @@ public class SystemOperationsService {
 
     /**
      * -- GETTER --
-     *  Get the SystemActivityBus for activity logging
+     * Get the SystemActivityBus for activity logging
      */
 
     private final SystemActivityBus activityBus;
@@ -41,6 +41,7 @@ public class SystemOperationsService {
     private Supplier<SystemSnapshot.TradingEngineSnapshot> tradingEngineProvider;
 
     private Supplier<SystemSnapshot.RiskStatusSnapshot> riskStatusProvider;
+    private Supplier<Map<String, Object>> runtimeHealthProvider;
     private ExchangeService exchangeService;
 
     private SystemOperationsService() {
@@ -96,6 +97,8 @@ public class SystemOperationsService {
      * Create a complete system snapshot
      */
     public SystemSnapshot createSnapshot() {
+        Map<String, Object> runtimeMetrics = runtimeHealthMetrics();
+
         SystemSnapshot snapshot = SystemSnapshot.builder()
                 .snapshotId(UUID.randomUUID().toString())
                 .snapshotTimestamp(Instant.now())
@@ -119,6 +122,12 @@ public class SystemOperationsService {
                 .errorCount(activityBus.getErrorCount())
                 .warningCount(activityBus.getWarningCount())
                 .criticalCount(activityBus.getCriticalCount())
+                .heartbeatAgeSeconds(longValue(runtimeMetrics.get("heartbeatAgeSeconds")))
+                .lastHeartbeatAt(instantValue(runtimeMetrics.get("lastHeartbeatAt")))
+                .lastHeartbeatSource(stringValue(runtimeMetrics.get("lastHeartbeatSource")))
+                .executionErrorCount(longValue(runtimeMetrics.get("executionErrorCount"), 0L))
+                .accountErrorCount(longValue(runtimeMetrics.get("accountErrorCount"), 0L))
+                .websocketDisconnectCount(longValue(runtimeMetrics.get("webSocketDisconnectCount"), 0L))
                 .isHealthy(determineHealthStatus())
                 .build();
 
@@ -435,5 +444,45 @@ public class SystemOperationsService {
 
     private boolean determineHealthStatus() {
         return activityBus.getCriticalCount() == 0 && activityBus.getErrorCount() < 5;
+    }
+
+    private @NotNull Map<String, Object> runtimeHealthMetrics() {
+        if (runtimeHealthProvider == null) {
+            return Map.of();
+        }
+        try {
+            Map<String, Object> snapshot = runtimeHealthProvider.get();
+            return snapshot == null ? Map.of() : snapshot;
+        } catch (Exception exception) {
+            log.debug("Unable to capture runtime health metrics", exception);
+            return Map.of();
+        }
+    }
+
+    private @Nullable Long longValue(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return null;
+    }
+
+    private long longValue(Object value, long fallback) {
+        Long parsed = longValue(value);
+        return parsed == null ? fallback : parsed;
+    }
+
+    private @Nullable Instant instantValue(Object value) {
+        if (value instanceof Instant instant) {
+            return instant;
+        }
+        return null;
+    }
+
+    private @Nullable String stringValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = value.toString();
+        return text.isBlank() ? null : text;
     }
 }

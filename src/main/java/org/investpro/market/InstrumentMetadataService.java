@@ -34,7 +34,7 @@ public class InstrumentMetadataService {
             return existing.get();
         }
 
-        AssetClass assetClass = inferAssetClass(tradePair);
+        AssetClass assetClass = inferAssetClass(tradePair, broker);
         InstrumentMetadata metadata = InstrumentMetadata.builder()
                 .tradePair(tradePair)
                 .broker(broker)
@@ -106,7 +106,11 @@ public class InstrumentMetadataService {
      * Infer asset class from pair naming conventions.
      */
     @NotNull
-    private AssetClass inferAssetClass(@NotNull TradePair tradePair) {
+    private AssetClass inferAssetClass(@NotNull TradePair tradePair, @NotNull String broker) {
+        if (isAlwaysOpenCryptoBroker(broker)) {
+            return AssetClass.CRYPTO_ASSET;
+        }
+
         String baseCode = tradePair.getBaseCode();
         if (isKnownCrypto(baseCode)) {
             return AssetClass.CRYPTO_ASSET;
@@ -124,7 +128,7 @@ public class InstrumentMetadataService {
     private String inferVenue(@NotNull String broker, @NotNull AssetClass assetClass) {
         return switch (assetClass) {
             case CRYPTO_ASSET -> "SPOT";
-            case DERIVATIVE , FIAT_CURRENCY -> "FOREX";
+            case DERIVATIVE, FIAT_CURRENCY -> "FOREX";
             case EQUITY, EQUITY_INDEX -> "EQUITIES";
             case COMMODITY -> "COMMODITIES";
             case FIXED_INCOME -> "BONDS";
@@ -134,7 +138,12 @@ public class InstrumentMetadataService {
     }
 
     private boolean isKnownCrypto(@NotNull String code) {
-        return code.matches("(BTC|ETH|BNB|SOL|XRP|ADA|DOGE|LTC|BCH|USDT|USDC|BUSD|DAI)");
+        return code.matches("(BTC|ETH|BNB|SOL|XLM|XRP|ADA|DOGE|LTC|BCH|USDT|USDC|BUSD|DAI)");
+    }
+
+    private boolean isAlwaysOpenCryptoBroker(@NotNull String broker) {
+        String normalized = broker.trim().toUpperCase();
+        return normalized.contains("STELLAR") || normalized.contains("SOLANA");
     }
 
     private boolean isKnownFiat(@NotNull String code) {

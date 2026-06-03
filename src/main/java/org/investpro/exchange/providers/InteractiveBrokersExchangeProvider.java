@@ -1,8 +1,8 @@
 package org.investpro.exchange.providers;
 
 import org.investpro.exchange.Exchange;
-import org.investpro.exchange.InteractiveBrokers;
 import org.investpro.exchange.credentials.ExchangeCredentials;
+import org.investpro.exchange.ibkr.IbkrExchange;
 import org.investpro.spi.ExchangeProvider;
 import org.investpro.spi.ExchangeProviderContext;
 
@@ -47,6 +47,6 @@ public final class InteractiveBrokersExchangeProvider implements ExchangeProvide
     @Override
     public Exchange create(ExchangeProviderContext context) {
         ExchangeCredentials credentials = context.credentialResolver().resolve("interactive_brokers");
-        return new InteractiveBrokers(credentials);
+        return new IbkrExchange(credentials);
     }
 }

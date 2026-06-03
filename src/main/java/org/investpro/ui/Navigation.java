@@ -97,6 +97,7 @@ public class Navigation extends StackPane {
                 createExchangeCard(),
                 createWorkflowSection(),
                 createMarketSection(),
+                createBrokerSection(),
                 createSystemSection());
 
         ScrollPane scrollPane = new ScrollPane(root);
@@ -214,6 +215,18 @@ public class Navigation extends StackPane {
                 createNavButton("Market Info", "Contract and session details", "market-info", false),
                 createNavButton("News Calendar", "Macro and event calendar", "news-calendar", false),
                 createNavButton("Data Window", "OHLCV details for selected symbol", "data-window", false));
+        return section;
+    }
+
+    private VBox createBrokerSection() {
+        VBox section = createSection("Broker Integrations");
+        section.getChildren().addAll(
+                createNavButton("IBKR Workspace", "Open the full Interactive Brokers workspace", "ibkr", true),
+                createNavButton("IBKR Connection", "Inspect IB Gateway health and reconnect", "ibkr-connection", false),
+                createNavButton("IBKR Account", "View balances and account summary", "ibkr-account-summary", false),
+                createNavButton("IBKR Portfolio", "Review portfolio and synchronisation", "ibkr-portfolio", false),
+                createNavButton("IBKR Positions", "Open position inventory", "ibkr-open-positions", false),
+                createNavButton("IBKR Orders", "View active broker orders", "ibkr-open-orders", false));
         return section;
     }
 

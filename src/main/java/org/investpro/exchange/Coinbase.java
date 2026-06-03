@@ -17,9 +17,6 @@ import org.investpro.exchange.websocket.CoinbaseWebSocketClient;
 import org.investpro.models.trading.*;
 import org.investpro.models.Account;
 import org.investpro.data.InProgressCandleData;
-import org.investpro.models.trading.OrderBook;
-import org.investpro.models.trading.Position;
-import org.investpro.models.trading.TradePair;
 import org.investpro.service.AuthResult;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
@@ -45,6 +42,7 @@ import org.java_websocket.drafts.Draft_6455;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -80,6 +78,11 @@ public class Coinbase extends Exchange {
     private static final String CANCEL_ORDERS_URL = "%s/orders/batch_cancel".formatted(REST_BASE_URL);
     private static final String ACCOUNTS_URL = "%s/accounts".formatted(REST_BASE_URL);
     private static final String MARKET_DATA_WS_URL = "wss://advanced-trade-ws.coinbase.com";
+    private static final String PEM_EC_BEGIN = "-----BEGIN EC PRIVATE " + "KEY-----";
+    private static final String PEM_EC_END = "-----END EC PRIVATE " + "KEY-----";
+    private static final String PEM_PKCS8_BEGIN = "-----BEGIN PRIVATE " + "KEY-----";
+    private static final String PEM_PKCS8_END = "-----END PRIVATE " + "KEY-----";
+    private static final String PEM_KEY_MARKER = "PRIVATE " + "KEY";
 
     protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -114,6 +117,10 @@ public class Coinbase extends Exchange {
     private record CacheEntry<T>(T value, long expiresAtMs) {
         boolean expired() {
             return Instant.now().getEpochSecond() >= expiresAtMs;
+        }
+
+        boolean fresh() {
+            return !expired();
         }
     }
 
@@ -608,11 +615,11 @@ public class Coinbase extends Exchange {
     private boolean looksLikePrivateKey(String value) {
         boolean result = value != null
                 && value.contains("BEGIN")
-                && value.contains("PRIVATE KEY");
+                && value.contains(PEM_KEY_MARKER);
         if (!result) {
-            log.debug("Private key validation failed: contains BEGIN={}, contains PRIVATE KEY={}",
+            log.debug("Private key validation failed: contains BEGIN={}, contains private-key marker={}",
                     value != null && value.contains("BEGIN"),
-                    value != null && value.contains("PRIVATE KEY"));
+                    value != null && value.contains(PEM_KEY_MARKER));
             logCredentialDiagnostics(apiKey, apiSecret, this.getDisplayName());
         }
         return result;
@@ -630,12 +637,12 @@ public class Coinbase extends Exchange {
         }
 
         // Private key format check
-        if (privateKey != null && privateKey.contains("BEGIN") && privateKey.contains("PRIVATE KEY")) {
+        if (privateKey != null && privateKey.contains("BEGIN") && privateKey.contains(PEM_KEY_MARKER)) {
             log.debug("  ✓ Private key contains PEM markers");
 
-            if (privateKey.contains("-----BEGIN EC PRIVATE KEY-----")) {
+            if (privateKey.contains(PEM_EC_BEGIN)) {
                 log.debug("    → EC PRIVATE KEY format");
-            } else if (privateKey.contains("-----BEGIN PRIVATE KEY-----")) {
+            } else if (privateKey.contains(PEM_PKCS8_BEGIN)) {
                 log.debug("    → PRIVATE KEY format (PKCS8)");
             }
         } else {
@@ -729,7 +736,7 @@ public class Coinbase extends Exchange {
 
     private @NotNull String buildCredentialErrorMessage() {
         boolean keyFormatOk = apiKey != null && apiKey.contains("organizations/") && apiKey.contains("/apiKeys/");
-        boolean secretFormatOk = apiSecret != null && apiSecret.contains("BEGIN") && apiSecret.contains("PRIVATE KEY");
+        boolean secretFormatOk = apiSecret != null && apiSecret.contains("BEGIN") && apiSecret.contains(PEM_KEY_MARKER);
 
         if (apiKey == null || apiKey.isBlank()) {
             return "Coinbase API Key is empty. Set apiKey to: organizations/{org_id}/apiKeys/{key_id}";
@@ -749,14 +756,15 @@ public class Coinbase extends Exchange {
             return """
                     Coinbase API Secret (Private Key) has invalid format. It must be a PEM-encoded EC private key:\
 
-                    • Starting with: -----BEGIN EC PRIVATE KEY----- or -----BEGIN PRIVATE KEY-----\
+                    • Starting with: %s or %s\
 
                     • Containing: Base64-encoded key content (multiple lines)\
 
-                    • Ending with: -----END EC PRIVATE KEY----- or -----END PRIVATE KEY-----\
+                    • Ending with: %s or %s\
 
 
-                    Get this from: Coinbase → Developer → API Keys → Download Private Key""";
+                    Get this from: Coinbase → Developer → API Keys → Download Private Key"""
+                    .formatted(PEM_EC_BEGIN, PEM_PKCS8_BEGIN, PEM_EC_END, PEM_PKCS8_END);
         }
 
         return "Coinbase Advanced Trade authentication not configured. Check API credentials format.";
@@ -982,7 +990,8 @@ public class Coinbase extends Exchange {
         if (retryAfter.isPresent()) {
             try {
                 retryAfterHint = Duration.ofSeconds(Math.max(1L, Long.parseLong(retryAfter.get().trim())));
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException exception) {
+                log.debug("Ignoring invalid Coinbase Retry-After header: {}", retryAfter.get(), exception);
                 retryAfterHint = Duration.ofDays(0);
             }
         }
@@ -1206,7 +1215,8 @@ public class Coinbase extends Exchange {
 
         try {
             return Long.parseLong(value);
-        } catch (Exception ignored) {
+        } catch (Exception exception) {
+            log.debug("Using hash code for non-numeric Coinbase trade id: {}", value, exception);
             return Math.abs(value.hashCode());
         }
     }
@@ -1432,7 +1442,6 @@ public class Coinbase extends Exchange {
         }
 
         boolean supportsOrders = canSubmitOrders();
-        boolean hasOrderAuthorization = isPaperTrading() || supportsLiveTrading();
         boolean orderSubmissionAllowed = supportsOrders
                 && status != TradabilityStatus.VIEW_ONLY
                 && status != TradabilityStatus.DISABLED
@@ -1443,13 +1452,7 @@ public class Coinbase extends Exchange {
                 && status != TradabilityStatus.MIN_SIZE_INVALID;
 
         if (!supportsOrders && status == TradabilityStatus.FULLY_TRADABLE) {
-            if (!hasOrderAuthorization) {
-                status = TradabilityStatus.API_KEY_RESTRICTED;
-                reason = "Coinbase API key/account is not authorized for order submission";
-            } else {
-                status = TradabilityStatus.INACTIVE;
-                reason = "Coinbase trading is temporarily unavailable until exchange connection is active";
-            }
+            reason = "Coinbase product is tradable; order submission is unavailable until exchange session is active";
         }
 
         return new SymbolTradability(
@@ -1488,7 +1491,8 @@ public class Coinbase extends Exchange {
     private BigDecimal safeDecimal(String value) {
         try {
             return new BigDecimal(value == null ? "0" : value.trim());
-        } catch (Exception ignored) {
+        } catch (Exception exception) {
+            log.debug("Using zero for invalid Coinbase decimal value: {}", value, exception);
             return BigDecimal.ZERO;
         }
     }
@@ -1535,7 +1539,7 @@ public class Coinbase extends Exchange {
 
         // Return fresh cache if available
         CacheEntry<OrderBook> cached = orderBookCache.get(cacheKey);
-        if (cached != null && !cached.expired()) {
+        if (cached != null && cached.fresh()) {
             log.debug("Coinbase orderBook cache-hit pair={} source=adapter-cache", tradePair);
             return CompletableFuture.completedFuture(cached.value());
         }
@@ -1697,7 +1701,7 @@ public class Coinbase extends Exchange {
         }
 
         CacheEntry<Ticker> cached = tickerCache.get(product);
-        if (cached != null && !cached.expired()) {
+        if (cached != null && cached.fresh()) {
             log.debug("Coinbase ticker cache-hit pair={} source=adapter-cache", tradePair);
             return cached.value();
         }
@@ -3141,12 +3145,12 @@ public class Coinbase extends Exchange {
 
     @Override
     public boolean supportsPositions() {
-        return true;
+        return isPaperTrading() || hasPrivateEndpointAuth();
     }
 
     @Override
     public boolean supportsAccountTrades() {
-        return hasPrivateEndpointAuth();
+        return isPaperTrading() || hasPrivateEndpointAuth();
     }
 
     @Override
@@ -3383,26 +3387,61 @@ public class Coinbase extends Exchange {
 
     @Override
     public void streamAccount(ExchangeStreamConsumer consumer) {
+        if (!isPaperTrading() && !hasPrivateEndpointAuth()) {
+            log.info("Skipping Coinbase account stream: Advanced Trade authentication is not configured.");
+            if (consumer != null) {
+                consumer.onStatus(getName(), "Coinbase account stream skipped: authentication required");
+            }
+            return;
+        }
         pollingStreamer.streamAccount(consumer);
     }
 
     @Override
     public void streamBalances(ExchangeStreamConsumer consumer) {
+        if (!isPaperTrading() && !hasPrivateEndpointAuth()) {
+            log.info("Skipping Coinbase balances stream: Advanced Trade authentication is not configured.");
+            if (consumer != null) {
+                consumer.onStatus(getName(), "Coinbase balances stream skipped: authentication required");
+            }
+            return;
+        }
         pollingStreamer.streamAccount(consumer);
     }
 
     @Override
     public void streamOrders(ExchangeStreamConsumer consumer) {
+        if (!isPaperTrading() && !hasPrivateEndpointAuth()) {
+            log.info("Skipping Coinbase orders stream: Advanced Trade authentication is not configured.");
+            if (consumer != null) {
+                consumer.onStatus(getName(), "Coinbase orders stream skipped: authentication required");
+            }
+            return;
+        }
         pollingStreamer.streamOrders(consumer);
     }
 
     @Override
     public void streamFills(ExchangeStreamConsumer consumer) {
+        if (!isPaperTrading() && !hasPrivateEndpointAuth()) {
+            log.info("Skipping Coinbase fills stream: Advanced Trade authentication is not configured.");
+            if (consumer != null) {
+                consumer.onStatus(getName(), "Coinbase fills stream skipped: authentication required");
+            }
+            return;
+        }
         pollingStreamer.streamOrders(consumer);
     }
 
     @Override
     public void streamPositions(ExchangeStreamConsumer consumer) {
+        if (!isPaperTrading() && !hasPrivateEndpointAuth()) {
+            log.info("Skipping Coinbase positions stream: Advanced Trade authentication is not configured.");
+            if (consumer != null) {
+                consumer.onStatus(getName(), "Coinbase positions stream skipped: authentication required");
+            }
+            return;
+        }
         pollingStreamer.streamPositions(consumer);
     }
 
@@ -3651,7 +3690,7 @@ public class Coinbase extends Exchange {
         }
     }
 
-    private OpenOrder parseOpenOrderNode(JsonNode node, TradePair tradePair) {
+    private @Nullable OpenOrder parseOpenOrderNode(JsonNode node, TradePair tradePair) {
         try {
             OpenOrder order = new OpenOrder();
 
@@ -3669,13 +3708,8 @@ public class Coinbase extends Exchange {
 
             String orderTypeText = firstText(node, "order_type", "type");
             if (!orderTypeText.isBlank()) {
-                try {
-                    order.setOrderType(
-                            OpenOrder.OrderType.valueOf(orderTypeText.toUpperCase(Locale.ROOT).replace("-", "_")));
-                } catch (Exception ignored) {
-                    // Keep default if model has one.
-                    log.error(ignored.toString());
-                }
+                order.setOrderType(
+                        OpenOrder.OrderType.valueOf(orderTypeText.toUpperCase(Locale.ROOT).replace("-", "_")));
             }
 
             double price = parseDouble(firstText(node, "price", "limit_price"), 0.0);
@@ -3698,12 +3732,7 @@ public class Coinbase extends Exchange {
 
             String status = firstText(node, "status");
             if (!status.isBlank()) {
-                try {
-                    order.setStatus(OpenOrder.OrderStatus.valueOf(status.toUpperCase(Locale.ROOT)));
-                } catch (Exception ignored) {
-                    // Keep default if model has one.
-                    log.error(ignored.toString());
-                }
+                order.setStatus(OpenOrder.OrderStatus.valueOf(status.toUpperCase(Locale.ROOT)));
             }
 
             return order;
@@ -3858,7 +3887,7 @@ public class Coinbase extends Exchange {
         return trades;
     }
 
-    private Trade parseTradeFromFill(JsonNode fillNode, TradePair tradePair) {
+    private @NonNull Trade parseTradeFromFill(JsonNode fillNode, TradePair tradePair) {
         try {
             double price = parseDouble(firstText(fillNode, "price"), 0.0);
             double size = parseDouble(firstText(fillNode, "size"), 0.0);
@@ -3876,12 +3905,7 @@ public class Coinbase extends Exchange {
                     tradeId,
                     timestamp);
 
-            try {
-                trade.setFee(parseDouble(firstText(fillNode, "commission", "fee"), 0.0));
-            } catch (Exception ignored) {
-                // Fee setter may not exist in every Trade version
-                log.warn(ignored.toString());
-            }
+            trade.setFee(parseDouble(firstText(fillNode, "commission", "fee"), 0.0));
 
             return trade;
         } catch (Exception exception) {

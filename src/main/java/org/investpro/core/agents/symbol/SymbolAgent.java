@@ -16,6 +16,7 @@ import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.lab.StrategyLabService;
 import org.investpro.utils.CandleDataSupplier;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -139,6 +140,7 @@ public class SymbolAgent implements Agent {
             case RANKING -> state.setLastIssue("Ranking strategies...");
             case PAPER_TRADING ->
                 state.setLastIssue("Paper validation is waiting for future live paper-trade results.");
+            case null -> {}
             default -> {
                 // ASSIGNED, LIVE_READY, LIVE_TRADING, FAILED, and PAUSED are managed
                 // externally.
@@ -287,7 +289,7 @@ public class SymbolAgent implements Agent {
                 "SYMBOL_STATE_CHANGED",
                 name(),
                 state,
-                java.time.Instant.now(),
+                Instant.now(),
                 Map.of(
                         "tradePairObject", symbol,
                         "previousState", previous.name(),

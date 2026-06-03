@@ -502,7 +502,8 @@ public class TradeExecutionCoordinator {
 
             @Override
             public boolean brokerConnected() {
-                return exchange != null && Boolean.TRUE.equals(exchange.isConnected());
+                return exchange != null
+                        && (Boolean.TRUE.equals(exchange.isConnected()) || exchange.isPaperTrading());
             }
 
             @Override

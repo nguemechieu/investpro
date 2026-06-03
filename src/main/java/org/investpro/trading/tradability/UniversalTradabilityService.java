@@ -26,6 +26,10 @@ public final class UniversalTradabilityService {
         private boolean expired() {
             return System.currentTimeMillis() >= expiresAtMs;
         }
+
+        private boolean fresh() {
+            return !expired();
+        }
     }
 
     public UniversalTradabilityService(Exchange exchange, MarketDataEngine marketDataEngine) {
@@ -128,7 +132,7 @@ public final class UniversalTradabilityService {
                 .filter(Objects::nonNull)
                 .filter(pair -> {
                     SymbolTradability status = snapshot(pair, TradabilityScope.WATCHLIST);
-                    return status != null ? status.canBeDisplayedInMarketWatch() : true;
+                    return status == null || status.canBeDisplayedInMarketWatch();
                 })
                 .toList();
     }
@@ -213,7 +217,7 @@ public final class UniversalTradabilityService {
 
     private SymbolTradability cached(TradePair pair, TradabilityScope scope) {
         CacheEntry entry = cache.get(cacheKey(pair, scope));
-        if (entry == null || entry.expired()) {
+        if (entry == null || !entry.fresh()) {
             return null;
         }
         return entry.tradability();

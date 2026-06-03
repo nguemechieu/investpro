@@ -13,6 +13,7 @@ import org.investpro.core.agents.risk.RiskDecision;
 import org.investpro.core.agents.signal.Signal;
 import org.investpro.models.trading.Order;
 import org.investpro.utils.Side;
+
 /**
  * Final execution gate.
  * <p>
@@ -54,7 +55,15 @@ public class ExecutionAgent implements Agent {
             return;
         }
 
-        if (context.getExchange() == null || !Boolean.TRUE.equals(context.getExchange().isConnected())) {
+        if (context.getExchange() == null) {
+            context.getEventBus().publishAsync(
+                    AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), "Exchange is not available."));
+            return;
+        }
+
+        boolean connected = Boolean.TRUE.equals(context.getExchange().isConnected());
+        boolean paperMode = context.getExchange().isPaperTrading();
+        if (!connected && !paperMode) {
             context.getEventBus().publishAsync(
                     AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), "Exchange is not connected."));
             return;

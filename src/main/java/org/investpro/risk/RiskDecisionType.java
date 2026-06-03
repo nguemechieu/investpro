@@ -1,5 +1,8 @@
 package org.investpro.risk;
 
+import lombok.Getter;
+
+@Getter
 public enum RiskDecisionType {
     APPROVE,
     REJECT,

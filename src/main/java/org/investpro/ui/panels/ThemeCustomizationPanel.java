@@ -7,8 +7,9 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Window;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.ui.theme.ThemeConfig;
 
@@ -16,15 +17,16 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.function.Consumer;
 
 /**
  * Theme Customization Panel
  * Allows users to adjust colors, fonts, and other styling without editing code.
  * Changes can be saved to .env file or exported as CSS.
  */
+@EqualsAndHashCode(callSuper = true)
 @Slf4j
-@Getter
-@Setter
+@Data
 public class ThemeCustomizationPanel extends VBox {
     private ThemeConfig currentTheme;
     private final TabPane themeTabPane = new TabPane();
@@ -124,7 +126,7 @@ public class ThemeCustomizationPanel extends VBox {
         // Spacing
         typographyContent.getChildren().add(createSectionTitle("Spacing"));
         typographyContent.getChildren().add(
-                createSpacingSlider("Component Spacing", currentTheme.getSpacing(),
+                createSpacingSlider(currentTheme.getSpacing(),
                         value -> currentTheme.setSpacing(value)));
 
         ScrollPane scrollPane = new ScrollPane(typographyContent);
@@ -234,12 +236,12 @@ public class ThemeCustomizationPanel extends VBox {
         return box;
     }
 
-    private HBox createSpacingSlider(String label, String currentValue, java.util.function.Consumer<String> callback) {
+    private HBox createSpacingSlider(String currentValue, Consumer<String> callback) {
         HBox box = new HBox(12);
         box.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         box.setPadding(new Insets(8));
 
-        Label labelNode = new Label(label);
+        Label labelNode = new Label("Component Spacing");
         labelNode.setPrefWidth(150);
         labelNode.setStyle("-fx-text-fill: -text-primary;");
 
@@ -315,7 +317,7 @@ public class ThemeCustomizationPanel extends VBox {
         VBox swatch = new VBox(4);
         swatch.setAlignment(javafx.geometry.Pos.CENTER);
         swatch.setPrefSize(60, 60);
-        swatch.setStyle("-fx-background-color: " + normalizePaintValue(color, "#2563eb") +
+        swatch.setStyle("-fx-background-color: " + normalizePaintValue(color) +
                 "; -fx-border-color: -border-strong; -fx-border-width: 1;");
 
         Label swatchLabel = new Label(label);
@@ -342,7 +344,7 @@ public class ThemeCustomizationPanel extends VBox {
 
         Button applyButton = new Button("Apply Theme");
         applyButton.setStyle("-fx-padding: 8 16; -fx-font-size: 12; -fx-text-fill: white; -fx-background-color: " +
-                normalizePaintValue(currentTheme.getPrimaryColor(), "#2563eb") + ";");
+                normalizePaintValue(currentTheme.getPrimaryColor()) + ";");
         applyButton.setOnAction(e -> applyTheme());
 
         buttonBox.getChildren().addAll(resetButton, applyButton);
@@ -496,7 +498,7 @@ public class ThemeCustomizationPanel extends VBox {
         return (base + " " + themeVariables).trim();
     }
 
-    private static String normalizePaintValue(String value, String fallback) {
+    private static String normalizePaintValue(String value) {
         String candidate = value == null ? "" : value.trim();
         if (candidate.startsWith("\"") && candidate.endsWith("\"") && candidate.length() > 1) {
             candidate = candidate.substring(1, candidate.length() - 1).trim();
@@ -508,7 +510,7 @@ public class ThemeCustomizationPanel extends VBox {
             Color.web(candidate);
             return candidate;
         } catch (Exception ignored) {
-            return fallback;
+            return "#2563eb";
         }
     }
 }

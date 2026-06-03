@@ -1,5 +1,6 @@
 package org.investpro.backtesting;
 
+import lombok.Data;
 import lombok.Getter;
 import org.investpro.data.CandleData;
 import org.jetbrains.annotations.NotNull;
@@ -9,12 +10,13 @@ import java.util.*;
 /**
  * Abstract base class for trading strategies used in backtesting
  */
+@Data
 public abstract class BacktestStrategy {
     /**
      * -- GETTER --
-     *  Get strategy name
+     * Get strategy name
      */
-    @Getter
+
     protected String strategyName;
     protected BacktestConfig config;
     protected List<CandleData> candleHistory;
@@ -127,24 +129,26 @@ public abstract class BacktestStrategy {
      *
      * @param strength 0.0 to 1.0
      */
-        public record SignalEvent(int candleIndex, Type type, String reason, double strength) {
-            public enum Type {BUY, SELL, HOLD}
+    public record SignalEvent(int candleIndex, Type type, String reason, double strength) {
+        public enum Type {
+            BUY, SELL, HOLD
+        }
 
         public SignalEvent(int candleIndex, Type type, String reason) {
-                this(candleIndex, type, reason, 1.0);
-            }
-
-            public SignalEvent(int candleIndex, Type type, String reason, double strength) {
-                this.candleIndex = candleIndex;
-                this.type = type;
-                this.reason = reason;
-                this.strength = Math.min(1.0, Math.max(0.0, strength));
-            }
-
-            @Override
-            public @NotNull String toString() {
-                return String.format("Signal[idx=%d, type=%s, reason='%s', strength=%.2f]",
-                        candleIndex, type, reason, strength);
-            }
+            this(candleIndex, type, reason, 1.0);
         }
+
+        public SignalEvent(int candleIndex, Type type, String reason, double strength) {
+            this.candleIndex = candleIndex;
+            this.type = type;
+            this.reason = reason;
+            this.strength = Math.min(1.0, Math.max(0.0, strength));
+        }
+
+        @Override
+        public @NotNull String toString() {
+            return String.format("Signal[idx=%d, type=%s, reason='%s', strength=%.2f]",
+                    candleIndex, type, reason, strength);
+        }
+    }
 }

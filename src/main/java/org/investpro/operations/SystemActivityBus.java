@@ -221,21 +221,21 @@ public class SystemActivityBus {
      * Get event count by severity
      */
     public int getErrorCount() {
-        return (int) getEventsBySeverity(SystemActivityEvent.Severity.ERROR).size();
+        return getEventsBySeverity(SystemActivityEvent.Severity.ERROR).size();
     }
 
     /**
      * Get warning count
      */
     public int getWarningCount() {
-        return (int) getEventsBySeverity(SystemActivityEvent.Severity.WARN).size();
+        return getEventsBySeverity(SystemActivityEvent.Severity.WARN).size();
     }
 
     /**
      * Get critical error count
      */
     public int getCriticalCount() {
-        return (int) getEventsBySeverity(SystemActivityEvent.Severity.CRITICAL).size();
+        return getEventsBySeverity(SystemActivityEvent.Severity.CRITICAL).size();
     }
 
     private void notifyListeners(SystemActivityEvent event) {

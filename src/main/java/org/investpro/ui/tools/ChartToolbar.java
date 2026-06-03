@@ -38,26 +38,31 @@ import java.util.Set;
 /**
  * Professional chart-only toolbar for InvestPro candlestick charts.
  *
- * <p>This toolbar intentionally does not include desk-level trading controls:
- * BUY, SELL, New Order, Cancel All, Algo Trading, broker selector, symbol selector,
- * or timeframe controls.</p>
+ * <p>
+ * This toolbar intentionally does not include desk-level trading controls:
+ * BUY, SELL, New Order, Cancel All, Algo Trading, broker selector, symbol
+ * selector,
+ * or timeframe controls.
+ * </p>
  *
- * <p>It only includes chart tools a trader needs:</p>
+ * <p>
+ * It only includes chart tools a trader needs:
+ * </p>
  * <ul>
- *     <li>Cursor</li>
- *     <li>Crosshair</li>
- *     <li>Trendline</li>
- *     <li>Horizontal line</li>
- *     <li>Vertical line</li>
- *     <li>Rectangle</li>
- *     <li>Fibonacci retracement</li>
- *     <li>Measure/ruler</li>
- *     <li>Zoom in/out</li>
- *     <li>Fit chart</li>
- *     <li>Indicators</li>
- *     <li>Screenshot</li>
- *     <li>Print</li>
- *     <li>Chart options</li>
+ * <li>Cursor</li>
+ * <li>Crosshair</li>
+ * <li>Trendline</li>
+ * <li>Horizontal line</li>
+ * <li>Vertical line</li>
+ * <li>Rectangle</li>
+ * <li>Fibonacci retracement</li>
+ * <li>Measure/ruler</li>
+ * <li>Zoom in/out</li>
+ * <li>Fit chart</li>
+ * <li>Indicators</li>
+ * <li>Screenshot</li>
+ * <li>Print</li>
+ * <li>Chart options</li>
  * </ul>
  */
 @Getter
@@ -82,21 +87,21 @@ public class ChartToolbar extends Region {
     /**
      * Compatibility constructor.
      *
-     * <p>The {@code granularities} argument is intentionally ignored because
-     * timeframe controls belong to the parent chart header or trading desk.</p>
+     * <p>
+     * The {@code granularities} argument is intentionally ignored because
+     * timeframe controls belong to the parent chart header or trading desk.
+     * </p>
      */
     public ChartToolbar(
             ObservableNumberValue containerWidth,
             ObservableNumberValue containerHeight,
-            Set<Integer> granularities
-    ) {
+            Set<Integer> granularities) {
         this(containerWidth, containerHeight);
     }
 
     public ChartToolbar(
             ObservableNumberValue containerWidth,
-            ObservableNumberValue containerHeight
-    ) {
+            ObservableNumberValue containerHeight) {
         Objects.requireNonNull(containerWidth, "containerWidth must not be null");
         Objects.requireNonNull(containerHeight, "containerHeight must not be null");
 
@@ -161,6 +166,7 @@ public class ChartToolbar extends Region {
                 new ToolbarButton(Tool.ZOOM_IN),
                 new ToolbarButton(Tool.ZOOM_OUT),
                 new ToolbarButton(Tool.FIT_CHART),
+                new ToolbarButton(Tool.CHART_TYPE),
                 verticalSeparator(),
 
                 new ToolbarButton(Tool.EVENTS),
@@ -169,8 +175,7 @@ public class ChartToolbar extends Region {
                 new ToolbarButton(Tool.PRINT),
                 spacer(),
 
-                createOptionsButton()
-        );
+                createOptionsButton());
     }
 
     private ToolbarButton createOptionsButton() {
@@ -216,11 +221,10 @@ public class ChartToolbar extends Region {
                         mouseExitedPopOverFilter = null;
                         return;
                     }
-                    boolean insidePopover =
-                            event.getScreenX() <= optionsPopOver.getX() + optionsPopOver.getWidth()
-                                    && event.getScreenX() >= optionsPopOver.getX()
-                                    && event.getScreenY() <= optionsPopOver.getY() + optionsPopOver.getHeight()
-                                    && event.getScreenY() >= optionsPopOver.getY();
+                    boolean insidePopover = event.getScreenX() <= optionsPopOver.getX() + optionsPopOver.getWidth()
+                            && event.getScreenX() >= optionsPopOver.getX()
+                            && event.getScreenY() <= optionsPopOver.getY() + optionsPopOver.getHeight()
+                            && event.getScreenY() >= optionsPopOver.getY();
                     if (!insidePopover && !mouseInsideOptionsButton) {
                         optionsPopOver.hide(Duration.seconds(0.20));
                         capturedScene.getWindow().removeEventFilter(MouseEvent.MOUSE_MOVED, mouseExitedPopOverFilter);
@@ -270,7 +274,10 @@ public class ChartToolbar extends Region {
     /**
      * Kept for compatibility with older chart-container code.
      *
-     * <p>This toolbar no longer owns timeframe buttons, so this method is intentionally empty.</p>
+     * <p>
+     * This toolbar no longer owns timeframe buttons, so this method is
+     * intentionally empty.
+     * </p>
      */
     public void setActiveToolbarButton(javafx.beans.property.IntegerProperty secondsPerCandle) {
         // Intentionally empty.
@@ -278,8 +285,7 @@ public class ChartToolbar extends Region {
 
     public void registerEventHandlers(
             CandleStickChart candleStickChart,
-            javafx.beans.property.IntegerProperty secondsPerCandle
-    ) {
+            javafx.beans.property.IntegerProperty secondsPerCandle) {
         Objects.requireNonNull(candleStickChart, "candleStickChart must not be null");
 
         for (Node childNode : toolbar.getChildren()) {
@@ -354,6 +360,8 @@ public class ChartToolbar extends Region {
 
                 case FIT_CHART -> toolButton.setOnAction(event -> candleStickChart.fitChart());
 
+                case CHART_TYPE -> toolButton.setOnAction(event -> candleStickChart.cycleChartType());
+
                 case EVENTS -> toolButton.setOnAction(event -> candleStickChart.toggleChartEvents());
 
                 case INDICATORS -> toolButton.setOnAction(event -> candleStickChart.openIndicatorDialog());
@@ -420,6 +428,7 @@ public class ChartToolbar extends Region {
         ZOOM_IN("/img/search-plus-solid.png", "+", "Zoom In"),
         ZOOM_OUT("/img/search-minus-solid.png", "−", "Zoom Out"),
         FIT_CHART("/img/expand-solid.png", "⛶", "Fit Chart"),
+        CHART_TYPE("/img/chart-line-solid.png", "Ty", "Cycle Chart Type"),
 
         EVENTS("/img/calendar-days-solid.png", "Ev", "Toggle Events"),
         INDICATORS("/img/chart-line-solid.png", "ƒ", "Indicators"),
@@ -453,14 +462,12 @@ public class ChartToolbar extends Region {
         }
     }
 
-
     private class SizeChangeListener extends DelayedSizeChangeListener {
 
         SizeChangeListener(
                 BooleanProperty gotFirstSize,
                 ObservableValue<Number> containerWidth,
-                ObservableValue<Number> containerHeight
-        ) {
+                ObservableValue<Number> containerHeight) {
             super(650, 220, gotFirstSize, containerWidth, containerHeight);
         }
 

@@ -86,7 +86,7 @@ public final class RequestPrioritizationQueue {
         updatePressureMode();
 
         @SuppressWarnings("unchecked")
-        CompletableFuture<T> future = (CompletableFuture<T>) request.resultFuture;
+        CompletableFuture<T> future = request.resultFuture;
         return future;
     }
 
@@ -127,7 +127,7 @@ public final class RequestPrioritizationQueue {
                 request.supplier.get().whenComplete((result, ex) -> {
                     completed.incrementAndGet();
                     if (ex != null) {
-                        ((CompletableFuture<Object>) request.resultFuture).completeExceptionally(ex);
+                        request.resultFuture.completeExceptionally(ex);
                     } else {
                         ((CompletableFuture<Object>) request.resultFuture).complete(result);
                     }

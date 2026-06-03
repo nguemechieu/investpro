@@ -66,6 +66,9 @@ public class SymbolAgentState {
      * Returns UNKNOWN if the state field has not been initialised.
      */
     public SymbolTradingMode getTradingMode() {
+        if (state == null) {
+            return SymbolTradingMode.UNKNOWN;
+        }
 
         return switch (state) {
             case NOT_STARTED, COLLECTING_DATA, BACKTESTING, RANKING -> SymbolTradingMode.TRAINING;
@@ -136,7 +139,7 @@ public class SymbolAgentState {
                 }
                 yield "Failed";
             }
-            default -> "Unknown";
+            case UNKNOWN -> "Unknown";
         };
     }
 
@@ -144,7 +147,9 @@ public class SymbolAgentState {
      * Returns a compact signal text like "▲ BUY 0.82" or "▼ SELL 0.65", empty if no signal.
      */
     public String getSignalText() {
-        if (lastSignalSide == null || lastSignalSide.isBlank()) return "";
+        if (lastSignalSide == null || lastSignalSide.isBlank()) {
+            return "";
+        }
         String arrow = "BUY".equalsIgnoreCase(lastSignalSide) ? "▲" : "▼";
         if (lastSignalConfidence > 0) {
             return String.format("%s %s %.2f", arrow, lastSignalSide.toUpperCase(), lastSignalConfidence);

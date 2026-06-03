@@ -9,22 +9,23 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Routes execution plans to the appropriate venue based on symbol type and venue health.
+ * Routes execution plans to the appropriate venue based on symbol type and
+ * venue health.
  * Tracks venue error counts and adapts routing decisions accordingly.
  *
- * <p><strong>CRITICAL:</strong> This router selects a venue for the plan
+ * <p>
+ * <strong>CRITICAL:</strong> This router selects a venue for the plan
  * but does NOT submit or execute the plan against any exchange.
- * The ExecutionEngine owns all order submission.</p>
+ * The ExecutionEngine owns all order submission.
+ * </p>
  */
 @Slf4j
 public class ExecutionRouter {
 
     private static volatile ExecutionRouter instance;
 
-    private final ConcurrentHashMap<ExecutionVenue, AtomicInteger> venueErrorCounts =
-            new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<ExecutionVenue, Boolean> venueHealthy =
-            new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ExecutionVenue, AtomicInteger> venueErrorCounts = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ExecutionVenue, Boolean> venueHealthy = new ConcurrentHashMap<>();
 
     private static final String SOURCE = "ExecutionRouter";
     private static final int MAX_ERRORS_BEFORE_DEMOTION = 5;
@@ -57,14 +58,16 @@ public class ExecutionRouter {
     }
 
     /**
-     * Selects the best execution venue for the plan and returns an updated plan with venue set.
+     * Selects the best execution venue for the plan and returns an updated plan
+     * with venue set.
      *
      * @param plan   the execution plan to route
      * @param record the strategy lifecycle record
      * @return ExecutionPlan with the venue field set to the selected venue
      */
     public ExecutionPlan route(ExecutionPlan plan, StrategyLifecycleRecord record) {
-        if (plan == null) throw new IllegalArgumentException("ExecutionPlan must not be null");
+        if (plan == null)
+            throw new IllegalArgumentException("ExecutionPlan must not be null");
 
         ExecutionVenue selectedVenue = selectVenue(plan.getSymbol(), record);
 
@@ -112,12 +115,14 @@ public class ExecutionRouter {
     }
 
     /**
-     * Records a venue error. After {@code MAX_ERRORS_BEFORE_DEMOTION} errors, marks venue unhealthy.
+     * Records a venue error. After {@code MAX_ERRORS_BEFORE_DEMOTION} errors, marks
+     * venue unhealthy.
      *
      * @param venue the venue that experienced an error
      */
     public void recordVenueError(ExecutionVenue venue) {
-        if (venue == null) return;
+        if (venue == null)
+            return;
         int errors = venueErrorCounts.computeIfAbsent(venue, v -> new AtomicInteger(0))
                 .incrementAndGet();
         if (errors >= MAX_ERRORS_BEFORE_DEMOTION) {
@@ -132,7 +137,8 @@ public class ExecutionRouter {
      * @param venue the venue to recover
      */
     public void recoverVenue(ExecutionVenue venue) {
-        if (venue == null) return;
+        if (venue == null)
+            return;
         venueErrorCounts.computeIfAbsent(venue, v -> new AtomicInteger(0)).set(0);
         venueHealthy.put(venue, true);
         log.info("Venue recovered: {}", venue);
@@ -153,7 +159,8 @@ public class ExecutionRouter {
     // =========================================================================
 
     private ExecutionVenue selectVenue(String symbol, StrategyLifecycleRecord record) {
-        if (symbol == null) return ExecutionVenue.PAPER_TRADE;
+        if (symbol == null)
+            return ExecutionVenue.PAPER_TRADE;
 
         // Use paper trading for non-live strategies
         if (record != null && !record.getLifecycleStatus().isLive()) {
@@ -161,6 +168,14 @@ public class ExecutionRouter {
         }
 
         String upper = symbol.toUpperCase();
+
+        if (upper.contains("/SOL") || upper.startsWith("SOL/") || upper.contains("SOL")) {
+            return pickHealthy(ExecutionVenue.SOLANA_DEX, ExecutionVenue.COINBASE_ADVANCED);
+        }
+
+        if (upper.contains("/XLM") || upper.startsWith("XLM/") || upper.contains("XLM")) {
+            return pickHealthy(ExecutionVenue.STELLAR, ExecutionVenue.COINBASE_ADVANCED);
+        }
 
         // Crypto symbols
         if (upper.contains("BTC") || upper.contains("ETH") || upper.contains("USDT")
@@ -183,16 +198,19 @@ public class ExecutionRouter {
     }
 
     private ExecutionVenue pickHealthy(ExecutionVenue preferred, ExecutionVenue fallback) {
-        if (venueHealthy.getOrDefault(preferred, true)) return preferred;
-        if (venueHealthy.getOrDefault(fallback, true)) return fallback;
+        if (venueHealthy.getOrDefault(preferred, true))
+            return preferred;
+        if (venueHealthy.getOrDefault(fallback, true))
+            return fallback;
         return ExecutionVenue.PAPER_TRADE;
     }
 
     private boolean isForexPair(String symbol) {
-        String[] currencies = {"USD", "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF"};
+        String[] currencies = { "USD", "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF" };
         int matches = 0;
         for (String c : currencies) {
-            if (symbol.contains(c)) matches++;
+            if (symbol.contains(c))
+                matches++;
         }
         return matches >= 2;
     }

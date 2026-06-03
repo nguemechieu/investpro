@@ -1026,7 +1026,8 @@ public class Alpaca extends Exchange {
     @Override
     public CompletableFuture<SymbolTradability> fetchTradabilityStatus(TradePair pair) {
         if (pair == null) {
-            return CompletableFuture.completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+            return CompletableFuture
+                    .completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
         }
         return CompletableFuture.supplyAsync(() -> mapAlpacaTradability(pair));
     }
@@ -1118,22 +1119,22 @@ public class Alpaca extends Exchange {
 
     @Override
     public Ticker getLivePrice(TradePair tradePair) {
-        return null;
+        return Ticker.empty();
     }
 
     @Override
     public CompletableFuture<Ticker> fetchTicker(TradePair tradePair) {
-        return null;
+        return CompletableFuture.completedFuture(Ticker.empty());
     }
 
     @Override
     public CompletableFuture<List<Ticker>> fetchTickers(List<TradePair> tradePairs) {
-        return null;
+        return CompletableFuture.completedFuture(List.of());
     }
 
     @Override
     public CompletableFuture<List<Ticker>> getTicker(TradePair pair) {
-        return null;
+        return CompletableFuture.completedFuture(List.of(Ticker.empty()));
     }
 
     @Override

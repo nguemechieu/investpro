@@ -17,14 +17,19 @@ import java.util.function.Consumer;
  * Central backtest scheduling engine for the InvestPro Strategy Lab.
  *
  * <h2>Architecture</h2>
+ * 
  * <pre>
  *   submit(BacktestJob)
  *       │
  *       ▼
- *   PriorityBlockingQueue (max {@code strategy.lab.maxQueueSize} jobs)
+ *   PriorityBlockingQueue (max {@code
+ * strategy.lab.maxQueueSize
+ * } jobs)
  *       │
  *       ▼
- *   ThreadPoolExecutor (max {@code strategy.lab.maxConcurrentBacktests} workers)
+ *   ThreadPoolExecutor (max {@code
+ * strategy.lab.maxConcurrentBacktests
+ * } workers)
  *       │
  *       ▼
  *   StrategyBacktestRunner.run(request)
@@ -38,15 +43,18 @@ import java.util.function.Consumer;
  *
  * <h2>Design guarantees</h2>
  * <ul>
- *   <li>The JavaFX UI thread <b>never</b> executes backtest logic.</li>
- *   <li>At most {@code maxWorkers} backtests run simultaneously.</li>
- *   <li>The queue is bounded; submissions beyond the limit are rejected.</li>
- *   <li>Every backtest supports graceful interruption at each candle iteration.</li>
- *   <li>A {@link ResourceGuard} can pause intake when memory/CPU is critical.</li>
- *   <li>Periodic status logs replace per-backtest INFO spam.</li>
+ * <li>The JavaFX UI thread <b>never</b> executes backtest logic.</li>
+ * <li>At most {@code maxWorkers} backtests run simultaneously.</li>
+ * <li>The queue is bounded; submissions beyond the limit are rejected.</li>
+ * <li>Every backtest supports graceful interruption at each candle
+ * iteration.</li>
+ * <li>A {@link ResourceGuard} can pause intake when memory/CPU is
+ * critical.</li>
+ * <li>Periodic status logs replace per-backtest INFO spam.</li>
  * </ul>
  *
  * <h2>Configuration (config.properties)</h2>
+ * 
  * <pre>
  *   strategy.lab.maxConcurrentBacktests   – max simultaneous workers (default: cores/2)
  *   strategy.lab.maxQueueSize             – max queued jobs             (default: 1000)
@@ -60,9 +68,9 @@ public final class BacktestScheduler {
     // ─── Configuration keys ──────────────────────────────────────────────────
 
     private static final String CFG_MAX_WORKERS = "strategy.lab.maxConcurrentBacktests";
-    private static final String CFG_MAX_QUEUE   = "strategy.lab.maxQueueSize";
+    private static final String CFG_MAX_QUEUE = "strategy.lab.maxQueueSize";
     private static final String CFG_RESOURCE_GUARD = "strategy.lab.enableResourceProtection";
-    private static final String CFG_LOG_EACH    = "strategy.lab.logEachBacktest";
+    private static final String CFG_LOG_EACH = "strategy.lab.logEachBacktest";
 
     // ─── Singleton ───────────────────────────────────────────────────────────
 
@@ -104,6 +112,12 @@ public final class BacktestScheduler {
     /** Priority queue: lower priority level → dequeued first. */
     private final PriorityBlockingQueue<BacktestJob> workQueue;
 
+    /** Guards the logical queue capacity so callers can block without polling. */
+    private final Semaphore queueCapacity;
+
+    /** Coordinates dispatcher back-off without spin/sleep loops. */
+    private final Object dispatchMonitor = new Object();
+
     /** Fixed-size worker pool. */
     private final ThreadPoolExecutor executor;
     private volatile Thread dispatcherThread;
@@ -124,9 +138,9 @@ public final class BacktestScheduler {
 
     // ─── Metrics ─────────────────────────────────────────────────────────────
 
-    private final AtomicLong completedCount  = new AtomicLong();
-    private final AtomicLong failedCount     = new AtomicLong();
-    private final AtomicLong cancelledCount  = new AtomicLong();
+    private final AtomicLong completedCount = new AtomicLong();
+    private final AtomicLong failedCount = new AtomicLong();
+    private final AtomicLong cancelledCount = new AtomicLong();
     private final AtomicLong totalExecTimeMs = new AtomicLong();
 
     /** Throughput tracking – completion timestamps in rolling 10-second window. */
@@ -134,8 +148,8 @@ public final class BacktestScheduler {
 
     // ─── Control flags ───────────────────────────────────────────────────────
 
-    private final AtomicBoolean paused    = new AtomicBoolean(false);
-    private final AtomicBoolean shutdown  = new AtomicBoolean(false);
+    private final AtomicBoolean paused = new AtomicBoolean(false);
+    private final AtomicBoolean shutdown = new AtomicBoolean(false);
 
     /** Listeners notified when the stats snapshot changes. */
     private final List<Consumer<SchedulerStats>> statsListeners = new CopyOnWriteArrayList<>();
@@ -152,18 +166,19 @@ public final class BacktestScheduler {
 
     private BacktestScheduler() {
         int cores = Runtime.getRuntime().availableProcessors();
-        this.maxWorkers       = AppConfig.getInt(CFG_MAX_WORKERS, Math.max(1, cores / 2));
+        this.maxWorkers = AppConfig.getInt(CFG_MAX_WORKERS, Math.max(1, cores / 2));
         this.currentMaxWorkers = this.maxWorkers;
-        this.maxQueueSize     = AppConfig.getInt(CFG_MAX_QUEUE,   1000);
+        this.maxQueueSize = AppConfig.getInt(CFG_MAX_QUEUE, 1000);
         this.resourceProtection = AppConfig.getBoolean(CFG_RESOURCE_GUARD, true);
-        this.logEachBacktest  = AppConfig.getBoolean(CFG_LOG_EACH, false);
+        this.logEachBacktest = AppConfig.getBoolean(CFG_LOG_EACH, false);
 
         this.workQueue = new PriorityBlockingQueue<>(256);
+        this.queueCapacity = new Semaphore(maxQueueSize, true);
 
         this.executor = new ThreadPoolExecutor(
                 maxWorkers, maxWorkers,
                 60L, TimeUnit.SECONDS,
-                new SynchronousQueue<>(),      // workers take directly from workQueue via our dispatch loop
+                new SynchronousQueue<>(), // workers take directly from workQueue via our dispatch loop
                 r -> {
                     Thread t = new Thread(r, "strategy-lab-worker");
                     t.setDaemon(true);
@@ -186,8 +201,10 @@ public final class BacktestScheduler {
      *
      * @param request  backtest parameters
      * @param priority scheduling priority
-     * @return the queued job (contains a {@link CompletableFuture} callers can await)
-     * @throws RejectedExecutionException if the queue is full or the scheduler is shut down
+     * @return the queued job (contains a {@link CompletableFuture} callers can
+     *         await)
+     * @throws RejectedExecutionException if the queue is full or the scheduler is
+     *                                    shut down
      */
     @NotNull
     public BacktestJob submit(
@@ -210,11 +227,19 @@ public final class BacktestScheduler {
         }
         ensureDispatchLoopRunning();
 
-        if (workQueue.size() >= maxQueueSize) {
+        if (!queueCapacity.tryAcquire()) {
             throw new RejectedExecutionException(
                     "Backtest queue is full (limit=" + maxQueueSize + "). "
-                    + "Increase strategy.lab.maxQueueSize or wait for jobs to complete.");
+                            + "Increase strategy.lab.maxQueueSize or wait for jobs to complete.");
         }
+
+        return submitWithReservedCapacity(request, priority, onComplete);
+    }
+
+    private BacktestJob submitWithReservedCapacity(
+            @NotNull StrategyBacktestRequest request,
+            @NotNull BacktestJobPriority priority,
+            @Nullable Consumer<BacktestJob> onComplete) {
 
         if (resourceProtection && resourceGuard.isMemoryCritical()) {
             log.warn("BacktestScheduler: memory critical ({}% used) - pausing intake",
@@ -225,7 +250,14 @@ public final class BacktestScheduler {
 
         BacktestJob job = new BacktestJob(request, priority, onComplete);
         allJobs.put(job.getJobId(), job);
-        workQueue.add(job);
+        if (!workQueue.offer(job)) {
+            queueCapacity.release();
+            allJobs.remove(job.getJobId());
+            throw new RejectedExecutionException("Backtest queue rejected job " + job.getJobId());
+        }
+        synchronized (dispatchMonitor) {
+            dispatchMonitor.notifyAll();
+        }
         notifyStatsListeners();
 
         log.debug("Queued backtest job {} ({} {} {})",
@@ -239,7 +271,8 @@ public final class BacktestScheduler {
     /**
      * Submits a job after waiting for queue capacity.
      *
-     * <p>This is intended for bulk Strategy Lab runs where rejecting a valid
+     * <p>
+     * This is intended for bulk Strategy Lab runs where rejecting a valid
      * strategy because the queue is temporarily full would hide useful results.
      * The caller should already be off the JavaFX thread.
      */
@@ -249,21 +282,21 @@ public final class BacktestScheduler {
             @NotNull BacktestJobPriority priority,
             @Nullable Consumer<BacktestJob> onComplete) {
         while (!shutdown.get()) {
-            if (workQueue.size() < maxQueueSize) {
-                try {
-                    return submit(request, priority, onComplete);
-                } catch (RejectedExecutionException exception) {
-                    if (shutdown.get()) {
-                        throw exception;
-                    }
-                }
-            }
-
             try {
-                Thread.sleep(100L);
+                queueCapacity.acquire();
+                if (shutdown.get()) {
+                    queueCapacity.release();
+                    throw new RejectedExecutionException("BacktestScheduler has been shut down");
+                }
+                return submitWithReservedCapacity(request, priority, onComplete);
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
-                throw new RejectedExecutionException("Interrupted while waiting for backtest queue capacity", exception);
+                throw new RejectedExecutionException("Interrupted while waiting for backtest queue capacity",
+                        exception);
+            } catch (RejectedExecutionException exception) {
+                if (shutdown.get()) {
+                    throw exception;
+                }
             }
         }
 
@@ -290,7 +323,9 @@ public final class BacktestScheduler {
         }
         boolean cancelled = job.cancel();
         if (cancelled) {
-            workQueue.remove(job); // remove from queue if not yet started
+            if (workQueue.remove(job)) {
+                queueCapacity.release();
+            }
             cancelledCount.incrementAndGet();
             notifyStatsListeners();
         }
@@ -305,7 +340,9 @@ public final class BacktestScheduler {
         List<BacktestJob> queued = new ArrayList<>(workQueue);
         for (BacktestJob job : queued) {
             if (job.getStatus() == BacktestJobStatus.QUEUED && job.cancel()) {
-                workQueue.remove(job);
+                if (workQueue.remove(job)) {
+                    queueCapacity.release();
+                }
                 cancelledCount.incrementAndGet();
                 count++;
             }
@@ -365,7 +402,7 @@ public final class BacktestScheduler {
     @NotNull
     public SchedulerStats getStats() {
         long[] heap = resourceGuard.getHeapBytes();
-        double cpu  = resourceGuard.getCpuLoad();
+        double cpu = resourceGuard.getCpuLoad();
 
         double avg = 0.0;
         long completedSoFar = completedCount.get();
@@ -388,7 +425,8 @@ public final class BacktestScheduler {
     }
 
     /**
-     * Registers a listener that is called (on the worker thread) whenever a job finishes.
+     * Registers a listener that is called (on the worker thread) whenever a job
+     * finishes.
      * Used by the UI to trigger throttled refreshes.
      */
     public void addStatsListener(@NotNull Consumer<SchedulerStats> listener) {
@@ -455,11 +493,12 @@ public final class BacktestScheduler {
     // ─── Dispatch loop ───────────────────────────────────────────────────────
 
     /**
-     * The dispatch loop runs on a dedicated daemon thread.  It drains the
+     * The dispatch loop runs on a dedicated daemon thread. It drains the
      * {@link PriorityBlockingQueue} and submits each job to the executor when
      * a worker slot is available.
      *
-     * <p>This approach lets the executor's {@link SynchronousQueue} act as a
+     * <p>
+     * This approach lets the executor's {@link SynchronousQueue} act as a
      * back-pressure mechanism: if all workers are busy, {@code executor.submit()}
      * will block, throttling the dispatch thread without spinning.
      */
@@ -484,12 +523,16 @@ public final class BacktestScheduler {
                             && resourceGuard.isSystemStressed()
                             && executor.getActiveCount() > 0) {
                         log.debug("BacktestScheduler: system stressed, dispatch paused 2s");
-                        Thread.sleep(2000);
+                        synchronized (dispatchMonitor) {
+                            dispatchMonitor.wait(2000);
+                        }
                         continue;
                     }
 
                     if (executor.getActiveCount() >= currentMaxWorkers) {
-                        Thread.sleep(50);
+                        synchronized (dispatchMonitor) {
+                            dispatchMonitor.wait(50);
+                        }
                         continue;
                     }
 
@@ -498,6 +541,8 @@ public final class BacktestScheduler {
                     if (job == null) {
                         continue;
                     }
+
+                    queueCapacity.release();
 
                     // Job may have been cancelled before we dequeued it
                     if (job.getStatus() == BacktestJobStatus.CANCELLED) {
@@ -511,7 +556,10 @@ public final class BacktestScheduler {
                     } catch (RejectedExecutionException exception) {
                         if (!shutdown.get() && job.getStatus() != BacktestJobStatus.CANCELLED) {
                             workQueue.offer(job);
-                            Thread.sleep(100);
+                            queueCapacity.acquireUninterruptibly();
+                            synchronized (dispatchMonitor) {
+                                dispatchMonitor.wait(100);
+                            }
                         }
                     }
 
@@ -533,6 +581,42 @@ public final class BacktestScheduler {
         if (!shutdown.get() && (dispatcherThread == null || !dispatcherThread.isAlive())) {
             log.warn("BacktestScheduler dispatch loop was not running; restarting dispatcher.");
             startDispatchLoop();
+        }
+    }
+
+    private void forceDispatchAvailableJobs(String reason) {
+        if (shutdown.get() || paused.get()) {
+            return;
+        }
+
+        int dispatched = 0;
+        while (executor.getActiveCount() + runningJobIds.size() + dispatched < currentMaxWorkers) {
+            BacktestJob job = workQueue.poll();
+            if (job == null) {
+                break;
+            }
+
+            queueCapacity.release();
+
+            if (job.getStatus() == BacktestJobStatus.CANCELLED) {
+                continue;
+            }
+
+            try {
+                executor.execute(() -> executeJob(job));
+                dispatched++;
+            } catch (RejectedExecutionException exception) {
+                if (!shutdown.get() && job.getStatus() != BacktestJobStatus.CANCELLED) {
+                    if (workQueue.offer(job)) {
+                        queueCapacity.acquireUninterruptibly();
+                    }
+                }
+                break;
+            }
+        }
+
+        if (dispatched > 0) {
+            log.warn("BacktestScheduler watchdog dispatched {} queued job(s). reason={}", dispatched, reason);
         }
     }
 
@@ -597,6 +681,9 @@ public final class BacktestScheduler {
         } finally {
             runningJobIds.remove(job.getJobId());
             notifyStatsListeners();
+            synchronized (dispatchMonitor) {
+                dispatchMonitor.notifyAll();
+            }
         }
     }
 
@@ -637,17 +724,22 @@ public final class BacktestScheduler {
     /** Periodic aggregate status log (replaces per-backtest INFO spam). */
     private void logStatus() {
         SchedulerStats s = getStats();
-        if (s.getQueued() > 0 && s.getActiveWorkers() == 0 && !paused.get() && !shutdown.get()) {
+        if (s.queued() > 0 && s.activeWorkers() == 0 && !paused.get() && !shutdown.get()) {
             ensureDispatchLoopRunning();
+            synchronized (dispatchMonitor) {
+                dispatchMonitor.notifyAll();
+            }
+            forceDispatchAvailableJobs("queued jobs with no active workers");
+            s = getStats();
         }
-        if (s.getQueued() > 0 || s.getRunning() > 0 || s.getCompleted() > 0) {
+        if (s.queued() > 0 || s.running() > 0 || s.completed() > 0) {
             log.info("Strategy Lab Status: queued={} running={} completed={} failed={} cancelled={} "
                     + "workers={}/{} avgMs={} rps={} heap={}/{}MiB",
-                    s.getQueued(), s.getRunning(), s.getCompleted(),
-                    s.getFailed(), s.getCancelled(),
-                    s.getActiveWorkers(), s.getMaxWorkers(),
-                    String.format("%.0f", s.getAvgExecTimeMs()),
-                    String.format("%.2f", s.getThroughputPerSec()),
+                    s.queued(), s.running(), s.completed(),
+                    s.failed(), s.cancelled(),
+                    s.activeWorkers(), s.maxWorkers(),
+                    String.format("%.0f", s.avgExecTimeMs()),
+                    String.format("%.2f", s.throughputPerSec()),
                     String.format("%.0f", s.getHeapUsedMiB()),
                     String.format("%.0f", s.getHeapMaxMiB()));
         }

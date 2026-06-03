@@ -114,7 +114,7 @@ public class SolanaNetworkAdapter {
             String address) {
 
         // Silently skip unconfigured or invalid addresses (e.g. account username UUIDs)
-        if (address == null || address.isBlank() || !walletService.validateAddress(address)) {
+        if (address == null || address.isBlank() || walletService.validateAddress(address)) {
             log.debug("Solana balance refresh skipped — not a valid wallet address: '{}'",
                     address == null ? "<null>" : safePrefix(address));
             return CompletableFuture.completedFuture(

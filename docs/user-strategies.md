@@ -253,61 +253,61 @@ import org.investpro.strategy.api.UserStrategy;
 import org.jetbrains.annotations.NotNull;
 
 public class MyCustomStrategy implements UserStrategy {
-    
+
     @Override
     public @NotNull String getId() {
         return "my-custom-strategy";
     }
-    
+
     @Override
     public @NotNull String getName() {
         return "My Custom Trading Strategy";
     }
-    
+
     @Override
     public @NotNull String getDescription() {
         return "A custom strategy combining multiple indicators.";
     }
-    
+
     @Override
     public int requiredWarmupBars() {
         return 200;  // Requires 200 bars of history
     }
-    
+
     @Override
     public @NotNull StrategySignal generateSignal(@NotNull StrategyContext context) {
         try {
             // Your custom logic here
-            
+
             if (shouldBuy(context)) {
                 return StrategySignal.buy(
-                    context.getSymbol().toString(),
-                    context.getTimeframe().toString(),
-                    getId(),
-                    "Custom buy condition met");
+                        context.getSymbol().toString(),
+                        context.getTimeframe().toString(),
+                        id(),
+                        "Custom buy condition met");
             }
-            
+
             if (shouldSell(context)) {
                 return StrategySignal.sell(...)
             }
-            
+
             return StrategySignal.hold(...)
 
         } catch (Exception e) {
             // Always handle errors gracefully
             return StrategySignal.hold(
-                context.getSymbol().toString(),
-                context.getTimeframe().toString(),
-                getId(),
-                "Error: " + e.getMessage());
+                    context.getSymbol().toString(),
+                    context.getTimeframe().toString(),
+                    id(),
+                    "Error: " + e.getMessage());
         }
     }
-    
+
     private boolean shouldBuy(StrategyContext context) {
         // Your buy logic
         return false;
     }
-    
+
     private boolean shouldSell(StrategyContext context) {
         // Your sell logic
         return false;

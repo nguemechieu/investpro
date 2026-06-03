@@ -102,7 +102,7 @@ public final class SmartExecutionRouter {
                     if (request.paperMode()) return true; // anything allowed
                     // If request specifies preferred exchange and fallback is not allowed, enforce it
                     return request.getPreferredExchange()
-                            .map(pref -> !request.allowFallback() ? name.equalsIgnoreCase(pref) : true)
+                            .map(pref -> request.allowFallback() || name.equalsIgnoreCase(pref))
                             .orElse(true);
                 })
                 .toList();

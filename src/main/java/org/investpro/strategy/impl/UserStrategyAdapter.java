@@ -47,8 +47,8 @@ public class UserStrategyAdapter implements TradingStrategy {
 
     private static StrategyMetadata createMetadata(@NotNull UserStrategy userStrategy) {
         return StrategyMetadata.builder()
-                .strategyId(userStrategy.getId())
-                .displayName(userStrategy.getName())
+                .strategyId(userStrategy.id())
+                .displayName(userStrategy.name())
                 .description(userStrategy.getDescription())
                 .build();
     }
@@ -146,7 +146,7 @@ public class UserStrategyAdapter implements TradingStrategy {
     @Override
     public @NotNull Object getName() {
         try {
-            return userStrategy.getName();
+            return userStrategy.name();
         } catch (Exception e) {
             log.error("Error getting strategy name", e);
             return "Unknown User Strategy";
@@ -156,7 +156,7 @@ public class UserStrategyAdapter implements TradingStrategy {
     @Override
     public @NotNull Object getId() {
         try {
-            return userStrategy.getId();
+            return userStrategy.id();
         } catch (Exception e) {
             log.error("Error getting strategy ID", e);
             return "unknown-user-strategy";

@@ -170,8 +170,8 @@ public class UserStrategyLoader {
 
     private void loadStrategy(@NotNull UserStrategy userStrategy, @NotNull File jarFile) {
         try {
-            String id = userStrategy.getId();
-            String name = userStrategy.getName();
+            String id = userStrategy.id();
+            String name = userStrategy.name();
 
             log.debug("Discovered user strategy: id={}, name={}", id, name);
 
@@ -210,7 +210,7 @@ public class UserStrategyLoader {
         } catch (Exception e) {
             log.error("Error loading user strategy", e);
             try {
-                failedStrategies.put(userStrategy.getId(), e.getMessage());
+                failedStrategies.put(userStrategy.id(), e.getMessage());
             } catch (Exception ignored) {
                 failedStrategies.put("unknown", e.getMessage());
             }

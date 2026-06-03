@@ -57,6 +57,7 @@ import org.investpro.data.CandleData;
 import org.investpro.data.CandleDataPager;
 import org.investpro.enums.TradingSessionStatus;
 import org.investpro.exchange.Exchange;
+import org.investpro.models.market.NewsEvent;
 import org.investpro.models.trading.LiveTradesConsumer;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
@@ -106,6 +107,31 @@ import static org.investpro.ui.charts.ChartColors.PLACE_HOLDER_FILL_COLOR;
 @Slf4j
 @SuppressWarnings({ "unused", "SameParameterValue" })
 public class CandleStickChart extends Region {
+    public enum ChartType {
+        LINE("Line"),
+        BAR_OHLC("Bar (OHLC)"),
+        CANDLESTICK("Candlestick"),
+        HEIKIN_ASHI("Heikin Ashi"),
+        RENKO("Renko"),
+        POINT_AND_FIGURE("Point & Figure"),
+        VOLUME("Volume");
+
+        private final String displayName;
+
+        ChartType(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public ChartType next() {
+            ChartType[] values = values();
+            return values[(ordinal() + 1) % values.length];
+        }
+    }
+
     private static final DateTimeFormatter SCREENSHOT_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
     private static final DateTimeFormatter CROSSHAIR_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
             .withZone(java.time.ZoneId.systemDefault());
@@ -206,6 +232,7 @@ public class CandleStickChart extends Region {
     private final List<Indicator> indicators = new ArrayList<>();
     private final List<ChartEvent> chartEvents = Collections.synchronizedList(new ArrayList<>());
     private boolean showChartEvents = true; // Toggle for displaying events
+    private ChartType chartType = ChartType.CANDLESTICK;
     private Image backgroundImage;
     private double backgroundImageOpacity = 0.22;
 
@@ -364,6 +391,15 @@ public class CandleStickChart extends Region {
                     .setShowVolume(CHART_PREFERENCES.getBoolean(prefKey("showVolume"), chartOptions.isShowVolume()));
             chartOptions.setAlignOpenClose(
                     CHART_PREFERENCES.getBoolean(prefKey("alignOpenClose"), chartOptions.isAlignOpenClose()));
+            chartOptions.setShowNewsEvents(
+                    CHART_PREFERENCES.getBoolean(prefKey("showNewsEvents"), chartOptions.isShowNewsEvents()));
+
+            String chartTypeName = CHART_PREFERENCES.get(prefKey("chartType"), ChartType.CANDLESTICK.name());
+            try {
+                chartType = ChartType.valueOf(chartTypeName);
+            } catch (IllegalArgumentException ignored) {
+                chartType = ChartType.CANDLESTICK;
+            }
 
             showCrosshair = CHART_PREFERENCES.getBoolean(prefKey("crosshair"), showCrosshair);
             showPriceLines = CHART_PREFERENCES.getBoolean(prefKey("showPriceLines"), showPriceLines);
@@ -403,6 +439,8 @@ public class CandleStickChart extends Region {
         CHART_PREFERENCES.putBoolean(prefKey("grid.horizontal"), chartOptions.isHorizontalGridLinesVisible());
         CHART_PREFERENCES.putBoolean(prefKey("showVolume"), chartOptions.isShowVolume());
         CHART_PREFERENCES.putBoolean(prefKey("alignOpenClose"), chartOptions.isAlignOpenClose());
+        CHART_PREFERENCES.putBoolean(prefKey("showNewsEvents"), chartOptions.isShowNewsEvents());
+        CHART_PREFERENCES.put(prefKey("chartType"), chartType.name());
 
         CHART_PREFERENCES.putBoolean(prefKey("crosshair"), showCrosshair);
         CHART_PREFERENCES.putBoolean(prefKey("showPriceLines"), showPriceLines);
@@ -834,6 +872,10 @@ public class CandleStickChart extends Region {
             persistChartPreferences();
             requestChartRedraw();
         });
+        chartOptions.showNewsEventsProperty().addListener((observable, oldValue, newValue) -> {
+            persistChartPreferences();
+            requestChartRedraw();
+        });
     }
 
     private void initializeEventHandlers() {
@@ -1201,7 +1243,10 @@ public class CandleStickChart extends Region {
     }
 
     private void recomputeVisiblePriceRange() {
-        List<CandleData> visible = visibleCandlesSnapshot();
+        recomputeVisiblePriceRange(visibleCandlesSnapshot());
+    }
+
+    private void recomputeVisiblePriceRange(List<CandleData> visible) {
         if (visible.isEmpty()) {
             visibleMinPrice = 0.0;
             visibleMaxPrice = 1.0;
@@ -1304,36 +1349,45 @@ public class CandleStickChart extends Region {
             return;
         if (clear)
             clearCanvas();
-        List<CandleData> visible = visibleCandlesSnapshot();
+        List<CandleData> visibleRaw = visibleCandlesSnapshot();
+        if (visibleRaw.isEmpty()) {
+            drawNoDataOverlay();
+            return;
+        }
+        List<CandleData> visible = buildRenderableCandles(visibleRaw);
         if (visible.isEmpty()) {
             drawNoDataOverlay();
             return;
         }
         // Calculate current market regime
         calculateMarketRegime();
-        recomputeVisiblePriceRange();
+        recomputeVisiblePriceRange(visible);
         drawTradingBackground();
         drawGridLines();
         double volumeScale = (canvas.getHeight() * VOLUME_AREA_RATIO) / visibleMaxVolume;
         int highIndex = -1, lowIndex = -1;
         double high = Double.NEGATIVE_INFINITY, low = Double.POSITIVE_INFINITY;
-        double lastClose = -1.0;
+
+        switch (chartType) {
+            case LINE -> drawLineSeries(visible, volumeScale, true);
+            case BAR_OHLC -> drawOhlcBars(visible, volumeScale);
+            case VOLUME -> drawVolumeDominantSeries(visible);
+            default -> drawCandlesByType(visible, volumeScale);
+        }
+
         for (int i = 0; i < visible.size(); i++) {
             CandleData candle = visible.get(i);
-            if (candle == null)
+            if (candle == null || candle.placeHolder()) {
                 continue;
-            if (!candle.placeHolder()) {
-                if (candle.highPrice() > high) {
-                    high = candle.highPrice();
-                    highIndex = i;
-                }
-                if (candle.lowPrice() < low) {
-                    low = candle.lowPrice();
-                    lowIndex = i;
-                }
             }
-            drawCandle(candle, i, volumeScale, lastClose);
-            lastClose = candle.closePrice();
+            if (candle.highPrice() > high) {
+                high = candle.highPrice();
+                highIndex = i;
+            }
+            if (candle.lowPrice() < low) {
+                low = candle.lowPrice();
+                lowIndex = i;
+            }
         }
         drawHighLowMarkers(high, low, highIndex, lowIndex);
         drawChartHeader(visible.getLast());
@@ -1470,6 +1524,264 @@ public class CandleStickChart extends Region {
             drawVolumeBar(candle, bodyX, bodyWidth, fill, volumeScale);
     }
 
+    private void drawCandlesByType(List<CandleData> visible, double volumeScale) {
+        double lastClose = -1.0;
+        for (int i = 0; i < visible.size(); i++) {
+            CandleData candle = visible.get(i);
+            if (candle == null) {
+                continue;
+            }
+            drawCandle(candle, i, volumeScale, lastClose);
+            lastClose = candle.closePrice();
+        }
+    }
+
+    private void drawOhlcBars(List<CandleData> visible, double volumeScale) {
+        double slot = Math.max(1.0, canvas.getWidth() / Math.max(1, visibleCandles));
+        double tick = Math.max(2.0, Math.min(7.0, slot * 0.32));
+        for (int i = 0; i < visible.size(); i++) {
+            CandleData candle = visible.get(i);
+            if (candle == null || candle.placeHolder()) {
+                continue;
+            }
+            double x = snapPixel(candleCenterX(i));
+            double openY = snapPixel(priceToY(candle.openPrice()));
+            double closeY = snapPixel(priceToY(candle.closePrice()));
+            double highY = snapPixel(priceToY(candle.highPrice()));
+            double lowY = snapPixel(priceToY(candle.lowPrice()));
+            Paint stroke = candle.closePrice() < candle.openPrice() ? BEAR_CANDLE_BORDER_COLOR
+                    : BULL_CANDLE_BORDER_COLOR;
+            graphicsContext.setStroke(stroke);
+            graphicsContext.setLineWidth(1.3);
+            graphicsContext.strokeLine(x, highY, x, lowY);
+            graphicsContext.strokeLine(x - tick, openY, x, openY);
+            graphicsContext.strokeLine(x, closeY, x + tick, closeY);
+
+            if (chartOptions.isShowVolume()) {
+                drawVolumeBar(candle, x - 1, 2, stroke, volumeScale);
+            }
+        }
+    }
+
+    private void drawLineSeries(List<CandleData> visible, double volumeScale, boolean withVolume) {
+        if (visible.size() < 2) {
+            return;
+        }
+        graphicsContext.setStroke(THEME_ACCENT);
+        graphicsContext.setLineWidth(1.8);
+
+        double previousX = -1;
+        double previousY = -1;
+        for (int i = 0; i < visible.size(); i++) {
+            CandleData candle = visible.get(i);
+            if (candle == null || candle.placeHolder()) {
+                continue;
+            }
+            double x = candleCenterX(i);
+            double y = priceToY(candle.closePrice());
+            if (previousX >= 0) {
+                graphicsContext.strokeLine(previousX, previousY, x, y);
+            }
+            previousX = x;
+            previousY = y;
+
+            if (withVolume && chartOptions.isShowVolume()) {
+                drawVolumeBar(candle, x - 1, 2, Color.rgb(56, 189, 248, 0.7), volumeScale);
+            }
+        }
+    }
+
+    private void drawVolumeDominantSeries(List<CandleData> visible) {
+        double baseY = canvas.getHeight() - 2;
+        double areaTop = HEADER_HEIGHT + 16;
+        double areaHeight = Math.max(1.0, baseY - areaTop);
+        double slot = Math.max(1.0, canvas.getWidth() / Math.max(1, visibleCandles));
+        double barWidth = Math.max(1.0, Math.min(slot - 1.0, 8.0));
+
+        for (int i = 0; i < visible.size(); i++) {
+            CandleData candle = visible.get(i);
+            if (candle == null || candle.placeHolder()) {
+                continue;
+            }
+            double x = candleCenterX(i) - (barWidth / 2.0);
+            double ratio = Math.max(0.0, Math.min(1.0, candle.volume() / visibleMaxVolume));
+            double h = Math.max(1.0, ratio * areaHeight);
+            Paint fill = candle.closePrice() < candle.openPrice() ? Color.rgb(239, 68, 68, 0.74)
+                    : Color.rgb(34, 197, 94, 0.74);
+            graphicsContext.setFill(fill);
+            graphicsContext.fillRect(x, baseY - h, barWidth, h);
+        }
+
+        drawLineSeries(visible, 1.0, false);
+    }
+
+    private List<CandleData> buildRenderableCandles(List<CandleData> visibleRaw) {
+        if (visibleRaw == null || visibleRaw.isEmpty()) {
+            return List.of();
+        }
+        return switch (chartType) {
+            case HEIKIN_ASHI -> buildHeikinAshiCandles(visibleRaw);
+            case RENKO -> buildRenkoCandles(visibleRaw);
+            case POINT_AND_FIGURE -> buildPointAndFigureCandles(visibleRaw);
+            default -> visibleRaw;
+        };
+    }
+
+    private List<CandleData> buildHeikinAshiCandles(List<CandleData> source) {
+        List<CandleData> result = new ArrayList<>(source.size());
+        double previousHaOpen = 0.0;
+        double previousHaClose = 0.0;
+        for (int i = 0; i < source.size(); i++) {
+            CandleData candle = source.get(i);
+            if (candle == null) {
+                continue;
+            }
+            if (candle.placeHolder()) {
+                result.add(candle);
+                continue;
+            }
+
+            double haClose = (candle.openPrice() + candle.highPrice() + candle.lowPrice() + candle.closePrice()) / 4.0;
+            double haOpen = (i == 0)
+                    ? (candle.openPrice() + candle.closePrice()) / 2.0
+                    : (previousHaOpen + previousHaClose) / 2.0;
+            double haHigh = Math.max(candle.highPrice(), Math.max(haOpen, haClose));
+            double haLow = Math.min(candle.lowPrice(), Math.min(haOpen, haClose));
+
+            result.add(new CandleData(
+                    haOpen,
+                    haClose,
+                    haHigh,
+                    haLow,
+                    candle.openTime(),
+                    candle.volume(),
+                    candle.averagePrice(),
+                    candle.volumeWeightedAveragePrice(),
+                    false));
+
+            previousHaOpen = haOpen;
+            previousHaClose = haClose;
+        }
+        return result;
+    }
+
+    private List<CandleData> buildRenkoCandles(List<CandleData> source) {
+        List<CandleData> result = new ArrayList<>(source.size());
+        double boxSize = deriveBoxSize(source, 72.0);
+        double brickClose = firstValidClose(source);
+        if (!Double.isFinite(brickClose)) {
+            return source;
+        }
+
+        for (CandleData candle : source) {
+            if (candle == null || candle.placeHolder()) {
+                result.add(candle);
+                continue;
+            }
+            double target = candle.closePrice();
+            while (Math.abs(target - brickClose) >= boxSize) {
+                brickClose += Math.signum(target - brickClose) * boxSize;
+            }
+
+            double open = result.isEmpty() || result.getLast() == null
+                    ? brickClose
+                    : result.getLast().closePrice();
+            double high = Math.max(open, brickClose);
+            double low = Math.min(open, brickClose);
+            result.add(new CandleData(
+                    open,
+                    brickClose,
+                    high,
+                    low,
+                    candle.openTime(),
+                    candle.volume(),
+                    candle.averagePrice(),
+                    candle.volumeWeightedAveragePrice(),
+                    false));
+        }
+        return result;
+    }
+
+    private List<CandleData> buildPointAndFigureCandles(List<CandleData> source) {
+        List<CandleData> result = new ArrayList<>(source.size());
+        double boxSize = deriveBoxSize(source, 96.0);
+        double reversal = boxSize * 3.0;
+        double plotted = firstValidClose(source);
+        if (!Double.isFinite(plotted)) {
+            return source;
+        }
+        int direction = 0;
+
+        for (CandleData candle : source) {
+            if (candle == null || candle.placeHolder()) {
+                result.add(candle);
+                continue;
+            }
+            double price = candle.closePrice();
+            double diff = price - plotted;
+
+            if ((direction >= 0 && diff >= boxSize) || (direction == -1 && diff >= reversal)) {
+                plotted += Math.floor(diff / boxSize) * boxSize;
+                direction = 1;
+            } else if ((direction <= 0 && diff <= -boxSize) || (direction == 1 && diff <= -reversal)) {
+                plotted -= Math.floor((-diff) / boxSize) * boxSize;
+                direction = -1;
+            }
+
+            double open = result.isEmpty() || result.getLast() == null
+                    ? plotted
+                    : result.getLast().closePrice();
+            double high = Math.max(open, plotted);
+            double low = Math.min(open, plotted);
+            result.add(new CandleData(
+                    open,
+                    plotted,
+                    high,
+                    low,
+                    candle.openTime(),
+                    candle.volume(),
+                    candle.averagePrice(),
+                    candle.volumeWeightedAveragePrice(),
+                    false));
+        }
+        return result;
+    }
+
+    private double firstValidClose(List<CandleData> source) {
+        for (CandleData candle : source) {
+            if (candle != null && !candle.placeHolder()) {
+                return candle.closePrice();
+            }
+        }
+        return Double.NaN;
+    }
+
+    private double deriveBoxSize(List<CandleData> source, double divisor) {
+        double min = Double.POSITIVE_INFINITY;
+        double max = Double.NEGATIVE_INFINITY;
+        double reference = 0.0;
+        int count = 0;
+
+        for (CandleData candle : source) {
+            if (candle == null || candle.placeHolder()) {
+                continue;
+            }
+            min = Math.min(min, candle.lowPrice());
+            max = Math.max(max, candle.highPrice());
+            reference += Math.abs(candle.closePrice());
+            count++;
+        }
+
+        if (!Double.isFinite(min) || !Double.isFinite(max) || count == 0) {
+            return 0.0001;
+        }
+
+        double rangeBased = Math.max((max - min) / Math.max(8.0, divisor), 0.0001);
+        double referencePrice = Math.max(reference / count, 0.0001);
+        double percentBased = referencePrice * 0.0012;
+        return Math.max(rangeBased, percentBased);
+    }
+
     private void drawVolumeBar(CandleData candle, double x, double width, Paint fill, double volumeScale) {
         double maxH = canvas.getHeight() * VOLUME_AREA_RATIO;
         double height = Math.min(maxH, Math.max(1.0, candle.volume() * volumeScale));
@@ -1529,9 +1841,40 @@ public class CandleStickChart extends Region {
 
         String session = getMarketSession();
         Color sessionColor = getSessionColor(session);
-        double badgeX = Math.max(520, canvas.getWidth() - 245);
+        double badgeX = Math.max(600, canvas.getWidth() - 245);
+        double chartTypeBadgeX = Math.max(495, badgeX - 150);
+        drawSmallPill(chartType.getDisplayName(), chartTypeBadgeX, 20, THEME_ACCENT, Color.rgb(8, 47, 73, 0.95));
         drawSmallPill(session, badgeX, 20, sessionColor, Color.rgb(15, 23, 42, 0.95));
         graphicsContext.setTextAlign(TextAlignment.LEFT);
+    }
+
+    public ChartType getChartType() {
+        return chartType;
+    }
+
+    public void setChartType(ChartType newChartType) {
+        if (newChartType == null) {
+            return;
+        }
+        runOnFx(() -> {
+            if (chartType == newChartType) {
+                return;
+            }
+            chartType = newChartType;
+            persistChartPreferences();
+            recomputeVisiblePriceRange();
+            drawChartContents(true);
+        });
+    }
+
+    public void cycleChartType() {
+        runOnFx(() -> {
+            chartType = chartType.next();
+            persistChartPreferences();
+            recomputeVisiblePriceRange();
+            drawChartContents(true);
+            showTransientNotice("Chart Type: " + chartType.getDisplayName());
+        });
     }
 
     private void drawSmallPill(String text, double x, double centerY, Color accent, Color background) {
@@ -2013,7 +2356,7 @@ public class CandleStickChart extends Region {
         for (ChartEvent event : List.copyOf(chartEvents)) {
             if (!event.isVisible())
                 continue;
-            if (isNewsEvent(event))
+            if (isNewsEvent(event) && !chartOptions.isShowNewsEvents())
                 continue;
 
             // Calculate X position from event timestamp
@@ -2099,7 +2442,7 @@ public class CandleStickChart extends Region {
      * Add a chart event to be drawn
      */
     public void addChartEvent(ChartEvent event) {
-        if (event == null || isNewsEvent(event))
+        if (event == null)
             return;
         chartEvents.add(event);
         requestChartRedraw();
@@ -2111,8 +2454,47 @@ public class CandleStickChart extends Region {
     public void addChartEvents(List<ChartEvent> events) {
         if (events == null || events.isEmpty())
             return;
-        chartEvents.addAll(events.stream().filter(event -> !isNewsEvent(event)).toList());
+        chartEvents.addAll(events);
         requestChartRedraw();
+    }
+
+    public void setNewsEvents(List<NewsEvent> events) {
+        chartEvents.removeIf(this::isNewsEvent);
+        if (events == null || events.isEmpty()) {
+            requestChartRedraw();
+            return;
+        }
+
+        List<ChartEvent> mappedEvents = events.stream()
+                .filter(Objects::nonNull)
+                .filter(event -> event.getEventTime() != null)
+                .map(event -> ChartEvent.builder()
+                        .id("news-" + event.getEventTime().getEpochSecond() + "-" + safeNewsKey(event.getTitle()))
+                        .timestamp(event.getEventTime())
+                        .type(event.getImportance() == NewsEvent.Importance.CRITICAL
+                                ? ChartEvent.EventType.NEWS
+                                : ChartEvent.EventType.ECONOMIC_EVENT)
+                        .label(event.getCurrency() + " " + event.getImportance().name())
+                        .description(event.getTitle())
+                        .hexColor(event.getImportance() == NewsEvent.Importance.CRITICAL
+                                ? "#ef4444"
+                                : event.getImportance() == NewsEvent.Importance.HIGH
+                                        ? "#f97316"
+                                        : "#f59e0b")
+                        .visible(true)
+                        .lineWidth(1)
+                        .build())
+                .toList();
+
+        chartEvents.addAll(mappedEvents);
+        requestChartRedraw();
+    }
+
+    private String safeNewsKey(String text) {
+        if (text == null || text.isBlank()) {
+            return "event";
+        }
+        return text.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-");
     }
 
     private boolean isNewsEvent(ChartEvent event) {
@@ -2203,10 +2585,9 @@ public class CandleStickChart extends Region {
         CandleData candleData = new CandleData(
 
                 existing.openPrice(),
-
+                price,
                 Math.max(existing.highPrice(), price),
                 Math.min(existing.lowPrice(), price),
-                price,
                 existing.openTime(),
                 (existing.volume() + Math.max(0.0, amount)),
                 existing.averagePrice(), existing.volumeWeightedAveragePrice(),

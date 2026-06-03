@@ -4,11 +4,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.decision.MarketRegime;
 import org.investpro.event.EventBusManager;
+import org.investpro.exchange.blockchain.BlockchainTransactionResult;
+import org.investpro.exchange.blockchain.execution.BlockchainExecutionRequests;
+import org.investpro.exchange.blockchain.execution.BlockchainExecutionService;
+import org.investpro.risk.RiskDecision;
 import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.ai.AISignalReviewEngine;
 import org.investpro.strategy.execution.ExecutionPlan;
 import org.investpro.strategy.execution.ExecutionPlanningEngine;
 import org.investpro.strategy.execution.ExecutionRouter;
+import org.investpro.strategy.execution.ExecutionVenue;
 import org.investpro.strategy.lifecycle.AISignalReview;
 import org.investpro.strategy.lifecycle.StrategyLifecycleRecord;
 import org.investpro.strategy.position.PositionSizeRequest;
@@ -19,14 +24,21 @@ import org.investpro.strategy.position.PositionSizingMethod;
 import java.util.Optional;
 
 /**
- * Orchestrates the complete Signal → AI Review → Position Sizing → Execution Planning → Route pipeline.
+ * Orchestrates the complete Signal → AI Review → Position Sizing → Execution
+ * Planning → Route pipeline.
  *
- * <p>This class coordinates all phases without executing any orders. The final
+ * <p>
+ * This class coordinates all phases without executing any orders. The final
  * {@link ExecutionPlan} returned is advisory and must be submitted to the
- * order management system separately by a human-approved or risk-cleared mechanism.</p>
+ * order management system separately by a human-approved or risk-cleared
+ * mechanism.
+ * </p>
  *
- * <p><strong>CRITICAL:</strong> This orchestrator NEVER places, submits, or executes any orders.
- * It produces execution plans for downstream consumption only.</p>
+ * <p>
+ * <strong>CRITICAL:</strong> This orchestrator NEVER places, submits, or
+ * executes any orders.
+ * It produces execution plans for downstream consumption only.
+ * </p>
  */
 @Slf4j
 public class DecisionPipelineOrchestrator {
@@ -70,16 +82,17 @@ public class DecisionPipelineOrchestrator {
     /**
      * Runs the complete decision pipeline for a trading signal.
      *
-     * @param signal  the raw trading signal to evaluate
-     * @param record  the lifecycle record for the strategy producing this signal
-     * @param equity  current account equity
-     * @param method  position sizing method to use
-     * @return Optional containing ExecutionPlan if all stages approved, empty if rejected
+     * @param signal the raw trading signal to evaluate
+     * @param record the lifecycle record for the strategy producing this signal
+     * @param equity current account equity
+     * @param method position sizing method to use
+     * @return Optional containing ExecutionPlan if all stages approved, empty if
+     *         rejected
      */
     public Optional<ExecutionPlan> process(StrategySignal signal,
-                                           StrategyLifecycleRecord record,
-                                           double equity,
-                                           PositionSizingMethod method) {
+            StrategyLifecycleRecord record,
+            double equity,
+            PositionSizingMethod method) {
         if (signal == null || record == null) {
             log.warn("process: null signal or lifecycle record");
             return Optional.empty();
@@ -92,7 +105,8 @@ public class DecisionPipelineOrchestrator {
         // Stage 1: AI Signal Review
         // =====================================================================
         MarketRegime regime = record.getMarketRegime() != null
-                ? record.getMarketRegime() : MarketRegime.UNKNOWN;
+                ? record.getMarketRegime()
+                : MarketRegime.UNKNOWN;
 
         AISignalReview signalReview;
         try {
@@ -116,7 +130,8 @@ public class DecisionPipelineOrchestrator {
         // =====================================================================
         // Stage 2: Position Sizing
         // =====================================================================
-        double stopLossDistance = signal.getRiskDistance() > 0 ? signal.getRiskDistance() : 0.001 * signal.getEntryPrice();
+        double stopLossDistance = signal.getRiskDistance() > 0 ? signal.getRiskDistance()
+                : 0.001 * signal.getEntryPrice();
         double sizeMultiplier = signalReview.getSuggestedSizeMultiplier();
 
         PositionSizeRequest sizeRequest = PositionSizeRequest.builder()
@@ -126,12 +141,12 @@ public class DecisionPipelineOrchestrator {
                 .timeframe(signal.getTimeframe())
                 .side(signal.isBuy() ? "BUY" : "SELL")
                 .equity(equity)
-                .riskPerTradePercent(0.02)         // 2% risk per trade
+                .riskPerTradePercent(0.02) // 2% risk per trade
                 .entryPrice(signal.getEntryPrice())
                 .stopLossPrice(signal.getStopLossPrice())
                 .stopLossDistance(stopLossDistance)
-                .pipValue(1.0)                     // default; caller may override
-                .maxPositionSizePercent(0.10)      // 10% of equity cap
+                .pipValue(1.0) // default; caller may override
+                .maxPositionSizePercent(0.10) // 10% of equity cap
                 .method(method != null ? method : PositionSizingMethod.RISK_PERCENT)
                 .aiSizeMultiplier(sizeMultiplier)
                 .build();
@@ -178,5 +193,53 @@ public class DecisionPipelineOrchestrator {
             // Return the unrouted plan rather than failing completely
             return Optional.of(plan);
         }
+    }
+
+    /**
+     * Executes blockchain plans only after a positive risk decision.
+     *
+     * <p>
+     * This method enforces pipeline discipline and prevents direct signal-to-chain
+     * execution without risk validation.
+     * </p>
+     */
+    public BlockchainTransactionResult executeBlockchainPlan(
+            ExecutionPlan plan,
+            RiskDecision riskDecision,
+            BlockchainExecutionService blockchainExecutionService,
+            String walletAddress) {
+        if (plan == null) {
+            throw new IllegalArgumentException("Execution plan is required");
+        }
+        if (blockchainExecutionService == null) {
+            throw new IllegalArgumentException("BlockchainExecutionService is required");
+        }
+
+        ExecutionVenue venue = plan.getVenue();
+        if (venue != ExecutionVenue.SOLANA_DEX && venue != ExecutionVenue.STELLAR) {
+            return BlockchainTransactionResult.failed(
+                    plan.getPlanId(),
+                    "UNSUPPORTED",
+                    "UNSUPPORTED_VENUE",
+                    "Execution venue is not blockchain-backed: " + venue);
+        }
+
+        String networkId = venue == ExecutionVenue.SOLANA_DEX ? "SOLANA" : "STELLAR";
+        BlockchainExecutionRequests.OrderRequest request = "LIMIT".equalsIgnoreCase(plan.getOrderType())
+                ? BlockchainExecutionRequests.OrderRequest.limitOrder(
+                        networkId,
+                        walletAddress,
+                        plan.getSymbol(),
+                        plan.getSide(),
+                        plan.getUnits(),
+                        plan.getEntryPrice())
+                : BlockchainExecutionRequests.OrderRequest.marketOrder(
+                        networkId,
+                        walletAddress,
+                        plan.getSymbol(),
+                        plan.getSide(),
+                        plan.getUnits());
+
+        return blockchainExecutionService.executeOrder(request, riskDecision).join();
     }
 }

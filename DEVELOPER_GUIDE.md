@@ -389,8 +389,8 @@ class TradeExecutionIntegrationTest {
     @Test
     void testFullTradeExecution_WithValidSignal_ExecutesSuccessfully() {
         // Arrange
-        StrategySignal signal = new StrategySignal(...);
-        
+        StrategySignal signal = new StrategySignal(...)
+
         // Act
         TradeExecutionResult result = coordinator.executeSignal(signal, context);
         
@@ -609,8 +609,8 @@ public BotTradeDecision evaluateSignal(...) {
             regime = MarketRegime.UNKNOWN;
         }
         
-        return new BotTradeDecision(...);
-        
+        return new BotTradeDecision(...)
+
     } catch (IllegalArgumentException | NullPointerException e) {
         log.error("Invalid input to evaluateSignal", e);
         throw e;
@@ -665,7 +665,7 @@ public class MyCustomAgent implements Agent {
     }
     
     private void onMarketEvent(MarketEvent event) {
-        CustomEvent result = new CustomEvent(...);
+        CustomEvent result = new CustomEvent(...)
         context.getEventBus().publish(result);
     }
 }
@@ -796,10 +796,10 @@ Eclipse:
 @Test
 @Disabled("For manual debugging only")
 void debugTradeDecisionFlow() {
-    StrategySignal signal = new StrategySignal(...);
+    StrategySignal signal = new StrategySignal(...)
     Ticker ticker = createTestTicker();
     
-    BotTradeDecision decision = engine.evaluateSignal(...);
+    BotTradeDecision decision = engine.evaluateSignal(...)
     // Step through evaluateSignal() method
 }
 
@@ -807,7 +807,7 @@ void debugTradeDecisionFlow() {
 @Test
 @Disabled("For manual debugging only")
 void debugRiskEvaluation() {
-    StrategySignal signal = new StrategySignal(...);
+    StrategySignal signal = new StrategySignal(...)
     Account account = createTestAccount(10000.0);
     
     RiskDecision decision = riskMgmt.evaluateTrade(signal, ticker);

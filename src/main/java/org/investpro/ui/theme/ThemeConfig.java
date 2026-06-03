@@ -114,33 +114,29 @@ public class ThemeConfig {
      * Export current theme as CSS variable definitions
      */
     public String toCSSVariables() {
-        StringBuilder css = new StringBuilder(".root {\n");
-        css.append("    /* Core Backgrounds */\n");
-        css.append("    -dark-bg: ").append(darkBg).append(";\n");
-        css.append("    -workspace-bg: ").append(workspaceBg).append(";\n");
-        css.append("    -surface-bg: ").append(surfaceBg).append(";\n");
-        css.append("    -panel-bg: ").append(panelBg).append(";\n");
-        css.append("    -elevated-bg: ").append(elevatedBg).append(";\n");
-        css.append("    -header-bg: ").append(headerBg).append(";\n");
-        css.append("    -terminal-bg: ").append(terminalBg).append(";\n");
 
-        css.append("\n    /* Text Colors */\n");
-        css.append("    -text-primary: ").append(textPrimary).append(";\n");
-        css.append("    -text-secondary: ").append(textSecondary).append(";\n");
-        css.append("    -text-muted: ").append(textMuted).append(";\n");
-
-        css.append("\n    /* Trading Colors */\n");
-        css.append("    -buy-color: ").append(buyColor).append(";\n");
-        css.append("    -sell-color: ").append(sellColor).append(";\n");
-        css.append("    -profit-color: ").append(profitColor).append(";\n");
-
-        css.append("\n    /* Accent Colors */\n");
-        css.append("    -primary-color: ").append(primaryColor).append(";\n");
-        css.append("    -accent-color: ").append(accentColor).append(";\n");
-        css.append("    -warning: ").append(warningColor).append(";\n");
-
-        css.append("}\n");
-        return css.toString();
+        String css = ".root {\n" + "    /* Core Backgrounds */\n" +
+                "    -dark-bg: " + darkBg + ";\n" +
+                "    -workspace-bg: " + workspaceBg + ";\n" +
+                "    -surface-bg: " + surfaceBg + ";\n" +
+                "    -panel-bg: " + panelBg + ";\n" +
+                "    -elevated-bg: " + elevatedBg + ";\n" +
+                "    -header-bg: " + headerBg + ";\n" +
+                "    -terminal-bg: " + terminalBg + ";\n" +
+                "\n    /* Text Colors */\n" +
+                "    -text-primary: " + textPrimary + ";\n" +
+                "    -text-secondary: " + textSecondary + ";\n" +
+                "    -text-muted: " + textMuted + ";\n" +
+                "\n    /* Trading Colors */\n" +
+                "    -buy-color: " + buyColor + ";\n" +
+                "    -sell-color: " + sellColor + ";\n" +
+                "    -profit-color: " + profitColor + ";\n" +
+                "\n    /* Accent Colors */\n" +
+                "    -primary-color: " + primaryColor + ";\n" +
+                "    -accent-color: " + accentColor + ";\n" +
+                "    -warning: " + warningColor + ";\n" +
+                "}\n";
+        return css;
     }
 
     /**

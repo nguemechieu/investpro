@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.api.UserStrategy;
-import org.investpro.strategy.impl.UserStrategyAdapter;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -92,7 +91,7 @@ public class UserStrategyValidator {
 
     private static String validateId(@NotNull UserStrategy strategy, List<String> errors) {
         try {
-            String id = strategy.getId();
+            String id = strategy.id();
             if (id == null || id.isBlank()) {
                 errors.add("Strategy ID is null or blank");
                 return null;
@@ -119,7 +118,7 @@ public class UserStrategyValidator {
 
     private static String validateName(@NotNull UserStrategy strategy, List<String> errors) {
         try {
-            String name = strategy.getName();
+            String name = strategy.name();
             if (name == null || name.isBlank()) {
                 errors.add("Strategy name is null or blank");
                 return null;
@@ -215,12 +214,12 @@ public class UserStrategyValidator {
         String name = "Unknown";
 
         try {
-            id = strategy.getId();
+            id = strategy.id();
         } catch (Exception ignored) {
         }
 
         try {
-            name = strategy.getName();
+            name = strategy.name();
         } catch (Exception ignored) {
         }
 

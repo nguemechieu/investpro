@@ -1,9 +1,6 @@
 package org.investpro.monitoring;
 
-import lombok.Builder;
 import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
@@ -15,7 +12,6 @@ import java.util.Map;
  * This is the main output of the system monitor.
  */
 
-@Builder
 @Data
 public class SystemHealthSnapshot {
     /**
@@ -39,106 +35,118 @@ public class SystemHealthSnapshot {
      * Exchange health (connectivity, type, capabilities).
      */
     @NotNull
-    @Builder.Default
-    private final ComponentHealth exchange = unavailableComponent("Exchange");
+    private final ComponentHealth exchange;
 
     /**
      * Market data health (streaming, selected pair, tickers).
      */
     @NotNull
-    @Builder.Default
-    private final ComponentHealth marketData = unavailableComponent("Market Data");
+    private final ComponentHealth marketData;
 
     /**
      * Account health (balance, positions, permissions).
      */
     @NotNull
-    @Builder.Default
-    private final ComponentHealth account = unavailableComponent("Account");
+    private final ComponentHealth account;
 
     /**
      * Strategy health (engine status, last signal, freshness).
      */
     @NotNull
-    @Builder.Default
-    private final ComponentHealth strategy = unavailableComponent("Strategy");
+    private final ComponentHealth strategy;
 
     /**
      * Risk management health (decisions, limits, blockers).
      */
     @NotNull
-    @Builder.Default
-    private final ComponentHealth risk = unavailableComponent("Risk");
+    private final ComponentHealth risk;
 
     /**
      * Execution health (coordinator, orders, locks).
      */
     @NotNull
-    @Builder.Default
-    private final ComponentHealth execution = unavailableComponent("Execution");
+    private final ComponentHealth execution;
 
     /**
      * Agent/bot health (registry, automation, events).
      */
     @NotNull
-    @Builder.Default
-    private final ComponentHealth agents = unavailableComponent("Agents");
+    private final ComponentHealth agents;
 
     /**
      * AI reasoning health (service, last analysis, errors).
      */
     @NotNull
-    @Builder.Default
-    private final ComponentHealth ai = unavailableComponent("AI");
+    private final ComponentHealth ai;
 
     /**
      * Notification health (Telegram, email, delivery).
      */
     @NotNull
-    @Builder.Default
-    private final ComponentHealth notifications = unavailableComponent("Notifications");
+    private final ComponentHealth notifications;
 
     /**
      * License health (validity, expiration, feature access).
      */
     @NotNull
-    @Builder.Default
-    private final ComponentHealth license = unavailableComponent("License");
+    private final ComponentHealth license;
 
     /**
      * System resources health (memory, CPU, disk, threads).
      */
     @NotNull
-    @Builder.Default
-    private final ComponentHealth systemResources = unavailableComponent("System Resources");
+    private final ComponentHealth systemResources;
 
     /**
      * Critical blockers preventing trading.
      */
     @NotNull
-    @Builder.Default
-    private final List<String> blockers = List.of();
+    private final List<String> blockers;
 
     /**
      * Non-critical warnings that should be addressed.
      */
     @NotNull
-    @Builder.Default
-    private final List<String> warnings = List.of();
+    private final List<String> warnings;
 
     /**
      * Arbitrary details for debugging or extension.
      */
     @NotNull
-    @Builder.Default
-    private final Map<String, Object> details = Map.of();
+    private final Map<String, Object> details;
 
     /**
      * When this snapshot was taken.
      */
     @NotNull
-    @Builder.Default
-    private final Instant timestamp = Instant.now();
+    private final Instant timestamp;
+
+    private SystemHealthSnapshot(Builder builder) {
+        this.overallStatus = builder.overallStatus;
+        this.canTrade = builder.canTrade;
+        this.summary = builder.summary;
+        this.exchange = builder.exchange == null ? unavailableComponent("Exchange") : builder.exchange;
+        this.marketData = builder.marketData == null ? unavailableComponent("Market Data") : builder.marketData;
+        this.account = builder.account == null ? unavailableComponent("Account") : builder.account;
+        this.strategy = builder.strategy == null ? unavailableComponent("Strategy") : builder.strategy;
+        this.risk = builder.risk == null ? unavailableComponent("Risk") : builder.risk;
+        this.execution = builder.execution == null ? unavailableComponent("Execution") : builder.execution;
+        this.agents = builder.agents == null ? unavailableComponent("Agents") : builder.agents;
+        this.ai = builder.ai == null ? unavailableComponent("AI") : builder.ai;
+        this.notifications = builder.notifications == null ? unavailableComponent("Notifications")
+                : builder.notifications;
+        this.license = builder.license == null ? unavailableComponent("License") : builder.license;
+        this.systemResources = builder.systemResources == null ? unavailableComponent("System Resources")
+                : builder.systemResources;
+        this.blockers = builder.blockers == null ? List.of() : List.copyOf(builder.blockers);
+        this.warnings = builder.warnings == null ? List.of() : List.copyOf(builder.warnings);
+        this.details = builder.details == null ? Map.of() : Map.copyOf(builder.details);
+        this.timestamp = builder.timestamp == null ? Instant.now() : builder.timestamp;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
 
     private static ComponentHealth unavailableComponent(String componentName) {
         return ComponentHealth.builder()
@@ -146,6 +154,121 @@ public class SystemHealthSnapshot {
                 .status(ComponentStatus.UNKNOWN)
                 .summary("Not checked")
                 .build();
+    }
+
+    public static final class Builder {
+        private ComponentStatus overallStatus;
+        private boolean canTrade;
+        private String summary;
+        private ComponentHealth exchange;
+        private ComponentHealth marketData;
+        private ComponentHealth account;
+        private ComponentHealth strategy;
+        private ComponentHealth risk;
+        private ComponentHealth execution;
+        private ComponentHealth agents;
+        private ComponentHealth ai;
+        private ComponentHealth notifications;
+        private ComponentHealth license;
+        private ComponentHealth systemResources;
+        private List<String> blockers;
+        private List<String> warnings;
+        private Map<String, Object> details;
+        private Instant timestamp;
+
+        public Builder overallStatus(ComponentStatus overallStatus) {
+            this.overallStatus = overallStatus;
+            return this;
+        }
+
+        public Builder canTrade(boolean canTrade) {
+            this.canTrade = canTrade;
+            return this;
+        }
+
+        public Builder summary(String summary) {
+            this.summary = summary;
+            return this;
+        }
+
+        public Builder exchange(ComponentHealth exchange) {
+            this.exchange = exchange;
+            return this;
+        }
+
+        public Builder marketData(ComponentHealth marketData) {
+            this.marketData = marketData;
+            return this;
+        }
+
+        public Builder account(ComponentHealth account) {
+            this.account = account;
+            return this;
+        }
+
+        public Builder strategy(ComponentHealth strategy) {
+            this.strategy = strategy;
+            return this;
+        }
+
+        public Builder risk(ComponentHealth risk) {
+            this.risk = risk;
+            return this;
+        }
+
+        public Builder execution(ComponentHealth execution) {
+            this.execution = execution;
+            return this;
+        }
+
+        public Builder agents(ComponentHealth agents) {
+            this.agents = agents;
+            return this;
+        }
+
+        public Builder ai(ComponentHealth ai) {
+            this.ai = ai;
+            return this;
+        }
+
+        public Builder notifications(ComponentHealth notifications) {
+            this.notifications = notifications;
+            return this;
+        }
+
+        public Builder license(ComponentHealth license) {
+            this.license = license;
+            return this;
+        }
+
+        public Builder systemResources(ComponentHealth systemResources) {
+            this.systemResources = systemResources;
+            return this;
+        }
+
+        public Builder blockers(List<String> blockers) {
+            this.blockers = blockers;
+            return this;
+        }
+
+        public Builder warnings(List<String> warnings) {
+            this.warnings = warnings;
+            return this;
+        }
+
+        public Builder details(Map<String, Object> details) {
+            this.details = details;
+            return this;
+        }
+
+        public Builder timestamp(Instant timestamp) {
+            this.timestamp = timestamp;
+            return this;
+        }
+
+        public SystemHealthSnapshot build() {
+            return new SystemHealthSnapshot(this);
+        }
     }
 
     /**
@@ -277,6 +400,5 @@ public class SystemHealthSnapshot {
 
         return report.toString();
     }
-
 
 }

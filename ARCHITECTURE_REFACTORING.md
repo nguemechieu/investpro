@@ -234,18 +234,23 @@ public RiskDecision evaluateTrade(TradeRiskContext context)
 Simple wrapper around SmartBot for cleaner SystemCore API:
 
 ```java
-public class BotRuntimeController {
-    private final SmartBot smartBot;
-    
+public record BotRuntimeController(SmartBot smartBot) {
     public void start(Exchange exchange, TradingService svc, TradePair pair)
+
     public void stop()
+
     public void setAutoTradingEnabled(boolean enabled)
+
     public void setAiReasoningEnabled(boolean enabled)
+
     public void selectTradePair(TradePair pair)
-    
+
     public boolean isStarted()
+
     public boolean isAutoTradingEnabled()
-    public SmartBot getSmartBot()
+
+    @Override
+    public SmartBot smartBot()
 }
 ```
 

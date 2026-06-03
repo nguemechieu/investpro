@@ -123,6 +123,15 @@ public record AgentEvent(
     /** Emitted when a Solana transaction submission fails. */
     public static final String SOLANA_TRANSACTION_FAILED = "SOLANA_TRANSACTION_FAILED";
 
+    /** Emitted when a blockchain transaction is submitted to a chain network. */
+    public static final String BLOCKCHAIN_TRANSACTION_SUBMITTED = "BLOCKCHAIN_TRANSACTION_SUBMITTED";
+    /** Emitted when a blockchain transaction reaches confirmed finality. */
+    public static final String BLOCKCHAIN_TRANSACTION_CONFIRMED = "BLOCKCHAIN_TRANSACTION_CONFIRMED";
+    /** Emitted when a blockchain transaction fails or is rejected. */
+    public static final String BLOCKCHAIN_TRANSACTION_FAILED = "BLOCKCHAIN_TRANSACTION_FAILED";
+    /** Emitted when a blockchain transaction fails confirmation due to timeout. */
+    public static final String BLOCKCHAIN_TRANSACTION_TIMEOUT = "BLOCKCHAIN_TRANSACTION_TIMEOUT";
+
     // ── Strategy lifecycle events
     // ───────────────────────────────────────────────────────
     /** Emitted when a strategy is assigned to a symbol/timeframe. */

@@ -14,9 +14,7 @@ import java.util.List;
 @Value
 @Builder
 @AllArgsConstructor
-@Setter
-@Getter
-
+@Data
 public class RiskDecision {
 
     // Primary decision

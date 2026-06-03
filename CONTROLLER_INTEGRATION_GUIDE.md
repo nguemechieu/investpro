@@ -167,8 +167,8 @@ public class SystemCore {
 
 ```java
 public class TradingWindow extends JFrame {
-    private SystemCore systemCore;
-    private BotRuntimeController botController;
+    private final SystemCore systemCore;
+    private final BotRuntimeController botController;
     private final ManualTradeController manualTradeController;
     
     private void onStartBotButton() {

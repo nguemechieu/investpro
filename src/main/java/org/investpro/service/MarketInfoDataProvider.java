@@ -36,7 +36,18 @@ public class MarketInfoDataProvider {
             return CompletableFuture.completedFuture(buildStats(pair, null, "TradePair cache"));
         }
 
-        return exchange.fetchTicker(pair)
+        CompletableFuture<Ticker> tickerFuture;
+        try {
+            tickerFuture = exchange.fetchTicker(pair);
+        } catch (Exception exception) {
+            return CompletableFuture.completedFuture(buildStats(pair, null, "TradePair cache"));
+        }
+
+        if (tickerFuture == null) {
+            return CompletableFuture.completedFuture(buildStats(pair, null, "TradePair cache"));
+        }
+
+        return tickerFuture
                 .handle((ticker, error) -> {
                     if (error != null || ticker == null || !ticker.isValid()) {
                         return buildStats(pair, null, "TradePair cache");

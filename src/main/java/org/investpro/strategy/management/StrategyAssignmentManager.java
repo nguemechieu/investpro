@@ -428,9 +428,7 @@ public class StrategyAssignmentManager {
             log.warn("resumeAssignment: assignment not found: {}", assignmentId);
             return null;
         }
-        StrategyLifecycleStatus target = existing.getLifecycleStatus() == StrategyLifecycleStatus.PAUSED
-                ? StrategyLifecycleStatus.RESUMED
-                : StrategyLifecycleStatus.RESUMED;
+        StrategyLifecycleStatus target = StrategyLifecycleStatus.RESUMED;
         return transitionStatus(assignmentId, target, reason,
                 AgentEvent.STRATEGY_ASSIGNMENT_RESUMED, false, false);
     }

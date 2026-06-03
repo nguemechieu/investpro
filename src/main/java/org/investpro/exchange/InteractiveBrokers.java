@@ -58,10 +58,132 @@ public class InteractiveBrokers extends Exchange {
     private static final String IBK_URL = "https://www.interactivebrokers.com";
     private static final String IBKR_CLIENT_PORTAL_DEFAULT_URL = "https://localhost:5000/v1/api";
     private static final String IBK_WEB_SOCKET_URL = "https://api.interactivebrokers.com";
-    private static final List<String> DEFAULT_STOCK_SYMBOLS = List.of("AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META",
-            "GOOGL", "SPY", "QQQ");
-    private static final List<String> DEFAULT_FOREX_SYMBOLS = List.of("EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF",
-            "AUD/USD", "USD/CAD");
+    private static final List<String> DEFAULT_STOCK_SYMBOLS = List.of(
+
+            // Mega Cap Tech
+            "AAPL",
+            "MSFT",
+            "NVDA",
+            "AMZN",
+            "META",
+            "GOOGL",
+            "TSLA",
+            "AVGO",
+            "AMD",
+            "CRM",
+            "ADBE",
+            "ORCL",
+            "INTC",
+            "QCOM",
+            "CSCO",
+
+            // AI & Semiconductor
+            "ARM",
+            "SMCI",
+            "MU",
+            "ASML",
+            "TSM",
+            "KLAC",
+            "LRCX",
+            "AMAT",
+            "MRVL",
+
+            // Financials
+            "JPM",
+            "BAC",
+            "WFC",
+            "GS",
+            "MS",
+            "BLK",
+            "SCHW",
+
+            // Consumer
+            "WMT",
+            "COST",
+            "HD",
+            "LOW",
+            "MCD",
+            "NKE",
+            "SBUX",
+
+            // Healthcare
+            "LLY",
+            "JNJ",
+            "UNH",
+            "ABBV",
+            "PFE",
+            "MRK",
+
+            // Energy
+            "XOM",
+            "CVX",
+            "COP",
+            "SLB",
+
+            // Industrials
+            "CAT",
+            "BA",
+            "GE",
+            "RTX",
+            "LMT",
+
+            // Communication
+            "NFLX",
+            "DIS",
+            "TMUS",
+            "VZ",
+
+            // ETFs
+            "SPY",
+            "QQQ",
+            "IWM",
+            "DIA",
+            "VTI",
+            "VOO",
+            "ARKK",
+            "XLF",
+            "XLK",
+            "XLE",
+            "SMH",
+
+            // Volatility
+            "VXX",
+            "UVXY",
+
+            // International
+            "BABA",
+            "NIO",
+            "PDD",
+            "JD",
+
+            // Popular Trading Stocks
+            "PLTR",
+            "SOFI",
+            "RIVN",
+            "LCID",
+            "HOOD",
+            "COIN",
+
+            // Crypto Exposure
+            "MSTR",
+            "IBIT",
+            "FBTC",
+            "BITO"
+    );
+    private static final List<String> DEFAULT_FOREX_SYMBOLS = List.of(
+            // Major pairs
+            "EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF",
+            "AUD/USD", "USD/CAD", "NZD/USD",
+
+            // Crosses (non‑USD majors)
+            "EUR/GBP", "EUR/JPY", "EUR/CHF", "EUR/AUD", "EUR/CAD", "EUR/NZD",
+            "GBP/JPY", "GBP/CHF", "GBP/AUD", "GBP/CAD", "GBP/NZD",
+            "AUD/JPY", "AUD/CHF", "AUD/CAD", "AUD/NZD",
+            "NZD/JPY", "NZD/CHF", "NZD/CAD",
+            "CAD/JPY", "CAD/CHF",
+            "CHF/JPY"
+    );
+
     // Paper trading state
     private final java.util.Map<String, Double> balances = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Map<String, String> orders = new java.util.concurrent.ConcurrentHashMap<>();
@@ -74,7 +196,7 @@ public class InteractiveBrokers extends Exchange {
     private IBKWebSocketClient webSocketClient;
 
     public InteractiveBrokers(String apiKey, String apiSecret) {
-        this(new ExchangeCredentials("ibk", apiKey, apiSecret, null, null, null, null, false));
+        this(new ExchangeCredentials("ibk", apiKey, apiSecret, null, apiKey, apiSecret, apiKey, false));
     }
 
     public InteractiveBrokers(ExchangeCredentials credentials) {
@@ -127,10 +249,7 @@ public class InteractiveBrokers extends Exchange {
         if (modeRequestsPaperNetwork()) {
             return true;
         }
-        if (modeRequestsLiveNetwork()) {
-            return false;
-        }
-        return true;
+        return !modeRequestsLiveNetwork();
     }
 
     @Override
@@ -482,7 +601,7 @@ public class InteractiveBrokers extends Exchange {
         return CompletableFuture.supplyAsync(() -> {
             String orderId = "ORDER-" + (nextOrderId++) + "-" + System.currentTimeMillis();
             double fillPrice = safePositive(fetchTicker(tradePair).join().getMidPrice(), syntheticPrice(tradePair));
-            applyPaperFill(tradePair, side, amount, fillPrice, 0.0, 0.0);
+            applyPaperFill(tradePair, side, amount, fillPrice);
             orders.put(orderId, "FILLED");
             return orderId;
         });
@@ -499,7 +618,7 @@ public class InteractiveBrokers extends Exchange {
         }
         return CompletableFuture.supplyAsync(() -> {
             String orderId = "ORDER-" + (nextOrderId++) + "-" + System.currentTimeMillis();
-            applyPaperFill(tradePair, side, amount, limitPrice, 0.0, 0.0);
+            applyPaperFill(tradePair, side, amount, limitPrice);
             orders.put(orderId, "FILLED");
             return orderId;
         });
@@ -1329,8 +1448,7 @@ public class InteractiveBrokers extends Exchange {
         return account;
     }
 
-    private void applyPaperFill(TradePair tradePair, Side side, double amount, double price, double stopLoss,
-            double takeProfit) {
+    private void applyPaperFill(TradePair tradePair, Side side, double amount, double price) {
         if (tradePair == null) {
             throw new IllegalArgumentException("tradePair must not be null");
         }
@@ -1356,8 +1474,8 @@ public class InteractiveBrokers extends Exchange {
             balances.put(base, balances.getOrDefault(base, 0.0) + amount);
         }
         Trade trade = new Trade(tradePair, price, amount, side, System.nanoTime(), Instant.now());
-        trade.setStopLoss(stopLoss);
-        trade.setTakeProfit(takeProfit);
+        trade.setStopLoss(0.0);
+        trade.setTakeProfit(0.0);
         tradeHistory.add(trade);
     }
 

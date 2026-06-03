@@ -53,7 +53,8 @@ public class Simulator {
         // Execute trades based on signals
         for (BacktestStrategy.SignalEvent signal : signals) {
             int idx = signal.candleIndex();
-            if (idx < 0 || idx >= historicalData.size()) continue;
+            if (idx < 0 || idx >= historicalData.size())
+                continue;
 
             CandleData candle = historicalData.get(idx);
             double price = candle.closePrice();
@@ -96,8 +97,7 @@ public class Simulator {
         portfolioState.enterPosition(quantity, price, commission);
 
         BacktestResult.TradeRecord trade = new BacktestResult.TradeRecord(
-                candleIndex, price, quantity
-        );
+                candleIndex, price, quantity);
         trade.setEntrySignal(signal != null ? signal.reason() : "BUY");
         trade.setFee(commission);
         executedTrades.add(trade);
@@ -190,7 +190,8 @@ public class Simulator {
     }
 
     private double calculateMaxDrawdown() {
-        if (equityCurve.isEmpty()) return 0.0;
+        if (equityCurve.isEmpty())
+            return 0.0;
 
         double maxDD = 0.0;
         double peak = equityCurve.get(0);
@@ -207,7 +208,8 @@ public class Simulator {
     }
 
     private double calculateSharpeRatio() {
-        if (equityCurve.size() < 2) return 0.0;
+        if (equityCurve.size() < 2)
+            return 0.0;
 
         double[] returns = new double[equityCurve.size() - 1];
         for (int i = 1; i < equityCurve.size(); i++) {
@@ -225,7 +227,8 @@ public class Simulator {
     }
 
     private double calculateExpectedValue() {
-        if (executedTrades.isEmpty()) return 0.0;
+        if (executedTrades.isEmpty())
+            return 0.0;
 
         double sumProfit = executedTrades.stream()
                 .filter(t -> t.getExitTime() != 0)

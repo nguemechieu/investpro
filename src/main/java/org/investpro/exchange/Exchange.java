@@ -1,13 +1,13 @@
 package org.investpro.exchange;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.contracts.*;
 import org.investpro.exchange.credentials.ExchangeCredentials;
-import org.investpro.models.trading.Order;
-import org.investpro.models.trading.OrderBook;
-import org.investpro.models.trading.TradePair;
+import org.investpro.models.Account;
+import org.investpro.models.trading.*;
 import org.investpro.market.MarketDataEngine;
 import org.investpro.market.ExchangeMarketDataAdapter;
 import org.investpro.trading.tradability.ExchangeInstrumentService;
@@ -19,11 +19,9 @@ import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
-import java.util.Map;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 @Getter
 @Setter
@@ -45,14 +43,14 @@ public abstract class Exchange implements
     private String userSelectedTradingMode;
     private ExchangeCredentials credentials;
 
-    protected  MarketDataEngine marketDataEngine;
-    protected  ExchangeMarketDataAdapter marketDataAdapter;
+    protected MarketDataEngine marketDataEngine;
+    protected ExchangeMarketDataAdapter marketDataAdapter;
 
     protected Exchange(@NotNull ExchangeCredentials credentials) {
         this.credentials = credentials;
 
         this.userSelectedTradingMode = credentials.sandbox() ? "PAPER" : "LIVE";
-        log.debug(this.getClass().getSimpleName() + " created ", this);
+        log.debug("{} {} created ", this.getClass().getSimpleName(), this);
     }
 
     public String getResolvedTradingMode() {
@@ -72,7 +70,6 @@ public abstract class Exchange implements
         }
         return "LIVE";
     }
-
 
     protected boolean modeRequestsPaperNetwork() {
         return "PAPER".equals(getResolvedTradingMode());
@@ -99,8 +96,6 @@ public abstract class Exchange implements
     public TradePair getSelecTradePair() throws Exception {
         return getSelectedTradePair();
     }
-
-
 
     public void buy(
             TradePair tradePair,
@@ -156,8 +151,10 @@ public abstract class Exchange implements
     }
 
     public boolean canSubmitOrders() {
-        return Boolean.TRUE.equals(isConnected())
-                && (canSubmitLiveOrders() || (supportsPaperTradingMode() && isPaperTrading()));
+        if (isPaperTrading()) {
+            return supportsPaperTradingMode();
+        }
+        return canSubmitLiveOrders();
     }
 
     public int getDisplayPrecision(TradePair pair) {
@@ -187,7 +184,8 @@ public abstract class Exchange implements
 
     public CompletableFuture<SymbolTradability> fetchTradabilityStatus(TradePair pair) {
         if (pair == null) {
-            return CompletableFuture.completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+            return CompletableFuture
+                    .completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
         }
 
         boolean supportsPair = supportsTradePair(pair);
@@ -223,16 +221,6 @@ public abstract class Exchange implements
                 Map.of("source", "exchange-default"));
 
         return CompletableFuture.completedFuture(tradability);
-    }
-
-    public boolean canTradeSymbol(TradePair pair) {
-        SymbolTradability status = fetchTradabilityStatus(pair).join();
-        return status != null && status.isFullyTradable();
-    }
-
-    public boolean canBotTradeSymbol(TradePair pair) {
-        SymbolTradability status = fetchTradabilityStatus(pair).join();
-        return status != null && status.canBeUsedForBotTrading();
     }
 
     protected SymbolTradability defaultTradability(TradePair pair, TradabilityStatus status, String reason) {
@@ -309,6 +297,83 @@ public abstract class Exchange implements
         return failedFuture(unsupported("replaceOrder"));
     }
 
+    public CompletableFuture<String> updateOrderClientExtensions(String orderId, Map<String, String> extensions) {
+        return failedFuture(unsupported("updateOrderClientExtensions"));
+    }
+
+    public CompletableFuture<List<Account>> listAccounts() {
+        return CompletableFuture.completedFuture(List.of());
+    }
+
+    public CompletableFuture<Account> getAccountDetails(String accountID) {
+        return failedFuture(unsupported("getAccountDetails"));
+    }
+
+    public CompletableFuture<String> configureAccount(String accountID, Map<String, Object> config) {
+        return failedFuture(unsupported("configureAccount"));
+    }
+
+    public CompletableFuture<JsonNode> getAccountChanges(String accountID, String sinceTransactionID) {
+        return failedFuture(unsupported("getAccountChanges"));
+    }
+
+    public CompletableFuture<Optional<Trade>> getTrade(String tradeID) {
+        return CompletableFuture.completedFuture(Optional.empty());
+    }
+
+    public CompletableFuture<String> closeTrade(String tradeID, double units) {
+        return failedFuture(unsupported("closeTrade"));
+    }
+
+    public CompletableFuture<String> updateTradeClientExtensions(String tradeID, Map<String, String> extensions) {
+        return failedFuture(unsupported("updateTradeClientExtensions"));
+    }
+
+    public CompletableFuture<String> manageTradeOrders(String tradeID, double stopLoss, double takeProfit) {
+        return failedFuture(unsupported("manageTradeOrders"));
+    }
+
+    public CompletableFuture<List<Position>> getAllPositions() {
+        return CompletableFuture.completedFuture(List.of());
+    }
+
+    public CompletableFuture<Optional<Position>> getPositionDetails(String instrument) {
+        return CompletableFuture.completedFuture(Optional.empty());
+    }
+
+    public CompletableFuture<List<JsonNode>> getTransactions(int maxCount, String sinceTransactionID) {
+        return CompletableFuture.completedFuture(List.of());
+    }
+
+    public CompletableFuture<JsonNode> getTransaction(String transactionID) {
+        return failedFuture(unsupported("getTransaction"));
+    }
+
+    public CompletableFuture<List<JsonNode>> getTransactionIdRange(String fromTransactionID, String toTransactionID) {
+        return CompletableFuture.completedFuture(List.of());
+    }
+
+    public CompletableFuture<List<JsonNode>> getTransactionsSinceId(String sinceTransactionID) {
+        return CompletableFuture.completedFuture(List.of());
+    }
+
+    public CompletableFuture<Void> streamTransactions(
+            Consumer<JsonNode> onMessage,
+            Consumer<Throwable> onError) {
+        return failedFuture(unsupported("streamTransactions"));
+    }
+
+    public CompletableFuture<Map<String, JsonNode>> getLatestCandles(List<String> instruments) {
+        return failedFuture(new UnsupportedOperationException(
+                getClass().getSimpleName() + " does not support batch candle retrieval"));
+    }
+
+    public CompletableFuture<List<JsonNode>> getInstrumentCandles(String instrument, String granularity,
+            String from, String to, int count) {
+        return failedFuture(new UnsupportedOperationException(
+                getClass().getSimpleName() + " does not support instrument candle retrieval"));
+    }
+
     protected static <T> @NotNull CompletableFuture<T> failedFuture(Throwable throwable) {
         CompletableFuture<T> future = new CompletableFuture<>();
         future.completeExceptionally(throwable);
@@ -337,32 +402,11 @@ public abstract class Exchange implements
 
     /**
      * Returns the instrument service for this exchange, or null if not overridden.
-     * Override in exchange adapters to provide pair discovery and tradability checks.
+     * Override in exchange adapters to provide pair discovery and tradability
+     * checks.
      */
     public ExchangeInstrumentService instrumentService() {
         return null;
     }
 
-    /**
-     * Returns the full list of tradeable pairs for this exchange asynchronously.
-     * Default delegates to {@link #getTradablePairs()}.
-     */
-    public CompletableFuture<List<TradePair>> getTradeablePairsAsync() {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                return getTradablePairs();
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to load tradeable pairs for " + getName(), e);
-            }
-        });
-    }
-
-    /**
-     * Checks if a specific pair is tradeable for this account.
-     * Default delegates to {@link #fetchTradabilityStatus(TradePair)}.
-     */
-    public CompletableFuture<Boolean> isTradeablePair(TradePair pair) {
-        return fetchTradabilityStatus(pair)
-                .thenApply(st -> st != null && st.status() == TradabilityStatus.FULLY_TRADABLE);
-    }
 }

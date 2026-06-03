@@ -1,0 +1,412 @@
+package org.investpro.exchange.ibkr;
+
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+import org.investpro.exchange.InteractiveBrokers;
+import org.investpro.exchange.credentials.ExchangeCredentials;
+import org.investpro.enums.timeframe.Timeframe;
+import org.investpro.licensing.LicenseManager;
+import org.investpro.models.Account;
+import org.investpro.models.trading.OpenOrder;
+import org.investpro.models.trading.Position;
+import org.investpro.models.trading.Ticker;
+import org.investpro.models.trading.Trade;
+import org.investpro.models.trading.TradePair;
+import org.investpro.utils.CandleDataSupplier;
+import org.investpro.utils.MARKET_TYPES;
+import org.investpro.utils.Side;
+import org.jetbrains.annotations.NotNull;
+
+import java.sql.SQLException;
+import java.time.Instant;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.function.BooleanSupplier;
+
+@Slf4j
+@Getter
+public class IbkrExchange extends InteractiveBrokers {
+
+    private final IbkrConnectionManager connectionManager;
+    private final IbkrContractMapper contractMapper;
+    private final IbkrMarketDataProvider marketDataProvider;
+    private final IbkrPersistenceStore persistenceStore;
+    private final IbkrAccountService accountService;
+    private final IbkrPositionService positionService;
+    private final IbkrPortfolioService portfolioService;
+    private final IbkrOrderService orderService;
+    private final IbkrPortfolioSynchronizer portfolioSynchronizer;
+    private final IbkrExecutionAdapter executionAdapter;
+
+    private volatile BooleanSupplier liveTradingLicenseGate = () -> true;
+    private volatile BooleanSupplier liveRiskApprovalGate = () -> false;
+
+    public IbkrExchange(ExchangeCredentials credentials) {
+        super(credentials);
+        this.connectionManager = new IbkrConnectionManager();
+        this.contractMapper = new IbkrContractMapper();
+        this.marketDataProvider = new IbkrMarketDataProvider(connectionManager);
+        this.persistenceStore = new IbkrPersistenceStore();
+        this.accountService = new IbkrAccountService(connectionManager, persistenceStore, modeRequestsPaperNetwork());
+        this.positionService = new IbkrPositionService(persistenceStore);
+        this.portfolioService = new IbkrPortfolioService(positionService, accountService);
+        this.orderService = new IbkrOrderService(positionService, accountService, marketDataProvider, persistenceStore);
+        this.portfolioSynchronizer = new IbkrPortfolioSynchronizer(persistenceStore);
+        this.executionAdapter = new IbkrExecutionAdapter(this);
+    }
+
+    public IbkrExchange(String apiKey, String apiSecret) {
+        this(new ExchangeCredentials("interactive_brokers", apiKey, apiSecret, null, null, null, null, true));
+    }
+
+    public void setLicenseManager(LicenseManager licenseManager) {
+        this.liveTradingLicenseGate = () -> licenseManager != null
+                && licenseManager.isLicenseValid()
+                && (licenseManager.isFeatureEnabled("ADVANCED_TRADING")
+                        || licenseManager.isFeatureEnabled("BASIC_TRADING"));
+    }
+
+    public void setLiveTradingLicenseGate(BooleanSupplier licenseGate) {
+        this.liveTradingLicenseGate = licenseGate == null ? () -> true : licenseGate;
+    }
+
+    public void setLiveRiskApprovalGate(BooleanSupplier riskApprovalGate) {
+        this.liveRiskApprovalGate = riskApprovalGate == null ? () -> false : riskApprovalGate;
+    }
+
+    @Override
+    public String getName() {
+        return "INTERACTIVE BROKERS";
+    }
+
+    @Override
+    public String getDisplayName() {
+        return "Interactive Brokers";
+    }
+
+    @Override
+    public String getExchangeId() {
+        return "interactive_brokers";
+    }
+
+    @Override
+    public boolean supportsMarketType(MARKET_TYPES marketType) {
+        return marketType == null
+                || marketType == MARKET_TYPES.STOCKS
+                || marketType == MARKET_TYPES.FOREX
+                || marketType == MARKET_TYPES.FUTURES
+                || marketType == MARKET_TYPES.LIMIT
+                || marketType == MARKET_TYPES.MARKET
+                || marketType == MARKET_TYPES.STOP_LIMIT;
+    }
+
+    @Override
+    public List<MARKET_TYPES> getSupportedMarketTypes() {
+        return List.of(MARKET_TYPES.STOCKS, MARKET_TYPES.FOREX, MARKET_TYPES.FUTURES);
+    }
+
+    @Override
+    public void connect() {
+        connectionManager.connect(
+                modeRequestsPaperNetwork() ? IbkrConnectionManager.Mode.PAPER : IbkrConnectionManager.Mode.LIVE);
+    }
+
+    @Override
+    public void disconnect() {
+        connectionManager.disconnect();
+    }
+
+    @Override
+    public void reconnect() {
+        connectionManager.reconnect();
+    }
+
+    @Override
+    public Boolean isConnected() {
+        return connectionManager.isConnected();
+    }
+
+    @Override
+    public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
+        if (!canTradeNow(true)) {
+            return CompletableFuture
+                    .failedFuture(new IllegalStateException("IBKR live trading gate denied market order"));
+        }
+        return CompletableFuture.completedFuture(orderService.submitMarket(tradePair, side, amount));
+    }
+
+    @Override
+    public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
+            double limitPrice) {
+        if (!canTradeNow(true)) {
+            return CompletableFuture
+                    .failedFuture(new IllegalStateException("IBKR live trading gate denied limit order"));
+        }
+        return CompletableFuture.completedFuture(orderService.submitLimit(tradePair, side, amount, limitPrice));
+    }
+
+    @Override
+    public CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice) {
+        if (!canTradeNow(true)) {
+            return CompletableFuture
+                    .failedFuture(new IllegalStateException("IBKR live trading gate denied stop order"));
+        }
+        return CompletableFuture.completedFuture(orderService.submitStop(tradePair, side, amount, stopPrice));
+    }
+
+    @Override
+    public CompletableFuture<String> createBracketOrder(TradePair tradePair,
+            Side side,
+            double amount,
+            double entryPrice,
+            double stopLoss,
+            double takeProfit) {
+        if (!canTradeNow(true)) {
+            return CompletableFuture
+                    .failedFuture(new IllegalStateException("IBKR live trading gate denied bracket order"));
+        }
+        return CompletableFuture.completedFuture(
+                orderService.submitBracket(tradePair, side, amount, entryPrice, stopLoss, takeProfit));
+    }
+
+    @Override
+    public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
+        return CompletableFuture.completedFuture(orderService.fetchOpenOrders(tradePair));
+    }
+
+    @Override
+    public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
+        return CompletableFuture.completedFuture(orderService.fetchAllOpenOrders());
+    }
+
+    @Override
+    public CompletableFuture<String> cancelOrder(String orderId) {
+        return CompletableFuture.completedFuture(orderService.cancelOrder(orderId));
+    }
+
+    @Override
+    public CompletableFuture<List<String>> cancelOrders(List<String> orderIds) {
+        return CompletableFuture.completedFuture(orderService.cancelOrders(orderIds));
+    }
+
+    @Override
+    public CompletableFuture<String> cancelAllOrders() {
+        return CompletableFuture.completedFuture(orderService.cancelAll());
+    }
+
+    @Override
+    public CompletableFuture<List<Position>> fetchPositions(TradePair tradePair) {
+        return CompletableFuture.completedFuture(positionService.fetchFor(tradePair));
+    }
+
+    @Override
+    public CompletableFuture<List<Position>> fetchAllPositions() {
+        return CompletableFuture.completedFuture(positionService.fetchAll());
+    }
+
+    @Override
+    public CompletableFuture<Optional<Position>> fetchPosition(TradePair tradePair) {
+        return CompletableFuture.completedFuture(positionService.fetchOne(tradePair));
+    }
+
+    @Override
+    public CompletableFuture<String> closePosition(TradePair tradePair) {
+        positionService.close(tradePair);
+        return CompletableFuture.completedFuture("CLOSED");
+    }
+
+    @Override
+    public CompletableFuture<String> closeAllPositions() {
+        positionService.closeAll();
+        return CompletableFuture.completedFuture("CLOSED_ALL");
+    }
+
+    @Override
+    public CompletableFuture<String> closePosition(TradePair symbol, String positionId) {
+        return closePosition(symbol);
+    }
+
+    @Override
+    public CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity) {
+        return CompletableFuture.completedFuture("PARTIAL_NOT_IMPLEMENTED");
+    }
+
+    @Override
+    public CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss) {
+        positionService.setStopLoss(symbol, stopLoss);
+        return CompletableFuture.completedFuture("STOP_UPDATED");
+    }
+
+    @Override
+    public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
+        positionService.setTakeProfit(symbol, takeProfit);
+        return CompletableFuture.completedFuture("TAKE_PROFIT_UPDATED");
+    }
+
+    @Override
+    public CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) {
+        return CompletableFuture.completedFuture(
+                orderService.submitTrailingStop(symbol, Side.SELL, Math.max(1.0, quantityFor(symbol)),
+                        trailingDistance));
+    }
+
+    @Override
+    public Ticker getLivePrice(TradePair tradePair) {
+        return marketDataProvider.fetchTicker(tradePair).join();
+    }
+
+    @Override
+    public CompletableFuture<Ticker> fetchTicker(TradePair tradePair) {
+        return marketDataProvider.fetchTicker(tradePair);
+    }
+
+    @Override
+    public CompletableFuture<List<Ticker>> fetchTickers(List<TradePair> tradePairs) {
+        return marketDataProvider.fetchTickers(tradePairs);
+    }
+
+    @Override
+    public CompletableFuture<List<Ticker>> getTicker(TradePair pair) {
+        return fetchTicker(pair).thenApply(List::of);
+    }
+
+    @Override
+    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        return marketDataProvider.candleDataSupplier(secondsPerCandle, tradePair);
+    }
+
+    @Override
+    public CompletableFuture<Optional<org.investpro.data.InProgressCandleData>> fetchCandleDataForInProgressCandle(
+            TradePair tradePair,
+            Instant currentCandleStartedAt,
+            long secondsIntoCurrentCandle,
+            int secondsPerCandle) {
+        return marketDataProvider.fetchCandleDataForInProgressCandle(
+                tradePair,
+                currentCandleStartedAt,
+                secondsIntoCurrentCandle,
+                secondsPerCandle);
+    }
+
+    @Override
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+        return marketDataProvider.fetchRecentTradesUntil(tradePair, stopAt);
+    }
+
+    @Override
+    public List<Timeframe> getSupportedTimeframes() {
+        return marketDataProvider.supportedTimeframes();
+    }
+
+    @Override
+    public String supportsTimeframe(int secondsPerCandle) {
+        return secondsPerCandle > 0 ? "SUPPORTED" : "UNSUPPORTED";
+    }
+
+    @Override
+    public Account getUserAccountDetails() throws ExecutionException, InterruptedException {
+        return fetchAccount().get();
+    }
+
+    @Override
+    public CompletableFuture<Account> fetchAccount() {
+        return CompletableFuture.completedFuture(accountService.toAccount(this));
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchAvailableBalance(String currencyCode) {
+        return CompletableFuture.completedFuture(
+                accountService.snapshot().balances().getOrDefault(normalize(currencyCode), 0.0));
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchTotalBalance(String currencyCode) {
+        return fetchAvailableBalance(currencyCode);
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchEquity() {
+        return CompletableFuture.completedFuture(accountService.snapshot().equity());
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchMarginUsed() {
+        return CompletableFuture.completedFuture(accountService.snapshot().marginUsed());
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchFreeMargin() {
+        return CompletableFuture.completedFuture(accountService.snapshot().availableFunds());
+    }
+
+    public void synchronizePortfolio() {
+        portfolioSynchronizer.synchronize(
+                accountService.snapshot(),
+                positionService.fetchAll(),
+                orderService.fetchAllOpenOrders(),
+                orderService.executions());
+    }
+
+    public TradePair parsePair(String symbol) throws SQLException, ClassNotFoundException {
+        return TradePair.fromSymbol(symbol);
+    }
+
+    public IbkrConnectionManager.ConnectionHealth connectionHealth() {
+        return connectionManager.snapshotHealth();
+    }
+
+    private boolean canTradeNow(boolean riskApproved) {
+        if (isPaperTrading()) {
+            return true;
+        }
+        return connectionManager.isConnected()
+                && marketDataProvider.isMarketDataHealthy()
+                && riskApproved
+                && liveRiskApprovalGate.getAsBoolean()
+                && liveTradingLicenseGate.getAsBoolean();
+    }
+
+    private double quantityFor(TradePair pair) {
+        return positionService.fetchOne(pair).map(Position::getQuantity).orElse(1.0);
+    }
+
+    private String normalize(String currency) {
+        if (currency == null) {
+            return "USD";
+        }
+        return currency.trim().toUpperCase(Locale.ROOT);
+    }
+
+    @Override
+    public boolean supportsDerivatives() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsForex() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsStocks() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPaperTradingMode() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsLiveTrading() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsTradePair(@NotNull TradePair tradePair) {
+        return contractMapper.supports(tradePair, MARKET_TYPES.STOCKS);
+    }
+}

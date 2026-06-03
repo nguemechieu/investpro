@@ -143,26 +143,16 @@ class StrategyAssignmentManagerSafetyGateTest {
                 .build();
     }
 
-    private static final class TestUserStrategy implements UserStrategy {
-        private final String id;
-
-        private TestUserStrategy(String id) {
-            this.id = id;
-        }
+    private record TestUserStrategy(String id) implements UserStrategy {
 
         @Override
-        public String getId() {
-            return id;
-        }
+            public String name() {
+                return "Safety Gate Test";
+            }
 
-        @Override
-        public String getName() {
-            return "Safety Gate Test";
+            @Override
+            public StrategySignal generateSignal(StrategyContext context) {
+                return StrategySignal.hold("BTC/USD", "1h", id, "test");
+            }
         }
-
-        @Override
-        public StrategySignal generateSignal(StrategyContext context) {
-            return StrategySignal.hold("BTC/USD", "1h", id, "test");
-        }
-    }
 }

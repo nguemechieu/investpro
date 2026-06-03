@@ -20,10 +20,11 @@ import org.controlsfx.control.ToggleSwitch;
 public class ChartOptions {
     @Getter
     private final VBox optionsPane;
-    private ChartOption verticalGridOption;
-    private ChartOption horizontalGridOption;
-    private ChartOption showVolumeOption;
-    private ChartOption alignOpenCloseOption;
+    private final ChartOption verticalGridOption;
+    private final ChartOption horizontalGridOption;
+    private final ChartOption showVolumeOption;
+    private final ChartOption alignOpenCloseOption;
+    private final ChartOption showNewsEventsOption;
 
     public ChartOptions() {
         optionsPane = new VBox();
@@ -38,6 +39,7 @@ public class ChartOptions {
         horizontalGridOption = addOptionRow(optionsGrid, numOptions++, horizontalGridLinesVisible);
         showVolumeOption = addOptionRow(optionsGrid, numOptions++, showVolume);
         alignOpenCloseOption = addOptionRow(optionsGrid, numOptions++, alignOpenClose);
+        showNewsEventsOption = addOptionRow(optionsGrid, numOptions++, showNewsEvents);
         optionsPane.getChildren().setAll(optionsGrid);
         optionsPane.setPadding(new Insets(14, 16, 16, 16));
     }
@@ -51,7 +53,8 @@ public class ChartOptions {
     }
 
     /**
-     * {@literal true} if vertical grid lines should be drawn at major tick marks along the x-axis
+     * {@literal true} if vertical grid lines should be drawn at major tick marks
+     * along the x-axis
      */
     private final ReadOnlyBooleanWrapper verticalGridLinesVisible = new ReadOnlyBooleanWrapper(false) {
         @Override
@@ -80,7 +83,8 @@ public class ChartOptions {
     }
 
     /**
-     * {@literal true} if horizontal grid lines should be drawn at major tick marks along the y-axis
+     * {@literal true} if horizontal grid lines should be drawn at major tick marks
+     * along the y-axis
      */
     private final ReadOnlyBooleanWrapper horizontalGridLinesVisible = new ReadOnlyBooleanWrapper(false) {
         @Override
@@ -138,7 +142,8 @@ public class ChartOptions {
     }
 
     /**
-     * {@literal true} if the close price of candle at index N should be aligned (the same as) with the open price
+     * {@literal true} if the close price of candle at index N should be aligned
+     * (the same as) with the open price
      * of the candle at index N+1.
      */
     private final ReadOnlyBooleanWrapper alignOpenClose = new ReadOnlyBooleanWrapper(false) {
@@ -164,6 +169,35 @@ public class ChartOptions {
     public void setAlignOpenClose(boolean enabled) {
         if (alignOpenCloseOption != null) {
             alignOpenCloseOption.optionSwitch.setSelected(enabled);
+        }
+    }
+
+    /**
+     * {@literal true} if economic/news events should be drawn on the chart.
+     */
+    private final ReadOnlyBooleanWrapper showNewsEvents = new ReadOnlyBooleanWrapper(false) {
+        @Override
+        public Object getBean() {
+            return ChartOptions.this;
+        }
+
+        @Override
+        public String getName() {
+            return "News Events";
+        }
+    };
+
+    public final boolean isShowNewsEvents() {
+        return showNewsEvents.get();
+    }
+
+    public final ReadOnlyBooleanProperty showNewsEventsProperty() {
+        return showNewsEvents.getReadOnlyProperty();
+    }
+
+    public void setShowNewsEvents(boolean visible) {
+        if (showNewsEventsOption != null) {
+            showNewsEventsOption.optionSwitch.setSelected(visible);
         }
     }
 

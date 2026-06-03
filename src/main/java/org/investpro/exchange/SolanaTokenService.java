@@ -126,7 +126,7 @@ public class SolanaTokenService {
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
-                    if (response.statusCode() != 200) return Optional.<SolanaTokenMetadata>empty();
+                    if (response.statusCode() != 200) return Optional.empty();
                     try {
                         JsonNode arr = MAPPER.readTree(response.body());
                         if (arr.isArray()) {
@@ -144,7 +144,7 @@ public class SolanaTokenService {
                     } catch (Exception e) {
                         log.debug("Solana: failed to fetch Jupiter token list: {}", e.getMessage());
                     }
-                    return Optional.<SolanaTokenMetadata>empty();
+                    return Optional.empty();
                 });
     }
 

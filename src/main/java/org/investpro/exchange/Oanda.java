@@ -7,8 +7,6 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.Account;
 import org.investpro.data.InProgressCandleData;
@@ -43,6 +41,7 @@ import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.java_websocket.drafts.Draft_6455;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -846,12 +845,12 @@ public class Oanda extends Exchange {
             return failedFuture(new IllegalArgumentException("tradePair must not be null"));
         }
 
-        // Reject malformed symbols (XXX, ¤¤¤) before making HTTP requests
+        // Reject malformed symbols (XXX, ┬ñ┬ñ┬ñ) before making HTTP requests
         String baseCode = tradePair.getBaseCode();
         String counterCode = tradePair.getCounterCode();
 
-        if (baseCode.equals("XXX") || baseCode.equals("¤¤¤") ||
-                counterCode.equals("XXX") || counterCode.equals("¤¤¤")) {
+        if (baseCode.equals("XXX") || baseCode.equals("┬ñ┬ñ┬ñ") ||
+                counterCode.equals("XXX") || counterCode.equals("┬ñ┬ñ┬ñ")) {
             log.debug("Skipping OANDA order book fetch for malformed symbol: {}", tradePair);
             return CompletableFuture.completedFuture(new OrderBook(tradePair));
         }
@@ -1296,7 +1295,7 @@ public class Oanda extends Exchange {
         String account = resolveAccountId();
 
         if (account.isBlank()) {
-            log.warn("OANDA account id is blank — cannot fetch account details. "
+            log.warn("OANDA account id is blank ΓÇö cannot fetch account details. "
                     + "Ensure accountId is provided in credentials.");
             return null;
         }
@@ -1311,7 +1310,7 @@ public class Oanda extends Exchange {
         String url = oandaRoute(ACCOUNT_SUMMARY_ROUTE, account);
 
         if (isAccountConnectivityBackoffActive()) {
-            log.warn("OANDA account details fetch skipped — connectivity backoff active until {}ms. "
+            log.warn("OANDA account details fetch skipped ΓÇö connectivity backoff active until {}ms. "
                     + "Will retry automatically.", accountConnectivityUnavailableUntilMs);
             return null;
         }
@@ -2728,6 +2727,7 @@ public class Oanda extends Exchange {
      * PUT /v3/accounts/{accountID}/orders/{orderSpecifier}/clientExtensions -
      * Update order client extensions
      */
+    @Override
     public CompletableFuture<String> updateOrderClientExtensions(String orderId, Map<String, String> extensions) {
         if (safe(orderId).isBlank() || extensions == null) {
             return failedFuture(new IllegalArgumentException("orderId and extensions must not be null/blank"));
@@ -2759,6 +2759,7 @@ public class Oanda extends Exchange {
     /**
      * GET /v3/accounts - List all accounts accessible to the API token
      */
+    @Override
     public CompletableFuture<List<Account>> listAccounts() {
         String url = oandaRoute(ACCOUNTS_ROUTE);
         HttpRequest request = requestBuilder(url).GET().build();
@@ -2790,6 +2791,7 @@ public class Oanda extends Exchange {
     /**
      * GET /v3/accounts/{accountID} - Get full account details (not summary)
      */
+    @Override
     public CompletableFuture<Account> getAccountDetails(String accountID) {
         if (safe(accountID).isBlank()) {
             accountID = resolveAccountId();
@@ -2822,6 +2824,7 @@ public class Oanda extends Exchange {
     /**
      * PATCH /v3/accounts/{accountID}/configuration - Configure account settings
      */
+    @Override
     public CompletableFuture<String> configureAccount(String accountID, Map<String, Object> config) {
         if (safe(accountID).isBlank() || config == null) {
             return failedFuture(new IllegalArgumentException("accountID and config must not be null/blank"));
@@ -2845,6 +2848,7 @@ public class Oanda extends Exchange {
      * GET /v3/accounts/{accountID}/changes - Get account changes since a
      * transaction ID
      */
+    @Override
     public CompletableFuture<JsonNode> getAccountChanges(String accountID, String sinceTransactionID) {
         if (safe(accountID).isBlank()) {
             accountID = resolveAccountId();
@@ -2911,6 +2915,7 @@ public class Oanda extends Exchange {
     /**
      * GET /v3/accounts/{accountID}/trades/{tradeSpecifier} - Get trade details
      */
+    @Override
     public CompletableFuture<Optional<Trade>> getTrade(String tradeID) {
         if (safe(tradeID).isBlank()) {
             return CompletableFuture.completedFuture(Optional.empty());
@@ -2942,6 +2947,7 @@ public class Oanda extends Exchange {
     /**
      * PUT /v3/accounts/{accountID}/trades/{tradeSpecifier}/close - Close a trade
      */
+    @Override
     public CompletableFuture<String> closeTrade(String tradeID, double units) {
         if (safe(tradeID).isBlank()) {
             return failedFuture(new IllegalArgumentException("tradeID must not be blank"));
@@ -2974,6 +2980,8 @@ public class Oanda extends Exchange {
      * PUT /v3/accounts/{accountID}/trades/{tradeSpecifier}/clientExtensions -
      * Update trade client extensions
      */
+
+    @Override
     public CompletableFuture<String> updateTradeClientExtensions(String tradeID, Map<String, String> extensions) {
         if (safe(tradeID).isBlank() || extensions == null) {
             return failedFuture(new IllegalArgumentException("tradeID and extensions must not be null/blank"));
@@ -3005,6 +3013,7 @@ public class Oanda extends Exchange {
      * PUT /v3/accounts/{accountID}/trades/{tradeSpecifier}/orders - Set dependent
      * orders on trade
      */
+    @Override
     public CompletableFuture<String> manageTradeOrders(String tradeID, double stopLoss, double takeProfit) {
         if (safe(tradeID).isBlank()) {
             return failedFuture(new IllegalArgumentException("tradeID must not be blank"));
@@ -3044,6 +3053,7 @@ public class Oanda extends Exchange {
     /**
      * GET /v3/accounts/{accountID}/positions - Get all positions (not just open)
      */
+    @Override
     public CompletableFuture<List<Position>> getAllPositions() {
         String account = resolveAccountId();
         if (account.isBlank()) {
@@ -3067,6 +3077,7 @@ public class Oanda extends Exchange {
      * GET /v3/accounts/{accountID}/positions/{instrument} - Get position details
      * for instrument
      */
+    @Override
     public CompletableFuture<Optional<Position>> getPositionDetails(String instrument) {
         if (safe(instrument).isBlank()) {
             return CompletableFuture.completedFuture(Optional.empty());
@@ -3107,7 +3118,7 @@ public class Oanda extends Exchange {
     /**
      * GET /v3/accounts/{accountID}/transactions - Get transaction history
      */
-
+    @Override
     public CompletableFuture<List<JsonNode>> getTransactions(int maxCount, String sinceTransactionID) {
         String account = resolveAccountId();
         if (account.isBlank()) {
@@ -3149,6 +3160,7 @@ public class Oanda extends Exchange {
     /**
      * GET /v3/accounts/{accountID}/transactions/{transactionID}
      */
+    @Override
     public CompletableFuture<JsonNode> getTransaction(String transactionID) {
         String account = resolveAccountId();
         if (account.isBlank()) {
@@ -3160,6 +3172,7 @@ public class Oanda extends Exchange {
     /**
      * GET /v3/accounts/{accountID}/transactions/idrange
      */
+    @Override
     public CompletableFuture<List<JsonNode>> getTransactionIdRange(String fromTransactionID, String toTransactionID) {
         String account = resolveAccountId();
         if (account.isBlank()) {
@@ -3171,6 +3184,7 @@ public class Oanda extends Exchange {
     /**
      * GET /v3/accounts/{accountID}/transactions/sinceid
      */
+    @Override
     public CompletableFuture<List<JsonNode>> getTransactionsSinceId(String sinceTransactionID) {
         String account = resolveAccountId();
         if (account.isBlank()) {
@@ -3185,6 +3199,7 @@ public class Oanda extends Exchange {
      * <p>
      * This endpoint is served by OANDA's streaming base URL.
      */
+    @Override
     public CompletableFuture<Void> streamTransactions(
             Consumer<JsonNode> onMessage,
             Consumer<Throwable> onError) {
@@ -3201,6 +3216,7 @@ public class Oanda extends Exchange {
      * GET /v3/accounts/{accountID}/candles/latest - Get latest candles for multiple
      * instruments
      */
+    @Override
     public CompletableFuture<Map<String, JsonNode>> getLatestCandles(List<String> instruments) {
         if (instruments == null || instruments.isEmpty()) {
             return CompletableFuture.completedFuture(Collections.emptyMap());
@@ -3245,6 +3261,7 @@ public class Oanda extends Exchange {
      * GET /v3/accounts/{accountID}/instruments/{instrument}/candles - Get candles
      * for an instrument
      */
+    @Override
     public CompletableFuture<List<JsonNode>> getInstrumentCandles(String instrument, String granularity,
             String from, String to, int count) {
         if (safe(instrument).isBlank()) {
@@ -3479,7 +3496,7 @@ public class Oanda extends Exchange {
     /**
      * When a 401 is received from the primary OANDA environment, tries the
      * alternate
-     * environment (practice ↔ live). If the alternate succeeds, the adapter's
+     * environment (practice Γåö live). If the alternate succeeds, the adapter's
      * internal base URL switches accordingly so all subsequent calls work.
      */
     private Account retryWithAlternateEnvironment(String account, String cacheKey) {
@@ -3504,7 +3521,7 @@ public class Oanda extends Exchange {
                 return null;
             }
 
-            // Success on alternate environment — adapt internal mode and notify
+            // Success on alternate environment ΓÇö adapt internal mode and notify
             String suggestedMode = currentlyLive ? "PAPER" : "LIVE";
             log.warn("OANDA credentials validated against {} environment. "
                     + "Consider changing 'Trading Mode' to '{}' in the connection dialog "
@@ -3577,10 +3594,10 @@ public class Oanda extends Exchange {
     }
 
     /** Truncates a string to at most {@code maxLen} chars for safe log output. */
-    private static String truncate(String s, int maxLen) {
+    private static @NonNull String truncate(String s, int maxLen) {
         if (s == null)
             return "";
-        return s.length() <= maxLen ? s : s.substring(0, maxLen) + "…";
+        return s.length() <= maxLen ? s : s.substring(0, maxLen) + "ΓÇª";
     }
 
     private String resolveAccountId() {
@@ -3716,7 +3733,7 @@ public class Oanda extends Exchange {
      * <p>
      * Backoff strategy:
      * - Starts at 1000ms (not 200ms to respect API limits)
-     * - Adds jitter ±250-750ms to prevent thundering herd
+     * - Adds jitter ┬▒250-750ms to prevent thundering herd
      * - Respects Retry-After header if present
      * - Logs 429 at WARN once per cooldown window
      * 
@@ -3774,7 +3791,6 @@ public class Oanda extends Exchange {
                 if (now - lastLogTime > 60000) {
                     logger.warn("OANDA HTTP {}: Max retries ({}) exhausted. Endpoint: {}",
                             statusCode, maxRetries, extractEndpoint(request.uri().toString()));
-                    lastLogTime = now;
                     if (statusCode == 429) {
                         last429TimeMs = now;
                         last429Endpoint = extractEndpoint(request.uri().toString());

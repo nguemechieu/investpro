@@ -1,5 +1,7 @@
 package org.investpro.risk;
 
+import lombok.Data;
+import lombok.ToString;
 import org.investpro.enums.LiquidityProfile;
 import org.investpro.enums.PsychologyProfile;
 import org.investpro.enums.RiskProfile;
@@ -8,6 +10,8 @@ import org.investpro.enums.RiskProfile;
  * Calculates appropriate position size based on risk parameters.
  * Implements Kelly Criterion and fixed fraction position sizing.
  */
+@Data
+@ToString
 public class PositionSizingEngine {
 
     /**

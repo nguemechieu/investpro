@@ -15,6 +15,8 @@ public class AppConfigKeys {
     public static final String APP_ENV = "APP_ENV";
     public static final String APP_DEBUG = "APP_DEBUG";
     public static final String APP_TIMEZONE = "APP_TIMEZONE";
+    public static final String APP_STRICT_STARTUP_VALIDATION = "APP_STRICT_STARTUP_VALIDATION";
+    public static final String APP_HEARTBEAT_STALE_SECONDS = "APP_HEARTBEAT_STALE_SECONDS";
 
     // ============================================================
     // Local SQLite

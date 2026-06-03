@@ -1,9 +1,10 @@
 package org.investpro.core.controller;
 
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.bot.SmartBot;
+import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
+import org.investpro.service.TradingService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -23,21 +24,16 @@ import java.util.Objects;
  * - make trade decisions (that's Agent's job)
  * - execute trades (that's ExecutionService's job)
  * - manage UI (that's TradingWindow's job)
+ *
+ * @param smartBot -- GETTER --
+ *                 Get the underlying SmartBot instance.
+ *                 <p>
+ *                 Direct access is provided for advanced use cases where direct control is
+ *                 needed.
+ *                 For most operations, use the controller methods above.
  */
-@Getter
 @Slf4j
-public class BotRuntimeController {
-
-    /**
-     * -- GETTER --
-     *  Get the underlying SmartBot instance.
-     *  <p>
-     *  Direct access is provided for advanced use cases where direct control is
-     *  needed.
-     *  For most operations, use the controller methods above.
-     *
-     */
-    private final SmartBot smartBot;
+public record BotRuntimeController(SmartBot smartBot) {
 
     public BotRuntimeController(@NotNull SmartBot smartBot) {
         this.smartBot = Objects.requireNonNull(smartBot, "smartBot must not be null");
@@ -56,8 +52,8 @@ public class BotRuntimeController {
             @Nullable TradePair selectedTradePair) {
         try {
             smartBot.start(
-                    (org.investpro.exchange.Exchange) exchange,
-                    (org.investpro.service.TradingService) tradingService,
+                    (Exchange) exchange,
+                    (TradingService) tradingService,
                     selectedTradePair);
             log.info("BotRuntimeController: SmartBot started successfully");
         } catch (Exception e) {

@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Lightweight singleton for recording important system events with timestamps.
@@ -16,6 +17,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Getter
 @Setter
 public class SystemEventRecorder {
+    private volatile Instant lastHeartbeatAt;
+    private volatile String lastHeartbeatSource;
+
     // Market data events
     private volatile Instant lastMarketTickAt;
 
@@ -44,6 +48,14 @@ public class SystemEventRecorder {
 
     // Rate limit tracking by exchange
     private final Map<String, Integer> lastHttpStatusByExchange = new ConcurrentHashMap<>();
+    private final AtomicLong heartbeatCount = new AtomicLong();
+    private final AtomicLong marketTickCount = new AtomicLong();
+    private final AtomicLong orderAcceptedCount = new AtomicLong();
+    private final AtomicLong orderRejectedCount = new AtomicLong();
+    private final AtomicLong executionErrorCount = new AtomicLong();
+    private final AtomicLong webSocketDisconnectCount = new AtomicLong();
+    private final AtomicLong accountUpdateCount = new AtomicLong();
+    private final AtomicLong accountErrorCount = new AtomicLong();
 
     private static final SystemEventRecorder INSTANCE = new SystemEventRecorder();
 
@@ -54,11 +66,18 @@ public class SystemEventRecorder {
         return INSTANCE;
     }
 
+    public void recordHeartbeat(String source) {
+        this.lastHeartbeatAt = Instant.now();
+        this.lastHeartbeatSource = source == null ? "unknown" : source;
+        heartbeatCount.incrementAndGet();
+    }
+
     /**
      * Record a market tick event.
      */
     public void recordMarketTick() {
         this.lastMarketTickAt = Instant.now();
+        marketTickCount.incrementAndGet();
     }
 
     /**
@@ -67,6 +86,7 @@ public class SystemEventRecorder {
     public void recordOrderAccepted() {
         this.lastOrderAcceptedAt = Instant.now();
         this.lastOrderRejectionReason = null;
+        orderAcceptedCount.incrementAndGet();
     }
 
     /**
@@ -75,6 +95,7 @@ public class SystemEventRecorder {
     public void recordOrderRejected(String reason) {
         this.lastOrderRejectedAt = Instant.now();
         this.lastOrderRejectionReason = reason;
+        orderRejectedCount.incrementAndGet();
     }
 
     /**
@@ -83,6 +104,7 @@ public class SystemEventRecorder {
     public void recordExecutionError(String error) {
         this.lastExecutionErrorAt = Instant.now();
         this.lastExecutionError = error;
+        executionErrorCount.incrementAndGet();
     }
 
     /**
@@ -109,6 +131,7 @@ public class SystemEventRecorder {
     @SuppressWarnings("unused")
     public void recordWebSocketDisconnect() {
         this.lastWebSocketDisconnectAt = Instant.now();
+        webSocketDisconnectCount.incrementAndGet();
     }
 
     /**
@@ -117,6 +140,7 @@ public class SystemEventRecorder {
     public void recordAccountUpdate(double balance) {
         this.lastAccountUpdateAt = Instant.now();
         this.lastAccountBalance = balance;
+        accountUpdateCount.incrementAndGet();
     }
 
     /**
@@ -126,6 +150,7 @@ public class SystemEventRecorder {
     public void recordAccountError(String error) {
         this.lastAccountErrorAt = Instant.now();
         this.lastAccountError = error;
+        accountErrorCount.incrementAndGet();
     }
 
     /**
@@ -156,5 +181,25 @@ public class SystemEventRecorder {
             return Long.MAX_VALUE;
         }
         return java.time.temporal.ChronoUnit.SECONDS.between(lastRateLimitAt, Instant.now());
+    }
+
+    public long getSecondsSinceLastHeartbeat() {
+        if (lastHeartbeatAt == null) {
+            return Long.MAX_VALUE;
+        }
+        return java.time.temporal.ChronoUnit.SECONDS.between(lastHeartbeatAt, Instant.now());
+    }
+
+    public Map<String, Long> snapshotCounters() {
+        Map<String, Long> counters = new ConcurrentHashMap<>();
+        counters.put("heartbeatCount", heartbeatCount.get());
+        counters.put("marketTickCount", marketTickCount.get());
+        counters.put("orderAcceptedCount", orderAcceptedCount.get());
+        counters.put("orderRejectedCount", orderRejectedCount.get());
+        counters.put("executionErrorCount", executionErrorCount.get());
+        counters.put("webSocketDisconnectCount", webSocketDisconnectCount.get());
+        counters.put("accountUpdateCount", accountUpdateCount.get());
+        counters.put("accountErrorCount", accountErrorCount.get());
+        return counters;
     }
 }

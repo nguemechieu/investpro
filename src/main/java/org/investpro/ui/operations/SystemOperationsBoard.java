@@ -18,7 +18,7 @@ import org.investpro.operations.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-
+import org.jspecify.annotations.NonNull;
 
 /**
  * Professional Operations Center board for InvestPro.
@@ -39,13 +39,15 @@ public class SystemOperationsBoard extends BorderPane {
     private Label systemHealthLabel;
     private Label uptimeLabel;
     private Label memoryLabel;
+    private Label heartbeatLabel;
+    private Label runtimeErrorsLabel;
     private TableView<SystemActivityEvent> activityTableView;
     private TextArea snapshotJsonArea;
     private Label exchangeStatusLabel;
     private TableView<SystemSnapshot.ExchangeStatusSnapshot> exchangeTableView;
 
     private static final int REFRESH_INTERVAL_MS = 2000; // 2 seconds
-        private static final ObjectMapper SNAPSHOT_MAPPER = new ObjectMapper()
+    private static final ObjectMapper SNAPSHOT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .enable(SerializationFeature.INDENT_OUTPUT);
@@ -93,6 +95,10 @@ public class SystemOperationsBoard extends BorderPane {
         uptimeLabel.getStyleClass().add("operations-info-label");
         memoryLabel = new Label("Memory: 0%");
         memoryLabel.getStyleClass().add("operations-info-label");
+        heartbeatLabel = new Label("Heartbeat: n/a");
+        heartbeatLabel.getStyleClass().add("operations-info-label");
+        runtimeErrorsLabel = new Label("Runtime Errors: 0");
+        runtimeErrorsLabel.getStyleClass().add("operations-info-label");
 
         Button refreshBtn = new Button("🔄 Refresh");
         refreshBtn.getStyleClass().add("operations-button");
@@ -114,6 +120,8 @@ public class SystemOperationsBoard extends BorderPane {
                 new Separator(),
                 uptimeLabel,
                 memoryLabel,
+                heartbeatLabel,
+                runtimeErrorsLabel,
                 sep,
                 refreshBtn,
                 exportBtn,
@@ -126,6 +134,7 @@ public class SystemOperationsBoard extends BorderPane {
     /**
      * Overview tab - System health cards
      */
+    @SuppressWarnings("unused")
     Tab createOverviewTab() {
         Tab tab = new Tab("Overview", null);
         tab.setClosable(false);
@@ -163,7 +172,7 @@ public class SystemOperationsBoard extends BorderPane {
     /**
      * Exchanges tab - List of exchange status
      */
-    private Tab createFeedTab() {
+    private @NonNull Tab createFeedTab() {
         Tab tab = new Tab("Feed", null);
         tab.setClosable(false);
 
@@ -277,7 +286,8 @@ public class SystemOperationsBoard extends BorderPane {
     /**
      * Agents & AI tab
      */
-     Tab createAgentsTab() {
+    @SuppressWarnings("unused")
+    Tab createAgentsTab() {
         Tab tab = new Tab("Agents & AI", null);
         tab.setClosable(false);
 
@@ -481,7 +491,10 @@ public class SystemOperationsBoard extends BorderPane {
         restCol.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(
                 c.getValue().isRestAvailable() ? "Available" : "Unavailable"));
 
-        exchangeTableView.getColumns().addAll(nameCol, statusCol, wsCol, restCol);
+        exchangeTableView.getColumns().add(nameCol);
+        exchangeTableView.getColumns().add(statusCol);
+        exchangeTableView.getColumns().add(wsCol);
+        exchangeTableView.getColumns().add(restCol);
     }
 
     private void setupActivityTable() {
@@ -501,7 +514,10 @@ public class SystemOperationsBoard extends BorderPane {
         messageCol.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(
                 c.getValue().getMessage()));
 
-        activityTableView.getColumns().addAll(timestampCol, componentCol, severityCol, messageCol);
+        activityTableView.getColumns().add(timestampCol);
+        activityTableView.getColumns().add(componentCol);
+        activityTableView.getColumns().add(severityCol);
+        activityTableView.getColumns().add(messageCol);
 
         refreshActivityTable();
     }
@@ -584,6 +600,14 @@ public class SystemOperationsBoard extends BorderPane {
                     snapshot.getMemoryPercent(),
                     snapshot.getMemoryUsedMb(),
                     snapshot.getMemoryMaxMb()));
+
+            Long heartbeatAge = snapshot.getHeartbeatAgeSeconds();
+            heartbeatLabel.setText(heartbeatAge == null ? "Heartbeat: n/a" : "Heartbeat: " + heartbeatAge + "s");
+
+            long runtimeErrors = snapshot.getExecutionErrorCount()
+                    + snapshot.getAccountErrorCount()
+                    + snapshot.getWebsocketDisconnectCount();
+            runtimeErrorsLabel.setText("Runtime Errors: " + runtimeErrors);
         });
     }
 

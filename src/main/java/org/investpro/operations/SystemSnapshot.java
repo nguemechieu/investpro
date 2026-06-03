@@ -97,6 +97,28 @@ public class SystemSnapshot {
     @JsonProperty("critical_count")
     private int criticalCount;
 
+    // Runtime monitoring metrics
+    @JsonProperty("heartbeat_age_seconds")
+    @Nullable
+    private Long heartbeatAgeSeconds;
+
+    @JsonProperty("last_heartbeat_at")
+    @Nullable
+    private Instant lastHeartbeatAt;
+
+    @JsonProperty("last_heartbeat_source")
+    @Nullable
+    private String lastHeartbeatSource;
+
+    @JsonProperty("execution_error_count")
+    private long executionErrorCount;
+
+    @JsonProperty("account_error_count")
+    private long accountErrorCount;
+
+    @JsonProperty("websocket_disconnect_count")
+    private long websocketDisconnectCount;
+
     /**
      * Exchange Status Snapshot
      */

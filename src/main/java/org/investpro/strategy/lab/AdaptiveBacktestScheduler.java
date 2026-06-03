@@ -103,11 +103,11 @@ public final class AdaptiveBacktestScheduler {
     private void rebalance() {
         SchedulerStats stats = delegate.getStats();
         RuntimeMetricSnapshot runtime = telemetry.snapshot();
-        double cpu = runtime.systemCpuLoad() >= 0.0 ? runtime.systemCpuLoad() : stats.getSystemCpuLoad();
+        double cpu = runtime.systemCpuLoad() >= 0.0 ? runtime.systemCpuLoad() : stats.systemCpuLoad();
         double heap = runtime.heapUtilization();
         List<String> warnings = new ArrayList<>(3);
 
-        int recommended = stats.getMaxWorkers();
+        int recommended = stats.maxWorkers();
         boolean stressed = false;
         if (heap >= highHeapThreshold) {
             recommended = Math.max(minWorkers, recommended - 1);
@@ -119,15 +119,15 @@ public final class AdaptiveBacktestScheduler {
             warnings.add("High CPU pressure");
             stressed = true;
         }
-        if (!stressed && stats.getQueued() > stats.getRunning() * 4 && recommended < maxWorkers) {
+        if (!stressed && stats.queued() > stats.running() * 4 && recommended < maxWorkers) {
             recommended++;
         }
 
-        if (recommended != stats.getMaxWorkers()) {
+        if (recommended != stats.maxWorkers()) {
             delegate.setMaxWorkers(recommended);
         }
 
-        boolean pauseLowPriority = stressed && stats.getQueued() > 0;
+        boolean pauseLowPriority = stressed && stats.queued() > 0;
         lastDecision = new AdaptiveSchedulerDecision(recommended, pauseLowPriority, stressed, warnings, null);
     }
 }

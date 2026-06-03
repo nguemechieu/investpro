@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -383,7 +384,14 @@ public class StrategyLabPanel extends BorderPane {
                         }
                         return filtered.isEmpty() ? snapshotSymbols : filtered;
                     } catch (Exception exception) {
-                        log.warn("Unable to apply tradability filter in StrategyLabPanel", exception);
+                        Throwable cause = exception instanceof java.util.concurrent.ExecutionException
+                                ? exception.getCause()
+                                : exception;
+                        if (cause instanceof TimeoutException) {
+                            log.debug("StrategyLabPanel tradability filter timed out; using unfiltered symbols");
+                        } else {
+                            log.warn("Unable to apply tradability filter in StrategyLabPanel: {}", exception.getMessage());
+                        }
                         return snapshotSymbols;
                     }
                 })

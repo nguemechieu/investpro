@@ -13,6 +13,8 @@ public enum TabName {
     MARKET_INFO("MarketInfo", "Market Statistics", "📊"),
     OVERVIEW("Overview", "Trading Overview", "👁️"),
     BALANCES("Balances", "Account Balances", "💰"),
+    IBKR("IBKR", "Interactive Brokers Workspace", "IB"),
+    BLOCKCHAIN_TRANSACTIONS("Blockchain Tx", "Blockchain Transactions", "⛓"),
     DEPTH("Depth", "Market Depth Chart", "📈"),
     PORTFOLIO("Portfolio", "Portfolio Analysis", "🎯"),
     POSITIONS("Positions", "Open Positions", "📍"),
@@ -43,6 +45,5 @@ public enum TabName {
         this.displayName = displayName;
         this.icon = icon;
     }
-
 
 }

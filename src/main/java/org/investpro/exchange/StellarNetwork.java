@@ -1,11 +1,8 @@
 package org.investpro.exchange;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import javafx.beans.property.SimpleIntegerProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
 import org.investpro.data.CandleData;
@@ -33,7 +30,6 @@ import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import org.jspecify.annotations.NonNull;
 import org.stellar.sdk.Asset;
@@ -61,6 +57,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -150,6 +147,7 @@ public class StellarNetwork extends Exchange {
     private volatile Server server;
     private volatile Server marketDataServer;
     private volatile Boolean serverPaperMode;
+    private volatile Boolean marketDataServerPaperMode;
     private volatile OkHttpClient okHttpClient;
     private volatile OkHttpClient submitHttpClient;
     private volatile boolean connected;
@@ -211,9 +209,20 @@ public class StellarNetwork extends Exchange {
 
     private @NotNull Server activeMarketDataServer() {
         Server current = marketDataServer;
-        if (current == null) {
-            current = new Server(STELLAR_API_URL, okHttpClient, submitHttpClient);
+        boolean paperMode = isPaperTrading();
+
+        if (current == null || marketDataServerPaperMode == null || !marketDataServerPaperMode.equals(paperMode)) {
+            if (current != null) {
+                try {
+                    current.close();
+                } catch (Exception exception) {
+                    log.debug("Unable to close stale Stellar market-data Horizon Server cleanly: {}",
+                            exception.getMessage());
+                }
+            }
+            current = new Server(horizonUrl(), okHttpClient, submitHttpClient);
             marketDataServer = current;
+            marketDataServerPaperMode = paperMode;
         }
         return current;
     }
@@ -241,6 +250,7 @@ public class StellarNetwork extends Exchange {
             }
         }
         marketDataServer = null;
+        marketDataServerPaperMode = null;
     }
 
     private void initializePaperTradingAccount() {
@@ -353,10 +363,6 @@ public class StellarNetwork extends Exchange {
 
     private Network stellarNetwork() {
         return isPaperTrading() ? Network.TESTNET : Network.PUBLIC;
-    }
-
-    public boolean hasCredentials() {
-        return hasLiveCredentials();
     }
 
     private boolean hasLiveCredentials() {
@@ -840,6 +846,8 @@ public class StellarNetwork extends Exchange {
             stellarPrice = Price.fromString(formatAmount(1.0 / limitPrice));
         }
 
+        validateLiveOfferPreflight(pair, side, quantity, limitPrice, amountSelling);
+
         try {
             TransactionBuilderAccount sourceAccount = activeServer().loadAccount(accountId);
             ManageSellOfferOperation operation = ManageSellOfferOperation.builder()
@@ -871,9 +879,61 @@ public class StellarNetwork extends Exchange {
             return txHash;
         } catch (Exception exception) {
             throw new IllegalStateException(
-                    "Failed to submit Stellar live offer through Horizon Server SDK: " + exception.getMessage(),
+                    "Failed to submit Stellar live offer through Horizon Server SDK: "
+                            + detailedStellarError(exception),
                     exception);
         }
+    }
+
+    private void validateLiveOfferPreflight(TradePair pair, Side side, double quantity, double limitPrice,
+            BigDecimal amountSelling) {
+        if (!Double.isFinite(limitPrice) || limitPrice <= 0) {
+            throw new IllegalArgumentException("limitPrice must be positive");
+        }
+        if (amountSelling == null || amountSelling.signum() <= 0) {
+            throw new IllegalArgumentException("Order amount is too small after Stellar precision normalization");
+        }
+
+        double minNotional = getMinOrderNotional(pair);
+        double notional = quantity * limitPrice;
+        if (Double.isFinite(minNotional) && minNotional > 0 && notional < minNotional) {
+            throw new IllegalArgumentException(
+                    "Order notional is below minimum %.8f for %s".formatted(minNotional, pair.toString('/')));
+        }
+
+        fetchAccount().join();
+        String sellingCode = side == Side.SELL
+                ? normalizeCurrency(pair.getBaseCode())
+                : normalizeCurrency(pair.getCounterCode());
+
+        double available = balances.getOrDefault(sellingCode, 0.0);
+        double required = amountSelling.doubleValue();
+        if (available + 0.0000001 < required) {
+            throw new IllegalArgumentException(
+                    "Insufficient %s balance: required %.8f, available %.8f"
+                            .formatted(sellingCode, required, available));
+        }
+    }
+
+    private String detailedStellarError(Throwable throwable) {
+        if (throwable == null) {
+            return "Unknown Stellar submission error";
+        }
+
+        LinkedHashSet<String> messages = new LinkedHashSet<>();
+        Throwable current = throwable;
+        while (current != null) {
+            String message = trimToNull(current.getMessage());
+            if (message != null) {
+                messages.add(message);
+            }
+            current = current.getCause();
+        }
+
+        if (messages.isEmpty()) {
+            return throwable.getClass().getSimpleName();
+        }
+        return String.join(" | ", messages);
     }
 
     private void ensureLiveTradingReady() {
@@ -1046,70 +1106,6 @@ public class StellarNetwork extends Exchange {
     @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
         return CompletableFuture.completedFuture(List.copyOf(orders.values()));
-    }
-
-    private List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
-        List<OpenOrder> openOrders = new ArrayList<>();
-        if (rootNode == null || rootNode.isNull()) {
-            return openOrders;
-        }
-
-        if (rootNode.isArray()) {
-            for (JsonNode orderNode : rootNode) {
-                OpenOrder order = parseOpenOrder(orderNode);
-                if (order != null) {
-                    openOrders.add(order);
-                }
-            }
-            return openOrders;
-        }
-
-        if (rootNode.isObject()) {
-            OpenOrder order = parseOpenOrder(rootNode);
-            if (order != null) {
-                openOrders.add(order);
-            }
-        }
-
-        return openOrders;
-    }
-
-    private @Nullable OpenOrder parseOpenOrder(JsonNode node) {
-        try {
-            if (node == null || !node.isObject()) {
-                return null;
-            }
-
-            OpenOrder order = new OpenOrder();
-            order.setOrderId(node.path("id").asText(""));
-
-            String sellingAsset = node.path("selling").path("asset_code").asText();
-            String buyingAsset = node.path("buying").path("asset_code").asText();
-            if (!sellingAsset.isBlank() && !buyingAsset.isBlank()) {
-                order.setTradePair(new TradePair(buyingAsset, sellingAsset));
-            }
-
-            double price = node.path("price").asDouble(0.0);
-            double amount = node.path("amount").asDouble(0.0);
-            order.setPrice(price);
-            order.setSize(amount);
-            order.setFilledSize(0.0);
-            order.setRemainingSize(amount);
-            order.setSide("sell".equalsIgnoreCase(node.path("side").asText("buy")) ? Side.SELL : Side.BUY);
-            order.setOrderType(OpenOrder.OrderType.LIMIT);
-            order.setStatus(OpenOrder.OrderStatus.PENDING);
-
-            long timestamp = node.path("timestamp").asLong(0);
-            if (timestamp > 0) {
-                order.setCreatedAt(Instant.ofEpochSecond(timestamp));
-                order.setUpdatedAt(Instant.ofEpochSecond(timestamp));
-            }
-
-            return order;
-        } catch (Exception exception) {
-            log.debug("Error parsing Stellar open order", exception);
-            return null;
-        }
     }
 
     @Override
@@ -1357,13 +1353,6 @@ public class StellarNetwork extends Exchange {
         return fetchTickers(pair == null ? List.of(defaultPair()) : List.of(pair));
     }
 
-    public List<Ticker> getTickers(MARKET_TYPES marketType) {
-        if (marketType != MARKET_TYPES.SPOT && marketType != MARKET_TYPES.MARKET && marketType != MARKET_TYPES.LIMIT) {
-            return List.of();
-        }
-        return fetchTickers(defaultPairs()).join();
-    }
-
     public Ticker getTicker(String symbol) {
         return safeTicker(parseSymbolOrDefault(symbol));
     }
@@ -1419,7 +1408,7 @@ public class StellarNetwork extends Exchange {
         return supplyAsyncIo(() -> fetchStellarOrderBook(tradePair));
     }
 
-    private OrderBook fetchStellarOrderBook(TradePair tradePair) {
+    private @NonNull OrderBook fetchStellarOrderBook(TradePair tradePair) {
         TradePair pair = pairOrDefault(tradePair);
         if (!supportsTradePair(pair)) {
             return syntheticOrderBook(pair);
@@ -1484,20 +1473,17 @@ public class StellarNetwork extends Exchange {
         return orderBook;
     }
 
-    public List<Trade> getRecentTrades(TradePair tradePair, int limit) {
-        return fetchRecentTrades(tradePair, limit);
-    }
-
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
-        return supplyAsyncIo(() -> fetchRecentTrades(tradePair, MAX_RECENT_TRADES).stream()
+        return supplyAsyncIo(() -> fetchRecentTrades(tradePair).stream()
                 .filter(trade -> stopAt == null || !trade.getTimestamp().isAfter(stopAt))
                 .toList());
     }
 
-    private List<Trade> fetchRecentTrades(TradePair tradePair, int limit) {
+    private List<Trade> fetchRecentTrades(TradePair tradePair) {
         TradePair pair = pairOrDefault(tradePair);
-        int safeLimit = Math.min(limit <= 0 ? 100 : limit, MAX_RECENT_TRADES);
+        int safeLimit = Math.min(StellarNetwork.MAX_RECENT_TRADES <= 0 ? 100 : StellarNetwork.MAX_RECENT_TRADES,
+                MAX_RECENT_TRADES);
 
         try {
             var request = activeServer().trades()
@@ -1665,7 +1651,8 @@ public class StellarNetwork extends Exchange {
 
         if (resolution <= 0) {
             log.debug("Unsupported Stellar candle resolution: {} seconds", safeSeconds);
-            return List.of();
+            throw new IllegalArgumentException("Unsupported Stellar candle resolution: " + safeSeconds);
+
         }
 
         TradePair pair = pairOrDefault(tradePair);
@@ -1673,6 +1660,7 @@ public class StellarNetwork extends Exchange {
         if (!direct.isEmpty()) {
             return direct;
         }
+        log.info("Fetch inverse candles syntheticCandlesFromTicker");
 
         List<CandleData> inverse = fetchAggregationCandles(pair, start, end, resolution, safeSeconds, safeLimit, true);
         if (!inverse.isEmpty()) {
@@ -1717,9 +1705,10 @@ public class StellarNetwork extends Exchange {
                             limit);
                 }
             } catch (Exception exception) {
-                log.debug("Failed to fetch Stellar {}trade aggregations for {} on {}: {}",
-                        inverse ? "inverse " : "", pair, STELLAR_API_URL, exception.getMessage());
-                return List.of();
+                throw new RuntimeException(exception);
+                // "Failed to fetch Stellar {}trade aggregations for {} on {}: {}",
+                // inverse ? "inverse " : "", pair, horizonUrl(), exception.getMessage());
+                // return List.of();
             }
         }
 
@@ -1803,7 +1792,7 @@ public class StellarNetwork extends Exchange {
                         && candle.lowPrice() > 0.0
                         && candle.closePrice() > 0.0)
                 .collect(
-                        () -> new TreeMap<Integer, CandleData>(),
+                        TreeMap::new,
                         (collector, candle) -> collector.put(candle.openTime(), candle),
                         TreeMap::putAll);
 
@@ -1921,7 +1910,7 @@ public class StellarNetwork extends Exchange {
                     candle.volume()));
         } catch (Exception exception) {
             log.debug("Failed to fetch Stellar {}in-progress aggregation for {} on {}: {}",
-                    inverse ? "inverse " : "", pair, STELLAR_API_URL, exception.getMessage());
+                    inverse ? "inverse " : "", pair, horizonUrl(), exception.getMessage());
             return Optional.empty();
         }
     }
@@ -2084,13 +2073,6 @@ public class StellarNetwork extends Exchange {
     @Override
     public void streamTrades(TradePair tradePair, ExchangeStreamConsumer consumer) {
         log.debug("Stellar trade streaming unavailable; use polling.");
-    }
-
-    public void streamLiveCandles(TradePair tradePair, Timeframe timeframe, ExchangeStreamConsumer consumer) {
-        log.debug("Stellar candle streaming unavailable; use CandleDataSupplier polling.");
-    }
-
-    public void stopStreamLiveCandles(TradePair tradePair) {
     }
 
     @Override
@@ -2307,7 +2289,7 @@ public class StellarNetwork extends Exchange {
             Page<AssetResponse> page = activeServer()
                     .assets()
                     .assetCode(normalized)
-                    .limit(20)
+                    .limit(100)
                     .execute();
 
             if (page == null || page.getRecords() == null || page.getRecords().isEmpty()) {
@@ -2346,7 +2328,7 @@ public class StellarNetwork extends Exchange {
             Page<AssetResponse> page = activeMarketDataServer()
                     .assets()
                     .assetCode(normalized)
-                    .limit(100)
+                    .limit(1000)
                     .execute();
 
             if (page == null || page.getRecords() == null || page.getRecords().isEmpty()) {

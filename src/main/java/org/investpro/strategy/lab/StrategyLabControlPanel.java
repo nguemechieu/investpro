@@ -296,28 +296,28 @@ public final class StrategyLabControlPanel extends BorderPane {
      * Must be called on the JavaFX Application Thread.
      */
     private void applyStats(SchedulerStats s) {
-        queuedLabel.setText(    "Queued:    " + s.getQueued());
-        runningLabel.setText(   "Running:   " + s.getRunning());
-        completedLabel.setText( "Completed: " + s.getCompleted());
-        failedLabel.setText(    "Failed:    " + s.getFailed());
-        cancelledLabel.setText( "Cancelled: " + s.getCancelled());
+        queuedLabel.setText(    "Queued:    " + s.queued());
+        runningLabel.setText(   "Running:   " + s.running());
+        completedLabel.setText( "Completed: " + s.completed());
+        failedLabel.setText(    "Failed:    " + s.failed());
+        cancelledLabel.setText( "Cancelled: " + s.cancelled());
 
-        workerLabel.setText("Workers: " + s.getActiveWorkers() + " / " + s.getMaxWorkers());
+        workerLabel.setText("Workers: " + s.activeWorkers() + " / " + s.maxWorkers());
         workerBar.setProgress(s.getWorkerUtilization());
         setBarColor(workerBar, s.getWorkerUtilization(), CLR_ACCENT, CLR_YELLOW, CLR_RED);
 
-        avgExecLabel.setText(    "Avg exec:   " + (s.getAvgExecTimeMs() > 0
-                ? String.format("%.0f ms", s.getAvgExecTimeMs()) : "—"));
-        throughputLabel.setText( "Throughput: " + String.format("%.2f /s", s.getThroughputPerSec()));
+        avgExecLabel.setText(    "Avg exec:   " + (s.avgExecTimeMs() > 0
+                ? String.format("%.0f ms", s.avgExecTimeMs()) : "—"));
+        throughputLabel.setText( "Throughput: " + String.format("%.2f /s", s.throughputPerSec()));
 
         heapLabel.setText("Heap: " + String.format("%.0f / %.0f MiB", s.getHeapUsedMiB(), s.getHeapMaxMiB()));
         heapBar.setProgress(s.getHeapUtilization());
         setBarColor(heapBar, s.getHeapUtilization(), CLR_GREEN, CLR_YELLOW, CLR_RED);
 
-        if (s.getSystemCpuLoad() >= 0) {
-            cpuLabel.setText("CPU: " + String.format("%.0f%%", s.getSystemCpuLoad() * 100));
-            cpuBar.setProgress(s.getSystemCpuLoad());
-            setBarColor(cpuBar, s.getSystemCpuLoad(), CLR_GREEN, CLR_YELLOW, CLR_RED);
+        if (s.systemCpuLoad() >= 0) {
+            cpuLabel.setText("CPU: " + String.format("%.0f%%", s.systemCpuLoad() * 100));
+            cpuBar.setProgress(s.systemCpuLoad());
+            setBarColor(cpuBar, s.systemCpuLoad(), CLR_GREEN, CLR_YELLOW, CLR_RED);
         } else {
             cpuLabel.setText("CPU: n/a");
             cpuBar.setProgress(0);

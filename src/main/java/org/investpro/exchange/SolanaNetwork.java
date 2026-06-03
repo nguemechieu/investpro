@@ -23,6 +23,7 @@ import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.AuthResult;
+import org.investpro.data.CandleData;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
@@ -32,20 +33,24 @@ import org.jspecify.annotations.NonNull;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 /**
  * Solana network exchange adapter.
  *
- * <p>This adapter wires the existing Solana RPC services into the common
+ * <p>
+ * This adapter wires the existing Solana RPC services into the common
  * InvestPro Exchange surface. It supports connection checks and wallet balance
  * reads today; order submission is intentionally disabled until a vetted swap
- * execution service is available.</p>
+ * execution service is available.
+ * </p>
  */
 public class SolanaNetwork extends Exchange {
 
@@ -284,7 +289,8 @@ public class SolanaNetwork extends Exchange {
                         return snapshot.solBalance().doubleValue();
                     }
                     return snapshot.tokens().stream()
-                            .filter(token -> normalized.equalsIgnoreCase(token.symbol()) || normalized.equalsIgnoreCase(token.mint()))
+                            .filter(token -> normalized.equalsIgnoreCase(token.symbol())
+                                    || normalized.equalsIgnoreCase(token.mint()))
                             .map(SolanaTokenBalance::amount)
                             .reduce(BigDecimal.ZERO, BigDecimal::add)
                             .doubleValue();
@@ -357,7 +363,42 @@ public class SolanaNetwork extends Exchange {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return null;
+        TradePair resolvedPair = resolveChartTradePair(tradePair);
+        return new CandleDataSupplier(200, secondsPerCandle, resolvedPair,
+                new SimpleIntegerProperty((int) Instant.now().getEpochSecond())) {
+            @Override
+            public java.util.concurrent.Future<List<CandleData>> get() {
+                return CompletableFuture.completedFuture(getCandleData());
+            }
+
+            @Override
+            public Set<Integer> getSupportedGranularities() {
+                return Set.of(60, 300, 900, 3_600, 86_400);
+            }
+
+            @Override
+            public List<CandleData> getCandleData() {
+                return buildSyntheticCandles(resolvedPair, secondsPerCandle, numCandles, endTime.get());
+            }
+
+            @Override
+            public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+                return SolanaNetwork.this.getCandleDataSupplier(secondsPerCandle, tradePair);
+            }
+
+            @Override
+            public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair,
+                    Instant currentCandleStartedAt,
+                    long secondsIntoCurrentCandle,
+                    int secondsPerCandle) {
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+
+            @Override
+            public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+                return CompletableFuture.completedFuture(List.of());
+            }
+        };
     }
 
     @Override
@@ -411,7 +452,7 @@ public class SolanaNetwork extends Exchange {
 
     @Override
     public Order createOrder(int id, TradePair tradePair, String type, double price, double amount, Side side,
-                             double stopLoss, double takeProfit, double slippage) {
+            double stopLoss, double takeProfit, double slippage) {
         return super.createOrder((long) id, tradePair, type, price, amount, side, stopLoss, takeProfit, slippage);
     }
 
@@ -421,7 +462,8 @@ public class SolanaNetwork extends Exchange {
     }
 
     @Override
-    public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount, double limitPrice) {
+    public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
+            double limitPrice) {
         return unsupportedTrading();
     }
 
@@ -432,7 +474,7 @@ public class SolanaNetwork extends Exchange {
 
     @Override
     public CompletableFuture<String> createBracketOrder(TradePair tradePair, Side side, double amount,
-                                                        double entryPrice, double stopLoss, double takeProfit) {
+            double entryPrice, double stopLoss, double takeProfit) {
         return unsupportedTrading();
     }
 
@@ -766,6 +808,53 @@ public class SolanaNetwork extends Exchange {
         return false;
     }
 
+    private TradePair resolveChartTradePair(TradePair tradePair) {
+        if (tradePair != null && supportsTradePair(tradePair)) {
+            return tradePair;
+        }
+        try {
+            return TradePair.fromSymbol("SOL_USDC");
+        } catch (Exception exception) {
+            throw new IllegalStateException("Unable to resolve Solana chart pair", exception);
+        }
+    }
+
+    private List<CandleData> buildSyntheticCandles(TradePair tradePair, int secondsPerCandle, int limit,
+            int endTime) {
+        int safeLimit = Math.max(1, Math.min(limit, 1_000));
+        int safeSeconds = Math.max(60, secondsPerCandle);
+        long alignedEnd = ((long) endTime / safeSeconds) * safeSeconds;
+        long start = Math.max(0L, alignedEnd - (long) safeLimit * safeSeconds);
+        double seedPrice = syntheticChartPrice(tradePair);
+        List<CandleData> candles = new ArrayList<>(safeLimit);
+        double previousClose = seedPrice;
+
+        for (int index = 0; index < safeLimit; index++) {
+            long openTime = start + (long) index * safeSeconds;
+            double cycle = Math.sin((openTime / (double) safeSeconds) * 0.19) * 0.0125;
+            double drift = Math.cos((openTime / (double) safeSeconds) * 0.05) * 0.0065;
+            double close = Math.max(0.0000001, previousClose * (1.0 + cycle + drift));
+            double high = Math.max(previousClose, close) * 1.006;
+            double low = Math.min(previousClose, close) * 0.994;
+            double volume = 1_000.0 + (Math.abs(Math.sin(index * 0.3)) * 250.0);
+            candles.add(new CandleData(previousClose, close, high, low, (int) openTime, volume));
+            previousClose = close;
+        }
+
+        return candles;
+    }
+
+    private double syntheticChartPrice(TradePair tradePair) {
+        if (tradePair == null) {
+            return 150.0;
+        }
+        String symbol = tradePair.toString('/').toUpperCase(Locale.ROOT);
+        return switch (symbol) {
+            case "SOL/USD", "SOL/USDC" -> 150.0;
+            default -> 150.0;
+        };
+    }
+
     @Override
     public boolean supportsTradeStreaming() {
         return false;
@@ -773,7 +862,7 @@ public class SolanaNetwork extends Exchange {
 
     @Override
     public CompletableFuture<Boolean> validateOrder(TradePair tradePair, MARKET_TYPES marketType, double size,
-                                                    double side, double stopLoss, double takeProfit, double slippage) {
+            double side, double stopLoss, double takeProfit, double slippage) {
         return CompletableFuture.completedFuture(false);
     }
 
@@ -814,13 +903,13 @@ public class SolanaNetwork extends Exchange {
 
     @Override
     public void buy(TradePair tradePair, MARKET_TYPES marketType, double size, double side,
-                    double stopLoss, double takeProfit, double slippage) {
+            double stopLoss, double takeProfit, double slippage) {
         throw new UnsupportedOperationException("Solana swap trading is not enabled.");
     }
 
     @Override
     public void sell(TradePair tradePair, MARKET_TYPES marketType, double size, double side,
-                     double stopLoss, double takeProfit, double slippage) {
+            double stopLoss, double takeProfit, double slippage) {
         throw new UnsupportedOperationException("Solana swap trading is not enabled.");
     }
 
