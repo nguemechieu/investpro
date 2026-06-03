@@ -4,6 +4,7 @@ import org.investpro.models.trading.Position;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -69,6 +70,58 @@ public final class IbkrPositionService {
         Position position = positionsBySymbol.get(pair.toString('/'));
         if (position != null) {
             position.setTakeProfit(takeProfit);
+            persistenceStore.persistPositions(fetchAll());
+        }
+    }
+
+    public Optional<Position> closePartial(TradePair pair, double quantity, double exitPrice) {
+        if (pair == null || quantity <= 0.0) {
+            return Optional.empty();
+        }
+
+        String symbol = pair.toString('/');
+        Position position = positionsBySymbol.get(symbol);
+        if (position == null) {
+            return Optional.empty();
+        }
+
+        double effectiveExit = exitPrice > 0.0
+                ? exitPrice
+                : Math.max(position.getCurrentPrice(), position.getEntryPrice());
+        position.updateCurrentPrice(effectiveExit);
+
+        double existingQuantity = Math.max(0.0, position.getQuantity());
+        double closeQuantity = Math.min(existingQuantity, quantity);
+        if (closeQuantity <= 0.0) {
+            return Optional.of(position);
+        }
+
+        if (closeQuantity >= existingQuantity) {
+            position.close(effectiveExit);
+            positionsBySymbol.remove(symbol);
+            persistenceStore.persistPositions(fetchAll());
+            return Optional.empty();
+        }
+
+        double realizedPerUnit = position.getSide() == Side.BUY
+                ? (effectiveExit - position.getEntryPrice())
+                : (position.getEntryPrice() - effectiveExit);
+        position.setRealizedPnl(position.getRealizedPnl() + (realizedPerUnit * closeQuantity));
+        position.setQuantity(existingQuantity - closeQuantity);
+        position.setTimestamp(Instant.now());
+        position.updateUnrealizedPnl();
+        persistenceStore.persistPositions(fetchAll());
+        return Optional.of(position);
+    }
+
+    public void setLeverage(TradePair pair, double leverage) {
+        if (pair == null || leverage <= 0.0) {
+            return;
+        }
+        Position position = positionsBySymbol.get(pair.toString('/'));
+        if (position != null) {
+            position.setLeverage(leverage);
+            position.setTimestamp(Instant.now());
             persistenceStore.persistPositions(fetchAll());
         }
     }

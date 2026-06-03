@@ -29,7 +29,8 @@ import org.java_websocket.drafts.Draft_6455;
 import org.jetbrains.annotations.NotNull;
 
 import javafx.beans.property.SimpleIntegerProperty;
-import java.math.BigDecimal;
+import org.jspecify.annotations.NonNull;
+
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -613,7 +614,7 @@ public class InteractiveBrokers extends Exchange {
             double amount,
             double limitPrice) {
         if (!isPaperTrading() && hasCredentials()) {
-            return submitClientPortalOrder(tradePair, side, amount, limitPrice, "LMT");
+            return submitClientPortalOrder(tradePair, side, amount, limitPrice, "LIMIT");
         }
         return CompletableFuture.supplyAsync(() -> {
             String orderId = "ORDER-" + (nextOrderId++) + "-" + System.currentTimeMillis();
@@ -629,8 +630,17 @@ public class InteractiveBrokers extends Exchange {
             Side side,
             double amount,
             double stopPrice) {
-        return failedFuture(unsupported("createStopOrder"));
-    }
+
+            if (!isPaperTrading() && hasCredentials()) {
+                return submitClientPortalOrder(tradePair, side, amount, stopPrice, "LIMIT");
+            }
+            return CompletableFuture.supplyAsync(() -> {
+                String orderId = "ORDER-" + (nextOrderId++) + "-" + System.currentTimeMillis();
+                applyPaperFill(tradePair, side, amount, stopPrice);
+                orders.put(orderId, "FILLED");
+                return orderId;
+            });
+  }
 
     @Override
     public CompletableFuture<String> createBracketOrder(
@@ -647,34 +657,140 @@ public class InteractiveBrokers extends Exchange {
 
     @Override
     public CompletableFuture<String> cancelOrder(String orderId) {
-        return failedFuture(unsupported("cancelOrder"));
+        return CompletableFuture.supplyAsync(() -> {
+            if (!notBlank(orderId)) {
+                throw new IllegalArgumentException("orderId must not be blank");
+            }
+
+            if (!isPaperTrading() && hasCredentials()) {
+                try {
+                    String accountId = resolveAccountId();
+                    HttpResponse<String> response = HTTP_CLIENT.send(
+                            clientPortalRequest("/iserver/account/%s/order/%s".formatted(url(accountId), url(orderId)))
+                                    .DELETE()
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
+                    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                        throw new IllegalStateException("IBKR cancel order failed with HTTP %d: %s"
+                                .formatted(response.statusCode(), response.body()));
+                    }
+                } catch (Exception exception) {
+                    throw new IllegalStateException("Unable to cancel IBKR order " + orderId, exception);
+                }
+            }
+
+            orders.put(orderId, "CANCELLED");
+            return orderId;
+        });
     }
 
     @Override
     public CompletableFuture<List<String>> cancelOrders(List<String> orderIds) {
-        return failedFuture(unsupported("cancelOrders"));
+        return CompletableFuture.supplyAsync(() -> {
+            if (orderIds == null || orderIds.isEmpty()) {
+                return List.of();
+            }
+            List<String> cancelled = new ArrayList<>();
+            for (String orderId : orderIds) {
+                cancelled.add(cancelOrder(orderId).join());
+            }
+            return cancelled;
+        });
     }
 
     @Override
     public CompletableFuture<String> cancelAllOrders() {
-        return failedFuture(unsupported("cancelAllOrders"));
+        return fetchAllOpenOrders()
+                .thenCompose(openOrders -> cancelOrders(openOrders.stream().map(OpenOrder::getOrderId).toList()))
+                .thenApply(cancelled -> String.valueOf(cancelled.size()));
     }
 
     // --------- Order Query Methods ---------
 
     @Override
     public CompletableFuture<Optional<Order>> fetchOrder(String orderId) {
-        return failedFuture(unsupported("fetchOrder"));
+        return fetchAllOpenOrders().thenApply(openOrders ->
+                openOrders.stream()
+                        .filter(order -> orderId != null && orderId.equals(order.getOrderId()))
+                        .findFirst()
+                        .map(this::toOrder)
+                        .or(() -> {
+                            String status = orders.get(orderId);
+                            if (status == null) {
+                                return Optional.empty();
+                            }
+                            Order order = new Order();
+                            order.setId(parseOrderId(orderId));
+                            order.setDate(java.util.Date.from(now()));
+                            order.setStatus(status);
+                            order.setType("UNKNOWN");
+                            return Optional.of(order);
+                        }));
     }
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
-        return failedFuture(unsupported("fetchOpenOrders"));
+        return fetchAllOpenOrders().thenApply(openOrders -> {
+            if (tradePair == null) {
+                return openOrders;
+            }
+            String requested = tradePair.toString('/');
+            return openOrders.stream()
+                    .filter(order -> order.getTradePair() != null)
+                    .filter(order -> requested.equals(order.getTradePair().toString('/')))
+                    .toList();
+        });
     }
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
-        return failedFuture(unsupported("fetchAllOpenOrders"));
+        return CompletableFuture.supplyAsync(() -> {
+            if (!isPaperTrading() && hasCredentials()) {
+                try {
+                    String accountId = resolveAccountId();
+                    HttpResponse<String> response = HTTP_CLIENT.send(
+                            clientPortalRequest("/iserver/account/%s/orders".formatted(url(accountId)))
+                                    .GET()
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
+                    if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                        JsonNode root = OBJECT_MAPPER.readTree(response.body());
+                        JsonNode payload = root.has("orders") ? root.get("orders") : root;
+                        List<OpenOrder> parsedOrders = parseOpenOrders(payload);
+                        for (OpenOrder parsed : parsedOrders) {
+                            if (notBlank(parsed.getOrderId()) && parsed.getStatus() != null) {
+                                orders.put(parsed.getOrderId(), parsed.getStatus().name());
+                            }
+                        }
+                        return parsedOrders;
+                    }
+                    throw new IllegalStateException("IBKR fetch open orders failed with HTTP %d: %s"
+                            .formatted(response.statusCode(), response.body()));
+                } catch (Exception exception) {
+                    throw new IllegalStateException("Unable to fetch IBKR open orders", exception);
+                }
+            }
+
+            List<OpenOrder> fallback = new ArrayList<>();
+            for (Map.Entry<String, String> entry : orders.entrySet()) {
+                String status = entry.getValue();
+                if (status == null) {
+                    continue;
+                }
+                if ("FILLED".equalsIgnoreCase(status) || "CANCELLED".equalsIgnoreCase(status)) {
+                    continue;
+                }
+                OpenOrder order = new OpenOrder();
+                order.setOrderId(entry.getKey());
+                try {
+                    order.setStatus(OpenOrder.OrderStatus.valueOf(status.toUpperCase(Locale.ROOT)));
+                } catch (Exception ignored) {
+                    order.setStatus(OpenOrder.OrderStatus.OPEN);
+                }
+                fallback.add(order);
+            }
+            return fallback;
+        });
     }
 
     /**
@@ -760,6 +876,37 @@ public class InteractiveBrokers extends Exchange {
         } catch (Exception exception) {
             log.debug("Error parsing Interactive Brokers open order", exception);
             return null;
+        }
+    }
+
+    private Order toOrder(OpenOrder openOrder) {
+        Order order = new Order();
+        order.setId(parseOrderId(openOrder.getOrderId()));
+        order.setDate(java.util.Date.from(openOrder.getCreatedAt() == null ? now() : openOrder.getCreatedAt()));
+        order.setTradePair(openOrder.getTradePair());
+        order.setSide(openOrder.getSide());
+        order.setType(openOrder.getOrderType() == null ? "UNKNOWN" : openOrder.getOrderType().name());
+        order.setPrice(openOrder.getPrice());
+        order.setQuantity(openOrder.getSize());
+        order.setFilledQuantity(openOrder.getFilledSize());
+        order.setStatus(openOrder.getStatus() == null ? "UNKNOWN" : openOrder.getStatus().name());
+        order.setCreatedAt(openOrder.getCreatedAt());
+        order.setUpdatedAt(openOrder.getUpdatedAt());
+        return order;
+    }
+
+    private long parseOrderId(String orderId) {
+        if (!notBlank(orderId)) {
+            return 0L;
+        }
+        String digits = orderId.replaceAll("[^0-9]", "");
+        if (digits.isEmpty()) {
+            return Math.abs(orderId.hashCode());
+        }
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException ignored) {
+            return Math.abs(orderId.hashCode());
         }
     }
 
@@ -1496,7 +1643,7 @@ public class InteractiveBrokers extends Exchange {
         return candles;
     }
 
-    private Ticker syntheticTicker(TradePair tradePair) {
+    private @NonNull Ticker syntheticTicker(TradePair tradePair) {
         double price = syntheticPrice(tradePair);
         double spread = Math.max(0.01, price * 0.0005);
         return new Ticker(price, price - spread, price + spread, price * 0.99, price * 1.02, price * 0.98, 100_000,
@@ -1590,16 +1737,23 @@ public class InteractiveBrokers extends Exchange {
         if (secondsPerCandle <= 3600) {
             return "1h";
         }
-        return "1d";
+        if (secondsPerCandle<=3600*24)
+         return "1d";
+        if (secondsPerCandle<=3600*24*7)
+            return "1W";
+        if (secondsPerCandle<=3600*24*7*4)
+            return "1M";
+        return "1h";
+
     }
 
-    private String normalizeCurrency(String currencyCode) {
+    private @NonNull String normalizeCurrency(String currencyCode) {
         return currencyCode == null || currencyCode.isBlank()
                 ? "USD"
                 : currencyCode.trim().toUpperCase(Locale.ROOT);
     }
 
-    private String firstText(JsonNode node, String... names) {
+    private @NonNull String firstText(JsonNode node, String... names) {
         if (node == null) {
             return "";
         }
@@ -1663,13 +1817,6 @@ public class InteractiveBrokers extends Exchange {
         return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
     }
 
-    private static String decimal(double value) {
-        if (!Double.isFinite(value) || value <= 0) {
-            throw new IllegalArgumentException("Order amount and price values must be positive.");
-        }
-        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
-    }
-
     @Override
     public List<Timeframe> getSupportedTimeframes() {
         return List.of(
@@ -1679,7 +1826,9 @@ public class InteractiveBrokers extends Exchange {
                 Timeframe.M30,
                 Timeframe.H1,
                 Timeframe.H4,
-                Timeframe.D1);
+                Timeframe.D1,
+                Timeframe.W1,
+                Timeframe.MN);
     }
 
     @Override

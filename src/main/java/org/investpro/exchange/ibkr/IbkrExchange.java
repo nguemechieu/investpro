@@ -8,6 +8,7 @@ import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.licensing.LicenseManager;
 import org.investpro.models.Account;
 import org.investpro.models.trading.OpenOrder;
+import org.investpro.models.trading.Order;
 import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.Trade;
@@ -19,10 +20,14 @@ import org.jetbrains.annotations.NotNull;
 
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.function.BooleanSupplier;
 
@@ -41,6 +46,7 @@ public class IbkrExchange extends InteractiveBrokers {
     private final IbkrOrderService orderService;
     private final IbkrPortfolioSynchronizer portfolioSynchronizer;
     private final IbkrExecutionAdapter executionAdapter;
+    private final Map<String, Double> leverageBySymbol = new ConcurrentHashMap<>();
 
     private volatile BooleanSupplier liveTradingLicenseGate = () -> true;
     private volatile BooleanSupplier liveRiskApprovalGate = () -> false;
@@ -223,7 +229,21 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity) {
-        return CompletableFuture.completedFuture("PARTIAL_NOT_IMPLEMENTED");
+        if (symbol == null || quantity <= 0.0) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("Trade pair and quantity must be provided"));
+        }
+        double exitPrice = marketDataProvider.fetchTicker(symbol).join().getMidPrice();
+        Optional<Position> existing = positionService.fetchOne(symbol);
+        positionService.closePartial(symbol, quantity, exitPrice);
+
+        existing.ifPresent(position -> {
+            double signedCashDelta = position.getSide() == Side.BUY
+                    ? (quantity * exitPrice)
+                    : -(quantity * exitPrice);
+            accountService.applyFillCashChange(signedCashDelta);
+        });
+        return CompletableFuture.completedFuture("PARTIAL_CLOSED");
     }
 
     @Override
@@ -278,8 +298,7 @@ public class IbkrExchange extends InteractiveBrokers {
             int secondsPerCandle) {
         return marketDataProvider.fetchCandleDataForInProgressCandle(
                 tradePair,
-                currentCandleStartedAt
-        );
+                currentCandleStartedAt);
     }
 
     @Override
@@ -338,6 +357,55 @@ public class IbkrExchange extends InteractiveBrokers {
         return marketDataProvider.fetchOrderBook(tradePair);
     }
 
+    @Override
+    public CompletableFuture<Optional<Order>> fetchOrder(String orderId) {
+        return CompletableFuture.completedFuture(orderService.fetchOrder(orderId).map(this::toOrder));
+    }
+
+    @Override
+    public CompletableFuture<List<Order>> fetchOrderHistory(TradePair tradePair, Instant since) {
+        List<Order> history = new ArrayList<>();
+
+        for (OpenOrder openOrder : orderService.fetchAllOpenOrders()) {
+            if (!matchesPair(openOrder.getTradePair(), tradePair)) {
+                continue;
+            }
+            if (!matchesSince(openOrder.getCreatedAt(), since)) {
+                continue;
+            }
+            history.add(toOrder(openOrder));
+        }
+
+        for (Trade trade : fetchAccountTradesSince(tradePair, since).join()) {
+            history.add(toOrder(trade));
+        }
+
+        history.sort(Comparator.comparing(Order::getDate, Comparator.nullsLast(Comparator.reverseOrder())));
+        return CompletableFuture.completedFuture(history);
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchLeverage(TradePair tradePair) {
+        if (tradePair == null) {
+            return CompletableFuture.completedFuture(1.0);
+        }
+        return CompletableFuture.completedFuture(
+                leverageBySymbol.getOrDefault(tradePair.toString('/'), positionService.fetchOne(tradePair)
+                        .map(Position::getLeverage)
+                        .orElse(1.0)));
+    }
+
+    @Override
+    public CompletableFuture<String> setLeverage(TradePair tradePair, double leverage) {
+        if (tradePair == null || leverage <= 0.0) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Trade pair and leverage are required"));
+        }
+        String symbol = tradePair.toString('/');
+        leverageBySymbol.put(symbol, leverage);
+        positionService.setLeverage(tradePair, leverage);
+        return CompletableFuture.completedFuture("LEVERAGE_UPDATED");
+    }
+
     public void synchronizePortfolio() {
         portfolioSynchronizer.synchronize(
                 accountService.snapshot(),
@@ -382,6 +450,63 @@ public class IbkrExchange extends InteractiveBrokers {
             return "USD";
         }
         return currency.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private Order toOrder(OpenOrder openOrder) {
+        Order order = new Order();
+        order.setId(parseOrderId(openOrder.getOrderId()));
+        order.setDate(java.util.Date.from(openOrder.getCreatedAt() == null ? Instant.now() : openOrder.getCreatedAt()));
+        order.setTradePair(openOrder.getTradePair());
+        order.setSide(openOrder.getSide());
+        order.setOrderType(openOrder.getOrderType() == null ? "UNKNOWN" : openOrder.getOrderType().name());
+        order.setPrice(openOrder.getPrice());
+        order.setQuantity(openOrder.getSize());
+        order.setFilledQuantity(openOrder.getFilledSize());
+        order.setStatus(openOrder.getStatus() == null ? "UNKNOWN" : openOrder.getStatus().name());
+        order.setCreatedAt(openOrder.getCreatedAt());
+        order.setUpdatedAt(openOrder.getUpdatedAt());
+        return order;
+    }
+
+    private Order toOrder(Trade trade) {
+        Order order = new Order();
+        order.setId(trade.getLocalTradeId());
+        order.setDate(java.util.Date.from(trade.getTimestamp() == null ? Instant.now() : trade.getTimestamp()));
+        order.setTradePair(trade.getTradePair());
+        order.setSide(trade.getTransactionType());
+        order.setOrderType("MARKET");
+        order.setPrice(trade.getPrice());
+        order.setQuantity(trade.getAmount());
+        order.setFilledQuantity(trade.getAmount());
+        order.setStatus("FILLED");
+        order.setCreatedAt(trade.getTimestamp());
+        order.setUpdatedAt(trade.getTimestamp());
+        return order;
+    }
+
+    private boolean matchesPair(TradePair source, TradePair requested) {
+        if (requested == null) {
+            return true;
+        }
+        return source != null && requested.toString('/').equals(source.toString('/'));
+    }
+
+    private boolean matchesSince(Instant timestamp, Instant since) {
+        if (since == null) {
+            return true;
+        }
+        return timestamp != null && !timestamp.isBefore(since);
+    }
+
+    private long parseOrderId(String orderId) {
+        if (orderId == null || orderId.isBlank()) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(orderId.replaceAll("[^0-9]", ""));
+        } catch (NumberFormatException ignored) {
+            return Math.abs(orderId.hashCode());
+        }
     }
 
     @Override
