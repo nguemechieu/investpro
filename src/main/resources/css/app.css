@@ -662,8 +662,8 @@ GridPane {
    ============================================================================ */
 
 .tab-pane {
-    -fx-background-color: -terminal-bg;
-    -fx-border-color: -border-color;
+    -fx-background-color: #0f172a;
+    -fx-border-color: #334155;
     -fx-border-width: 1;
 }
 
@@ -673,26 +673,26 @@ GridPane {
 
 .tab-pane .tab-header-background {
     -fx-background-color: linear-gradient(to bottom, #1e293b, #111827);
-    -fx-border-color: -border-color;
+    -fx-border-color: #334155;
     -fx-border-width: 0 0 1 0;
 }
 
 .tab {
     -fx-background-color: #111827;
-    -fx-border-color: -border-color;
+    -fx-border-color: #334155;
     -fx-border-width: 0 1 0 0;
     -fx-padding: 7 14 7 14;
 }
 
 .tab .tab-label {
-    -fx-text-fill: -text-secondary;
+    -fx-text-fill: #dbeafe;
     -fx-font-size: 12px;
     -fx-font-weight: 700;
 }
 
 .tab:selected {
     -fx-background-color: #243244;
-    -fx-border-color: -primary-light;
+    -fx-border-color: #60a5fa;
     -fx-border-width: 0 1 3 0;
 }
 
@@ -717,13 +717,13 @@ GridPane {
 .bottom-terminal,
 .mt5-terminal {
     -fx-background-color: #0b1120;
-    -fx-border-color: -border-strong;
+    -fx-border-color: #475569;
     -fx-border-width: 1 0 0 0;
 }
 
 .system-console .label,
 .bottom-terminal .label {
-    -fx-text-fill: -text-secondary;
+    -fx-text-fill: #dbeafe;
 }
 
 .system-console-title,
@@ -737,7 +737,7 @@ GridPane {
 .system-console .tab-pane,
 .bottom-terminal .tab-pane {
     -fx-background-color: #020617;
-    -fx-border-color: -border-color;
+    -fx-border-color: #334155;
     -fx-border-width: 1;
 }
 
@@ -749,7 +749,7 @@ GridPane {
 .system-console .tab:selected,
 .bottom-terminal .tab:selected {
     -fx-background-color: #0f172a;
-    -fx-border-color: -accent-color;
+    -fx-border-color: #f59e0b;
     -fx-border-width: 0 1 3 0;
 }
 
@@ -766,6 +766,46 @@ GridPane {
 
 .terminal-scroll-content {
     -fx-padding: 8;
+}
+
+.mt5-terminal-tab-strip-scroll,
+.mt5-terminal-tab-strip-scroll > .viewport {
+    -fx-background-color: #020617;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.mt5-terminal-tab-strip-scroll {
+    -fx-border-color: #334155;
+    -fx-border-width: 0 0 1 0;
+}
+
+.mt5-terminal-tab-strip {
+    -fx-padding: 6 8 6 8;
+    -fx-background-color: #0f172a;
+}
+
+.mt5-terminal-tab-button {
+    -fx-background-color: #111827;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 6 12 6 12;
+    -fx-text-fill: #dbeafe;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
+.mt5-terminal-tab-button:selected {
+    -fx-background-color: #0f172a;
+    -fx-border-color: #f59e0b;
+    -fx-text-fill: #fde68a;
+}
+
+.mt5-terminal-tab-button:hover {
+    -fx-border-color: #f59e0b;
+    -fx-text-fill: white;
 }
 
 
