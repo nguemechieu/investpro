@@ -68,9 +68,7 @@ public class ScreenManager {
                     navigationQueue.clear();
                     transitionInProgress = false;
                 }
-                throw exception instanceof RuntimeException runtimeException
-                        ? runtimeException
-                        : new IllegalStateException("Screen transition failed", exception);
+                throw (RuntimeException) exception;
             }
         }
     }
@@ -164,6 +162,7 @@ public class ScreenManager {
         if (view.getParent() instanceof Pane pane) {
             while (pane.getChildren().remove(view)) {
                 // Remove all stale references in case prior state left duplicates.
+                log.info("Remove all stale references in case prior state left duplicates.");
             }
             return;
         }

@@ -15,9 +15,12 @@ public enum Timeframe {
     M30("30m", 1800, "30 Minutes"),
     H1("1h", 3600, "1 Hour"),
     H4("4h", 14400, "4 Hours"),
+    H6("6h", 21600, "6 Hours"),
+    H8("8h", 23200, "8 Hours"),
     D1("1d", 86400, "1 Day"),
     W1("1w", 604800, "1 Week"),
     MN("1M", 2592000, "1 Month");
+
 
     private final String code;
     private final int seconds;

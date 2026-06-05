@@ -103,7 +103,7 @@ public class RssNewsService {
             Map.entry("BTC", "Bitcoin"),
             Map.entry("XBT", "Bitcoin"),
             Map.entry("ETH", "Ethereum"),
-            Map.entry("SOL", "Solana"),
+            Map.entry("SOL", "Solona"),
             Map.entry("XRP", "Ripple XRP"),
             Map.entry("DOGE", "Dogecoin"),
             Map.entry("ADA", "Cardano"),

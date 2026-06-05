@@ -1,4 +1,4 @@
-package org.investpro.exchange;
+package org.investpro.exchange.solona;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,9 +26,9 @@ import java.util.concurrent.CompletableFuture;
  * from the Jupiter token list API (no API key required, public endpoint).
  */
 @Data
-public class SolanaTokenService {
+public class SolonaTokenService {
 
-    private static final Logger log = LoggerFactory.getLogger(SolanaTokenService.class);
+    private static final Logger log = LoggerFactory.getLogger(SolonaTokenService.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /** Jupiter public token list endpoint (no auth required). */
@@ -40,33 +40,33 @@ public class SolanaTokenService {
             "https://api.coingecko.com/api/v3/simple/price?ids=%s&vs_currencies=usd";
 
     /**
-     * Offline registry of well-known Solana tokens.
-     * Key = mint address. Value = {@link SolanaTokenMetadata}.
+     * Offline registry of well-known Solona tokens.
+     * Key = mint address. Value = {@link SolonaTokenMetadata}.
      */
-    public static final Map<String, SolanaTokenMetadata> WELL_KNOWN_TOKENS = Map.ofEntries(
+    public static final Map<String, SolonaTokenMetadata> WELL_KNOWN_TOKENS = Map.ofEntries(
             Map.entry("So11111111111111111111111111111111111111112",
-                    new SolanaTokenMetadata("So11111111111111111111111111111111111111112",
-                            "SOL", "Wrapped SOL", 9, "solana")),
+                    new SolonaTokenMetadata("So11111111111111111111111111111111111111112",
+                            "SOL", "Wrapped SOL", 9, "solona")),
             Map.entry("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-                    new SolanaTokenMetadata("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                    new SolonaTokenMetadata("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
                             "USDC", "USD Coin", 6, "usd-coin")),
             Map.entry("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-                    new SolanaTokenMetadata("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+                    new SolonaTokenMetadata("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
                             "USDT", "Tether USD", 6, "tether")),
             Map.entry("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
-                    new SolanaTokenMetadata("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+                    new SolonaTokenMetadata("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
                             "mSOL", "Marinade Staked SOL", 9, "msol")),
             Map.entry("7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
-                    new SolanaTokenMetadata("7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
+                    new SolonaTokenMetadata("7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
                             "ETH", "Ether (Wormhole)", 8, "ethereum")),
             Map.entry("9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E",
-                    new SolanaTokenMetadata("9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E",
+                    new SolonaTokenMetadata("9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E",
                             "BTC", "Bitcoin (Wormhole)", 8, "bitcoin"))
     );
 
     private final HttpClient httpClient;
 
-    public SolanaTokenService() {
+    public SolonaTokenService() {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(15))
                 .build();
@@ -80,7 +80,7 @@ public class SolanaTokenService {
      * @param mintAddress base-58 mint address
      * @return token metadata if known
      */
-    public Optional<SolanaTokenMetadata> fetchTokenMetadata(String mintAddress) {
+    public Optional<SolonaTokenMetadata> fetchTokenMetadata(String mintAddress) {
         return Optional.ofNullable(WELL_KNOWN_TOKENS.get(mintAddress));
     }
 
@@ -97,7 +97,7 @@ public class SolanaTokenService {
     /**
      * Returns the list of well-known supported tokens (offline registry only).
      */
-    public List<SolanaTokenMetadata> listSupportedTokens() {
+    public List<SolonaTokenMetadata> listSupportedTokens() {
         return new ArrayList<>(WELL_KNOWN_TOKENS.values());
     }
 
@@ -111,11 +111,11 @@ public class SolanaTokenService {
      * @param mintAddress base-58 mint address
      * @return future resolving to the token metadata, or empty if not found
      */
-    public CompletableFuture<Optional<SolanaTokenMetadata>> fetchTokenMetadataDynamic(
+    public CompletableFuture<Optional<SolonaTokenMetadata>> fetchTokenMetadataDynamic(
             String mintAddress) {
 
         // First check offline registry
-        Optional<SolanaTokenMetadata> offline = fetchTokenMetadata(mintAddress);
+        Optional<SolonaTokenMetadata> offline = fetchTokenMetadata(mintAddress);
         if (offline.isPresent()) {
             return CompletableFuture.completedFuture(offline);
         }
@@ -134,7 +134,7 @@ public class SolanaTokenService {
                         if (arr.isArray()) {
                             for (JsonNode token : arr) {
                                 if (mintAddress.equals(token.path("address").asText())) {
-                                    return Optional.of(new SolanaTokenMetadata(
+                                    return Optional.of(new SolonaTokenMetadata(
                                             mintAddress,
                                             token.path("symbol").asText(""),
                                             token.path("name").asText(""),
@@ -144,7 +144,7 @@ public class SolanaTokenService {
                             }
                         }
                     } catch (Exception e) {
-                        log.debug("Solana: failed to fetch Jupiter token list: {}", e.getMessage());
+                        log.debug("Solona: failed to fetch Jupiter token list: {}", e.getMessage());
                     }
                     return Optional.empty();
                 });
@@ -155,12 +155,12 @@ public class SolanaTokenService {
     /**
      * Fetches the USD price for a token via CoinGecko (free tier, no key required).
      *
-     * <p>Uses the CoinGecko ID stored in {@link SolanaTokenMetadata#coingeckoId()}.
+     * <p>Uses the CoinGecko ID stored in {@link SolonaTokenMetadata#coingeckoId()}.
      *
      * @param metadata token metadata containing the CoinGecko ID
      * @return USD price, or {@link BigDecimal#ZERO} if unavailable
      */
-    public CompletableFuture<BigDecimal> fetchTokenPrice(SolanaTokenMetadata metadata) {
+    public CompletableFuture<BigDecimal> fetchTokenPrice(SolonaTokenMetadata metadata) {
         if (metadata.coingeckoId() == null || metadata.coingeckoId().isBlank()) {
             return CompletableFuture.completedFuture(BigDecimal.ZERO);
         }
@@ -180,13 +180,13 @@ public class SolanaTokenService {
                         double  price = root.path(metadata.coingeckoId()).path("usd").asDouble(0);
                         return BigDecimal.valueOf(price);
                     } catch (Exception e) {
-                        log.debug("Solana: failed to parse CoinGecko price for {}: {}",
+                        log.debug("Solona: failed to parse CoinGecko price for {}: {}",
                                 metadata.symbol(), e.getMessage());
                         return BigDecimal.ZERO;
                     }
                 })
                 .exceptionally(ex -> {
-                    log.debug("Solana: price fetch error for {}: {}", metadata.symbol(), ex.getMessage());
+                    log.debug("Solona: price fetch error for {}: {}", metadata.symbol(), ex.getMessage());
                     return BigDecimal.ZERO;
                 });
     }
@@ -202,7 +202,7 @@ public class SolanaTokenService {
      * @param decimals     number of decimal places
      * @param coingeckoId  CoinGecko coin ID for price lookups (may be empty)
      */
-    public record SolanaTokenMetadata(
+    public record SolonaTokenMetadata(
             String mint,
             String symbol,
             String name,

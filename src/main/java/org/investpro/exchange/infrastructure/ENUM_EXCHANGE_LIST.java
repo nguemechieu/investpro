@@ -1,45 +1,37 @@
 package org.investpro.exchange.infrastructure;
 
 public enum ENUM_EXCHANGE_LIST {
-    BINANCE_US("BINANCE_US", 1),
-    COINBASE("COINBASE ", 2),
-    OANDA("OANDA ", 3),
-    IG("IG ", 4),
-    KRAKEN("KRAKEN ", 5),
-    BITTREX("BITTREX ", 6),
-    BITFINEX("BITFINEX ", 7),
-    BITMEX("BITMEX ", 8),
-     KUCOIN("KUCOIN ", 9),
-     KUCOIN_US("KUCOIN US", 10),
-    BITFINEX_US(
-            "BITFINEX US", 11
-    ),
-    BITSTAMP(
-            "BITSTAMP", 12
-    ),
-       POLONIEX(
-        "POLONIEX", 13
-     ),
-    BINANCE(
-            "BINANCE", 14
-    ),
-    ALPACA(
-            "ALPACA", 15
-    ),
-    INTERACTIVE_BROKERS(
-            "INTERACTIVE BROKERS", 16
-    ),
-    STELLAR_NETWORK(
-            "STELLAR NETWORK", 17
-    ),
-    SOLANA_NETWORK(
-            "SOLANA NETWORK", 18
-    );
+        BINANCE_US("BINANCE_US", 1),
+        COINBASE("COINBASE ", 2),
+        OANDA("OANDA ", 3),
+        IG("IG ", 4),
+        KRAKEN("KRAKEN ", 5),
+        BITTREX("BITTREX ", 6),
+        BITFINEX("BITFINEX ", 7),
+        BITMEX("BITMEX ", 8),
+        KUCOIN("KUCOIN ", 9),
+        KUCOIN_US("KUCOIN US", 10),
+        BITFINEX_US(
+                        "BITFINEX US", 11),
+        BITSTAMP(
+                        "BITSTAMP", 12),
+        POLONIEX(
+                        "POLONIEX", 13),
+        BINANCE(
+                        "BINANCE", 14),
+        ALPACA(
+                        "ALPACA", 15),
+        INTERACTIVE_BROKERS(
+                        "INTERACTIVE BROKERS", 16),
+        SCHWAB(
+                        "SCHWAB", 17),
+        STELLAR_NETWORK(
+                        "STELLAR NETWORK", 18),
+        SOLONA_NETWORK(
+                        "SOLONA NETWORK", 19);
 
+        ENUM_EXCHANGE_LIST(String s, int i) {
 
-    ENUM_EXCHANGE_LIST(String s, int i) {
-
-
-    }
+        }
 
 }

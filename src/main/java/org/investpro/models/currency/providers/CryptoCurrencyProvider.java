@@ -45,7 +45,7 @@ public final class CryptoCurrencyProvider implements CurrencyProvider {
                 seed("Ethereum", "ETH"),
                 seed("Tether", "USDT"),
                 seed("USD Coin", "USDC"),
-                seed("Solana", "SOL"),
+                seed("Solona", "SOL"),
                 seed("XRP", "XRP"),
                 seed("Cardano", "ADA"),
                 seed("Dogecoin", "DOGE"),
@@ -55,15 +55,15 @@ public final class CryptoCurrencyProvider implements CurrencyProvider {
                 seed("Litecoin", "LTC"),
                 seed("Bitcoin Cash", "BCH"),
                 seed("Stellar", "XLM"),
-                seed("Algorand", "ALGO")
-        );
+                seed("Algorand", "ALGO"));
 
         for (CurrencySeed seed : seeds) {
             if (byCode.containsKey(seed.code())) {
                 continue;
             }
             try {
-                byCode.put(seed.code(), new CryptoCurrency(seed.name(), seed.code(), seed.code(), 8, seed.code(), seed.code()));
+                byCode.put(seed.code(),
+                        new CryptoCurrency(seed.name(), seed.code(), seed.code(), 8, seed.code(), seed.code()));
             } catch (Exception ignored) {
                 // Keep provider resilient.
             }

@@ -65,9 +65,7 @@ import java.util.function.Consumer;
 
 @Slf4j
 @EqualsAndHashCode(callSuper = true)
-
 @Data
-
 public class Oanda extends Exchange {
 
     private static final Logger logger = log;
@@ -2576,7 +2574,6 @@ public class Oanda extends Exchange {
             case 21600 -> "H6";
             case 28800 -> "H8";
             case 43200 -> "H12";
-
             case 86400 -> "D";
             case 604800 -> "W";
             case 2592000 -> "M";

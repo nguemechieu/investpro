@@ -41,11 +41,21 @@ public class TransferValidator {
         }
 
         if (fromProvider != null && toProvider != null) {
+            boolean crossProvider = !request.fromProvider().equalsIgnoreCase(request.toProvider());
+
             if (!fromProvider.getSupportedCurrencies().contains(request.currency())) {
                 errors.add("Source provider does not support selected currency.");
             }
             if (!toProvider.getSupportedCurrencies().contains(request.currency())) {
                 errors.add("Destination provider does not support selected currency.");
+            }
+
+            if (crossProvider && !isCryptoOrStablecoin(request.currency())) {
+                errors.add("Only crypto transfers are allowed between different exchanges or wallets.");
+            }
+
+            if (crossProvider && !"CRYPTO".equalsIgnoreCase(request.network())) {
+                errors.add("Cross-exchange transfers must use CRYPTO network.");
             }
 
             BigDecimal availableBalance = fromProvider.getBalances().getOrDefault(request.currency(), BigDecimal.ZERO);
@@ -96,6 +106,10 @@ public class TransferValidator {
 
     private boolean isStablecoin(String currency) {
         return "USDT".equalsIgnoreCase(currency) || "USDC".equalsIgnoreCase(currency);
+    }
+
+    private boolean isCryptoOrStablecoin(String currency) {
+        return isStablecoin(currency) || isCrypto(currency);
     }
 
     private boolean isCrypto(String currency) {

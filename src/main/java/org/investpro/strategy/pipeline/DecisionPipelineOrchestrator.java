@@ -216,7 +216,7 @@ public class DecisionPipelineOrchestrator {
         }
 
         ExecutionVenue venue = plan.getVenue();
-        if (venue != ExecutionVenue.SOLANA_DEX && venue != ExecutionVenue.STELLAR) {
+        if (venue != ExecutionVenue.SOLONA_DEX && venue != ExecutionVenue.STELLAR) {
             return BlockchainTransactionResult.failed(
                     plan.getPlanId(),
                     "UNSUPPORTED",
@@ -224,7 +224,7 @@ public class DecisionPipelineOrchestrator {
                     "Execution venue is not blockchain-backed: " + venue);
         }
 
-        String networkId = venue == ExecutionVenue.SOLANA_DEX ? "SOLANA" : "STELLAR";
+        String networkId = venue == ExecutionVenue.SOLONA_DEX ? "SOLONA" : "STELLAR";
         BlockchainExecutionRequests.OrderRequest request = "LIMIT".equalsIgnoreCase(plan.getOrderType())
                 ? BlockchainExecutionRequests.OrderRequest.limitOrder(
                         networkId,

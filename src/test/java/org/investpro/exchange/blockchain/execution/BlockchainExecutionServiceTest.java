@@ -24,10 +24,10 @@ class BlockchainExecutionServiceTest {
 
     @Test
     void confirmedTransactionUpdatesPortfolio() {
-        TestContext context = withProviders(new SolanaExecutionProvider(), new StellarExecutionProvider());
+        TestContext context = withProviders(new SolonaExecutionProvider(), new StellarExecutionProvider());
 
         BlockchainExecutionRequests.TransferRequest request = BlockchainExecutionRequests.TransferRequest.create(
-                "SOLANA", "wallet-a", "wallet-b", "SOL", 2.0);
+                "SOLONA", "wallet-a", "wallet-b", "SOL", 2.0);
 
         BlockchainTransactionResult result = context.service.executeTransfer(request).join();
 
@@ -40,7 +40,7 @@ class BlockchainExecutionServiceTest {
         BlockchainExecutionProvider failingProvider = new AbstractBlockchainExecutionProvider() {
             @Override
             public String networkId() {
-                return "SOLANA";
+                return "SOLONA";
             }
 
             @Override
@@ -89,7 +89,7 @@ class BlockchainExecutionServiceTest {
         TestContext context = withProviders(failingProvider);
 
         BlockchainExecutionRequests.TransferRequest request = BlockchainExecutionRequests.TransferRequest.create(
-                "SOLANA", "wallet-a", "wallet-b", "SOL", 2.0);
+                "SOLONA", "wallet-a", "wallet-b", "SOL", 2.0);
 
         BlockchainTransactionResult result = context.service.executeTransfer(request).join();
 
@@ -102,7 +102,7 @@ class BlockchainExecutionServiceTest {
         BlockchainExecutionProvider pendingProvider = new AbstractBlockchainExecutionProvider() {
             @Override
             public String networkId() {
-                return "SOLANA";
+                return "SOLONA";
             }
 
             @Override
@@ -181,7 +181,7 @@ class BlockchainExecutionServiceTest {
         TestContext context = withProviders(pendingProvider);
 
         BlockchainTransactionResult timeout = context.service.awaitConfirmation(
-                "SOLANA",
+                "SOLONA",
                 "tx-timeout",
                 "sig-timeout",
                 Duration.ofMillis(20)).join();
@@ -194,7 +194,7 @@ class BlockchainExecutionServiceTest {
         BlockchainExecutionProvider pendingProvider = new AbstractBlockchainExecutionProvider() {
             @Override
             public String networkId() {
-                return "SOLANA";
+                return "SOLONA";
             }
 
             @Override
@@ -256,7 +256,7 @@ class BlockchainExecutionServiceTest {
 
         TestContext context = withProviders(pendingProvider);
         BlockchainExecutionRequests.TransferRequest request = BlockchainExecutionRequests.TransferRequest.create(
-                "SOLANA", "wallet-a", "wallet-b", "SOL", 1.0);
+                "SOLONA", "wallet-a", "wallet-b", "SOL", 1.0);
 
         BlockchainTransactionResult result = context.service.executeTransfer(request).join();
 
@@ -267,13 +267,13 @@ class BlockchainExecutionServiceTest {
     }
 
     @Test
-    void solanaAndStellarProvidersReturnBlockchainTransactionResult() {
-        SolanaExecutionProvider solana = new SolanaExecutionProvider();
+    void solonaAndStellarProvidersReturnBlockchainTransactionResult() {
+        SolonaExecutionProvider solona = new SolonaExecutionProvider();
         StellarExecutionProvider stellar = new StellarExecutionProvider();
 
-        BlockchainTransactionResult solanaResult = solana.submitOrder(
+        BlockchainTransactionResult solonaResult = solona.submitOrder(
                 BlockchainExecutionRequests.OrderRequest.marketOrder(
-                        "SOLANA", "wallet", "SOL/USDC", "BUY", 1.0))
+                        "SOLONA", "wallet", "SOL/USDC", "BUY", 1.0))
                 .join();
 
         BlockchainTransactionResult stellarResult = stellar.submitOrder(
@@ -281,19 +281,19 @@ class BlockchainExecutionServiceTest {
                         "STELLAR", "wallet", "XLM/USDC", "BUY", 2.0))
                 .join();
 
-        assertThat(solanaResult.networkId()).isEqualTo("SOLANA");
+        assertThat(solonaResult.networkId()).isEqualTo("SOLONA");
         assertThat(stellarResult.networkId()).isEqualTo("STELLAR");
     }
 
     @Test
     void eventsEmittedCorrectly() {
-        TestContext context = withProviders(new SolanaExecutionProvider());
+        TestContext context = withProviders(new SolonaExecutionProvider());
 
         List<String> events = new CopyOnWriteArrayList<>();
         context.eventBus.subscribeAll(event -> events.add(event.type()));
 
         BlockchainExecutionRequests.TransferRequest request = BlockchainExecutionRequests.TransferRequest.create(
-                "SOLANA", "wallet-a", "wallet-b", "SOL", 1.0);
+                "SOLONA", "wallet-a", "wallet-b", "SOL", 1.0);
 
         context.service.executeTransfer(request).join();
 
@@ -307,7 +307,7 @@ class BlockchainExecutionServiceTest {
 
         FileBlockchainTransactionRepository first = new FileBlockchainTransactionRepository(file);
         BlockchainTransactionResult result = BlockchainTransactionResult.confirmed(
-                "tx-1", "SOLANA", "sig-1", 100L, 32);
+                "tx-1", "SOLONA", "sig-1", 100L, 32);
         first.save(result);
 
         FileBlockchainTransactionRepository second = new FileBlockchainTransactionRepository(file);
@@ -319,7 +319,7 @@ class BlockchainExecutionServiceTest {
     @Test
     void executionPipelineEnforcedByRiskValidation() {
         AtomicInteger submitCount = new AtomicInteger();
-        BlockchainExecutionProvider provider = new SolanaExecutionProvider() {
+        BlockchainExecutionProvider provider = new SolonaExecutionProvider() {
             @Override
             public CompletableFuture<BlockchainTransactionResult> submitOrder(
                     BlockchainExecutionRequests.OrderRequest request) {
@@ -331,7 +331,7 @@ class BlockchainExecutionServiceTest {
         TestContext context = withProviders(provider);
 
         BlockchainExecutionRequests.OrderRequest request = BlockchainExecutionRequests.OrderRequest.marketOrder(
-                "SOLANA", "wallet-a", "SOL/USDC", "BUY", 1.0);
+                "SOLONA", "wallet-a", "SOL/USDC", "BUY", 1.0);
 
         BlockchainTransactionResult blocked = context.service
                 .executeOrder(request, RiskDecision.rejected("risk violation")).join();

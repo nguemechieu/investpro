@@ -28,19 +28,20 @@ public enum SupportedExchange {
     BINANCE("Binance", "binance"),
     ALPACA("Alpaca", "alpaca"),
     INTERACTIVE_BROKERS("Interactive Brokers", "interactive-brokers"),
+    SCHWAB("Schwab", "schwab"),
     STELLAR_NETWORK("Stellar Network", "stellar-network"),
-    SOLANA_NETWORK("Solana Network", "solana-network");
+    SOLONA_NETWORK("Solona Network", "solona-network");
 
     /**
      * -- GETTER --
-     *  Get the user-friendly display name for this exchange.
+     * Get the user-friendly display name for this exchange.
      *
      * @return display name suitable for UI labels
      */
     private final String displayName;
     /**
      * -- GETTER --
-     *  Get the factory key used to instantiate this exchange.
+     * Get the factory key used to instantiate this exchange.
      *
      * @return key for ExchangeFactory.create()
      */

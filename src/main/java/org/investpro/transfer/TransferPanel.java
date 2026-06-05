@@ -19,6 +19,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import org.investpro.exchange.Exchange;
 
 import java.util.function.Consumer;
 
@@ -27,7 +28,11 @@ public class TransferPanel extends BorderPane {
     private final TransferController controller;
 
     public TransferPanel(Consumer<String> notifier) {
-        TransferService transferService = new TransferService();
+        this(null, notifier);
+    }
+
+    public TransferPanel(Exchange activeExchange, Consumer<String> notifier) {
+        TransferService transferService = new TransferService(activeExchange);
         TransferValidator transferValidator = new TransferValidator();
         TransferFeeCalculator feeCalculator = new TransferFeeCalculator();
         TransferHistoryService historyService = new TransferHistoryService();
@@ -52,6 +57,9 @@ public class TransferPanel extends BorderPane {
         ComboBox<String> fromAccount = new ComboBox<>();
         ComboBox<String> toAccount = new ComboBox<>();
         ComboBox<String> currency = new ComboBox<>();
+        ComboBox<String> network = new ComboBox<>();
+        ComboBox<String> destinationWallet = new ComboBox<>();
+        destinationWallet.setEditable(true);
         TextField amount = new TextField();
         amount.setPromptText("Enter amount");
         TextArea notes = new TextArea();
@@ -76,21 +84,27 @@ public class TransferPanel extends BorderPane {
         form.addRow(0, formLabel("From Account"), fromAccount);
         form.addRow(1, formLabel("To Account"), toAccount);
         form.addRow(2, formLabel("Currency"), currency);
-        form.addRow(3, formLabel("Amount"), amount);
-        form.addRow(4, formLabel("Available Balance"), availableBalance);
-        form.addRow(5, formLabel("Estimated Fees"), estimatedFees);
-        form.addRow(6, formLabel("Estimated Arrival"), estimatedArrival);
-        form.addRow(7, formLabel("Priority"), priority);
-        form.addRow(8, formLabel("Notes"), notes);
+        form.addRow(3, formLabel("Network"), network);
+        form.addRow(4, formLabel("Destination Wallet"), destinationWallet);
+        form.addRow(5, formLabel("Amount"), amount);
+        form.addRow(6, formLabel("Available Balance"), availableBalance);
+        form.addRow(7, formLabel("Estimated Fees"), estimatedFees);
+        form.addRow(8, formLabel("Estimated Arrival"), estimatedArrival);
+        form.addRow(9, formLabel("Priority"), priority);
+        form.addRow(10, formLabel("Notes"), notes);
 
         fromAccount.setMaxWidth(Double.MAX_VALUE);
         toAccount.setMaxWidth(Double.MAX_VALUE);
         currency.setMaxWidth(Double.MAX_VALUE);
+        network.setMaxWidth(Double.MAX_VALUE);
+        destinationWallet.setMaxWidth(Double.MAX_VALUE);
         amount.setMaxWidth(Double.MAX_VALUE);
         notes.setMaxWidth(Double.MAX_VALUE);
         GridPane.setHgrow(fromAccount, Priority.ALWAYS);
         GridPane.setHgrow(toAccount, Priority.ALWAYS);
         GridPane.setHgrow(currency, Priority.ALWAYS);
+        GridPane.setHgrow(network, Priority.ALWAYS);
+        GridPane.setHgrow(destinationWallet, Priority.ALWAYS);
         GridPane.setHgrow(amount, Priority.ALWAYS);
         GridPane.setHgrow(notes, Priority.ALWAYS);
 
@@ -140,7 +154,8 @@ public class TransferPanel extends BorderPane {
         root.getStyleClass().add("transfer-funds-root");
         VBox.setVgrow(historyBox, Priority.ALWAYS);
 
-        controller.initialize(fromAccount, toAccount, currency, amount, notes, priority, availableBalance,
+        controller.initialize(fromAccount, toAccount, currency, network, destinationWallet, amount, notes, priority,
+                availableBalance,
                 estimatedFees, estimatedArrival, transferMessage, progressIndicator, historyTable, previewButton,
                 executeButton);
 

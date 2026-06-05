@@ -12,6 +12,7 @@ import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.infrastructure.BrokerExchangeAdapter;
 import org.investpro.exchange.infrastructure.BrokerRouter;
 import org.investpro.exchange.infrastructure.ENUM_EXCHANGE_LIST;
+import org.investpro.exchange.schwab.Schwab;
 import org.investpro.operations.SystemActivityBus;
 import org.investpro.spi.ExchangeProvider;
 import org.investpro.spi.ExchangeProviderContext;
@@ -21,7 +22,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -32,7 +32,6 @@ public final class ExchangeFactory {
 
     private static final Map<String, String> EXCHANGE_ALIASES = buildExchangeAliases();
 
-    private final CredentialProvider credentialProvider;
     private final ExchangeCredentialResolver credentialResolver;
     private final BrokerRouter brokerRouter;
     private final PluginRegistry pluginRegistry;
@@ -40,7 +39,7 @@ public final class ExchangeFactory {
 
     /**
      * Cache one exchange adapter per normalized exchange id.
-     *
+     * <p>
      * This prevents creating multiple Coinbase/OANDA/Binance objects
      * every time the UI refreshes, reconnects, or asks for an adapter.
      */
@@ -53,7 +52,6 @@ public final class ExchangeFactory {
     public ExchangeFactory(@NotNull CredentialProvider credentialProvider, @NotNull PluginRegistry pluginRegistry) {
         Objects.requireNonNull(credentialProvider, "credentialProvider must not be null");
         Objects.requireNonNull(pluginRegistry, "pluginRegistry must not be null");
-        this.credentialProvider = credentialProvider;
         this.credentialResolver = new ExchangeCredentialResolver(credentialProvider);
         this.brokerRouter = new BrokerRouter();
         this.pluginRegistry = pluginRegistry;
@@ -82,7 +80,7 @@ public final class ExchangeFactory {
 
     /**
      * Backward-compatible method.
-     *
+     * <p>
      * IMPORTANT:
      * This no longer blindly creates a new adapter.
      * It now returns the cached adapter.
@@ -227,26 +225,23 @@ public final class ExchangeFactory {
             case BITFINEX, BITFINEX_US -> new Bitfinex(credentials);
             case COINBASE -> new Coinbase(credentials);
             case INTERACTIVE_BROKERS -> new IbkrExchange(credentials);
+            case SCHWAB -> new Schwab(credentials);
             case KRAKEN -> new Kraken(credentials);
             case OANDA -> new Oanda(credentials);
             case STELLAR_NETWORK -> new StellarNetwork(credentials);
-            case SOLANA_NETWORK -> new SolanaNetwork(credentials);
+            case SOLONA_NETWORK -> new SolonaNetwork(credentials);
             case POLONIEX -> throw new IllegalArgumentException("Poloniex adapter not implemented yet");
             case IG -> throw new IllegalArgumentException("IG adapter not implemented yet");
             case BITTREX -> throw new IllegalArgumentException("Bittrex adapter not implemented yet");
             case BITMEX -> throw new IllegalArgumentException("Bitmex adapter not implemented yet");
             case KUCOIN, KUCOIN_US -> throw new IllegalArgumentException("Kucoin adapter not implemented yet");
             case BITSTAMP -> throw new IllegalArgumentException("Bitstamp adapter not implemented yet");
-            default -> throw new IllegalArgumentException("Unsupported exchange: " + exchangeEnum);
         };
     }
 
     private String cacheKeyFor(String exchangeId) {
         Optional<ExchangeProvider> provider = pluginRegistry.findExchangeProvider(exchangeId);
-        if (provider.isPresent()) {
-            return PluginRegistry.normalize(provider.get().id());
-        }
-        return toEnum(exchangeId).name();
+        return provider.map(exchangeProvider -> PluginRegistry.normalize(exchangeProvider.id())).orElseGet(() -> toEnum(exchangeId).name());
     }
 
     private void disconnectQuietly(String exchangeId, Exchange exchange) {
@@ -288,10 +283,11 @@ public final class ExchangeFactory {
         addAliases(aliases, "coinbase", "coinbase", "coinbasepro", "coinbaseadvanced", "coinbaseadvancedtrade",
                 "coinbaseat", "coinbasebrokerage");
         addAliases(aliases, "interactive_brokers", "interactivebrokers", "interactivebroker", "ib",
-                "ibk", "ibkr", "schwab", "charlesschwab");
+                "ibk", "ibkr");
+        addAliases(aliases, "schwab", "schwab", "charlesschwab");
         addAliases(aliases, "oanda", "oanda", "oandafx", "oandaforex", "oandacfd", "oandafxcfd");
         addAliases(aliases, "stellar_network", "stellar", "stellarnetwork", "stellarx", "xlm");
-        addAliases(aliases, "solana_network", "solana", "solananetwork", "sol", "solanaweb3");
+        addAliases(aliases, "solona_network", "solona", "solonanetwork", "sol", "solonaweb3");
 
         addAliases(aliases, "bittrex", "bittrex");
         addAliases(aliases, "bitmex", "bitmex");

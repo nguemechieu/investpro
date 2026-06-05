@@ -20,11 +20,11 @@ class InstrumentMetadataServiceTest {
     }
 
     @Test
-    void solanaBrokerIsAlwaysClassifiedAsCryptoAsset() throws Exception {
+    void solonaBrokerIsAlwaysClassifiedAsCryptoAsset() throws Exception {
         InstrumentMetadataService service = new InstrumentMetadataService(new InstrumentRegistry());
         TradePair pair = new TradePair("EUR", "USD");
 
-        InstrumentMetadata metadata = service.enrich(pair, "SOLANA NETWORK");
+        InstrumentMetadata metadata = service.enrich(pair, "SOLONA NETWORK");
 
         assertThat(metadata.getAssetClass()).isEqualTo(AssetClass.CRYPTO_ASSET);
     }

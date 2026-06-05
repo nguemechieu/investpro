@@ -1,19 +1,21 @@
-package org.investpro.exchange;
+package org.investpro.exchange.solona;
+
+import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * Immutable snapshot of a confirmed Solana transaction.
+ * Immutable snapshot of a confirmed Solona transaction.
  *
  * @param signature   base-58 transaction signature (unique ID)
- * @param slot        Solana slot number the transaction was confirmed in
+ * @param slot        Solona slot number the transaction was confirmed in
  * @param blockTime   wall-clock time of confirmation (null if not available)
  * @param status      "confirmed" | "finalized" | "failed" | "unknown"
  * @param feeSol      transaction fee in SOL (converted from lamports)
  * @param confirmed   true if the transaction was confirmed without error
  */
-public record SolanaTransaction(
+public record SolonaTransaction(
         String signature,
         long slot,
         Instant blockTime,
@@ -30,8 +32,8 @@ public record SolanaTransaction(
     }
 
     @Override
-    public String toString() {
-        return "SolanaTransaction[sig=%s slot=%d status=%s fee=%s SOL]"
+    public @NonNull String toString() {
+        return "SolonaTransaction[sig=%s slot=%d status=%s fee=%s SOL]"
                 .formatted(shortSignature(), slot, status, feeSol);
     }
 }

@@ -1,4 +1,4 @@
-package org.investpro.exchange;
+package org.investpro.exchange.solona;
 
 import org.jspecify.annotations.NonNull;
 
@@ -9,11 +9,11 @@ import java.math.BigDecimal;
  *
  * @param mint     base-58 mint address of the SPL token
  * @param symbol   normalised ticker symbol (e.g. USDC, BONK) — may be empty
- *                 until enriched by {@link SolanaTokenService}
+ *                 until enriched by {@link SolonaTokenService}
  * @param amount   human-readable token amount (already divided by 10^decimals)
  * @param decimals number of decimal places the token uses
  */
-public record SolanaTokenBalance(
+public record SolonaTokenBalance(
         String mint,
         String symbol,
         BigDecimal amount,

@@ -11,7 +11,7 @@ public class ConfirmationPolicy {
     private final Map<String, Integer> networkDepth = new ConcurrentHashMap<>();
 
     public ConfirmationPolicy() {
-        networkDepth.put("SOLANA", 32);
+        networkDepth.put("SOLONA", 32);
         networkDepth.put("STELLAR", 1);
     }
 

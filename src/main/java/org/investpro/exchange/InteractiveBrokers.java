@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.models.Account;
@@ -52,6 +53,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+@EqualsAndHashCode(callSuper = true)
 @Slf4j
 @Data
 public class InteractiveBrokers extends Exchange {
@@ -336,7 +338,7 @@ public class InteractiveBrokers extends Exchange {
 
     @Override
     public boolean supportsCrypto() {
-        return false;
+        return true;
     }
 
     // --------- Streaming Transport Methods ---------
@@ -1918,6 +1920,7 @@ public class InteractiveBrokers extends Exchange {
                 Timeframe.M30,
                 Timeframe.H1,
                 Timeframe.H4,
+                Timeframe.H6,
                 Timeframe.D1,
                 Timeframe.W1,
                 Timeframe.MN);
@@ -1933,14 +1936,14 @@ public class InteractiveBrokers extends Exchange {
                 .webSocketBaseUrl(IBK_WEB_SOCKET_URL)
 
                 // Market coverage
-                .supportsCrypto(false)
+                .supportsCrypto(true)
                 .supportsSpot(true)
-                .supportsFutures(false)
+                .supportsFutures(true)
                 .supportsDerivatives(true)
                 .supportsForex(true)
                 .supportsStocks(true)
-                .supportsOptions(false)
-                .supportsIndices(false)
+                .supportsOptions(true)
+                .supportsIndices(true)
 
                 // Trading support
                 .supportsLiveTrading(true)
@@ -1950,7 +1953,7 @@ public class InteractiveBrokers extends Exchange {
                 .supportsStopOrders(true)
                 .supportsBracketOrders(false)
                 .supportsStopLossTakeProfit(false)
-                .supportsTrailingStop(false)
+                .supportsTrailingStop(true)
                 .supportsLeverage(true)
 
                 // Account / portfolio
@@ -1973,16 +1976,16 @@ public class InteractiveBrokers extends Exchange {
                 .supportsRecentTrades(true)
 
                 // Streaming
-                .supportsWebSocket(false)
+                .supportsWebSocket(true)
                 .supportsNativeWebSocket(false)
-                .supportsWebSocketStreaming(false)
-                .supportsTickerStreaming(false)
-                .supportsTradeStreaming(false)
+                .supportsWebSocketStreaming(true)
+                .supportsTickerStreaming(true)
+                .supportsTradeStreaming(true)
                 .supportsCandleStreaming(true)
-                .supportsOrderBookStreaming(false)
-                .supportsAccountStreaming(false)
-                .supportsOrderStreaming(false)
-                .supportsFillStreaming(false)
+                .supportsOrderBookStreaming(true)
+                .supportsAccountStreaming(true)
+                .supportsOrderStreaming(true)
+                .supportsFillStreaming(true)
                 .supportsPositionStreaming(false)
                 .supportsBalanceStreaming(false)
                 .supportsHttpStreaming(false)

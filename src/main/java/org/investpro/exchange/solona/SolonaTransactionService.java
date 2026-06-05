@@ -1,4 +1,4 @@
-package org.investpro.exchange;
+package org.investpro.exchange.solona;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
@@ -12,22 +12,22 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Provides Solana on-chain transaction operations.
+ * Provides Solona on-chain transaction operations.
  *
  * <p>
  * <b>Safety:</b> {@link #sendTransaction(String)} is guarded by the
- * {@code solana.tradingEnabled} configuration flag. Calling it when trading
- * is disabled always throws {@link SolanaException.TradingDisabledException}.
+ * {@code solona.tradingEnabled} configuration flag. Calling it when trading
+ * is disabled always throws {@link SolonaException.TradingDisabledException}.
  */
-public class SolanaTransactionService {
+public class SolonaTransactionService {
 
-    private static final Logger log = LoggerFactory.getLogger(SolanaTransactionService.class);
+    private static final Logger log = LoggerFactory.getLogger(SolonaTransactionService.class);
     private static final long DEFAULT_FEE_LAMPORTS = 5_000L;
 
-    private final SolanaNetworkClient rpc;
-    private final SolanaNetworkConfig config;
+    private final SolonaNetworkClient rpc;
+    private final SolonaNetworkConfig config;
 
-    public SolanaTransactionService(SolanaNetworkClient rpc, SolanaNetworkConfig config) {
+    public SolonaTransactionService(SolonaNetworkClient rpc, SolonaNetworkConfig config) {
         this.rpc = rpc;
         this.config = config;
     }
@@ -41,12 +41,12 @@ public class SolanaTransactionService {
      * @param limit   max number of transactions (1–100)
      * @return future resolving to the list of transactions (oldest to newest)
      */
-    public CompletableFuture<List<SolanaTransaction>> getRecentTransactions(
+    public CompletableFuture<List<SolonaTransaction>> getRecentTransactions(
             String address, int limit) {
 
         return rpc.getSignaturesForAddress(address, Math.min(100, Math.max(1, limit)))
                 .thenCompose(signaturesNode -> {
-                    List<CompletableFuture<SolanaTransaction>> fetches = new ArrayList<>();
+                    List<CompletableFuture<SolonaTransaction>> fetches = new ArrayList<>();
                     if (signaturesNode != null && signaturesNode.isArray()) {
                         for (JsonNode sig : signaturesNode) {
                             String signature = sig.path("signature").asText("");
@@ -57,8 +57,8 @@ public class SolanaTransactionService {
                     }
                     return CompletableFuture.allOf(fetches.toArray(new CompletableFuture[0]))
                             .thenApply(ignored -> {
-                                List<SolanaTransaction> results = new ArrayList<>(fetches.size());
-                                for (CompletableFuture<SolanaTransaction> f : fetches) {
+                                List<SolonaTransaction> results = new ArrayList<>(fetches.size());
+                                for (CompletableFuture<SolonaTransaction> f : fetches) {
                                     try {
                                         results.add(f.join());
                                     } catch (Exception joinError) {
@@ -75,7 +75,7 @@ public class SolanaTransactionService {
      * @param signature base-58 transaction signature
      * @return future resolving to the transaction details
      */
-    public CompletableFuture<SolanaTransaction> getTransaction(String signature) {
+    public CompletableFuture<SolonaTransaction> getTransaction(String signature) {
         return rpc.getTransaction(signature)
                 .thenApply(result -> parseTransaction(signature, result));
     }
@@ -97,7 +97,7 @@ public class SolanaTransactionService {
         }
         return rpc.getFeeForMessage(messageBase64)
                 .exceptionally(ex -> {
-                    log.debug("Solana: fee estimation failed, using default: {}", ex.getMessage());
+                    log.debug("Solona: fee estimation failed, using default: {}", ex.getMessage());
                     return DEFAULT_FEE_LAMPORTS;
                 });
     }
@@ -105,43 +105,43 @@ public class SolanaTransactionService {
     // ── Send ──────────────────────────────────────────────────────────────────
 
     /**
-     * Sends a fully signed, base-64 encoded transaction to the Solana network.
+     * Sends a fully signed, base-64 encoded transaction to the Solona network.
      *
      * <p>
      * <b>Safety checks performed before submission:</b>
      * <ol>
-     * <li>{@code solana.enabled=true}</li>
-     * <li>{@code solana.tradingEnabled=true}</li>
+     * <li>{@code solona.enabled=true}</li>
+     * <li>{@code solona.tradingEnabled=true}</li>
      * </ol>
      *
      * @param signedTransactionBase64 base-64 encoded signed transaction bytes
      * @return future resolving to the transaction signature
-     * @throws SolanaException.TradingDisabledException if trading is not enabled
+     * @throws SolonaException.TradingDisabledException if trading is not enabled
      */
     public CompletableFuture<String> sendTransaction(String signedTransactionBase64) {
         if (!config.isLiveTradingAllowed()) {
             return CompletableFuture.failedFuture(
-                    new SolanaException.TradingDisabledException(
-                            "Solana live trading is disabled. Set solana.tradingEnabled=true " +
-                                    "and solana.enabled=true in config.properties to enable it."));
+                    new SolonaException.TradingDisabledException(
+                            "Solona live trading is disabled. Set solona.tradingEnabled=true " +
+                                    "and solona.enabled=true in config.properties to enable it."));
         }
 
-        log.info("Solana: submitting transaction to network={}", config.network());
+        log.info("Solona: submitting transaction to network={}", config.network());
         return rpc.sendTransaction(signedTransactionBase64)
                 .whenComplete((sig, ex) -> {
                     if (ex == null) {
-                        log.info("Solana transaction submitted: sig={}...", safePrefix16(sig));
+                        log.info("Solona transaction submitted: sig={}...", safePrefix16(sig));
                     } else {
-                        log.warn("Solana transaction submission failed: {}", ex.getMessage());
+                        log.warn("Solona transaction submission failed: {}", ex.getMessage());
                     }
                 });
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private SolanaTransaction parseTransaction(String signature, JsonNode result) {
+    private SolonaTransaction parseTransaction(String signature, JsonNode result) {
         if (result == null || result.isNull() || result.isMissingNode()) {
-            return new SolanaTransaction(signature, -1L, null, "unknown",
+            return new SolonaTransaction(signature, -1L, null, "unknown",
                     BigDecimal.ZERO, false);
         }
 
@@ -153,11 +153,11 @@ public class SolanaTransactionService {
         boolean hasErr = !meta.path("err").isNull() && !meta.path("err").isMissingNode();
         long feeLam = meta.path("fee").asLong(DEFAULT_FEE_LAMPORTS);
         BigDecimal feeSol = BigDecimal.valueOf(feeLam)
-                .divide(BigDecimal.valueOf(SolanaNetworkConfig.LAMPORTS_PER_SOL),
+                .divide(BigDecimal.valueOf(SolonaNetworkConfig.LAMPORTS_PER_SOL),
                         9, RoundingMode.HALF_UP);
 
         String status = hasErr ? "failed" : "confirmed";
-        return new SolanaTransaction(signature, slot, ts, status, feeSol, !hasErr);
+        return new SolonaTransaction(signature, slot, ts, status, feeSol, !hasErr);
     }
 
     private static String safePrefix16(String s) {

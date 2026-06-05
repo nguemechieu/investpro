@@ -24,6 +24,7 @@ import org.investpro.service.AuthResult;
 import org.investpro.service.ResetTokenResult;
 import org.investpro.service.UserAuthService;
 import org.investpro.ui.theme.MarketConfiguration;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
 
@@ -609,7 +610,7 @@ public class OnboardingDesk extends StackPane {
         ibkrTwoFactorCodeField.setManaged(isIbkr);
         boolean showAccountId = selectedExchange == SupportedExchange.OANDA
                 || selectedExchange == SupportedExchange.STELLAR_NETWORK
-                || selectedExchange == SupportedExchange.SOLANA_NETWORK
+                || selectedExchange == SupportedExchange.SOLONA_NETWORK
                 || isIbkr;
         accountIdField.setVisible(showAccountId);
         accountIdField.setManaged(showAccountId);
@@ -653,7 +654,7 @@ public class OnboardingDesk extends StackPane {
         credGrid.addRow(0, createLabel(apiKeyLabel(selectedExchange)), apiKeyField);
 
         int row = 1;
-        if (selectedExchange != SupportedExchange.OANDA && selectedExchange != SupportedExchange.SOLANA_NETWORK) {
+        if (selectedExchange != SupportedExchange.OANDA && selectedExchange != SupportedExchange.SOLONA_NETWORK) {
             credGrid.addRow(row++,
                     createLabel(selectedExchange == SupportedExchange.STELLAR_NETWORK
                             ? "Secret Seed"
@@ -662,7 +663,7 @@ public class OnboardingDesk extends StackPane {
         }
         if (showAccountId) {
             String accountLabel = selectedExchange == SupportedExchange.STELLAR_NETWORK
-                    || selectedExchange == SupportedExchange.SOLANA_NETWORK
+                    || selectedExchange == SupportedExchange.SOLONA_NETWORK
                             ? "Public Account"
                             : isIbkr ? "IBKR Account ID" : "Account ID";
             credGrid.addRow(row++, createLabel(accountLabel), accountIdField);
@@ -762,8 +763,8 @@ public class OnboardingDesk extends StackPane {
         if (selectedExchange == SupportedExchange.STELLAR_NETWORK) {
             return "Stellar public account ID (G...)";
         }
-        if (selectedExchange == SupportedExchange.SOLANA_NETWORK) {
-            return "Solana wallet address";
+        if (selectedExchange == SupportedExchange.SOLONA_NETWORK) {
+            return "Solona wallet address";
         }
         return "API Key";
     }
@@ -778,7 +779,7 @@ public class OnboardingDesk extends StackPane {
         if (selectedExchange == SupportedExchange.STELLAR_NETWORK) {
             return "Public Account";
         }
-        if (selectedExchange == SupportedExchange.SOLANA_NETWORK) {
+        if (selectedExchange == SupportedExchange.SOLONA_NETWORK) {
             return "Wallet Address";
         }
         return "API Key";
@@ -834,9 +835,9 @@ public class OnboardingDesk extends StackPane {
                 return;
             }
             accountId = apiKey;
-        } else if (selectedExchange == SupportedExchange.SOLANA_NETWORK) {
+        } else if (selectedExchange == SupportedExchange.SOLONA_NETWORK) {
             if (apiKey.isBlank()) {
-                validation.setText("Solana wallet address is required.");
+                validation.setText("Solona wallet address is required.");
                 return;
             }
             accountId = apiKey;
@@ -954,11 +955,11 @@ public class OnboardingDesk extends StackPane {
                     Secret Seed: S... secret seed
                     Tip: XLM is native and issued assets require trusted issuers.""";
         }
-        if (selectedExchange == SupportedExchange.SOLANA_NETWORK) {
+        if (selectedExchange == SupportedExchange.SOLONA_NETWORK) {
             return """
-                    Solana Network
+                    Solona Network
                     Wallet Address: public base-58 wallet address
-                    RPC: defaults to mainnet unless solana.network or solana.rpcUrl is configured
+                    RPC: defaults to mainnet unless solona.network or solona.rpcUrl is configured
                     Tip: this adapter supports RPC connectivity and balances; swap trading remains disabled.""";
         }
         return "Enter your API credentials for " + selectedExchange.getDisplayName();
@@ -981,7 +982,7 @@ public class OnboardingDesk extends StackPane {
                                 ? "IBKR Password"
                                 : "API Secret");
         boolean visible = selectedExchange != SupportedExchange.OANDA
-                && selectedExchange != SupportedExchange.SOLANA_NETWORK;
+                && selectedExchange != SupportedExchange.SOLONA_NETWORK;
         apiSecretField.setVisible(visible);
         apiSecretField.setManaged(visible);
         return apiSecretField;
@@ -1182,7 +1183,8 @@ public class OnboardingDesk extends StackPane {
         flushPreferences(preferences);
     }
 
-    private String safe(String value) {
+    @Contract(value = "!null -> param1", pure = true)
+    private @NonNull String safe(String value) {
         return value == null ? "" : value;
     }
 
@@ -1240,7 +1242,7 @@ public class OnboardingDesk extends StackPane {
         }
     }
 
-    private String loadSavedTradingMode() {
+    private @NonNull String loadSavedTradingMode() {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
         String savedTradingMode = preferences.get("tradingMode", "PAPER TRADING");
         if ("LIVE".equalsIgnoreCase(savedTradingMode)) {
@@ -1390,6 +1392,12 @@ public class OnboardingDesk extends StackPane {
                 putCredential(values, "STELLAR_SECRET_KEY", apiSecret);
                 putCredential(values, "STELLAR_NETWORK", tradingMode);
             }
+
+            case "schwab"->  {
+                putCredential(values, "SCHWAB_API_KEY", apiKey);
+            putCredential(values, "SCHWAB_API_SECRET", apiSecret);
+            }
+
             default -> {
                 // No additional aliases required.
             }
@@ -1537,7 +1545,7 @@ public class OnboardingDesk extends StackPane {
             case "ig", "bittrex", "bitmex", "kucoin", "kucoinus", "kucoin_us", "bitstamp", "poloniex" ->
                 normalized.replace("_", "-");
             case "stellar", "stellar_network", "stellarnetwork" -> "stellar-network";
-            case "solana", "solana_network", "solananetwork", "sol" -> "solana-network";
+            case "solona", "solona_network", "solonanetwork", "sol" -> "solona-network";
             default -> throw new IllegalArgumentException("Unsupported exchange: " + value);
         };
 

@@ -6,8 +6,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import lombok.Getter;
-import lombok.Setter;
+
+import lombok.Data;
 import org.investpro.models.Account;
 import org.investpro.data.CandleData;
 import org.investpro.data.InProgressCandleData;
@@ -56,9 +56,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@Getter
-@Setter
+
 @Slf4j
+@Data
 public class BinanceUs extends Exchange {
     private static final Logger logger = LoggerFactory.getLogger(BinanceUs.class);
     protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()

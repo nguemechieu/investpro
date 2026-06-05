@@ -7,8 +7,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.investpro.models.Account;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.exchange.credentials.ExchangeCredentials;
@@ -56,8 +56,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
-@Getter
-@Setter
+@EqualsAndHashCode(callSuper = true)
+@Data
 @Slf4j
 public class Binance extends Exchange {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Binance.class);
@@ -1578,6 +1578,55 @@ public class Binance extends Exchange {
             throw new IllegalStateException("Binance API returned HTTP %d: %s".formatted(response.statusCode(), body));
         }
         return body;
+    }
+
+    public CompletableFuture<String> requestWithdrawalToCryptoAddress(
+            BigDecimal amount,
+            String currency,
+            String address,
+            String network,
+            String memo) {
+        if (isPaperTrading()) {
+            return failedFuture(
+                    new UnsupportedOperationException("Binance paper mode does not support live withdrawals."));
+        }
+        if (!hasCredentials()) {
+            return failedFuture(new IllegalStateException("Binance credentials are required for withdrawals."));
+        }
+        if (amount == null || amount.signum() <= 0) {
+            return failedFuture(new IllegalArgumentException("Withdrawal amount must be greater than zero."));
+        }
+        String coin = currency == null ? "" : currency.trim().toUpperCase(java.util.Locale.ROOT);
+        if (coin.isBlank()) {
+            return failedFuture(new IllegalArgumentException("Currency is required for Binance withdrawal."));
+        }
+        String destination = address == null ? "" : address.trim();
+        if (destination.isBlank()) {
+            return failedFuture(
+                    new IllegalArgumentException("Destination address is required for Binance withdrawal."));
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Map<String, String> params = new LinkedHashMap<>();
+                params.put("coin", coin);
+                params.put("address", destination);
+                params.put("amount", amount.stripTrailingZeros().toPlainString());
+                if (network != null && !network.isBlank()) {
+                    params.put("network", network.trim().toUpperCase(java.util.Locale.ROOT));
+                }
+                if (memo != null && !memo.isBlank()) {
+                    params.put("addressTag", memo.trim());
+                }
+                params.put("recvWindow", "5000");
+
+                JsonNode response = sendSignedBinanceRequest("POST", "/sapi/v1/capital/withdraw/apply", params);
+                JsonNode id = response.get("id");
+                return id != null && !id.isNull() ? id.asText() : response.toString();
+            } catch (Exception exception) {
+                throw new IllegalStateException("Binance withdrawal failed.", exception);
+            }
+        });
     }
 
     @Contract("null, _ -> fail")

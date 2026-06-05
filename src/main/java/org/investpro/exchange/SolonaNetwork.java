@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import javafx.beans.property.SimpleIntegerProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
+
 import org.investpro.config.AppConfig;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.enums.timeframe.Timeframe;
@@ -15,6 +15,9 @@ import org.investpro.exchange.infrastructure.StreamTransport;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.MarketDepthType;
+import org.investpro.exchange.solona.SolonaNetworkAdapter;
+import org.investpro.exchange.solona.SolonaNetworkConfig;
+import org.investpro.exchange.solona.SolonaTokenBalance;
 import org.investpro.exchange.websocket.ExchangeWebSocketClient;
 import org.investpro.models.Account;
 import org.investpro.models.trading.OpenOrder;
@@ -29,6 +32,7 @@ import org.investpro.data.CandleData;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
 
@@ -45,10 +49,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 /**
- * Solana network exchange adapter.
+ * Solona network exchange adapter.
  *
  * <p>
- * This adapter wires the existing Solana RPC services into the common
+ * This adapter wires the existing Solona RPC services into the common
  * InvestPro Exchange surface. It supports connection checks and wallet balance
  * reads today; order submission is intentionally disabled until a vetted swap
  * execution service is available.
@@ -56,41 +60,42 @@ import java.util.concurrent.ExecutionException;
  */
 @EqualsAndHashCode(callSuper = true)
 @Data
-public class SolanaNetwork extends Exchange {
+public class SolonaNetwork extends Exchange {
 
-    private static final String EXCHANGE_NAME = "SOLANA NETWORK";
-    private static final String EXCHANGE_ID = "solana-network";
-    private static final String DEFAULT_WALLET_KEY = "solana.walletAddress";
+    private static final String EXCHANGE_NAME = "SOLONA NETWORK";
+    private static final String EXCHANGE_ID = "solona-network";
+    private static final String DEFAULT_WALLET_KEY = "solona.walletAddress";
 
     private final ExchangeCredentials credentials;
 
-    private final SolanaNetworkAdapter adapter;
+    private final SolonaNetworkAdapter adapter;
     private volatile boolean connected;
 
-    public SolanaNetwork(@NotNull ExchangeCredentials credentials) {
+    public SolonaNetwork(@NotNull ExchangeCredentials credentials) {
         super(credentials);
         this.credentials = credentials;
-        this.adapter = new SolanaNetworkAdapter(resolveConfig());
+        this.adapter = new SolonaNetworkAdapter(resolveConfig());
     }
 
-    private SolanaNetworkConfig resolveConfig() {
-        String network = AppConfig.get("solana.network", SolanaNetworkConfig.MAINNET);
-        String commitment = AppConfig.get("solana.commitment", "confirmed");
-        int timeoutSeconds = AppConfig.getInt("solana.requestTimeoutSeconds", 30);
-        int maxRetries = AppConfig.getInt("solana.maxRetries", 3);
-        String rpcUrl = AppConfig.get("solana.rpcUrl", "");
+    @Contract(" -> new")
+    private @NonNull SolonaNetworkConfig resolveConfig() {
+        String network = AppConfig.get("solona.network", SolonaNetworkConfig.MAINNET);
+        String commitment = AppConfig.get("solona.commitment", "confirmed");
+        int timeoutSeconds = AppConfig.getInt("solona.requestTimeoutSeconds", 30);
+        int maxRetries = AppConfig.getInt("solona.maxRetries", 3);
+        String rpcUrl = AppConfig.get("solona.rpcUrl", "");
         if (rpcUrl.isBlank()) {
             rpcUrl = switch (network.trim().toLowerCase(Locale.ROOT)) {
-                case SolanaNetworkConfig.DEVNET -> """
-                        https://api.devnet.solana.com""";
-                case SolanaNetworkConfig.TESTNET -> """
-                        https://api.testnet.solana.com""";
+                case SolonaNetworkConfig.DEVNET -> """
+                        https://api.devnet.solona.com""";
+                case SolonaNetworkConfig.TESTNET -> """
+                        https://api.testnet.solona.com""";
                 default -> """
-                        https://api.mainnet-beta.solana.com""";
+                        https://api.mainnet-beta.solona.com""";
             };
         }
-        boolean tradingEnabled = AppConfig.getBoolean("solana.tradingEnabled", false);
-        return new SolanaNetworkConfig(true, network, rpcUrl, commitment, tradingEnabled, timeoutSeconds, maxRetries);
+        boolean tradingEnabled = AppConfig.getBoolean("solona.tradingEnabled", false);
+        return new SolonaNetworkConfig(true, network, rpcUrl, commitment, tradingEnabled, timeoutSeconds, maxRetries);
     }
 
     @Override
@@ -110,7 +115,7 @@ public class SolanaNetwork extends Exchange {
 
     @Override
     public String getDisplayName() {
-        return "Solana Network";
+        return "Solona Network";
     }
 
     @Override
@@ -169,7 +174,7 @@ public class SolanaNetwork extends Exchange {
                 .marketDepthType(MarketDepthType.NONE)
                 .supportsPollingFallback(true)
                 .supportedMarketType("SPOT")
-                .notes("Solana RPC wallet/balance integration. Swap trading is disabled until a swap executor is configured.")
+                .notes("Solona RPC wallet/balance integration. Swap trading is disabled until a swap executor is configured.")
                 .build();
     }
 
@@ -184,7 +189,7 @@ public class SolanaNetwork extends Exchange {
                     .credentialSource("CONFIG_OR_ACCOUNT_ID")
                     .endpointTested("getSlot")
                     .httpStatus(200)
-                    .message("Connected to Solana RPC at slot " + slot)
+                    .message("Connected to Solona RPC at slot " + slot)
                     .credentialIssue(false)
                     .checkedAt(Instant.now())
                     .metadata(Map.of("network", adapter.getConfig().network(), "rpcUrl", adapter.getConfig().rpcUrl()))
@@ -295,7 +300,7 @@ public class SolanaNetwork extends Exchange {
                     return snapshot.tokens().stream()
                             .filter(token -> normalized.equalsIgnoreCase(token.symbol())
                                     || normalized.equalsIgnoreCase(token.mint()))
-                            .map(SolanaTokenBalance::amount)
+                            .map(SolonaTokenBalance::amount)
                             .reduce(BigDecimal.ZERO, BigDecimal::add)
                             .doubleValue();
                 });
@@ -387,7 +392,7 @@ public class SolanaNetwork extends Exchange {
 
             @Override
             public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-                return SolanaNetwork.this.getCandleDataSupplier(secondsPerCandle, tradePair);
+                return SolonaNetwork.this.getCandleDataSupplier(secondsPerCandle, tradePair);
             }
 
             @Override
@@ -431,7 +436,7 @@ public class SolanaNetwork extends Exchange {
 
     @Override
     public String supportsTimeframe(int secondsPerCandle) {
-        return "Solana RPC market candles are not available in this adapter.";
+        return "Solona RPC market candles are not available in this adapter.";
     }
 
     @Override
@@ -484,7 +489,7 @@ public class SolanaNetwork extends Exchange {
 
     private CompletableFuture<String> unsupportedTrading() {
         return failedFuture(new UnsupportedOperationException(
-                "Solana swap trading is not enabled. Wallet balances and RPC connectivity are supported."));
+                "Solona swap trading is not enabled. Wallet balances and RPC connectivity are supported."));
     }
 
     @Override
@@ -499,7 +504,7 @@ public class SolanaNetwork extends Exchange {
 
     @Override
     public CompletableFuture<String> cancelAllOrders() {
-        return CompletableFuture.completedFuture("No Solana orders to cancel");
+        return CompletableFuture.completedFuture("No Solona orders to cancel");
     }
 
     @Override
@@ -539,12 +544,12 @@ public class SolanaNetwork extends Exchange {
 
     @Override
     public CompletableFuture<String> closePosition(TradePair tradePair) {
-        return CompletableFuture.completedFuture("No Solana position to close");
+        return CompletableFuture.completedFuture("No Solona position to close");
     }
 
     @Override
     public CompletableFuture<String> closeAllPositions() {
-        return CompletableFuture.completedFuture("No Solana positions to close");
+        return CompletableFuture.completedFuture("No Solona positions to close");
     }
 
     @Override
@@ -819,7 +824,7 @@ public class SolanaNetwork extends Exchange {
         try {
             return TradePair.fromSymbol("SOL_USDC");
         } catch (Exception exception) {
-            throw new IllegalStateException("Unable to resolve Solana chart pair", exception);
+            throw new IllegalStateException("Unable to resolve Solona chart pair", exception);
         }
     }
 
@@ -848,10 +853,8 @@ public class SolanaNetwork extends Exchange {
         return candles;
     }
 
-    private double syntheticChartPrice(TradePair tradePair) {
-        if (tradePair == null) {
-            return 150.0;
-        }
+    private double syntheticChartPrice(@NotNull TradePair tradePair) {
+
         String symbol = tradePair.toString('/').toUpperCase(Locale.ROOT);
         return switch (symbol) {
             case "SOL/USD", "SOL/USDC" -> 150.0;
@@ -902,19 +905,19 @@ public class SolanaNetwork extends Exchange {
 
     @Override
     public CompletableFuture<String> setLeverage(TradePair tradePair, double leverage) {
-        return failedFuture(new UnsupportedOperationException("Solana does not support leverage."));
+        return failedFuture(new UnsupportedOperationException("Solona does not support leverage."));
     }
 
     @Override
     public void buy(TradePair tradePair, MARKET_TYPES marketType, double size, double side,
             double stopLoss, double takeProfit, double slippage) {
-        throw new UnsupportedOperationException("Solana swap trading is not enabled.");
+        throw new UnsupportedOperationException("Solona swap trading is not enabled.");
     }
 
     @Override
     public void sell(TradePair tradePair, MARKET_TYPES marketType, double size, double side,
             double stopLoss, double takeProfit, double slippage) {
-        throw new UnsupportedOperationException("Solana swap trading is not enabled.");
+        throw new UnsupportedOperationException("Solona swap trading is not enabled.");
     }
 
     @Override
@@ -945,6 +948,6 @@ public class SolanaNetwork extends Exchange {
             current = current.getCause();
         }
         String message = current == null ? null : current.getMessage();
-        return message == null || message.isBlank() ? "Unknown Solana RPC error" : message;
+        return message == null || message.isBlank() ? "Unknown Solona RPC error" : message;
     }
 }

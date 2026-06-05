@@ -18,7 +18,7 @@ public enum ExecutionVenue {
     /** Decentralized exchange (Uniswap, Jupiter, etc.). Requires on-chain signing. */
     DEX(true, true, "Decentralized Exchange"),
 
-    /** Direct on-chain execution via smart contract or native transfer (Solana, Stellar). */
+    /** Direct on-chain execution via smart contract or native transfer (Solona, Stellar). */
     BLOCKCHAIN(true, true, "Blockchain Direct"),
 
     /** Paper trading mode — no real funds, orders are simulated locally. */

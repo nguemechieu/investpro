@@ -29,6 +29,7 @@ import org.investpro.service.AuthResult;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 import org.jspecify.annotations.NonNull;
@@ -54,6 +55,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -112,7 +115,7 @@ public class StellarNetwork extends Exchange {
     private static final String TESTNET_USDC_ISSUER = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
 
     private static final double DEFAULT_XLM_USDC_PRICE = 0.50;
-    private static final int DEFAULT_ORDER_BOOK_LIMIT = 20;
+    private static final int DEFAULT_ORDER_BOOK_LIMIT = 200;
     private static final int MAX_RECENT_TRADES = 200;
     private static final long DEFAULT_BASE_FEE_STROOPS = 100L;
     private static final long DEFAULT_TX_TIMEOUT_SECONDS = 45L;
@@ -258,12 +261,10 @@ public class StellarNetwork extends Exchange {
         trustedAssetIssuers.clear();
 
         balances.put("USDC", 1_000.0);
-        balances.put("USD", 1_000.0);
         balances.put("XLM", 1_000.0);
-        balances.put("EURC", 0.0);
+        balances.put("EURC", 1_000.0);
 
         trustedAssetIssuers.put("USDC", isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
-        trustedAssetIssuers.put("USD", isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
 
         log.info("Stellar paper account initialized with 1000 USDC and 1000 XLM");
     }
@@ -1584,7 +1585,7 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return new StellarCandleDataSupplier(200, secondsPerCandle, pairOrDefault(tradePair));
+        return new StellarCandleDataSupplier(1000, secondsPerCandle, pairOrDefault(tradePair));
     }
 
     public CandleDataSupplier getCandleDataSupplier(TradePair tradePair, Timeframe timeframe) {
@@ -1638,7 +1639,8 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public List<Timeframe> getSupportedTimeframes() {
-        return List.of(Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.D1, Timeframe.W1);
+        return List.of(Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.D1, Timeframe.W1,Timeframe.MN
+        );
     }
 
     private List<CandleData> buildCandlesFromTrades(TradePair tradePair, int secondsPerCandle, int limit,
@@ -1656,26 +1658,15 @@ public class StellarNetwork extends Exchange {
         }
 
         TradePair pair = pairOrDefault(tradePair);
-        List<CandleData> direct = fetchAggregationCandles(pair, start, end, resolution, safeSeconds, safeLimit, false);
-        if (!direct.isEmpty()) {
-            return direct;
-        }
-        log.info("Fetch inverse candles syntheticCandlesFromTicker");
+        return fetchAggregationCandles(pair, start, end, resolution, safeSeconds, safeLimit);
 
-        List<CandleData> inverse = fetchAggregationCandles(pair, start, end, resolution, safeSeconds, safeLimit, true);
-        if (!inverse.isEmpty()) {
-            return inverse;
-        }
-
-        return syntheticCandlesFromTicker(pair, safeSeconds, safeLimit, end);
     }
 
-    private List<CandleData> fetchAggregationCandles(TradePair pair, long requestedStart, long requestedEnd,
-            long resolution, int secondsPerCandle, int limit,
-            boolean inverse) {
+    private List<CandleData> fetchAggregationCandles(@NonNull TradePair pair, long requestedStart, long requestedEnd,
+                                                     long resolution, int secondsPerCandle, int limit) {
         long requestedWindow = Math.max(requestedEnd - requestedStart, (long) limit * secondsPerCandle);
-        Asset base = toStellarMarketDataAsset(inverse ? pair.getCounterCode() : pair.getBaseCode());
-        Asset counter = toStellarMarketDataAsset(inverse ? pair.getBaseCode() : pair.getCounterCode());
+        Asset base = toStellarMarketDataAsset(pair.getBaseCode());
+        Asset counter = toStellarMarketDataAsset(pair.getCounterCode());
 
         for (int attempt = 0; attempt < 6; attempt++) {
             long end = requestedEnd - attempt * requestedWindow;
@@ -1685,13 +1676,14 @@ public class StellarNetwork extends Exchange {
             }
 
             try {
+                long offset= LocalDateTime.now().atOffset(ZoneOffset.UTC).toEpochSecond();
                 Page<TradeAggregationResponse> page = activeMarketDataServer().tradeAggregations(
                         base,
                         counter,
                         start * 1000L,
                         end * 1000L,
                         resolution,
-                        0L).execute();
+                        0).execute();
 
                 List<TradeAggregationResponse> records = page == null || page.getRecords() == null
                         ? List.of()
@@ -1701,51 +1693,23 @@ public class StellarNetwork extends Exchange {
                                 .toList();
 
                 if (!records.isEmpty()) {
-                    return normalizeCandlePage(denseCandlesFromAggregations(records, secondsPerCandle, limit, inverse),
+                    return normalizeCandlePage(denseCandlesFromAggregations(records, secondsPerCandle, limit),
                             limit);
                 }
             } catch (Exception exception) {
                 throw new RuntimeException(exception);
-                // "Failed to fetch Stellar {}trade aggregations for {} on {}: {}",
-                // inverse ? "inverse " : "", pair, horizonUrl(), exception.getMessage());
-                // return List.of();
+
             }
         }
 
         return List.of();
     }
 
-    private List<CandleData> syntheticCandlesFromTicker(TradePair pair, int secondsPerCandle, int limit, long endTime) {
-        Ticker ticker = safeTicker(pair);
-        double mid = ticker.getMidPrice() > 0 ? ticker.getMidPrice() : DEFAULT_XLM_USDC_PRICE;
-        if (mid <= 0.0) {
-            return List.of();
-        }
 
-        int safeLimit = Math.max(1, Math.min(limit, 1_000));
-        long alignedEnd = (endTime / secondsPerCandle) * secondsPerCandle;
-        long start = Math.max(0, alignedEnd - (long) safeLimit * secondsPerCandle);
-        List<CandleData> candles = new ArrayList<>(safeLimit);
-        double previousClose = mid;
-
-        for (int index = 0; index < safeLimit; index++) {
-            long openTime = start + (long) index * secondsPerCandle;
-            double wave = Math.sin((openTime / (double) secondsPerCandle) * 0.21) * 0.0025;
-            double drift = Math.cos((openTime / (double) secondsPerCandle) * 0.07) * 0.0015;
-            double close = Math.max(0.0000001, mid * (1.0 + wave + drift));
-            double high = Math.max(previousClose, close) * 1.001;
-            double low = Math.min(previousClose, close) * 0.999;
-            candles.add(new CandleData(previousClose, close, high, low, (int) openTime, 0.0));
-            previousClose = close;
-        }
-
-        return normalizeCandlePage(candles, safeLimit);
-    }
 
     private List<CandleData> denseCandlesFromAggregations(List<TradeAggregationResponse> records,
             int secondsPerCandle,
-            int limit,
-            boolean inverse) {
+            int limit) {
         if (records == null || records.isEmpty()) {
             return List.of();
         }
@@ -1758,7 +1722,7 @@ public class StellarNetwork extends Exchange {
 
         long lastOpen = byOpenTime.lastKey();
         long firstOpen = Math.max(0, lastOpen - (long) (limit - 1) * secondsPerCandle);
-        double previousClose = inverse
+        double previousClose = false
                 ? invertPrice(parseDouble(records.get(0).getOpen(), 0.0))
                 : parseDouble(records.get(0).getOpen(), 0.0);
 
@@ -1766,7 +1730,7 @@ public class StellarNetwork extends Exchange {
         for (long openTime = firstOpen; openTime <= lastOpen; openTime += secondsPerCandle) {
             TradeAggregationResponse record = byOpenTime.get(openTime);
             if (record != null) {
-                CandleData candle = inverse ? invertedCandleFromAggregation(record) : candleFromAggregation(record);
+                CandleData candle = false ? invertedCandleFromAggregation(record) : candleFromAggregation(record);
                 previousClose = candle.closePrice();
                 candles.add(candle);
             } else if (previousClose > 0) {
@@ -1803,7 +1767,8 @@ public class StellarNetwork extends Exchange {
                 .toList();
     }
 
-    private CandleData candleFromAggregation(TradeAggregationResponse record) {
+    @Contract("_ -> new")
+    private @NonNull CandleData candleFromAggregation(@NonNull TradeAggregationResponse record) {
         return new CandleData(
                 parseDouble(record.getOpen(), 0.0),
                 parseDouble(record.getClose(), 0.0),
@@ -1813,7 +1778,7 @@ public class StellarNetwork extends Exchange {
                 parseDouble(record.getBaseVolume(), 0.0));
     }
 
-    private CandleData invertedCandleFromAggregation(TradeAggregationResponse record) {
+    private @NonNull CandleData invertedCandleFromAggregation(@NonNull TradeAggregationResponse record) {
         double open = invertPrice(parseDouble(record.getOpen(), 0.0));
         double close = invertPrice(parseDouble(record.getClose(), 0.0));
         double high = invertPrice(parseDouble(record.getLow(), 0.0));
@@ -1829,7 +1794,7 @@ public class StellarNetwork extends Exchange {
 
     private long aggregationResolutionMillis(int secondsPerCandle) {
         return switch (secondsPerCandle) {
-            case 60, 300, 900, 3_600, 86_400, 604_800 -> secondsPerCandle * 1000L;
+            case 60, 300, 900, 3_600, 86_400, 604_800,(3600*24*7*4) -> secondsPerCandle * 1000L;
             default -> -1L;
         };
     }
@@ -2221,8 +2186,8 @@ public class StellarNetwork extends Exchange {
                 .requiresAuthenticationForMarketData(false)
 
                 .supportedMarketType("CRYPTO")
-                .supportedMarketType("SPOT")
-                .supportedMarketType("XLM")
+
+
 
                 .notes("""
                         Stellar Network DEX adapter.
@@ -2289,7 +2254,7 @@ public class StellarNetwork extends Exchange {
             Page<AssetResponse> page = activeServer()
                     .assets()
                     .assetCode(normalized)
-                    .limit(100)
+
                     .execute();
 
             if (page == null || page.getRecords() == null || page.getRecords().isEmpty()) {
@@ -2390,7 +2355,7 @@ public class StellarNetwork extends Exchange {
         return pair == null ? defaultPair() : pair;
     }
 
-    private TradePair parseSymbolOrDefault(String symbol) {
+    private @NonNull TradePair parseSymbolOrDefault(String symbol) {
         if (symbol == null || symbol.isBlank()) {
             return defaultPair();
         }
@@ -2547,23 +2512,24 @@ public class StellarNetwork extends Exchange {
 
         @Override
         public Set<Integer> getSupportedGranularities() {
-            return Set.of(60, 300, 900, 3_600, 86_400, 604_800);
+            return Set.of(60, 300, 900, 3_600, 86_400, 604_800,(3600*24*7*4));
         }
 
         @Override
-        public List<CandleData> getCandleData() {
+        public @NonNull List<CandleData> getCandleData() {
             return loadAggregatedCandlePage();
         }
 
-        private List<CandleData> loadAggregatedCandlePage() {
+        private @NonNull List<CandleData> loadAggregatedCandlePage() {
             int end = endTime.get();
             List<CandleData> candles = normalizeCandlePage(
                     buildCandlesFromTrades(tradePair, secondsPerCandle, numCandles, null, (long) end),
                     numCandles);
+
             if (!candles.isEmpty()) {
                 int firstOpenTime = candles.stream()
                         .mapToInt(CandleData::openTime)
-                        .min()
+                        .max()
                         .orElse(end);
                 if (firstOpenTime < end) {
                     endTime.set(Math.max(0, firstOpenTime - 1));

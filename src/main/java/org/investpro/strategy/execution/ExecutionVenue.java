@@ -16,7 +16,7 @@ public enum ExecutionVenue {
     COINBASE("Coinbase Advanced Trade", "crypto", true),
     OANDA("OANDA FX", "forex", true),
     BINANCE("Binance", "crypto", true),
-    SOLANA_DEX("Solana DEX", "defi", true),
+    SOLONA_DEX("Solona DEX", "defi", true),
     STELLAR("Stellar Network", "defi", true),
     PAPER_TRADING("Paper Trading Simulator", "simulation", false),
     SIMULATION("Backtest Simulation Engine", "simulation", false);

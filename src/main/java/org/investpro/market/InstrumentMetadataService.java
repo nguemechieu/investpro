@@ -143,7 +143,7 @@ public class InstrumentMetadataService {
 
     private boolean isAlwaysOpenCryptoBroker(@NotNull String broker) {
         String normalized = broker.trim().toUpperCase();
-        return normalized.contains("STELLAR") || normalized.contains("SOLANA");
+        return normalized.contains("STELLAR") || normalized.contains("SOLONA");
     }
 
     private boolean isKnownFiat(@NotNull String code) {

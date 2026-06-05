@@ -7,8 +7,11 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import org.investpro.exchange.*;
-import org.investpro.exchange.SolanaBalanceService.SolanaAccountSnapshot;
+import org.investpro.exchange.solona.SolonaBalanceService.SolonaAccountSnapshot;
+import org.investpro.exchange.solona.SolonaException;
+import org.investpro.exchange.solona.SolonaNetworkAdapter;
+import org.investpro.exchange.solona.SolonaTokenBalance;
+import org.investpro.exchange.solona.SolonaTransaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,20 +20,20 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * JavaFX panel that displays Solana wallet information, token balances,
+ * JavaFX panel that displays Solona wallet information, token balances,
  * and transaction history.
  *
- * <p>All Solana network calls run on background threads via
+ * <p>All Solona network calls run on background threads via
  * {@link CompletableFuture}. UI updates are dispatched to the JavaFX
  * Application Thread via {@link Platform#runLater(Runnable)}.
  * The panel NEVER blocks the UI thread.
  *
- * <p>The panel is lazily initialised: Solana is only contacted when
+ * <p>The panel is lazily initialised: Solona is only contacted when
  * the user provides a wallet address and clicks "Refresh".
  */
-public class SolanaNetworkPanel extends VBox {
+public class SolonaNetworkPanel extends VBox {
 
-    private static final Logger log = LoggerFactory.getLogger(SolanaNetworkPanel.class);
+    private static final Logger log = LoggerFactory.getLogger(SolonaNetworkPanel.class);
 
     // ── Status indicator ─────────────────────────────────────────────────────
     private final Circle       statusDot     = new Circle(6);
@@ -42,24 +45,24 @@ public class SolanaNetworkPanel extends VBox {
     private final Label        solBalance    = new Label("–");
 
     // ── Token table ──────────────────────────────────────────────────────────
-    private final TableView<SolanaTokenBalance> tokenTable = new TableView<>();
+    private final TableView<SolonaTokenBalance> tokenTable = new TableView<>();
 
     // ── Transaction table ────────────────────────────────────────────────────
-    private final TableView<SolanaTransaction> txTable = new TableView<>();
+    private final TableView<SolonaTransaction> txTable = new TableView<>();
 
     // ── Controls ─────────────────────────────────────────────────────────────
     private final Button refreshBtn  = new Button("⟳ Refresh");
     private final Button connectBtn  = new Button("Connect");
     private final Label  errorLabel  = new Label();
 
-    private SolanaNetworkAdapter adapter;
+    private SolonaNetworkAdapter adapter;
 
     // ── Constructor ───────────────────────────────────────────────────────────
 
-    public SolanaNetworkPanel() {
+    public SolonaNetworkPanel() {
         super(12);
         setPadding(new Insets(16));
-        getStyleClass().add("solana-panel");
+        getStyleClass().add("solona-panel");
 
         buildUI();
         setDisconnectedState();
@@ -75,7 +78,7 @@ public class SolanaNetworkPanel extends VBox {
         statusRow.setAlignment(Pos.CENTER_LEFT);
 
         // ── Wallet address input ──────────────────────────────────────────────
-        addressField.setPromptText("Enter Solana wallet address (base-58)…");
+        addressField.setPromptText("Enter Solona wallet address (base-58)…");
         addressField.setPrefWidth(480);
         HBox walletRow = new HBox(8, new Label("Wallet:"), addressField,
                 connectBtn, refreshBtn);
@@ -87,17 +90,17 @@ public class SolanaNetworkPanel extends VBox {
         balanceRow.setAlignment(Pos.CENTER_LEFT);
 
         // ── Token table ───────────────────────────────────────────────────────
-        TableColumn<SolanaTokenBalance, String> mintCol   = new TableColumn<>("Mint");
+        TableColumn<SolonaTokenBalance, String> mintCol   = new TableColumn<>("Mint");
         mintCol.setCellValueFactory(c ->
                 new javafx.beans.property.SimpleStringProperty(c.getValue().mint()));
         mintCol.setPrefWidth(320);
 
-        TableColumn<SolanaTokenBalance, String> symbolCol = new TableColumn<>("Symbol");
+        TableColumn<SolonaTokenBalance, String> symbolCol = new TableColumn<>("Symbol");
         symbolCol.setCellValueFactory(c ->
                 new javafx.beans.property.SimpleStringProperty(c.getValue().symbol()));
         symbolCol.setPrefWidth(80);
 
-        TableColumn<SolanaTokenBalance, String> amountCol = new TableColumn<>("Amount");
+        TableColumn<SolonaTokenBalance, String> amountCol = new TableColumn<>("Amount");
         amountCol.setCellValueFactory(c ->
                 new javafx.beans.property.SimpleStringProperty(
                         c.getValue().amount() == null ? "0"
@@ -109,24 +112,24 @@ public class SolanaNetworkPanel extends VBox {
         tokenTable.setPrefHeight(180);
 
         // ── Transaction table ─────────────────────────────────────────────────
-        TableColumn<SolanaTransaction, String> sigCol    = new TableColumn<>("Signature");
+        TableColumn<SolonaTransaction, String> sigCol    = new TableColumn<>("Signature");
         sigCol.setCellValueFactory(c ->
                 new javafx.beans.property.SimpleStringProperty(
                         c.getValue().shortSignature()));
         sigCol.setPrefWidth(200);
 
-        TableColumn<SolanaTransaction, String> statusCol = new TableColumn<>("Status");
+        TableColumn<SolonaTransaction, String> statusCol = new TableColumn<>("Status");
         statusCol.setCellValueFactory(c ->
                 new javafx.beans.property.SimpleStringProperty(c.getValue().status()));
         statusCol.setPrefWidth(90);
 
-        TableColumn<SolanaTransaction, String> slotCol   = new TableColumn<>("Slot");
+        TableColumn<SolonaTransaction, String> slotCol   = new TableColumn<>("Slot");
         slotCol.setCellValueFactory(c ->
                 new javafx.beans.property.SimpleStringProperty(
                         String.valueOf(c.getValue().slot())));
         slotCol.setPrefWidth(120);
 
-        TableColumn<SolanaTransaction, String> feeCol    = new TableColumn<>("Fee (SOL)");
+        TableColumn<SolonaTransaction, String> feeCol    = new TableColumn<>("Fee (SOL)");
         feeCol.setCellValueFactory(c ->
                 new javafx.beans.property.SimpleStringProperty(
                         c.getValue().feeSol() == null ? "–"
@@ -148,7 +151,7 @@ public class SolanaNetworkPanel extends VBox {
 
         // ── Layout ────────────────────────────────────────────────────────────
         getChildren().addAll(
-                new Label("Solana Network"),
+                new Label("Solona Network"),
                 new Separator(),
                 statusRow,
                 walletRow,
@@ -170,10 +173,10 @@ public class SolanaNetworkPanel extends VBox {
 
         CompletableFuture.supplyAsync(() -> {
             try {
-                return SolanaNetworkAdapter.create();
-            } catch (SolanaException.SolanaDisabledException ex) {
-                throw new RuntimeException("Solana is disabled in config.properties\n" +
-                        "Set solana.enabled=true to activate.", ex);
+                return SolonaNetworkAdapter.create();
+            } catch (SolonaException.SolonaDisabledException ex) {
+                throw new RuntimeException("Solona is disabled in config.properties\n" +
+                        "Set solona.enabled=true to activate.", ex);
             }
         }).thenCompose(adp -> {
             this.adapter = adp;
@@ -196,7 +199,7 @@ public class SolanaNetworkPanel extends VBox {
             return;
         }
         if (adapter.getWalletService().validateAddress(address)) {
-            showError("Invalid Solana address format.");
+            showError("Invalid Solona address format.");
             return;
         }
         clearError();
@@ -235,7 +238,7 @@ public class SolanaNetworkPanel extends VBox {
 
     private void showError(String message) {
         errorLabel.setText("⚠ " + message);
-        log.warn("SolanaNetworkPanel: {}", message);
+        log.warn("SolonaNetworkPanel: {}", message);
     }
 
     private void clearError() {
@@ -248,7 +251,7 @@ public class SolanaNetworkPanel extends VBox {
 
     /** Combines snapshot + transactions for a single-future composition. */
     private record RefreshResult(
-            SolanaAccountSnapshot snapshot,
-            List<SolanaTransaction> transactions
+            SolonaAccountSnapshot snapshot,
+            List<SolonaTransaction> transactions
     ) {}
 }

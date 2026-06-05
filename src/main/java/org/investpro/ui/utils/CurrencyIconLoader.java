@@ -46,7 +46,7 @@ public final class CurrencyIconLoader {
             Map.entry("USDC", "usd-coin"),
             Map.entry("USDT", "tether"),
             Map.entry("XRP", "ripple"),
-            Map.entry("SOL", "solana"),
+            Map.entry("SOL", "solona"),
             Map.entry("ADA", "cardano"),
             Map.entry("BNB", "binancecoin"),
             Map.entry("DOGE", "dogecoin"),

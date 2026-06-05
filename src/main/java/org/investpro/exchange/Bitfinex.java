@@ -1456,6 +1456,66 @@ public class Bitfinex extends Exchange {
         return responseBody;
     }
 
+    public CompletableFuture<String> requestWithdrawalToCryptoAddress(
+            BigDecimal amount,
+            String currency,
+            String address,
+            String network,
+            String memo) {
+        if (isPaperTrading()) {
+            return failedFuture(
+                    new UnsupportedOperationException("Bitfinex paper mode does not support live withdrawals."));
+        }
+        if (!hasCredentials()) {
+            return failedFuture(new IllegalStateException("Bitfinex credentials are required for withdrawals."));
+        }
+        if (amount == null || amount.signum() <= 0) {
+            return failedFuture(new IllegalArgumentException("Withdrawal amount must be greater than zero."));
+        }
+        String asset = currency == null ? "" : currency.trim().toUpperCase(java.util.Locale.ROOT);
+        if (asset.isBlank()) {
+            return failedFuture(new IllegalArgumentException("Currency is required for Bitfinex withdrawal."));
+        }
+        String destination = address == null ? "" : address.trim();
+        if (destination.isBlank()) {
+            return failedFuture(
+                    new IllegalArgumentException("Destination address is required for Bitfinex withdrawal."));
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Map<String, String> payload = new LinkedHashMap<>();
+                payload.put("wallet", "exchange");
+                payload.put("method", bitfinexWithdrawalMethod(asset, network));
+                payload.put("amount", amount.stripTrailingZeros().toPlainString());
+                payload.put("address", destination);
+                if (memo != null && !memo.isBlank()) {
+                    payload.put("payment_id", memo.trim());
+                }
+                JsonNode response = sendAuthenticatedBitfinexRequest("/v2/auth/w/withdraw", payload);
+                JsonNode maybeId = response.at("/4/0/0");
+                return maybeId.isMissingNode() ? response.toString() : maybeId.asText();
+            } catch (Exception exception) {
+                throw new IllegalStateException("Bitfinex withdrawal failed.", exception);
+            }
+        });
+    }
+
+    private String bitfinexWithdrawalMethod(String currency, String network) {
+        if (network != null && !network.isBlank()) {
+            return network.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+        return switch (currency.toUpperCase(java.util.Locale.ROOT)) {
+            case "BTC" -> "bitcoin";
+            case "ETH" -> "ethereum";
+            case "LTC" -> "litecoin";
+            case "XRP" -> "ripple";
+            case "USDT" -> "tetheruso";
+            case "USDC" -> "usdcoin";
+            default -> currency.toLowerCase(java.util.Locale.ROOT);
+        };
+    }
+
     private static String bitfinexSymbol(TradePair tradePair) {
         if (tradePair == null) {
             throw new IllegalArgumentException("tradePair must not be null");

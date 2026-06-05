@@ -1,4 +1,4 @@
-package org.investpro.exchange;
+package org.investpro.exchange.solona;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Data;
@@ -13,35 +13,35 @@ import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 
 /**
- * Provides wallet-level operations for a Solana account.
+ * Provides wallet-level operations for a Solona account.
  *
  * <p>Responsibilities:
  * <ul>
  *   <li>Retrieve native SOL balance</li>
  *   <li>Retrieve SPL token balances</li>
- *   <li>Validate Solana public key addresses</li>
+ *   <li>Validate Solona public key addresses</li>
  * </ul>
  *
  * <p>Private keys and seed phrases are NEVER handled, stored, or logged by this service.
  */
 @Data
-public class SolanaWalletService {
+public class SolonaWalletService {
 
-    public static final Logger log = LoggerFactory.getLogger(SolanaWalletService.class);
+    public static final Logger log = LoggerFactory.getLogger(SolonaWalletService.class);
 
     /**
-     * Solana base-58 addresses are 32–44 characters from the base-58 alphabet.
+     * Solona base-58 addresses are 32–44 characters from the base-58 alphabet.
      * The actual validation is best-effort: byte-level validation requires a base-58
      * decoder which is out of scope for the RPC layer.
      */
     private static final Pattern ADDRESS_PATTERN =
             Pattern.compile("^[1-9A-HJ-NP-Za-km-z]{32,44}$");
 
-    private final SolanaNetworkClient rpc;
+    private final SolonaNetworkClient rpc;
 
-    private  SolanaNetworkConfig config;
+    private  SolonaNetworkConfig config;
 
-    public SolanaWalletService(SolanaNetworkClient rpc, SolanaNetworkConfig config) {
+    public SolonaWalletService(SolonaNetworkClient rpc, SolonaNetworkConfig config) {
         this.rpc    = rpc;
         this.config = config;
     }
@@ -49,12 +49,12 @@ public class SolanaWalletService {
     // ── Address validation ────────────────────────────────────────────────────
 
     /**
-     * Returns {@code true} if the address looks like a valid Solana public key.
+     * Returns {@code true} if the address looks like a valid Solona public key.
      *
      * <p>This performs a pattern-level check only (base-58 alphabet, correct length).
      * A full cryptographic check requires a complete base-58 decoder.
      *
-     * @param address candidate Solana address
+     * @param address candidate Solona address
      * @return true if address matches the expected format
      */
     public boolean validateAddress(String address) {
@@ -67,20 +67,20 @@ public class SolanaWalletService {
     /**
      * Returns the native SOL balance for the given address.
      *
-     * @param address base-58 Solana public key
+     * @param address base-58 Solona public key
      * @return SOL balance (lamports converted to SOL with 9 decimal places)
      */
     public CompletableFuture<BigDecimal> getSOLBalance(String address) {
         if (validateAddress(address)) {
             return CompletableFuture.failedFuture(
-                    new SolanaException.InvalidAddressException(address));
+                    new SolonaException.InvalidAddressException(address));
         }
         return rpc.getBalance(address)
                 .thenApply(lamports -> {
                     BigDecimal sol = BigDecimal.valueOf(lamports)
-                            .divide(BigDecimal.valueOf(SolanaNetworkConfig.LAMPORTS_PER_SOL),
+                            .divide(BigDecimal.valueOf(SolonaNetworkConfig.LAMPORTS_PER_SOL),
                                     9, RoundingMode.HALF_UP);
-                    log.debug("Solana SOL balance: address={}... sol={}", safePrefix(address), sol);
+                    log.debug("Solona SOL balance: address={}... sol={}", safePrefix(address), sol);
                     return sol;
                 });
     }
@@ -93,10 +93,10 @@ public class SolanaWalletService {
      * @param ownerAddress base-58 owner public key
      * @return list of token balances (may be empty)
      */
-    public CompletableFuture<List<SolanaTokenBalance>> getTokenBalances(String ownerAddress) {
+    public CompletableFuture<List<SolonaTokenBalance>> getTokenBalances(String ownerAddress) {
         if (validateAddress(ownerAddress)) {
             return CompletableFuture.failedFuture(
-                    new SolanaException.InvalidAddressException(ownerAddress));
+                    new SolonaException.InvalidAddressException(ownerAddress));
         }
         return rpc.getTokenAccountsByOwner(ownerAddress)
                 .thenApply(valueNode -> parseTokenBalances(valueNode, ownerAddress));
@@ -104,11 +104,11 @@ public class SolanaWalletService {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private List<SolanaTokenBalance> parseTokenBalances(JsonNode valueNode, String ownerAddress) {
-        List<SolanaTokenBalance> balances = new ArrayList<>();
+    private List<SolonaTokenBalance> parseTokenBalances(JsonNode valueNode, String ownerAddress) {
+        List<SolonaTokenBalance> balances = new ArrayList<>();
 
         if (valueNode == null || valueNode.isMissingNode() || !valueNode.isArray()) {
-            log.debug("Solana: no token accounts found for address={}...", safePrefix(ownerAddress));
+            log.debug("Solona: no token accounts found for address={}...", safePrefix(ownerAddress));
             return balances;
         }
 
@@ -118,7 +118,7 @@ public class SolanaWalletService {
                                           .path("info");
                 JsonNode tokenAmt = info.path("tokenAmount");
                 String   mint     = info.path("mint").asText("");
-                String   symbol   = ""; // will be enriched by SolanaTokenService
+                String   symbol   = ""; // will be enriched by SolonaTokenService
                 int      decimals = tokenAmt.path("decimals").asInt(0);
                 String   uiAmtStr = tokenAmt.path("uiAmountString").asText("0");
 
@@ -130,14 +130,14 @@ public class SolanaWalletService {
                 }
 
                 if (!mint.isBlank()) {
-                    balances.add(new SolanaTokenBalance(mint, symbol, amount, decimals));
+                    balances.add(new SolonaTokenBalance(mint, symbol, amount, decimals));
                 }
             } catch (Exception e) {
-                log.debug("Solana: failed to parse token account entry: {}", e.getMessage());
+                log.debug("Solona: failed to parse token account entry: {}", e.getMessage());
             }
         }
 
-        log.debug("Solana token balances: address={}... count={}", safePrefix(ownerAddress), balances.size());
+        log.debug("Solona token balances: address={}... count={}", safePrefix(ownerAddress), balances.size());
         return balances;
     }
 

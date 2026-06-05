@@ -1,17 +1,26 @@
 package org.investpro.exchange;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.data.InProgressCandleData;
+import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.exchange.credentials.ExchangeCredentials;
+import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
+import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
+import org.investpro.exchange.infrastructure.StreamTransport;
+import org.investpro.exchange.models.AuthCheckResult;
+import org.investpro.exchange.models.ExchangeCapability;
+import org.investpro.exchange.websocket.ExchangeWebSocketClient;
 import org.investpro.models.Account;
-import org.investpro.models.trading.OpenOrder;
-import org.investpro.models.trading.OrderBook;
-import org.investpro.models.trading.Ticker;
-import org.investpro.models.trading.TradePair;
+import org.investpro.models.trading.*;
 import org.investpro.service.AuthResult;
+import org.investpro.utils.CandleDataSupplier;
+import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
+import org.jetbrains.annotations.NotNull;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -23,22 +32,19 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.CompletableFuture;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import static org.investpro.exchange.Oanda.OBJECT_MAPPER;
+
 @EqualsAndHashCode(callSuper = true)
 @Slf4j
 @Data
-public class Kraken extends Bitfinex {
+public class Kraken extends Exchange {
 
     private static final String KRAKEN_REST_URL = "https://api.kraken.com";
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
@@ -48,6 +54,16 @@ public class Kraken extends Bitfinex {
 
     public Kraken(ExchangeCredentials exchangeCredentials) {
         super(exchangeCredentials);
+    }
+
+    @Override
+    public void buy(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss, double takeProfit, double slippage) {
+
+    }
+
+    @Override
+    public void sell(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss, double takeProfit, double slippage) {
+
     }
 
     @Override
@@ -71,6 +87,11 @@ public class Kraken extends Bitfinex {
     }
 
     @Override
+    public boolean isSandbox() {
+        return false;
+    }
+
+    @Override
     public boolean isPaperTrading() {
         if (modeRequestsPaperNetwork()) {
             return true;
@@ -82,8 +103,138 @@ public class Kraken extends Bitfinex {
     }
 
     @Override
+    public String getTimestamp() {
+        return "";
+    }
+
+    @Override
+    public Instant now() {
+        return null;
+    }
+
+    @Override
+    public boolean supportsMarketType(MARKET_TYPES marketType) {
+        return false;
+    }
+
+    @Override
+    public List<MARKET_TYPES> getSupportedMarketTypes() {
+        return List.of();
+    }
+
+    @Override
+    public @NotNull ExchangeCapability getCapability() {
+        return null;
+    }
+
+    @Override
+    public AuthCheckResult checkAuthentication() {
+        return null;
+    }
+
+    @Override
     public boolean supportsLiveTrading() {
         return hasLiveCredentials();
+    }
+
+    @Override
+    public boolean supportsPaperTradingMode() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsOrderBook() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsPositions() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsAccountTrades() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsStopLossTakeProfit() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsBracketOrders() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsLeverage() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsDerivatives() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsForex() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsStocks() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsCrypto() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsAccountStreaming() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsOrderStreaming() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsFillStreaming() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsPositionStreaming() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsBalanceStreaming() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsTickerStreaming() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsOrderBookStreaming() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsCandleStreaming() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsTradeStreaming() {
+        return false;
     }
 
     @Override
@@ -120,6 +271,11 @@ public class Kraken extends Bitfinex {
             log.warn("Kraken auth/connectivity check failed", exception);
             return AuthResult.failure("Kraken connectivity check failed: " + exception.getMessage());
         }
+    }
+
+    @Override
+    public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
+        return null;
     }
 
     @Override
@@ -174,6 +330,21 @@ public class Kraken extends Bitfinex {
     }
 
     @Override
+    public List<TradePair> getTradablePairs() throws SQLException, ClassNotFoundException {
+        return List.of();
+    }
+
+    @Override
+    public boolean supportsTradePair(TradePair tradePair) {
+        return false;
+    }
+
+    @Override
+    public double getLivePrice() {
+        return 0;
+    }
+
+    @Override
     public Ticker getLivePrice(TradePair tradePair) {
         if (tradePair == null) {
             return Ticker.empty();
@@ -188,13 +359,13 @@ public class Kraken extends Bitfinex {
                     .build();
             HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                return super.getLivePrice(tradePair);
+                return getLivePrice(tradePair);
             }
 
             JsonNode root = OBJECT_MAPPER.readTree(response.body());
             JsonNode result = root.path("result");
             if (!result.isObject() || result.isEmpty()) {
-                return super.getLivePrice(tradePair);
+                return getLivePrice(tradePair);
             }
 
             JsonNode tickerNode = firstObjectValue(result);
@@ -203,7 +374,7 @@ public class Kraken extends Bitfinex {
             double ask = firstArrayDouble(tickerNode, "a");
             double volume = firstArrayDouble(tickerNode, "v", 1);
 
-            double fallback = super.getLivePrice(tradePair).getLastPrice();
+            double fallback = getLivePrice();
             double price = last > 0 ? last : fallback;
 
             Ticker ticker = new Ticker();
@@ -215,7 +386,7 @@ public class Kraken extends Bitfinex {
             return ticker;
         } catch (Exception exception) {
             log.debug("Unable to fetch Kraken ticker for {}", tradePair, exception);
-            return super.getLivePrice(tradePair);
+            return getLivePrice(tradePair);
         }
     }
 
@@ -225,9 +396,44 @@ public class Kraken extends Bitfinex {
     }
 
     @Override
+    public CompletableFuture<List<Ticker>> fetchTickers(List<TradePair> tradePairs) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<List<Ticker>> getTicker(TradePair pair) {
+        return null;
+    }
+
+    @Override
+    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<?> getOrderBook(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public Account getUserAccountDetails() throws ExecutionException, InterruptedException {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<Account> fetchAccount() {
         if (isPaperTrading()) {
-            return super.fetchAccount();
+            return fetchAccount();
         }
         return CompletableFuture.supplyAsync(this::fetchLiveAccountFromKraken);
     }
@@ -235,7 +441,7 @@ public class Kraken extends Bitfinex {
     @Override
     public CompletableFuture<Double> fetchAvailableBalance(String currencyCode) {
         if (isPaperTrading()) {
-            return super.fetchAvailableBalance(currencyCode);
+            return fetchAvailableBalance(currencyCode);
         }
         String normalized = normalizeAssetFromKraken(currencyCode);
         return fetchAccount().thenApply(account -> account.getBalances().getOrDefault(normalized, 0.0));
@@ -247,10 +453,43 @@ public class Kraken extends Bitfinex {
     }
 
     @Override
+    public CompletableFuture<Double> fetchEquity() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchMarginUsed() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchFreeMargin() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> placeLimitOrder(TradePair symbol, Side side, double quantity, double limitPrice) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> createOrder(Order order) throws JsonProcessingException {
+        return null;
+    }
+
+    @Override
+    public Order createOrder(int id, TradePair tradePair, String type, double price, double amount, Side side, double stopLoss, double takeProfit, double slippage) {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
-        if (isPaperTrading()) {
-            return super.createMarketOrder(tradePair, side, amount);
-        }
+
         return CompletableFuture.supplyAsync(() -> submitKrakenOrder(tradePair, side, amount, null, "market"));
     }
 
@@ -258,16 +497,26 @@ public class Kraken extends Bitfinex {
     public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
             double limitPrice) {
         if (isPaperTrading()) {
-            return super.createLimitOrder(tradePair, side, amount, limitPrice);
+            return createLimitOrder(tradePair, side, amount, limitPrice);
         }
         return CompletableFuture
                 .supplyAsync(() -> submitKrakenOrder(tradePair, side, amount, limitPrice, "limit"));
     }
 
     @Override
+    public CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> createBracketOrder(TradePair tradePair, Side side, double amount, double entryPrice, double stopLoss, double takeProfit) {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<String> cancelOrder(String orderId) {
         if (isPaperTrading()) {
-            return super.cancelOrder(orderId);
+            return cancelOrder(orderId);
         }
         if (orderId == null || orderId.isBlank()) {
             return failedFuture(new IllegalArgumentException("orderId must not be blank"));
@@ -280,11 +529,31 @@ public class Kraken extends Bitfinex {
     }
 
     @Override
+    public CompletableFuture<List<String>> cancelOrders(List<String> orderIds) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> cancelAllOrders() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Optional<Order>> fetchOrder(String orderId) {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
         if (isPaperTrading()) {
-            return super.fetchAllOpenOrders();
+            return fetchAllOpenOrders();
         }
         return CompletableFuture.supplyAsync(this::fetchKrakenOpenOrders);
+    }
+
+    @Override
+    public CompletableFuture<List<Order>> fetchOrderHistory(TradePair tradePair, Instant since) {
+        return null;
     }
 
     @Override
@@ -314,13 +583,13 @@ public class Kraken extends Bitfinex {
                     .build();
             HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                return super.fetchOrderBook(tradePair);
+                return fetchOrderBook(tradePair);
             }
 
             JsonNode root = OBJECT_MAPPER.readTree(response.body());
             JsonNode result = root.path("result");
             if (!result.isObject() || result.isEmpty()) {
-                return super.fetchOrderBook(tradePair);
+                return fetchOrderBook(tradePair);
             }
 
             JsonNode orderBookNode = firstObjectValue(result);
@@ -332,8 +601,18 @@ public class Kraken extends Bitfinex {
             return CompletableFuture.completedFuture(orderBook);
         } catch (Exception exception) {
             log.debug("Unable to fetch Kraken order book for {}", tradePair, exception);
-            return super.fetchOrderBook(tradePair);
+            return fetchOrderBook(tradePair);
         }
+    }
+
+    @Override
+    public String supportsTimeframe(int secondsPerCandle) {
+        return "";
+    }
+
+    @Override
+    public List<Timeframe> getSupportedTimeframes() {
+        return List.of();
     }
 
     private List<OrderBook.PriceLevel> parsePriceLevels(JsonNode levelsNode) {
@@ -744,5 +1023,295 @@ public class Kraken extends Bitfinex {
 
     private String url(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public void connect() {
+
+    }
+
+    @Override
+    public void disconnect() {
+
+    }
+
+    @Override
+    public void reconnect() {
+
+    }
+
+    @Override
+    public Boolean isConnected() {
+        return null;
+    }
+
+    @Override
+    public ExchangeWebSocketClient getWebsocketClient() {
+        return null;
+    }
+
+    @Override
+    public boolean supportsWebSocket() {
+        return false;
+    }
+
+    @Override
+    public boolean isWebsocketAvailable() {
+        return false;
+    }
+
+    @Override
+    public CompletableFuture<List<Position>> fetchPositions(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<List<Position>> fetchAllPositions() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Optional<Position>> fetchPosition(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> closePosition(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> closeAllPositions() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> closePosition(TradePair symbol, String positionId) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Boolean> validateOrder(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss, double takeProfit, double slippage) {
+        return null;
+    }
+
+    @Override
+    public double normalizeAmount(TradePair tradePair, double amount) {
+        return 0;
+    }
+
+    @Override
+    public double normalizePrice(TradePair tradePair, double price) {
+        return 0;
+    }
+
+    @Override
+    public double getMinOrderAmount(TradePair tradePair) {
+        return 0;
+    }
+
+    @Override
+    public double getMinOrderNotional(TradePair tradePair) {
+        return 0;
+    }
+
+    @Override
+    public double getMaxLeverage(TradePair tradePair) {
+        return 0;
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchLeverage(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> setLeverage(TradePair tradePair, double leverage) {
+        return null;
+    }
+
+    @Override
+    public StreamTransport getStreamTransport() {
+        return null;
+    }
+
+    @Override
+    public boolean supportsNativeWebSocket() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsHttpStreaming() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsPollingFallback() {
+        return false;
+    }
+
+    @Override
+    public void connectStream() {
+
+    }
+
+    @Override
+    public void disconnectStream() {
+
+    }
+
+    @Override
+    public boolean isStreamConnected() {
+        return false;
+    }
+
+    @Override
+    public void reconnectStream() {
+
+    }
+
+    @Override
+    public void stream(ExchangeStreamSubscription subscription, ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
+    public void stopStreaming(ExchangeStreamSubscription subscription) {
+
+    }
+
+    @Override
+    public void stopAllStreams() {
+
+    }
+
+    @Override
+    public void streamTicker(TradePair tradePair, ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
+    public void streamTrades(TradePair tradePair, ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
+    public void subscribeTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
+    public void streamOrderBook(TradePair tradePair, ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
+    public void streamCandles(TradePair tradePair, int secondsPerCandle, ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
+    public void streamAccount(ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
+    public void streamBalances(ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
+    public void streamOrders(ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
+    public void streamFills(ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
+    public void streamPositions(ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
+    public void stopTickerStream(TradePair tradePair) {
+
+    }
+
+    @Override
+    public void stopTradesStream(TradePair tradePair) {
+
+    }
+
+    @Override
+    public void stopOrderBookStream(TradePair tradePair) {
+
+    }
+
+    @Override
+    public void stopCandlesStream(TradePair tradePair, int secondsPerCandle) {
+
+    }
+
+    @Override
+    public void stopAccountStream() {
+
+    }
+
+    @Override
+    public void stopBalancesStream() {
+
+    }
+
+    @Override
+    public void stopOrdersStream() {
+
+    }
+
+    @Override
+    public void stopFillsStream() {
+
+    }
+
+    @Override
+    public void stopPositionsStream() {
+
+    }
+
+    @Override
+    public CompletableFuture<List<Trade>> fetchAccountTrades(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<List<Trade>> fetchAccountTradesSince(TradePair tradePair, Instant since) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<List<Trade>> fetchAccountTradesBetween(TradePair tradePair, Instant from, Instant to) {
+        return null;
     }
 }

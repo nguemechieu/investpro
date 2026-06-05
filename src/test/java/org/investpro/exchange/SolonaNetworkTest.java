@@ -10,12 +10,12 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class SolanaNetworkTest {
+class SolonaNetworkTest {
 
     @Test
     void providesSyntheticCandleDataForCharting() throws Exception {
-        SolanaNetwork solana = new SolanaNetwork(new ExchangeCredentials(
-                "solana-network",
+        SolonaNetwork solona = new SolonaNetwork(new ExchangeCredentials(
+                "solona-network",
                 "",
                 "",
                 "",
@@ -24,7 +24,7 @@ class SolanaNetworkTest {
                 "",
                 true));
 
-        CandleDataSupplier supplier = solana.getCandleDataSupplier(3600, new TradePair("SOL", "USDC"));
+        CandleDataSupplier supplier = solona.getCandleDataSupplier(3600, new TradePair("SOL", "USDC"));
 
         assertThat(supplier).isNotNull();
         assertThat(supplier.getCandleData()).isNotEmpty();

@@ -1,4 +1,4 @@
-package org.investpro.exchange;
+package org.investpro.exchange.solona;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,25 +18,25 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Async HTTP JSON-RPC client for the Solana network.
+ * Async HTTP JSON-RPC client for the Solona network.
  *
- * <p>Wraps all Solana RPC calls using the standard JSON-RPC 2.0 protocol.
- * No external Solana SDK is required — all communication uses Java 21's
+ * <p>Wraps all Solona RPC calls using the standard JSON-RPC 2.0 protocol.
+ * No external Solona SDK is required — all communication uses Java 21's
  * {@link HttpClient} and Jackson for JSON serialisation.
  *
- * <p>Thread-safe. A single instance should be shared per {@link SolanaNetworkConfig}.
+ * <p>Thread-safe. A single instance should be shared per {@link SolonaNetworkConfig}.
  */
 @Data
-public class SolanaNetworkClient {
+public class SolonaNetworkClient {
 
-    private static final Logger log = LoggerFactory.getLogger(SolanaNetworkClient.class);
+    private static final Logger log = LoggerFactory.getLogger(SolonaNetworkClient.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final AtomicLong REQUEST_ID = new AtomicLong(1);
 
-    private final SolanaNetworkConfig config;
+    private final SolonaNetworkConfig config;
     private final HttpClient httpClient;
 
-    public SolanaNetworkClient(SolanaNetworkConfig config) {
+    public SolonaNetworkClient(SolonaNetworkConfig config) {
         this.config = config;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(config.requestTimeoutSeconds()))
@@ -61,7 +61,7 @@ public class SolanaNetworkClient {
      * Returns the SOL balance in lamports for the given public key.
      *
      * @param address base-58 encoded public key
-     * @return lamports (divide by {@link SolanaNetworkConfig#LAMPORTS_PER_SOL} to get SOL)
+     * @return lamports (divide by {@link SolonaNetworkConfig#LAMPORTS_PER_SOL} to get SOL)
      */
     public CompletableFuture<Long> getBalance(String address) {
         ArrayNode params = MAPPER.createArrayNode()
@@ -135,7 +135,7 @@ public class SolanaNetworkClient {
     /**
      * Sends a signed, serialised transaction to the network.
      *
-     * <p><b>IMPORTANT:</b> callers must verify {@link SolanaNetworkConfig#isLiveTradingAllowed()}
+     * <p><b>IMPORTANT:</b> callers must verify {@link SolonaNetworkConfig#isLiveTradingAllowed()}
      * before calling this method.
      *
      * @param signedTransactionBase64 base-64 encoded signed transaction
@@ -165,7 +165,7 @@ public class SolanaNetworkClient {
      * @param method RPC method name
      * @param params JSON array of parameters
      * @return future resolving to the "result" node, never null
-     * @throws SolanaException.RpcException if the RPC response contains an error
+     * @throws SolonaException.RpcException if the RPC response contains an error
      */
     public CompletableFuture<JsonNode> call(String method, ArrayNode params) {
         long id       = REQUEST_ID.getAndIncrement();
@@ -177,7 +177,7 @@ public class SolanaNetworkClient {
                 .timeout(Duration.ofSeconds(config.requestTimeoutSeconds()))
                 .build();
 
-        log.debug("Solana RPC → [{}] id={} network={}", method, id, config.network());
+        log.debug("Solona RPC → [{}] id={} network={}", method, id, config.network());
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> parseResponse(method, id, response));
@@ -196,7 +196,7 @@ public class SolanaNetworkClient {
 
     private JsonNode parseResponse(String method, long id, HttpResponse<String> response) {
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new SolanaException.RpcException(method, response.statusCode(),
+            throw new SolonaException.RpcException(method, response.statusCode(),
                     "HTTP " + response.statusCode());
         }
 
@@ -204,18 +204,18 @@ public class SolanaNetworkClient {
         try {
             root = MAPPER.readTree(response.body());
         } catch (IOException e) {
-            throw new SolanaException("Failed to parse Solana RPC response for " + method, e);
+            throw new SolonaException("Failed to parse Solona RPC response for " + method, e);
         }
 
         JsonNode errorNode = root.path("error");
         if (!errorNode.isMissingNode() && !errorNode.isNull()) {
             int    code    = errorNode.path("code").asInt(-1);
             String message = errorNode.path("message").asText("unknown RPC error");
-            throw new SolanaException.RpcException(method, code, message);
+            throw new SolonaException.RpcException(method, code, message);
         }
 
         JsonNode result = root.path("result");
-        log.debug("Solana RPC ← [{}] id={} resultType={}", method, id,
+        log.debug("Solona RPC ← [{}] id={} resultType={}", method, id,
                 result.isNull() ? "null" : result.getNodeType().name());
         return result;
     }

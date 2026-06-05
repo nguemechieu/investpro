@@ -6,11 +6,11 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Solana blockchain execution provider.
+ * Solona blockchain execution provider.
  */
-public class SolanaExecutionProvider extends AbstractBlockchainExecutionProvider {
+public class SolonaExecutionProvider extends AbstractBlockchainExecutionProvider {
 
-    public static final String NETWORK_ID = "SOLANA";
+    public static final String NETWORK_ID = "SOLONA";
 
     @Override
     public String networkId() {

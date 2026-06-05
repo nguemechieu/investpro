@@ -198,7 +198,8 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
         addAliases(aliases, "coinbase", "coinbase", "coinbasepro", "coinbaseadvanced", "coinbaseadvancedtrade",
                 "coinbaseat", "coinbasebrokerage");
         addAliases(aliases, "interactive_brokers", "interactivebrokers", "interactivebroker", "ib",
-                "ibk", "ibkr", "schwab", "charlesschwab");
+                "ibk", "ibkr");
+        addAliases(aliases, "schwab", "schwab", "charlesschwab");
         addAliases(aliases, "oanda", "oanda", "oandafx", "oandaforex", "oandacfd", "oandafxcfd");
         addAliases(aliases, "stellar_network", "stellar", "stellarnetwork", "stellarx", "xlm");
 

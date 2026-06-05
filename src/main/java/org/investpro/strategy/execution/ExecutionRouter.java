@@ -170,7 +170,7 @@ public class ExecutionRouter {
         String upper = symbol.toUpperCase();
 
         if (upper.contains("/SOL") || upper.startsWith("SOL/") || upper.contains("SOL")) {
-            return pickHealthy(ExecutionVenue.SOLANA_DEX, ExecutionVenue.COINBASE_ADVANCED);
+            return pickHealthy(ExecutionVenue.SOLONA_DEX, ExecutionVenue.COINBASE_ADVANCED);
         }
 
         if (upper.contains("/XLM") || upper.startsWith("XLM/") || upper.contains("XLM")) {

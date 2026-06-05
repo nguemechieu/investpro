@@ -77,6 +77,9 @@ public class Coinbase extends Exchange {
     private static final String ORDERS_URL = "%s/orders".formatted(REST_BASE_URL);
     private static final String CANCEL_ORDERS_URL = "%s/orders/batch_cancel".formatted(REST_BASE_URL);
     private static final String ACCOUNTS_URL = "%s/accounts".formatted(REST_BASE_URL);
+    private static final String DEPOSIT_PAYMENT_METHOD_URL = "%s/deposits/payment-method".formatted(REST_BASE_URL);
+    private static final String WITHDRAW_PAYMENT_METHOD_URL = "%s/withdrawals/payment-method".formatted(REST_BASE_URL);
+    private static final String WITHDRAW_CRYPTO_URL = "%s/withdrawals/crypto".formatted(REST_BASE_URL);
     private static final String MARKET_DATA_WS_URL = "wss://advanced-trade-ws.coinbase.com";
     private static final String PEM_EC_BEGIN = "-----BEGIN EC PRIVATE " + "KEY-----";
     private static final String PEM_EC_END = "-----END EC PRIVATE " + "KEY-----";
@@ -3122,6 +3125,139 @@ public class Coinbase extends Exchange {
                 "%s/orders/historical/%s".formatted(REST_BASE_URL, encode(orderId))).GET().build();
 
         return sendAsync(request);
+    }
+
+    public CompletableFuture<String> requestDepositFromPaymentMethod(
+            @NotNull BigDecimal amount,
+            @NotNull String currency,
+            @NotNull String paymentMethodId) {
+        if (isPaperTrading()) {
+            return failedFuture(
+                    new UnsupportedOperationException("Coinbase paper mode does not support live deposits."));
+        }
+
+        requirePrivateEndpointAuth("Coinbase deposit from payment method");
+
+        if (amount.signum() <= 0) {
+            return failedFuture(new IllegalArgumentException("Amount must be greater than zero."));
+        }
+        if (currency.isBlank()) {
+            return failedFuture(new IllegalArgumentException("Currency is required."));
+        }
+        if (paymentMethodId.isBlank()) {
+            return failedFuture(new IllegalArgumentException("Payment method ID is required for Coinbase deposit."));
+        }
+
+        JsonNode payload = OBJECT_MAPPER.createObjectNode()
+                .put("amount", amount.stripTrailingZeros().toPlainString())
+                .put("currency", currency.trim().toUpperCase(Locale.ROOT))
+                .put("payment_method_id", paymentMethodId.trim());
+
+        HttpRequest request = authenticatedRequest("POST", DEPOSIT_PAYMENT_METHOD_URL)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
+
+        return sendAsync(request).thenApply(this::requireSuccessfulFundingResponse);
+    }
+
+    public CompletableFuture<String> requestWithdrawalToPaymentMethod(
+            @NotNull BigDecimal amount,
+            @NotNull String currency,
+            @NotNull String paymentMethodId) {
+        if (isPaperTrading()) {
+            return failedFuture(
+                    new UnsupportedOperationException("Coinbase paper mode does not support live withdrawals."));
+        }
+
+        requirePrivateEndpointAuth("Coinbase withdrawal to payment method");
+
+        if (amount.signum() <= 0) {
+            return failedFuture(new IllegalArgumentException("Amount must be greater than zero."));
+        }
+        if (currency.isBlank()) {
+            return failedFuture(new IllegalArgumentException("Currency is required."));
+        }
+        if (paymentMethodId.isBlank()) {
+            return failedFuture(new IllegalArgumentException("Payment method ID is required for fiat withdrawal."));
+        }
+
+        JsonNode payload = OBJECT_MAPPER.createObjectNode()
+                .put("amount", amount.stripTrailingZeros().toPlainString())
+                .put("currency", currency.trim().toUpperCase(Locale.ROOT))
+                .put("payment_method_id", paymentMethodId.trim());
+
+        HttpRequest request = authenticatedRequest("POST", WITHDRAW_PAYMENT_METHOD_URL)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
+
+        return sendAsync(request).thenApply(this::requireSuccessfulFundingResponse);
+    }
+
+    public CompletableFuture<String> requestWithdrawalToCryptoAddress(
+            @NotNull BigDecimal amount,
+            @NotNull String currency,
+            @NotNull String cryptoAddress,
+            @Nullable String network,
+            @Nullable String destinationTag) {
+        if (isPaperTrading()) {
+            return failedFuture(
+                    new UnsupportedOperationException("Coinbase paper mode does not support live withdrawals."));
+        }
+
+        requirePrivateEndpointAuth("Coinbase withdrawal to crypto address");
+
+        if (amount.signum() <= 0) {
+            return failedFuture(new IllegalArgumentException("Amount must be greater than zero."));
+        }
+        if (currency.isBlank()) {
+            return failedFuture(new IllegalArgumentException("Currency is required."));
+        }
+        if (cryptoAddress.isBlank()) {
+            return failedFuture(new IllegalArgumentException("Crypto address is required."));
+        }
+
+        var payload = OBJECT_MAPPER.createObjectNode()
+                .put("amount", amount.stripTrailingZeros().toPlainString())
+                .put("currency", currency.trim().toUpperCase(Locale.ROOT))
+                .put("crypto_address", cryptoAddress.trim());
+
+        if (network != null && !network.isBlank()) {
+            payload.put("network", network.trim().toUpperCase(Locale.ROOT));
+        }
+        if (destinationTag != null && !destinationTag.isBlank()) {
+            payload.put("destination_tag", destinationTag.trim());
+        }
+
+        HttpRequest request = authenticatedRequest("POST", WITHDRAW_CRYPTO_URL)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
+
+        return sendAsync(request).thenApply(this::requireSuccessfulFundingResponse);
+    }
+
+    private String requireSuccessfulFundingResponse(String responseBody) {
+        JsonNode root = readJson(responseBody);
+
+        if (root.has("success") && !root.path("success").asBoolean(true)) {
+            throw new IllegalStateException(root.path("message").asText("Coinbase funding request failed."));
+        }
+
+        if (root.has("error_response")) {
+            String message = root.path("error_response").path("message").asText("");
+            if (!message.isBlank()) {
+                throw new IllegalStateException(message);
+            }
+            throw new IllegalStateException("Coinbase funding request failed.");
+        }
+
+        if (root.has("error") && !root.path("error").asText("").isBlank()) {
+            throw new IllegalStateException(root.path("error").asText());
+        }
+
+        return responseBody;
     }
 
     // ---------------------------------------------------------------------

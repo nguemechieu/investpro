@@ -112,16 +112,16 @@ public record AgentEvent(
      * state.
      */
     public static final String RECONCILIATION_DRIFT_DETECTED = "RECONCILIATION_DRIFT_DETECTED";
-    /** Emitted when the Solana RPC adapter connects successfully. */
-    public static final String SOLANA_CONNECTED = "SOLANA_CONNECTED";
-    /** Emitted when Solana wallet balance data is refreshed. */
-    public static final String SOLANA_BALANCE_UPDATED = "SOLANA_BALANCE_UPDATED";
-    /** Emitted when a Solana wallet transaction is detected. */
-    public static final String SOLANA_TRANSACTION_DETECTED = "SOLANA_TRANSACTION_DETECTED";
-    /** Emitted when a Solana transaction submission succeeds. */
-    public static final String SOLANA_TRANSACTION_SUBMITTED = "SOLANA_TRANSACTION_SUBMITTED";
-    /** Emitted when a Solana transaction submission fails. */
-    public static final String SOLANA_TRANSACTION_FAILED = "SOLANA_TRANSACTION_FAILED";
+    /** Emitted when the Solona RPC adapter connects successfully. */
+    public static final String SOLONA_CONNECTED = "SOLONA_CONNECTED";
+    /** Emitted when Solona wallet balance data is refreshed. */
+    public static final String SOLONA_BALANCE_UPDATED = "SOLONA_BALANCE_UPDATED";
+    /** Emitted when a Solona wallet transaction is detected. */
+    public static final String SOLONA_TRANSACTION_DETECTED = "SOLONA_TRANSACTION_DETECTED";
+    /** Emitted when a Solona transaction submission succeeds. */
+    public static final String SOLONA_TRANSACTION_SUBMITTED = "SOLONA_TRANSACTION_SUBMITTED";
+    /** Emitted when a Solona transaction submission fails. */
+    public static final String SOLONA_TRANSACTION_FAILED = "SOLONA_TRANSACTION_FAILED";
 
     /** Emitted when a blockchain transaction is submitted to a chain network. */
     public static final String BLOCKCHAIN_TRANSACTION_SUBMITTED = "BLOCKCHAIN_TRANSACTION_SUBMITTED";

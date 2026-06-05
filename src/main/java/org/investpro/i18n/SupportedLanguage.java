@@ -1,7 +1,9 @@
 package org.investpro.i18n;
 
-import java.util.Locale;
+import lombok.Getter;
 
+import java.util.Locale;
+@Getter
 public enum SupportedLanguage {
     ENGLISH("en", "English", Locale.ENGLISH, false),
     SPANISH("es", "Spanish", Locale.forLanguageTag("es"), false),
@@ -21,22 +23,6 @@ public enum SupportedLanguage {
         this.displayName = displayName;
         this.locale = locale;
         this.rightToLeft = rightToLeft;
-    }
-
-    public String getCode() {
-        return code;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public Locale getLocale() {
-        return locale;
-    }
-
-    public boolean isRightToLeft() {
-        return rightToLeft;
     }
 
     public static SupportedLanguage fromCode(String code) {

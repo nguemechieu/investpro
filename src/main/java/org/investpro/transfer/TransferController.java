@@ -20,6 +20,8 @@ import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -34,6 +36,9 @@ public class TransferController {
     private final ObservableList<String> fromAccounts = FXCollections.observableArrayList();
     private final ObservableList<String> toAccounts = FXCollections.observableArrayList();
     private final ObservableList<String> currencies = FXCollections.observableArrayList();
+    private final ObservableList<String> networks = FXCollections.observableArrayList("AUTO", "BTC", "ERC20", "TRC20",
+            "BEP20", "SOL", "XLM");
+    private final Map<String, List<String>> walletByNetwork = new LinkedHashMap<>();
 
     private final SimpleStringProperty availableBalance = new SimpleStringProperty("$0.00");
     private final SimpleStringProperty estimatedFees = new SimpleStringProperty("$0.00");
@@ -45,11 +50,21 @@ public class TransferController {
         this.manager = manager;
         this.notifier = notifier == null ? ignored -> {
         } : notifier;
+
+        walletByNetwork.put("AUTO", List.of());
+        walletByNetwork.put("BTC", List.of("bc1qexamplewallet0001", "1BitcoinExampleWallet0001"));
+        walletByNetwork.put("ERC20", List.of("0xAbCDef0123456789aBCdef0123456789AbCdEf01"));
+        walletByNetwork.put("TRC20", List.of("TRXExampleWalletAddress0001"));
+        walletByNetwork.put("BEP20", List.of("0xBep20ExampleAddress0001"));
+        walletByNetwork.put("SOL", List.of("SoL4wLLeTExAmPlEAddReSs11111111111111"));
+        walletByNetwork.put("XLM", List.of("GBZXN7PIRZGNMHGA4D5CGQWJ6NIPWG5GS2AHTVLF4L3E5QGWQ6XTY7RF"));
     }
 
     public void initialize(ComboBox<String> fromAccountBox,
             ComboBox<String> toAccountBox,
             ComboBox<String> currencyBox,
+            ComboBox<String> networkBox,
+            ComboBox<String> destinationWalletBox,
             TextField amountField,
             TextArea notesField,
             Spinner<Integer> prioritySpinner,
@@ -65,6 +80,11 @@ public class TransferController {
         fromAccountBox.setItems(fromAccounts);
         toAccountBox.setItems(toAccounts);
         currencyBox.setItems(currencies);
+        networkBox.setItems(networks);
+        networkBox.getSelectionModel().select("AUTO");
+        destinationWalletBox.setItems(FXCollections.observableArrayList());
+        destinationWalletBox.setEditable(true);
+        refreshDestinationWallets(networkBox.getValue(), destinationWalletBox);
         historyTable.setItems(manager.historyService().history());
         manager.statusMonitor().tickWithCallback(result -> Platform.runLater(() -> {
             historyTable.refresh();
@@ -93,21 +113,40 @@ public class TransferController {
         fromAccountBox.valueProperty().addListener((obs, oldVal, newVal) -> {
             refreshCurrencies(newVal, currencyBox);
             updateBalance(newVal, currencyBox.getValue());
-            recalculateEstimate(fromAccountBox, toAccountBox, currencyBox, amountField, notesField, prioritySpinner);
+            recalculateEstimate(fromAccountBox, toAccountBox, currencyBox, networkBox, destinationWalletBox,
+                    amountField,
+                    notesField, prioritySpinner);
         });
         toAccountBox.valueProperty().addListener((obs, oldVal, newVal) -> recalculateEstimate(fromAccountBox,
-                toAccountBox, currencyBox, amountField, notesField, prioritySpinner));
+                toAccountBox, currencyBox, networkBox, destinationWalletBox, amountField, notesField, prioritySpinner));
         currencyBox.valueProperty().addListener((obs, oldVal, newVal) -> {
             updateBalance(fromAccountBox.getValue(), newVal);
-            recalculateEstimate(fromAccountBox, toAccountBox, currencyBox, amountField, notesField, prioritySpinner);
+            toggleCryptoRoutingControls(newVal, networkBox, destinationWalletBox);
+            recalculateEstimate(fromAccountBox, toAccountBox, currencyBox, networkBox, destinationWalletBox,
+                    amountField,
+                    notesField, prioritySpinner);
         });
+        networkBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+            refreshDestinationWallets(newVal, destinationWalletBox);
+            recalculateEstimate(fromAccountBox, toAccountBox, currencyBox, networkBox, destinationWalletBox,
+                    amountField,
+                    notesField, prioritySpinner);
+        });
+        destinationWalletBox.valueProperty().addListener((obs, oldVal, newVal) -> recalculateEstimate(fromAccountBox,
+                toAccountBox, currencyBox, networkBox, destinationWalletBox, amountField, notesField,
+                prioritySpinner));
+        destinationWalletBox.getEditor().textProperty().addListener((obs, oldVal, newVal) -> recalculateEstimate(
+                fromAccountBox, toAccountBox, currencyBox, networkBox, destinationWalletBox, amountField,
+                notesField, prioritySpinner));
         amountField.textProperty().addListener((obs, oldVal, newVal) -> recalculateEstimate(fromAccountBox,
-                toAccountBox, currencyBox, amountField, notesField, prioritySpinner));
+                toAccountBox, currencyBox, networkBox, destinationWalletBox, amountField, notesField, prioritySpinner));
         notesField.textProperty().addListener((obs, oldVal, newVal) -> recalculateEstimate(fromAccountBox,
-                toAccountBox, currencyBox, amountField, notesField, prioritySpinner));
+                toAccountBox, currencyBox, networkBox, destinationWalletBox, amountField, notesField, prioritySpinner));
+
+        toggleCryptoRoutingControls(currencyBox.getValue(), networkBox, destinationWalletBox);
 
         previewButton.disableProperty().bind(Bindings.createBooleanBinding(() -> canPreview(fromAccountBox,
-                        toAccountBox, currencyBox, amountField),
+                toAccountBox, currencyBox, amountField),
                 fromAccountBox.valueProperty(), toAccountBox.valueProperty(), currencyBox.valueProperty(),
                 amountField.textProperty()));
 
@@ -116,20 +155,23 @@ public class TransferController {
             return preview == null || !preview.validation().valid();
         }, lastPreview));
 
-        previewButton.setOnAction(event -> previewTransfer(fromAccountBox, toAccountBox, currencyBox, amountField,
-                notesField, prioritySpinner));
-        executeButton.setOnAction(event -> executeTransfer(fromAccountBox, toAccountBox, currencyBox, amountField,
-                notesField, prioritySpinner, progressIndicator));
+        previewButton.setOnAction(event -> previewTransfer(fromAccountBox, toAccountBox, currencyBox, networkBox,
+                destinationWalletBox, amountField, notesField, prioritySpinner));
+        executeButton.setOnAction(event -> executeTransfer(fromAccountBox, toAccountBox, currencyBox, networkBox,
+                destinationWalletBox, amountField, notesField, prioritySpinner, progressIndicator));
     }
 
     private void previewTransfer(ComboBox<String> fromAccountBox,
             ComboBox<String> toAccountBox,
             ComboBox<String> currencyBox,
+            ComboBox<String> networkBox,
+            ComboBox<String> destinationWalletBox,
             TextField amountField,
             TextArea notesField,
             Spinner<Integer> prioritySpinner) {
         TransferRequest request = request(fromAccountBox.getValue(), toAccountBox.getValue(), currencyBox.getValue(),
-                amountField.getText(), notesField.getText(), prioritySpinner.getValue());
+                networkBox.getValue(), selectedDestinationWallet(destinationWalletBox), amountField.getText(),
+                notesField.getText(), prioritySpinner.getValue());
         TransferManager.Preview preview = manager.preview(request);
         lastPreview.set(preview);
 
@@ -147,12 +189,15 @@ public class TransferController {
     private void executeTransfer(ComboBox<String> fromAccountBox,
             ComboBox<String> toAccountBox,
             ComboBox<String> currencyBox,
+            ComboBox<String> networkBox,
+            ComboBox<String> destinationWalletBox,
             TextField amountField,
             TextArea notesField,
             Spinner<Integer> prioritySpinner,
             ProgressIndicator progressIndicator) {
         TransferRequest request = request(fromAccountBox.getValue(), toAccountBox.getValue(), currencyBox.getValue(),
-                amountField.getText(), notesField.getText(), prioritySpinner.getValue());
+                networkBox.getValue(), selectedDestinationWallet(destinationWalletBox), amountField.getText(),
+                notesField.getText(), prioritySpinner.getValue());
 
         TransferManager.Preview preview = manager.preview(request);
         if (!preview.validation().valid()) {
@@ -217,11 +262,15 @@ public class TransferController {
     private TransferRequest request(String fromAccountValue,
             String toAccountValue,
             String currency,
+            String selectedNetwork,
+            String destinationWallet,
             String amountText,
             String notes,
             Integer priority) {
         AccountRef from = parseAccount(fromAccountValue);
         AccountRef to = parseAccount(toAccountValue);
+        String effectiveNetwork = chooseNetwork(currency, selectedNetwork);
+        String effectiveNotes = mergeRoutingNotes(notes, currency, effectiveNetwork, destinationWallet);
         return manager.createRequest(
                 from.provider(),
                 from.account(),
@@ -229,8 +278,8 @@ public class TransferController {
                 to.account(),
                 currency == null ? "USD" : currency,
                 parseAmount(amountText),
-                notes,
-                chooseNetwork(currency),
+                effectiveNotes,
+                effectiveNetwork,
                 priority == null ? 3 : priority);
     }
 
@@ -273,6 +322,8 @@ public class TransferController {
     private void recalculateEstimate(ComboBox<String> fromAccountBox,
             ComboBox<String> toAccountBox,
             ComboBox<String> currencyBox,
+            ComboBox<String> networkBox,
+            ComboBox<String> destinationWalletBox,
             TextField amountField,
             TextArea notesField,
             Spinner<Integer> prioritySpinner) {
@@ -282,7 +333,8 @@ public class TransferController {
             return;
         }
         TransferRequest request = request(fromAccountBox.getValue(), toAccountBox.getValue(), currencyBox.getValue(),
-                amountField.getText(), notesField.getText(), prioritySpinner.getValue());
+                networkBox.getValue(), selectedDestinationWallet(destinationWalletBox), amountField.getText(),
+                notesField.getText(), prioritySpinner.getValue());
         TransferManager.Preview preview = manager.preview(request);
         lastPreview.set(preview);
         estimatedFees.set(money(preview.fee()));
@@ -308,18 +360,78 @@ public class TransferController {
         }
     }
 
-    private String chooseNetwork(String currency) {
+    private String chooseNetwork(String currency, String selectedNetwork) {
         if (currency == null) {
             return "FIAT";
         }
-        if ("USDT".equalsIgnoreCase(currency)
-                || "USDC".equalsIgnoreCase(currency)
-                || "BTC".equalsIgnoreCase(currency)
-                || "ETH".equalsIgnoreCase(currency)
-                || "SOL".equalsIgnoreCase(currency)) {
+        if (isCryptoCurrency(currency)) {
             return "CRYPTO";
         }
         return "FIAT";
+    }
+
+    private boolean isCryptoCurrency(String currency) {
+        if (currency == null) {
+            return false;
+        }
+        return switch (currency.toUpperCase(Locale.ROOT)) {
+            case "USDT", "USDC", "BTC", "ETH", "SOL", "LTC", "XRP", "ADA", "DOGE" -> true;
+            default -> false;
+        };
+    }
+
+    private void toggleCryptoRoutingControls(String currency,
+            ComboBox<String> networkBox,
+            ComboBox<String> destinationWalletBox) {
+        boolean crypto = isCryptoCurrency(currency);
+        networkBox.setDisable(!crypto);
+        destinationWalletBox.setDisable(!crypto);
+        if (!crypto) {
+            networkBox.getSelectionModel().select("AUTO");
+            destinationWalletBox.getSelectionModel().clearSelection();
+            destinationWalletBox.getEditor().clear();
+        }
+    }
+
+    private void refreshDestinationWallets(String network, ComboBox<String> destinationWalletBox) {
+        String key = network == null || network.isBlank() ? "AUTO" : network.toUpperCase(Locale.ROOT);
+        List<String> presets = walletByNetwork.getOrDefault(key, List.of());
+        destinationWalletBox.getItems().setAll(presets);
+        if (!presets.isEmpty()) {
+            destinationWalletBox.getSelectionModel().selectFirst();
+        }
+    }
+
+    private String selectedDestinationWallet(ComboBox<String> destinationWalletBox) {
+        String selected = destinationWalletBox.getValue();
+        if (selected != null && !selected.isBlank()) {
+            return selected.trim();
+        }
+        String edited = destinationWalletBox.getEditor().getText();
+        return edited == null ? "" : edited.trim();
+    }
+
+    private String mergeRoutingNotes(String baseNotes, String currency, String network, String destinationWallet) {
+        String notes = baseNotes == null ? "" : baseNotes.trim();
+        if (!isCryptoCurrency(currency)) {
+            return notes;
+        }
+
+        String wallet = destinationWallet == null ? "" : destinationWallet.trim();
+        if (wallet.isBlank()) {
+            return notes;
+        }
+
+        StringBuilder builder = new StringBuilder(notes);
+        if (!notes.isBlank() && !notes.endsWith(";")) {
+            builder.append(';');
+        }
+        builder.append("crypto_address=").append(wallet);
+        if (network != null && !network.isBlank() && !"AUTO".equalsIgnoreCase(network)
+                && !"CRYPTO".equalsIgnoreCase(network)) {
+            builder.append(";network=").append(network);
+        }
+        return builder.toString();
     }
 
     private AccountRef parseAccount(String value) {

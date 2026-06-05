@@ -45,7 +45,7 @@ public record BlockchainHealthState(
         Objects.requireNonNull(checkedAt, "checkedAt");
     }
 
-    /** Returns the current slot (Solana) or ledger sequence (Stellar) if available. */
+    /** Returns the current slot (Solona) or ledger sequence (Stellar) if available. */
     public Optional<Long> getCurrentSlotOrLedger() { return Optional.ofNullable(currentSlotOrLedger); }
 
     /** Returns the slot lag (local vs. cluster tip) if measurable. */

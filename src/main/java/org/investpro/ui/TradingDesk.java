@@ -76,7 +76,7 @@ import org.investpro.exchange.blockchain.execution.ConfirmationPolicy;
 import org.investpro.exchange.blockchain.execution.EthereumExecutionProvider;
 import org.investpro.exchange.blockchain.execution.FileBlockchainTransactionRepository;
 import org.investpro.exchange.blockchain.execution.PolygonExecutionProvider;
-import org.investpro.exchange.blockchain.execution.SolanaExecutionProvider;
+import org.investpro.exchange.blockchain.execution.SolonaExecutionProvider;
 import org.investpro.exchange.blockchain.execution.StellarExecutionProvider;
 import org.investpro.models.trading.*;
 import org.investpro.market.MarketDataEngine;
@@ -133,6 +133,7 @@ import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -227,7 +228,7 @@ public class TradingDesk extends BorderPane {
             "POLONIEX",
             "IG",
             "STELLAR NETWORK",
-            "SOLANA NETWORK"
+            "SOLONA NETWORK"
     };
 
     private final ComboBox<String> exchangeSelector = new ComboBox<>();
@@ -906,7 +907,7 @@ public class TradingDesk extends BorderPane {
         title.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #e2e8f0;");
 
         Label subtitle = new Label(
-                "Funding ledger and settlement activity. Use Transfer Funds to initiate broker-to-broker and wallet transfers.");
+                "Submit live funding requests for connected exchanges that expose deposit/withdraw APIs. Cross-exchange movement is crypto-only and should be executed from Transfer Funds.");
         subtitle.setWrapText(true);
         subtitle.setStyle("-fx-font-size: 12; -fx-text-fill: #94a3b8;");
 
@@ -921,13 +922,155 @@ public class TradingDesk extends BorderPane {
                 tableColumn("Status", TransferFundingRow::status, 110),
                 tableColumn("Reference", TransferFundingRow::reference, 180));
 
-        table.setItems(FXCollections.observableArrayList(
+        ObservableList<TransferFundingRow> fundingRows = FXCollections.observableArrayList(
                 new TransferFundingRow("2026-06-03 10:22", "Coinbase", "Deposit", "USD", "$5,000.00", "Completed",
                         "CB-DEP-84A2"),
                 new TransferFundingRow("2026-06-03 11:03", "Interactive Brokers", "Withdrawal", "USD", "$2,000.00",
-                        "Processing", "IBKR-WD-19F1")));
+                        "Processing", "IBKR-WD-19F1"));
+        table.setItems(fundingRows);
 
-        VBox content = new VBox(10, title, subtitle, table);
+        ComboBox<String> actionType = new ComboBox<>(FXCollections.observableArrayList("Deposit", "Withdrawal"));
+        actionType.getSelectionModel().selectFirst();
+
+        ObservableList<String> fundingProviders = FXCollections.observableArrayList(fundingCapableProviders());
+        ComboBox<String> providerBox = new ComboBox<>(fundingProviders);
+        if (!fundingProviders.isEmpty()) {
+            providerBox.getSelectionModel().selectFirst();
+        }
+
+        ComboBox<String> currencyBox = new ComboBox<>(
+                FXCollections.observableArrayList("USD", "USDC", "BTC", "ETH", "SOL"));
+        currencyBox.getSelectionModel().select("USD");
+
+        TextField amountField = new TextField();
+        amountField.setPromptText("Amount (e.g. 100.00)");
+
+        TextField destinationField = new TextField();
+        destinationField.setPromptText("payment_method_id or bank_account:<id> / debit_card:<id>");
+
+        TextField networkField = new TextField();
+        networkField.setPromptText("Network (optional, e.g. ERC20, SOL)");
+
+        Label statusLabel = new Label();
+        statusLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #94a3b8;");
+
+        if (fundingProviders.isEmpty()) {
+            statusLabel.setText("No connected exchange currently exposes live deposit/withdraw operations.");
+        }
+
+        actionType.valueProperty().addListener((obs, oldValue, newValue) -> {
+            String action = Optional.ofNullable(newValue).orElse("Deposit");
+            if ("Deposit".equalsIgnoreCase(action)) {
+                destinationField.setPromptText("bank_account:<id>, debit_card:<id>, or payment_method_id");
+            } else {
+                destinationField.setPromptText("payment_method_id (fiat) or wallet address (crypto)");
+            }
+        });
+
+        Button submitButton = new Button("Submit Request");
+        submitButton.setDisable(fundingProviders.isEmpty());
+        submitButton.setOnAction(event -> {
+            String type = Optional.ofNullable(actionType.getValue()).orElse("Deposit");
+            String provider = Optional.ofNullable(providerBox.getValue()).orElse("");
+            String currency = Optional.ofNullable(currencyBox.getValue()).orElse("USD");
+            String destination = safe(destinationField.getText());
+            String network = safe(networkField.getText());
+
+            if (provider.isBlank()) {
+                statusLabel.setText("Select a provider that supports funding operations.");
+                return;
+            }
+
+            Exchange providerExchange = resolveFundingExchange(provider);
+            if (providerExchange == null) {
+                statusLabel.setText("Selected provider is not connected.");
+                return;
+            }
+
+            BigDecimal amount;
+            try {
+                amount = new BigDecimal(safe(amountField.getText()));
+            } catch (Exception exception) {
+                statusLabel.setText("Invalid amount.");
+                return;
+            }
+
+            if (amount.signum() <= 0) {
+                statusLabel.setText("Amount must be greater than zero.");
+                return;
+            }
+
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+            String pendingReference = "PENDING-"
+                    + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
+            String amountDisplay = money(amount.doubleValue());
+
+            TransferFundingRow pending = new TransferFundingRow(
+                    timestamp,
+                    provider,
+                    type,
+                    currency,
+                    amountDisplay,
+                    "Pending",
+                    pendingReference);
+            fundingRows.add(0, pending);
+            statusLabel.setText("Submitting " + type.toLowerCase(Locale.ROOT) + " request...");
+            journal("Funding request submitted: " + type + " " + amountDisplay + " " + currency + " via " + provider);
+
+            CompletableFuture<String> future = executeFundingRequest(
+                    providerExchange,
+                    type,
+                    currency,
+                    amount,
+                    destination,
+                    network);
+
+            future.whenComplete((response, throwable) -> runOnFx(() -> {
+                if (throwable != null) {
+                    String message = rootMessage(throwable);
+                    TransferFundingRow failed = new TransferFundingRow(
+                            timestamp,
+                            provider,
+                            type,
+                            currency,
+                            amountDisplay,
+                            "Failed",
+                            pendingReference);
+                    fundingRows.set(0, failed);
+                    statusLabel.setText("Failed: " + message);
+                    journal("Funding request failed: " + message);
+                    return;
+                }
+
+                String reference = extractFundingReference(response, pendingReference);
+                TransferFundingRow completed = new TransferFundingRow(
+                        timestamp,
+                        provider,
+                        type,
+                        currency,
+                        amountDisplay,
+                        "Submitted",
+                        reference);
+                fundingRows.set(0, completed);
+                statusLabel.setText("Request submitted successfully. Ref: " + reference);
+                journal("Funding request submitted successfully: " + reference);
+            }));
+        });
+
+        GridPane actionForm = new GridPane();
+        actionForm.setHgap(10);
+        actionForm.setVgap(8);
+        actionForm.addRow(0, new Label("Action"), actionType, new Label("Provider"), providerBox);
+        actionForm.addRow(1, new Label("Currency"), currencyBox, new Label("Amount"), amountField);
+        actionForm.addRow(2, new Label("Destination"), destinationField, new Label("Network"), networkField);
+        actionForm.add(submitButton, 3, 3);
+        actionForm.add(statusLabel, 0, 3, 3, 1);
+        GridPane.setHgrow(amountField, Priority.ALWAYS);
+        GridPane.setHgrow(destinationField, Priority.ALWAYS);
+        GridPane.setHgrow(networkField, Priority.ALWAYS);
+        actionForm.getStyleClass().add("pro-panel");
+
+        VBox content = new VBox(10, title, subtitle, actionForm, table);
         content.setPadding(new Insets(16));
         content.getStyleClass().add("pro-panel");
         VBox.setVgrow(table, Priority.ALWAYS);
@@ -937,9 +1080,199 @@ public class TradingDesk extends BorderPane {
     }
 
     private void openTransferFundsWindow() {
-        TransferPanel transferPanel = new TransferPanel(this::journal);
+        TransferPanel transferPanel = new TransferPanel(exchange, this::journal);
         createIndependentWindow("Transfer Funds", transferPanel, 1120, 780);
         journal("Transfer Funds panel opened");
+    }
+
+    private List<String> fundingCapableProviders() {
+        java.util.LinkedHashMap<String, Exchange> providers = new java.util.LinkedHashMap<>();
+
+        if (supportsFundingOperations(exchange)) {
+            providers.put(normalizeExchangeName(firstNonBlank(
+                    exchange.getDisplayName(),
+                    exchange.getName(),
+                    exchange.getExchangeId(),
+                    exchange.getClass().getSimpleName())), exchange);
+        }
+
+        for (BrokerSession session : brokerSessions.values()) {
+            if (session == null || !session.accessGranted() || session.exchange() == null) {
+                continue;
+            }
+            Exchange sessionExchange = session.exchange();
+            if (!supportsFundingOperations(sessionExchange)) {
+                continue;
+            }
+            String providerName = normalizeExchangeName(firstNonBlank(
+                    sessionExchange.getDisplayName(),
+                    sessionExchange.getName(),
+                    sessionExchange.getExchangeId(),
+                    sessionExchange.getClass().getSimpleName()));
+            providers.putIfAbsent(providerName, sessionExchange);
+        }
+
+        return providers.keySet().stream().sorted().toList();
+    }
+
+    private Exchange resolveFundingExchange(String providerName) {
+        String normalizedProvider = normalizeExchangeName(providerName);
+        if (exchange != null) {
+            String current = normalizeExchangeName(firstNonBlank(
+                    exchange.getDisplayName(),
+                    exchange.getName(),
+                    exchange.getExchangeId(),
+                    exchange.getClass().getSimpleName()));
+            if (normalizedProvider.equals(current)) {
+                return exchange;
+            }
+        }
+
+        BrokerSession session = findBrokerSession(normalizedProvider);
+        if (session != null && session.accessGranted() && session.exchange() != null) {
+            return session.exchange();
+        }
+
+        return null;
+    }
+
+    private boolean supportsFundingOperations(Exchange providerExchange) {
+        return providerExchange instanceof Coinbase
+                || providerExchange instanceof Binance
+                || providerExchange instanceof Bitfinex;
+    }
+
+    private CompletableFuture<String> executeFundingRequest(
+            Exchange providerExchange,
+            String action,
+            String currency,
+            BigDecimal amount,
+            String destination,
+            String network) {
+        if (providerExchange instanceof Coinbase coinbase) {
+            return executeCoinbaseFundingRequest(coinbase, action, currency, amount, destination, network);
+        }
+
+        if (providerExchange instanceof Binance binance) {
+            if ("Deposit".equalsIgnoreCase(action)) {
+                return CompletableFuture.failedFuture(
+                        new UnsupportedOperationException("Binance adapter supports withdrawals only in this build."));
+            }
+            if (!isCryptoCurrencyCode(currency)) {
+                return CompletableFuture.failedFuture(
+                        new IllegalArgumentException("Binance withdrawals require a crypto currency."));
+            }
+            if (destination.isBlank()) {
+                return CompletableFuture.failedFuture(
+                        new IllegalArgumentException("Binance withdrawal requires a destination wallet address."));
+            }
+            return binance.requestWithdrawalToCryptoAddress(amount, currency, destination, network, null);
+        }
+
+        if (providerExchange instanceof Bitfinex bitfinex) {
+            if ("Deposit".equalsIgnoreCase(action)) {
+                return CompletableFuture.failedFuture(
+                        new UnsupportedOperationException("Bitfinex adapter supports withdrawals only in this build."));
+            }
+            if (!isCryptoCurrencyCode(currency)) {
+                return CompletableFuture.failedFuture(
+                        new IllegalArgumentException("Bitfinex withdrawals require a crypto currency."));
+            }
+            if (destination.isBlank()) {
+                return CompletableFuture.failedFuture(
+                        new IllegalArgumentException("Bitfinex withdrawal requires a destination wallet address."));
+            }
+            return bitfinex.requestWithdrawalToCryptoAddress(amount, currency, destination, network, null);
+        }
+
+        return CompletableFuture.failedFuture(new UnsupportedOperationException(
+                providerExchange.getDisplayName() + " does not expose live funding APIs in this adapter."));
+    }
+
+    private CompletableFuture<String> executeCoinbaseFundingRequest(
+            Coinbase coinbase,
+            String action,
+            String currency,
+            BigDecimal amount,
+            String destination,
+            String network) {
+        if (coinbase == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Coinbase exchange is unavailable."));
+        }
+
+        boolean isDeposit = "Deposit".equalsIgnoreCase(action);
+        boolean cryptoRoute = isCryptoCurrencyCode(currency) || (!destination.isBlank() && destination.length() >= 24);
+
+        if (isDeposit) {
+            String paymentMethodId = normalizePaymentMethodId(destination);
+            if (paymentMethodId.isBlank()) {
+                return CompletableFuture.failedFuture(new IllegalArgumentException(
+                        "Deposit requires payment_method_id, bank_account:<id>, or debit_card:<id> in Destination."));
+            }
+            return coinbase.requestDepositFromPaymentMethod(amount, currency, paymentMethodId);
+        }
+
+        if (destination.isBlank()) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException(
+                    "Withdrawal requires a payment method ID or crypto address in Destination."));
+        }
+
+        if (cryptoRoute) {
+            return coinbase.requestWithdrawalToCryptoAddress(amount, currency, destination, network, null);
+        }
+
+        String paymentMethodId = normalizePaymentMethodId(destination);
+        if (paymentMethodId.isBlank()) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException(
+                    "Fiat withdrawal requires payment_method_id in Destination."));
+        }
+        return coinbase.requestWithdrawalToPaymentMethod(amount, currency, paymentMethodId);
+    }
+
+    private String normalizePaymentMethodId(String destination) {
+        return org.investpro.transfer.FundingDestinationParser.parsePaymentMethodId(destination);
+    }
+
+    private boolean isCryptoCurrencyCode(String currency) {
+        if (currency == null) {
+            return false;
+        }
+        return switch (currency.toUpperCase(Locale.ROOT)) {
+            case "BTC", "ETH", "SOL", "USDC", "USDT", "XRP", "LTC", "ADA", "DOGE" -> true;
+            default -> false;
+        };
+    }
+
+    private String extractFundingReference(String responseBody, String fallback) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return fallback;
+        }
+
+        for (String key : List.of("id", "transfer_id", "transaction_id", "withdrawal_id", "deposit_id")) {
+            String needle = "\"" + key + "\"";
+            int keyIndex = responseBody.indexOf(needle);
+            if (keyIndex < 0) {
+                continue;
+            }
+            int colonIndex = responseBody.indexOf(':', keyIndex + needle.length());
+            if (colonIndex < 0) {
+                continue;
+            }
+            int firstQuote = responseBody.indexOf('"', colonIndex + 1);
+            if (firstQuote < 0) {
+                continue;
+            }
+            int secondQuote = responseBody.indexOf('"', firstQuote + 1);
+            if (secondQuote < 0) {
+                continue;
+            }
+            String value = responseBody.substring(firstQuote + 1, secondQuote).trim();
+            if (!value.isBlank()) {
+                return value;
+            }
+        }
+
+        return fallback;
     }
 
     private void openAccountManagementWindow() {
@@ -2141,7 +2474,7 @@ public class TradingDesk extends BorderPane {
 
         blockchainExecutionService = new BlockchainExecutionService(
                 List.of(
-                        new SolanaExecutionProvider(),
+                        new SolonaExecutionProvider(),
                         new StellarExecutionProvider(),
                         new EthereumExecutionProvider(),
                         new PolygonExecutionProvider(),
@@ -7703,9 +8036,8 @@ public class TradingDesk extends BorderPane {
                 .thenAccept(trades -> runOnFx(() -> updateAccountTrades(trades)));
         refreshes.add(tradesRefresh);
 
-        CompletableFuture<?> openOrdersRefresh = fetchAccountWorkspaceAsync("open orders",
-                this::fetchOpenOrdersForWorkspace)
-                .thenAccept(orders -> runOnFx(() -> updateAccountOpenOrders((List<OpenOrder>) orders)));
+        CompletableFuture<?> openOrdersRefresh = fetchOpenOrdersForWorkspace(exchange)
+                .thenAccept(orders -> runOnFx(() -> updateAccountOpenOrders(orders)));
         refreshes.add(openOrdersRefresh);
 
         if (accountHistoryItems.isEmpty() || Duration.between(lastAccountHistoryRefreshAt, Instant.now())
@@ -7742,29 +8074,80 @@ public class TradingDesk extends BorderPane {
         }, autoRefreshExecutor);
     }
 
-    private CompletableFuture<? extends List<?>> fetchOpenOrdersForWorkspace(Exchange current) {
+    private CompletableFuture<List<OpenOrder>> fetchOpenOrdersForWorkspace(Exchange current) {
         if (current == null) {
-            return CompletableFuture.completedFuture(List.of());
+            return CompletableFuture.completedFuture(List.<OpenOrder>of());
         }
 
-        return current.fetchOpenOrders(null).thenCompose(openOrders -> {
+        TradePair fallbackPair = preferredOpenOrdersPairSnapshot();
+
+        if (current instanceof IbkrExchange) {
+            if (fallbackPair == null) {
+                log.debug("Skipping IBKR open orders refresh because no symbol is selected yet.");
+                return CompletableFuture.completedFuture(List.of());
+            }
+
+            return current.fetchOpenOrders(fallbackPair)
+                    .thenApply(this::normalizeOpenOrdersTyped)
+                    .exceptionally(ex -> {
+                        log.debug("IBKR open orders refresh failed", ex);
+                        return List.of();
+                    });
+        }
+
+        if (fallbackPair != null) {
+            return current.fetchOpenOrders(fallbackPair).thenCompose(initialOrders -> {
+                List<OpenOrder> openOrders = normalizeOpenOrdersTyped(initialOrders);
+                if (!openOrders.isEmpty()) {
+                    return CompletableFuture.completedFuture(openOrders);
+                }
+
+                return current.fetchOpenOrders(null)
+                        .thenApply(this::normalizeOpenOrdersTyped)
+                        .thenApply(globalOrders -> globalOrders.isEmpty() ? openOrders : globalOrders);
+            }).exceptionally(ex -> {
+                log.debug("Open orders workspace refresh failed", ex);
+                return List.<OpenOrder>of();
+            });
+        }
+
+        return current.fetchOpenOrders(null).thenCompose(initialOrders -> {
+            List<OpenOrder> openOrders = normalizeOpenOrdersTyped(initialOrders);
             if (openOrders != null && !openOrders.isEmpty()) {
                 return CompletableFuture.completedFuture(openOrders);
             }
 
             TradePair selected = selectedSymbolSnapshot();
             if (selected == null) {
-                return CompletableFuture.completedFuture(openOrders == null ? List.of() : openOrders);
+                return CompletableFuture.completedFuture(openOrders);
             }
 
-            return current.fetchOpenOrders(selected).thenApply(selectedOrders -> selectedOrders == null
-                    ? (openOrders == null ? List.of() : openOrders)
-                    : selectedOrders);
+            return current.fetchOpenOrders(selected).thenApply(selectedOrders -> {
+                List<OpenOrder> normalizedSelectedOrders = normalizeOpenOrdersTyped(selectedOrders);
+                return normalizedSelectedOrders.isEmpty() ? openOrders : normalizedSelectedOrders;
+            });
         }).exceptionally(ex -> {
             log.debug("Open orders workspace refresh failed", ex);
-
-            return (List<OpenOrder>) new ArrayList<OpenOrder>();
+            return List.<OpenOrder>of();
         });
+    }
+
+    private TradePair preferredOpenOrdersPairSnapshot() {
+        TradePair selected = selectedSymbolSnapshot();
+        if (selected != null) {
+            return selected;
+        }
+        if (!marketWatchItems.isEmpty()) {
+            return marketWatchItems.getFirst();
+        }
+        return null;
+    }
+
+    private @NotNull List<OpenOrder> normalizeOpenOrdersTyped(List<? extends OpenOrder> sourceOrders) {
+        if (sourceOrders == null || sourceOrders.isEmpty()) {
+            return List.of();
+        }
+        return sourceOrders.stream().filter(Objects::nonNull).map(order -> (OpenOrder) order).toList();
     }
 
     private TradePair selectedSymbolSnapshot() {
@@ -10724,7 +11107,7 @@ public class TradingDesk extends BorderPane {
                 || "DEMO".equalsIgnoreCase(safe(tradingMode))
                 || "TESTNET".equalsIgnoreCase(safe(tradingMode));
         boolean walletAddressBroker = "STELLAR NETWORK".equals(normalizedName)
-                || "SOLANA NETWORK".equals(normalizedName);
+                || "SOLONA NETWORK".equals(normalizedName);
         String normalizedAccountId = walletAddressBroker ? safe(apiKey) : safe(accountId);
 
         ExchangeCredentials credentials = new ExchangeCredentials(
@@ -10757,7 +11140,8 @@ public class TradingDesk extends BorderPane {
                     new IbkrExchange(credentials);
                 case "COINBASE" -> new Coinbase(credentials);
                 case "STELLAR NETWORK", "STELLAR-NETWORK", "STELLAR_NETWORK" -> new StellarNetwork(credentials);
-                case "SOLANA NETWORK", "SOLANA-NETWORK", "SOLANA_NETWORK" -> new SolanaNetwork(credentials);
+                case  "SOLONA NETWORK", "SOLONA-NETWORK", "SOLONA_NETWORK" ->
+                    new SolonaNetwork(credentials);
                 default -> {
                     log.warn("Exchange {} is not implemented yet. Falling back to Coinbase.", exchangeName);
                     throw new RuntimeException("UNSUPPORTED EXCHANGE");
@@ -10805,15 +11189,15 @@ public class TradingDesk extends BorderPane {
 
         return switch (key) {
             case "COINBASE_API_KEY", "COINBASE_KEY_NAME", "BINANCE_API_KEY", "BINANCE_US_API_KEY", "BITFINEX_API_KEY",
-                    "OANDA_API_KEY", "ALPACA_API_KEY", "SOLANA_API_KEY", "SOLANA_WALLET_ADDRESS", "SOLANA_PUBLIC_KEY",
-                    "SOLANA_NETWORK_API_KEY" ->
+                    "OANDA_API_KEY", "ALPACA_API_KEY", "SOLONA_API_KEY", "SOLONA_WALLET_ADDRESS", "SOLONA_PUBLIC_KEY",
+                    "SOLONA_NETWORK_API_KEY" ->
                 Optional.ofNullable(credentials.apiKey());
             case "STELLAR_PUBLIC_KEY", "STELLAR_NETWORK_API_KEY", "STELLAR_NETWORK_ACCOUNT_ID" ->
                 Optional.ofNullable(
                         safe(credentials.accountId()).isBlank() ? credentials.apiKey() : credentials.accountId());
             case "COINBASE_API_SECRET", "COINBASE_PRIVATE_KEY", "BINANCE_API_SECRET", "BINANCE_US_API_SECRET",
-                    "BITFINEX_API_SECRET", "OANDA_API_SECRET", "ALPACA_API_SECRET", "SOLANA_API_SECRET",
-                    "SOLANA_NETWORK_API_SECRET", "STELLAR_SECRET_KEY", "STELLAR_NETWORK_API_SECRET" ->
+                    "BITFINEX_API_SECRET", "OANDA_API_SECRET", "ALPACA_API_SECRET", "SOLONA_API_SECRET",
+                    "SOLONA_NETWORK_API_SECRET", "STELLAR_SECRET_KEY", "STELLAR_NETWORK_API_SECRET" ->
                 Optional.ofNullable(credentials.apiSecret());
             case "OANDA_ACCOUNT_ID" -> Optional.ofNullable(credentials.accountId());
             case "OANDA_SANDBOX", "ALPACA_PAPER" -> Optional.of(String.valueOf(credentials.sandbox()));
@@ -10833,12 +11217,13 @@ public class TradingDesk extends BorderPane {
             case "INTERACTIVE BROKERS", "INTERACTIVEBROKERS", "IBKR", "IBK" -> "INTERACTIVE BROKERS";
             case "SCHWAB", "CHARLES SCHWAB", "CHARLESSCHWAB" -> "SCHWAB";
             case "STELLAR", "STELLAR NETWORK", "STELLARNETWORK" -> "STELLAR NETWORK";
-            case "SOLANA", "SOLANA NETWORK", "SOLANANETWORK", "SOL" -> "SOLANA NETWORK";
+            case "SOLONA", "SOLONA NETWORK", "SOLONANETWORK", "SOL" ->
+                "SOLONA NETWORK";
             default -> name;
         };
     }
 
-    private @NotNull String normalizedExchangeId(String normalizedName) {
+    private @NotNull String normalizedExchangeId(@NonNull String normalizedName) {
         return switch (normalizedName) {
             case "BINANCE US" -> "binanceus";
             case "BINANCE" -> "binance";
@@ -10846,10 +11231,11 @@ public class TradingDesk extends BorderPane {
             case "OANDA" -> "oanda";
             case "ALPACA" -> "alpaca";
             case "BITFINEX" -> "bitfinex";
+
             case "INTERACTIVE BROKERS" -> "interactive_brokers";
             case "SCHWAB" -> "schwab";
-            case "STELLAR NETWORK" -> "stellar-network";
-            case "SOLANA NETWORK" -> "solana-network";
+            case "STELLAR NETWORK","STELLAR" -> "stellar-network";
+            case "SOLONA NETWORK" -> "solona-network";
             default -> normalizedName.toLowerCase(Locale.ROOT).replace(" ", "_");
         };
     }

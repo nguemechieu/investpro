@@ -111,7 +111,7 @@ class TradeExecutionCoordinatorTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         Unsafe unsafe = unsafe();
-        long offset = unsafe.objectFieldOffset(field);
+        long offset = unsafe.getLong(field,0);
         unsafe.putObject(target, offset, value);
     }
 

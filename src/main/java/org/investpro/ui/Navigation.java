@@ -56,7 +56,7 @@ public class Navigation extends StackPane {
             "ALPACA",
             "INTERACTIVE_BROKERS",
             "STELLAR_NETWORK",
-            "SOLANA_NETWORK");
+            "SOLONA_NETWORK");
 
     private ComboBox<String> exchangeSelector;
     private Label currentExchangeLabel;
@@ -177,7 +177,7 @@ public class Navigation extends StackPane {
         venueGrid.add(createExchangeButton("BINANCE"), 0, 1);
         venueGrid.add(createExchangeButton("BINANCE_US"), 1, 1);
         venueGrid.add(createExchangeButton("BITFINEX"), 0, 2);
-        venueGrid.add(createExchangeButton("SOLANA_NETWORK"), 1, 2);
+        venueGrid.add(createExchangeButton("SOLONA_NETWORK"), 1, 2);
 
         Button connectButton = createUtilityButton("Connect", "Connect to the selected venue.");
         connectButton.getStyleClass().add("success-button");
