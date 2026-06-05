@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 @Data
 public class SolanaWalletService {
 
-    private static final Logger log = LoggerFactory.getLogger(SolanaWalletService.class);
+    public static final Logger log = LoggerFactory.getLogger(SolanaWalletService.class);
 
     /**
      * Solana base-58 addresses are 32–44 characters from the base-58 alphabet.

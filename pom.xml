@@ -14,7 +14,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.12.1</junit.version>
         <javafx.version>21.0.8</javafx.version>
-        <grpc.version>1.66.0</grpc.version>
+        <grpc.version>1.75.0</grpc.version>
         <protobuf.version>3.25.5</protobuf.version>
         <kotlin.version>1.9.10</kotlin.version>
         <slf4j.version>2.0.17</slf4j.version>

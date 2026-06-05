@@ -146,7 +146,7 @@ public class PasswordReset extends Stage {
         boolean success = performPasswordReset(username, email, newPassword);
 
         if (success) {
-            showSuccess("Password reset successful! You can now login with your new password.");
+            showSuccess();
             new java.util.Timer().schedule(
                     new java.util.TimerTask() {
                         @Override
@@ -296,8 +296,8 @@ public class PasswordReset extends Stage {
         statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11px;");
     }
 
-    private void showSuccess(String message) {
-        statusLabel.setText(message);
+    private void showSuccess() {
+        statusLabel.setText("Password reset successful! You can now login with your new password.");
         statusLabel.setStyle("-fx-text-fill: #22c55e; -fx-font-size: 11px;");
     }
 }

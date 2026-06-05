@@ -181,7 +181,7 @@ public class StrategyLabService {
             int candleCount = cleanCandles.size();
             HistoricalDataPrefetcher.DataReadiness readiness = HistoricalDataPrefetcher
                     .evaluateDataReadiness(candleCount, candleCount);
-            if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
+            if (HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
                 log.warn("Cannot evaluate strategies for {}/{}: only {} candles available, readiness={}",
                         symbol, timeframe.getCode(), candleCount, readiness);
                 return null;
@@ -279,7 +279,7 @@ public class StrategyLabService {
                 HistoricalDataPrefetcher.DataReadiness readiness = HistoricalDataPrefetcher
                         .evaluateDataReadiness(candleCount, candleCount);
 
-                if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
+                if (HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
                     log.warn("Skipping Strategy Lab backtests for {}/{}: insufficient candles={} readiness={}",
                             symbol, timeframe.getCode(), candleCount, readiness);
                     rankingsCache.put(cacheKey, List.of());
@@ -545,7 +545,7 @@ public class StrategyLabService {
     }
 
     private List<StrategyPerformanceReport> applyLocalAiBacktestReview(List<StrategyPerformanceReport> reports) {
-        if (reports == null || reports.isEmpty() || !LocalAiRuntimeService.isGrpcAdvisoryEnabled()) {
+        if (reports == null || reports.isEmpty() || LocalAiRuntimeService.isGrpcAdvisoryEnabled()) {
             return reports == null ? List.of() : reports;
         }
 

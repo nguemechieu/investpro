@@ -3,6 +3,7 @@ package org.investpro.exchange;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.models.Account;
@@ -26,6 +27,7 @@ import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import lombok.extern.slf4j.Slf4j;
 import org.java_websocket.drafts.Draft_6455;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import javafx.beans.property.SimpleIntegerProperty;
@@ -51,8 +53,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
-@Getter
-@Setter
+@Data
 public class InteractiveBrokers extends Exchange {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -211,7 +212,8 @@ public class InteractiveBrokers extends Exchange {
         }
     }
 
-    private IBKWebSocketClient createWebSocketClient() {
+    @Contract(" -> new")
+    private @NonNull IBKWebSocketClient createWebSocketClient() {
         return new IBKWebSocketClient(URI.create(IBK_URL), new Draft_6455());
     }
 
@@ -261,7 +263,8 @@ public class InteractiveBrokers extends Exchange {
 
     @Override
     public List<MARKET_TYPES> getSupportedMarketTypes() {
-        return List.of(MARKET_TYPES.STOCKS, MARKET_TYPES.FOREX);
+        return List.of(
+                MARKET_TYPES.values());
     }
 
     @Override
@@ -631,16 +634,16 @@ public class InteractiveBrokers extends Exchange {
             double amount,
             double stopPrice) {
 
-            if (!isPaperTrading() && hasCredentials()) {
-                return submitClientPortalOrder(tradePair, side, amount, stopPrice, "LIMIT");
-            }
-            return CompletableFuture.supplyAsync(() -> {
-                String orderId = "ORDER-" + (nextOrderId++) + "-" + System.currentTimeMillis();
-                applyPaperFill(tradePair, side, amount, stopPrice);
-                orders.put(orderId, "FILLED");
-                return orderId;
-            });
-  }
+        if (!isPaperTrading() && hasCredentials()) {
+            return submitClientPortalOrder(tradePair, side, amount, stopPrice, "LIMIT");
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            String orderId = "ORDER-" + (nextOrderId++) + "-" + System.currentTimeMillis();
+            applyPaperFill(tradePair, side, amount, stopPrice);
+            orders.put(orderId, "FILLED");
+            return orderId;
+        });
+    }
 
     @Override
     public CompletableFuture<String> createBracketOrder(
@@ -709,23 +712,22 @@ public class InteractiveBrokers extends Exchange {
 
     @Override
     public CompletableFuture<Optional<Order>> fetchOrder(String orderId) {
-        return fetchAllOpenOrders().thenApply(openOrders ->
-                openOrders.stream()
-                        .filter(order -> orderId != null && orderId.equals(order.getOrderId()))
-                        .findFirst()
-                        .map(this::toOrder)
-                        .or(() -> {
-                            String status = orders.get(orderId);
-                            if (status == null) {
-                                return Optional.empty();
-                            }
-                            Order order = new Order();
-                            order.setId(parseOrderId(orderId));
-                            order.setDate(java.util.Date.from(now()));
-                            order.setStatus(status);
-                            order.setType("UNKNOWN");
-                            return Optional.of(order);
-                        }));
+        return fetchAllOpenOrders().thenApply(openOrders -> openOrders.stream()
+                .filter(order -> orderId != null && orderId.equals(order.getOrderId()))
+                .findFirst()
+                .map(this::toOrder)
+                .or(() -> {
+                    String status = orders.get(orderId);
+                    if (status == null) {
+                        return Optional.empty();
+                    }
+                    Order order = new Order();
+                    order.setId(parseOrderId(orderId));
+                    order.setDate(java.util.Date.from(now()));
+                    order.setStatus(status);
+                    order.setType("MARKET");
+                    return Optional.of(order);
+                }));
     }
 
     @Override
@@ -1273,7 +1275,8 @@ public class InteractiveBrokers extends Exchange {
 
     @Override
     public CompletableFuture<OrderBook> fetchOrderBook(TradePair tradePair) {
-        return failedFuture(unsupported("fetchOrderBook"));
+        return CompletableFuture.supplyAsync(() -> fetchClientPortalOrderBook(tradePair)
+                .orElseGet(() -> syntheticOrderBook(tradePair)));
     }
 
     @Override
@@ -1374,7 +1377,29 @@ public class InteractiveBrokers extends Exchange {
         String configured = firstNonBlank(
                 System.getenv("IBKR_CLIENT_PORTAL_URL"),
                 System.getProperty("investpro.ibkr.clientPortalUrl"));
-        return configured == null ? IBKR_CLIENT_PORTAL_DEFAULT_URL : configured.replaceAll("/+$", "");
+        if (!notBlank(configured)) {
+            return IBKR_CLIENT_PORTAL_DEFAULT_URL;
+        }
+
+        String normalized = configured.trim().replaceAll("/+$", "");
+        try {
+            URI uri = URI.create(normalized);
+            int port = uri.getPort();
+            if (port == 4001 || port == 4002) {
+                log.warn("Ignoring IBKR Client Portal URL '{}' because port {} is reserved for IB API socket traffic. "
+                        + "Falling back to {}.",
+                        normalized,
+                        port,
+                        IBKR_CLIENT_PORTAL_DEFAULT_URL);
+                return IBKR_CLIENT_PORTAL_DEFAULT_URL;
+            }
+            return normalized;
+        } catch (Exception exception) {
+            log.warn("Invalid IBKR Client Portal URL '{}'; falling back to {}",
+                    normalized,
+                    IBKR_CLIENT_PORTAL_DEFAULT_URL);
+            return IBKR_CLIENT_PORTAL_DEFAULT_URL;
+        }
     }
 
     private HttpRequest.Builder clientPortalRequest(String path) {
@@ -1422,6 +1447,62 @@ public class InteractiveBrokers extends Exchange {
             return Optional.of(new Ticker(mid, bid, ask, mid, high, low, volume, System.currentTimeMillis()));
         } catch (Exception exception) {
             log.debug("Unable to fetch IBKR ticker for {}: {}", tradePair, exception.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private Optional<OrderBook> fetchClientPortalOrderBook(TradePair tradePair) {
+        try {
+            String conid = resolveConid(tradePair).orElse(null);
+            if (!notBlank(conid)) {
+                return Optional.empty();
+            }
+            String path = "/iserver/marketdata/snapshot?conids=%s&fields=84,85,86,88,31"
+                    .formatted(url(conid));
+            HttpResponse<String> response = HTTP_CLIENT.send(
+                    clientPortalRequest(path).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.debug("IBKR order book request returned HTTP {}: {}", response.statusCode(), response.body());
+                return Optional.empty();
+            }
+
+            JsonNode root = OBJECT_MAPPER.readTree(response.body());
+            JsonNode node = root.isArray() && !root.isEmpty() ? root.get(0) : root;
+            double bid = firstDouble(node, "84", "bid", "bidPrice");
+            double ask = firstDouble(node, "86", "ask", "askPrice");
+            double bidSize = firstDouble(node, "88", "bidSize", "bid_size");
+            double askSize = firstDouble(node, "85", "askSize", "ask_size");
+            double last = firstDouble(node, "31", "last", "lastPrice");
+
+            if (bid <= 0.0 && ask <= 0.0 && last <= 0.0) {
+                return Optional.empty();
+            }
+
+            if (bid <= 0.0 && ask > 0.0) {
+                bid = Math.max(0.0, ask - Math.max(0.01, ask * 0.0005));
+            }
+            if (ask <= 0.0 && bid > 0.0) {
+                ask = bid + Math.max(0.01, bid * 0.0005);
+            }
+            if (bid <= 0.0 && ask <= 0.0 && last > 0.0) {
+                double spread = Math.max(0.01, last * 0.0005);
+                bid = Math.max(0.0, last - spread);
+                ask = last + spread;
+            }
+
+            OrderBook orderBook = new OrderBook(tradePair);
+            if (bid > 0.0) {
+                orderBook.setBids(List.of(new OrderBook.PriceLevel(bid, Math.max(1.0, bidSize), 1)));
+            }
+            if (ask > 0.0) {
+                orderBook.setAsks(List.of(new OrderBook.PriceLevel(ask, Math.max(1.0, askSize), 1)));
+            }
+            orderBook.setTimestamp(Instant.now());
+            orderBook.setSequence("ibkr-live-" + System.currentTimeMillis());
+            return Optional.of(orderBook);
+        } catch (Exception exception) {
+            log.debug("Unable to fetch IBKR order book for {}: {}", tradePair, exception.getMessage());
             return Optional.empty();
         }
     }
@@ -1502,7 +1583,8 @@ public class InteractiveBrokers extends Exchange {
         return Optional.empty();
     }
 
-    private CompletableFuture<String> submitClientPortalOrder(
+    @Contract("_, _, _, _, _ -> new")
+    private @NonNull CompletableFuture<String> submitClientPortalOrder(
             TradePair tradePair,
             Side side,
             double amount,
@@ -1562,17 +1644,17 @@ public class InteractiveBrokers extends Exchange {
             account.setMetadata(Map.of("source", "IBKR Client Portal"));
             return Optional.of(account);
         } catch (Exception exception) {
-            log.debug("Unable to fetch IBKR account: {}", exception.getMessage());
-            return Optional.empty();
+            throw new RuntimeException("Unable to fetch IBKR account: {}" + exception.getMessage());
+
         }
     }
 
-    private Account paperAccount() {
+    private @NonNull Account paperAccount() {
         double cash = balances.getOrDefault("USD", 0.0);
         return accountBase(resolveAccountIdOrDefault(), cash, cash);
     }
 
-    private Account accountBase(String accountId, double total, double available) {
+    private @NonNull Account accountBase(String accountId, double total, double available) {
         Map<String, Double> totalBalances = new LinkedHashMap<>();
         totalBalances.put("USD", total);
         Map<String, Double> availableBalances = new LinkedHashMap<>();
@@ -1627,7 +1709,7 @@ public class InteractiveBrokers extends Exchange {
         tradeHistory.add(trade);
     }
 
-    private List<CandleData> syntheticCandles(TradePair tradePair, int secondsPerCandle, int count) {
+    private @NonNull List<CandleData> syntheticCandles(TradePair tradePair, int secondsPerCandle, int count) {
         List<CandleData> candles = new ArrayList<>();
         double base = syntheticPrice(tradePair);
         int start = (int) (Instant.now().getEpochSecond() - ((long) count * secondsPerCandle));
@@ -1648,6 +1730,16 @@ public class InteractiveBrokers extends Exchange {
         double spread = Math.max(0.01, price * 0.0005);
         return new Ticker(price, price - spread, price + spread, price * 0.99, price * 1.02, price * 0.98, 100_000,
                 System.currentTimeMillis());
+    }
+
+    private @NonNull OrderBook syntheticOrderBook(TradePair tradePair) {
+        Ticker ticker = syntheticTicker(tradePair);
+        OrderBook orderBook = new OrderBook(tradePair);
+        orderBook.setBids(List.of(new OrderBook.PriceLevel(Math.max(0.0, ticker.getBidPrice()), 100, 1)));
+        orderBook.setAsks(List.of(new OrderBook.PriceLevel(Math.max(0.0, ticker.getAskPrice()), 100, 1)));
+        orderBook.setTimestamp(Instant.now());
+        orderBook.setSequence("ibkr-sim-" + System.currentTimeMillis());
+        return orderBook;
     }
 
     private double syntheticPrice(TradePair tradePair) {
@@ -1737,11 +1829,11 @@ public class InteractiveBrokers extends Exchange {
         if (secondsPerCandle <= 3600) {
             return "1h";
         }
-        if (secondsPerCandle<=3600*24)
-         return "1d";
-        if (secondsPerCandle<=3600*24*7)
+        if (secondsPerCandle <= 3600 * 24)
+            return "1d";
+        if (secondsPerCandle <= 3600 * 24 * 7)
             return "1W";
-        if (secondsPerCandle<=3600*24*7*4)
+        if (secondsPerCandle <= 3600 * 24 * 7 * 4)
             return "1M";
         return "1h";
 

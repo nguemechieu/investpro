@@ -10,6 +10,7 @@ import org.investpro.ai.local.grpc.generated.SignalReviewRequest;
 import org.investpro.config.AppConfig;
 import org.investpro.config.AppConfigKeys;
 import org.investpro.strategy.lab.StrategyPerformanceReport;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -52,7 +53,7 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
     }
 
     public static boolean isGrpcAdvisoryEnabled() {
-        return AppConfig.getBoolean(AppConfigKeys.AI_LOCAL_GRPC_ENABLED, true);
+        return !AppConfig.getBoolean(AppConfigKeys.AI_LOCAL_GRPC_ENABLED, true);
     }
 
     @Override
@@ -85,7 +86,7 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
     }
 
     public double reviewBacktestScore(StrategyPerformanceReport report) {
-        if (report == null || !isGrpcAdvisoryEnabled() || !circuitBreaker.allowRequest()) {
+        if (report == null || isGrpcAdvisoryEnabled() || !circuitBreaker.allowRequest()) {
             return report == null ? 0.0 : report.getScore();
         }
 
@@ -116,7 +117,7 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
 
     @Override
     public boolean isAvailable() {
-        if (!isGrpcAdvisoryEnabled()) {
+        if (isGrpcAdvisoryEnabled()) {
             return false;
         }
         AiGrpcHealthStatus status = healthStatus();
@@ -192,7 +193,7 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
                 .build();
     }
 
-    private void onGrpcFailure(Exception exception) {
+    private void onGrpcFailure(@NonNull Exception exception) {
         circuitBreaker.recordFailure();
         conservativeModeState.enable("gRPC failure");
         String message = exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();

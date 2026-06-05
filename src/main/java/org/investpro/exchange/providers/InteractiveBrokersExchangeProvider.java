@@ -5,6 +5,7 @@ import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.ibkr.IbkrExchange;
 import org.investpro.spi.ExchangeProvider;
 import org.investpro.spi.ExchangeProviderContext;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Set;
 
@@ -45,8 +46,15 @@ public final class InteractiveBrokersExchangeProvider implements ExchangeProvide
     }
 
     @Override
-    public Exchange create(ExchangeProviderContext context) {
+    public @NonNull Exchange create(@NonNull ExchangeProviderContext context) {
         ExchangeCredentials credentials = context.credentialResolver().resolve("interactive_brokers");
-        return new IbkrExchange(credentials);
+        try {
+            return new IbkrExchange(credentials);
+        } catch (LinkageError linkageError) {
+            throw new IllegalStateException(
+                    "Interactive Brokers adapter failed to initialize due to missing runtime classes. "
+                            + "Rebuild and relaunch the application.",
+                    linkageError);
+        }
     }
 }

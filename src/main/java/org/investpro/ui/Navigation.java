@@ -14,6 +14,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -23,9 +25,11 @@ import org.investpro.i18n.LocalizationService;
 import org.investpro.spi.ExchangeProvider;
 import org.investpro.spi.PluginRegistry;
 
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -38,9 +42,9 @@ import java.util.function.Consumer;
  * class stays focused on navigation intent and presentation.
  * </p>
  */
+@EqualsAndHashCode(callSuper = true)
 @Slf4j
-@Getter
-@Setter
+@Data
 public class Navigation extends StackPane {
 
     private static final List<String> LEGACY_EXCHANGES = List.of(
@@ -79,6 +83,7 @@ public class Navigation extends StackPane {
      */
     private Consumer<String> onNavigationRequested;
     private boolean syncingExchangeState;
+    private final Map<String, Button> venueButtons = new HashMap<>();
 
     public Navigation() {
         initializeUI();
@@ -94,9 +99,11 @@ public class Navigation extends StackPane {
 
         root.getChildren().setAll(
                 createHeader(),
+                createQuickCommandRail(),
                 createExchangeCard(),
                 createWorkflowSection(),
                 createMarketSection(),
+            createAccountsSection(),
                 createBrokerSection(),
                 createSystemSection());
 
@@ -193,7 +200,28 @@ public class Navigation extends StackPane {
                 venueGrid,
                 connectionActions);
         card.getStyleClass().add("trading-navigation-card");
+        updateVenueButtonState(defaultExchange);
         return card;
+    }
+
+    private HBox createQuickCommandRail() {
+        Button tradeDesk = createQuickCommandButton("Trade", "Open order ticket", "order-panel");
+        Button marketWatch = createQuickCommandButton("Markets", "Open market watch", "market-watch");
+        Button ibkr = createQuickCommandButton("IBKR", "Open IBKR workspace", "ibkr");
+        Button ops = createQuickCommandButton("Ops", "Open operations center", "operations-center");
+
+        HBox rail = new HBox(8, tradeDesk, marketWatch, ibkr, ops);
+        rail.setAlignment(Pos.CENTER_LEFT);
+        rail.getStyleClass().add("trading-navigation-quick-rail");
+        return rail;
+    }
+
+    private Button createQuickCommandButton(String text, String tooltip, String panelId) {
+        Button button = new Button(text);
+        button.getStyleClass().add("trading-navigation-quick-button");
+        button.setTooltip(new Tooltip(tooltip));
+        button.setOnAction(event -> requestNavigation(panelId));
+        return button;
     }
 
     private VBox createWorkflowSection() {
@@ -230,6 +258,20 @@ public class Navigation extends StackPane {
         return section;
     }
 
+        private VBox createAccountsSection() {
+        VBox section = createSection("Accounts");
+        section.getChildren().addAll(
+            createNavButton("Portfolio", "Account-level balance and asset overview", "portfolio", false),
+            createNavButton("Positions", "Open positions across connected venues", "positions", false),
+            createNavButton("Deposits & Withdrawals", "Funding movement and settlement events",
+                "deposits-withdrawals", false),
+            createNavButton("Transfer Funds", "Move capital between brokers and wallets", "transfer-funds",
+                true),
+            createNavButton("Account Management", "Broker credentials, KYC, and profile controls",
+                "account-management", false));
+        return section;
+        }
+
     private VBox createSystemSection() {
         VBox section = createSection("Operations");
         section.getChildren().addAll(
@@ -259,7 +301,9 @@ public class Navigation extends StackPane {
         button.getStyleClass().add("trading-navigation-venue-button");
         button.setMaxWidth(Double.MAX_VALUE);
         button.setTooltip(new Tooltip("Switch to " + displayExchangeName(exchangeName)));
-        button.setOnAction(event -> selectExchange(exchangeName));
+        String normalizedExchange = normalizeExchangeName(exchangeName);
+        venueButtons.put(normalizedExchange, button);
+        button.setOnAction(event -> selectExchange(normalizedExchange));
         GridPane.setHgrow(button, Priority.ALWAYS);
         return button;
     }
@@ -332,6 +376,7 @@ public class Navigation extends StackPane {
         }
 
         currentExchangeLabel.setText(displayExchangeName(normalizedExchange));
+        updateVenueButtonState(normalizedExchange);
 
         log.info("Exchange selected: {}", normalizedExchange);
 
@@ -419,6 +464,7 @@ public class Navigation extends StackPane {
                 syncingExchangeState = false;
             }
             currentExchangeLabel.setText(displayExchangeName(normalizedExchange));
+            updateVenueButtonState(normalizedExchange);
             setConnectionStatus(connected);
         };
 
@@ -502,5 +548,15 @@ public class Navigation extends StackPane {
 
         return exchangeName.trim()
                 .replace("_", " ");
+    }
+
+    private void updateVenueButtonState(String selectedExchange) {
+        String normalized = normalizeExchangeName(selectedExchange);
+        venueButtons.forEach((exchange, button) -> {
+            button.getStyleClass().remove("selected");
+            if (exchange.equals(normalized)) {
+                button.getStyleClass().add("selected");
+            }
+        });
     }
 }

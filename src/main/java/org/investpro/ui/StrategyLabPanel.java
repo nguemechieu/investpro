@@ -8,8 +8,9 @@ import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
+
+import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.ai.local.grpc.AiGrpcHealthStatus;
 import org.investpro.ai.local.grpc.LocalAiRuntimeService;
@@ -57,8 +58,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * - Consensus summary
  * - Async test status and logs
  */
-@Getter
-@Setter
+@EqualsAndHashCode(callSuper = true)
+@Data
 @Slf4j
 public class StrategyLabPanel extends BorderPane {
 
@@ -415,9 +416,6 @@ public class StrategyLabPanel extends BorderPane {
         List<String> names = new ArrayList<>(StrategyCatalog.availableStrategyNames());
         if (names.stream().noneMatch(StrategyCatalog.defaultStrategyName()::equalsIgnoreCase)) {
             names.add(0, StrategyCatalog.defaultStrategyName());
-        }
-        if (names.isEmpty()) {
-            names.add(StrategyCatalog.defaultStrategyName());
         }
         return names;
     }
@@ -1350,7 +1348,7 @@ public class StrategyLabPanel extends BorderPane {
             List<CandleData> candles) {
         List<CandleData> safeCandles = candles == null ? List.of() : candles;
         int candleCount = safeCandles.size();
-        if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
+        if (HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
             throw new IllegalStateException("Not enough historical candles for "
                     + pair.toString('/') + "/" + timeframe.getCode()
                     + ": " + candleCount + " loaded. Basic backtesting requires at least 100.");

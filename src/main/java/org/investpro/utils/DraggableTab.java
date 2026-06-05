@@ -17,6 +17,8 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.Contract;
@@ -40,8 +42,8 @@ import java.util.Set;
  * - Non-DraggableTab tabs are handled defensively and ignored for insertion
  * geometry.
  */
-@Getter
-@Setter
+@EqualsAndHashCode(callSuper = true)
+@Data
 public class DraggableTab extends Tab {
 
     private static final Set<TabPane> TAB_PANES = new HashSet<>();

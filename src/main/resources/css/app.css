@@ -273,6 +273,45 @@ GridPane {
     -fx-border-width: 1 0 1 0;
 }
 
+.toolbar-group {
+    -fx-alignment: center-left;
+    -fx-spacing: 6;
+    -fx-padding: 3 8;
+    -fx-background-color: rgba(15, 23, 36, 0.72);
+    -fx-border-color: rgba(96, 165, 250, 0.18);
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.toolbar-chip-label {
+    -fx-text-fill: #93c5fd;
+    -fx-font-size: 10px;
+    -fx-font-weight: 800;
+}
+
+.toolbar-toolbox-label {
+    -fx-text-fill: #7dd3fc;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+}
+
+.desk-metric-cluster {
+    -fx-alignment: center-left;
+    -fx-spacing: 8;
+}
+
+.desk-action-cluster {
+    -fx-alignment: center-left;
+    -fx-spacing: 8;
+    -fx-padding: 3 6;
+    -fx-background-color: rgba(12, 23, 37, 0.70);
+    -fx-border-color: rgba(96, 165, 250, 0.2);
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
 .separator {
     -fx-background-color: -border-color;
 }
@@ -1634,6 +1673,29 @@ GridPane {
     -fx-font-size: 11px;
 }
 
+.trading-navigation-quick-rail {
+    -fx-padding: 4 0 2 0;
+}
+
+.trading-navigation-quick-button {
+    -fx-background-color: linear-gradient(to bottom, #0f2238, #0c1b2d);
+    -fx-border-color: #2a4a64;
+    -fx-border-width: 1;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-text-fill: #cbe8ff;
+    -fx-font-size: 10px;
+    -fx-font-weight: 900;
+    -fx-padding: 5 12;
+    -fx-cursor: hand;
+}
+
+.trading-navigation-quick-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #15304e, #10263e);
+    -fx-border-color: #38bdf8;
+    -fx-text-fill: #e0f2fe;
+}
+
 .trading-navigation-chip {
     -fx-background-color: #172033;
     -fx-border-color: #334155;
@@ -1736,6 +1798,12 @@ GridPane {
     -fx-border-color: #60a5fa;
 }
 
+.trading-navigation-venue-button.selected {
+    -fx-background-color: linear-gradient(to bottom, #1f3a58, #182c45);
+    -fx-border-color: #38bdf8;
+    -fx-text-fill: #ecfeff;
+}
+
 .trading-navigation-action {
     -fx-background-color: #111a2b;
     -fx-border-color: #26364f;
@@ -1787,4 +1855,100 @@ GridPane {
 .connection-status.disconnected {
     -fx-text-fill: #ef4444;
     -fx-font-weight: 900;
+}
+
+/* Transfer Funds panel */
+.transfer-funds-panel {
+    -fx-background-color: linear-gradient(to bottom right, #0b1220, #111827);
+    -fx-border-color: rgba(71, 85, 105, 0.6);
+    -fx-border-width: 1;
+}
+
+.transfer-funds-root {
+    -fx-background-color: rgba(15, 23, 42, 0.85);
+    -fx-border-color: rgba(71, 85, 105, 0.6);
+    -fx-border-width: 1;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+}
+
+.transfer-funds-title {
+    -fx-font-size: 20;
+    -fx-font-weight: 800;
+    -fx-text-fill: #e2e8f0;
+}
+
+.transfer-funds-section-title {
+    -fx-font-size: 13;
+    -fx-font-weight: 700;
+    -fx-text-fill: #cbd5e1;
+}
+
+.transfer-funds-label {
+    -fx-font-size: 12;
+    -fx-font-weight: 600;
+    -fx-text-fill: #94a3b8;
+}
+
+.transfer-funds-metric {
+    -fx-font-size: 12;
+    -fx-font-weight: 700;
+    -fx-text-fill: #e2e8f0;
+}
+
+.transfer-funds-message {
+    -fx-font-size: 12;
+    -fx-text-fill: #7dd3fc;
+}
+
+.transfer-funds-root .combo-box,
+.transfer-funds-root .text-field,
+.transfer-funds-root .text-area,
+.transfer-funds-root .spinner {
+    -fx-background-color: #0b1220;
+    -fx-control-inner-background: #0b1220;
+    -fx-text-fill: #e2e8f0;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.transfer-funds-preview-button {
+    -fx-background-color: #1d4ed8;
+    -fx-text-fill: #ffffff;
+    -fx-font-weight: 700;
+}
+
+.transfer-funds-execute-button {
+    -fx-background-color: #0f766e;
+    -fx-text-fill: #ffffff;
+    -fx-font-weight: 700;
+}
+
+.transfer-funds-cancel-button {
+    -fx-background-color: #334155;
+    -fx-text-fill: #e2e8f0;
+    -fx-font-weight: 700;
+}
+
+.transfer-funds-root .table-view {
+    -fx-background-color: #0b1220;
+    -fx-control-inner-background: #0b1220;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+}
+
+.transfer-funds-root .table-view .column-header-background {
+    -fx-background-color: #111827;
+}
+
+.transfer-funds-root .table-view .column-header,
+.transfer-funds-root .table-view .filler {
+    -fx-background-color: #111827;
+    -fx-border-color: #1f2937;
+}
+
+.transfer-funds-root .table-view .label {
+    -fx-text-fill: #cbd5e1;
 }

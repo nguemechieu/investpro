@@ -1,6 +1,8 @@
 package org.investpro.exchange;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -22,9 +24,8 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
-
-@Getter
-@Setter
+@EqualsAndHashCode(callSuper = false)
+@Data
 @Slf4j
 public abstract class Exchange implements
         ExchangeIdentity,

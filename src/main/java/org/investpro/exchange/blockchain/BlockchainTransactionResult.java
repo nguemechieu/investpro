@@ -1,7 +1,9 @@
 package org.investpro.exchange.blockchain;
 
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -10,7 +12,7 @@ import java.util.Optional;
 /**
  * Immutable result of an on-chain transaction submission.
  *
- * <p>Captures the transaction signature (Solana) or hash (Stellar/EVM),
+ * <p>Captures the transaction signature (Solona) or hash (Stellar/EVM),
  * confirmation depth, gas/fee units consumed, and optional error details.
  *
  * <p><b>Design-only</b>: networking implementation deferred to a future phase.
@@ -52,13 +54,16 @@ public record BlockchainTransactionResult(
     }
 
     /** Returns the on-chain signature or hash if available. */
-    public Optional<String> getSignature() { return Optional.ofNullable(signature); }
+    @Contract(pure = true)
+    public @NonNull Optional<String> getSignature() { return Optional.ofNullable(signature); }
 
     /** Returns the error code if the transaction failed. */
-    public Optional<String> getErrorCode() { return Optional.ofNullable(errorCode); }
+    @Contract(pure = true)
+    public @NonNull Optional<String> getErrorCode() { return Optional.ofNullable(errorCode); }
 
     /** Returns the error message if the transaction failed. */
-    public Optional<String> getErrorMessage() { return Optional.ofNullable(errorMessage); }
+    @Contract(pure = true)
+    public @NonNull Optional<String> getErrorMessage() { return Optional.ofNullable(errorMessage); }
 
     /** Returns true if the transaction is confirmed on-chain. */
     public boolean isConfirmed() { return outcome == TransactionOutcome.CONFIRMED; }

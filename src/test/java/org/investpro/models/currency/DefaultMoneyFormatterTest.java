@@ -23,7 +23,6 @@ class DefaultMoneyFormatterTest {
     private MockCurrency usd;
     private MockCurrency btc;
     private MockCurrency eur;
-    private MockCurrency aud;
 
     @BeforeEach
     void setUp() throws SQLException, ClassNotFoundException {
@@ -37,7 +36,6 @@ class DefaultMoneyFormatterTest {
         eur = new MockCurrency("EUR", "Euro", CurrencyType.FIAT, 2, "€");
 
         // AUD: fiat, 2 fractional digits, A$
-        aud = new MockCurrency("AUD", "Australian Dollar", CurrencyType.FIAT, 2, "A$");
     }
 
     /**

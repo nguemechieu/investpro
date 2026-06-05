@@ -2,6 +2,7 @@ package org.investpro.exchange;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
  * {@link #WELL_KNOWN_TOKENS}. Dynamic metadata for unknown mints is fetched
  * from the Jupiter token list API (no API key required, public endpoint).
  */
+@Data
 public class SolanaTokenService {
 
     private static final Logger log = LoggerFactory.getLogger(SolanaTokenService.class);

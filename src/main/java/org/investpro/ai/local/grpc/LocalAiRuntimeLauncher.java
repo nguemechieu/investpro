@@ -25,7 +25,7 @@ public final class LocalAiRuntimeLauncher {
     }
 
     public static synchronized void startIfConfigured() {
-        if (!LocalAiRuntimeService.isGrpcAdvisoryEnabled()) {
+        if (LocalAiRuntimeService.isGrpcAdvisoryEnabled()) {
             log.info("Local AI gRPC advisory is disabled. Skipping Python AI runtime startup.");
             return;
         }

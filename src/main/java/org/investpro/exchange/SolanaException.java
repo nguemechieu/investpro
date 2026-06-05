@@ -1,5 +1,7 @@
 package org.investpro.exchange;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 /**
@@ -13,7 +15,8 @@ import lombok.Getter;
  * package directory is created.
  */
 
-@Getter
+@EqualsAndHashCode(callSuper = true)
+@Data
 public class SolanaException extends RuntimeException {
 
     /**

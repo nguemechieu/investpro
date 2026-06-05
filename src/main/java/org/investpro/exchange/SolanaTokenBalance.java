@@ -1,5 +1,7 @@
 package org.investpro.exchange;
 
+import org.jspecify.annotations.NonNull;
+
 import java.math.BigDecimal;
 
 /**
@@ -25,7 +27,7 @@ public record SolanaTokenBalance(
 
     /** Returns a display-friendly string: {@code USDC 12.50}. */
     @Override
-    public String toString() {
+    public @NonNull String toString() {
         String sym = (symbol == null || symbol.isBlank()) ? mint.substring(0, 6) + "…" : symbol;
         return "%s %s".formatted(sym, amount == null ? "0" : amount.toPlainString());
     }

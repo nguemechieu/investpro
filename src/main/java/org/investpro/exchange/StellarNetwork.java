@@ -1174,12 +1174,12 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public boolean supportsMarketType(MARKET_TYPES marketType) {
-        return marketType == MARKET_TYPES.SPOT || marketType == MARKET_TYPES.MARKET || marketType == MARKET_TYPES.LIMIT;
+        return marketType == MARKET_TYPES.SPOT;
     }
 
     @Override
     public List<MARKET_TYPES> getSupportedMarketTypes() {
-        return List.of(MARKET_TYPES.SPOT, MARKET_TYPES.MARKET, MARKET_TYPES.LIMIT);
+        return List.of(MARKET_TYPES.SPOT);
     }
 
     @Override

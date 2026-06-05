@@ -10,26 +10,33 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.util.Duration;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.models.Account;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.SupportedExchange;
 import org.investpro.exchange.contracts.CredentialProvider;
 import org.investpro.exchange.factory.ExchangeFactory;
-import org.investpro.exchange.providers.UiCredentialProvider;
 import org.investpro.i18n.LocalizationService;
 import org.investpro.i18n.SupportedLanguage;
 import org.investpro.service.AuthResult;
 import org.investpro.service.ResetTokenResult;
 import org.investpro.service.UserAuthService;
 import org.investpro.ui.theme.MarketConfiguration;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.net.URI;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.prefs.Preferences;
 
@@ -38,17 +45,19 @@ import static org.investpro.i18n.LocalizationService.t;
 /**
  * Modern onboarding view for InvestPro.
  *
- * <p>Flow:</p>
+ * <p>
+ * Flow:
+ * </p>
  * <ol>
- *     <li>User login or account creation</li>
- *     <li>Market and venue selection</li>
- *     <li>Exchange credentials and trading mode</li>
- *     <li>Configuration save and terminal launch</li>
+ * <li>User login or account creation</li>
+ * <li>Market and venue selection</li>
+ * <li>Exchange credentials and trading mode</li>
+ * <li>Configuration save and terminal launch</li>
  * </ol>
  */
+@EqualsAndHashCode(callSuper = true)
 @Slf4j
-@Getter
-@Setter
+@Data
 public class OnboardingDesk extends StackPane {
 
     private static final int DEFAULT_WIDTH = 1540;
@@ -118,6 +127,8 @@ public class OnboardingDesk extends StackPane {
     private final ProgressBar progressBar = new ProgressBar(0);
     private final TextField telegramToken = new TextField();
     private final PasswordField openAiField = new PasswordField();
+    private final AtomicBoolean launchTransitionStarted = new AtomicBoolean(false);
+    private StackPane activeLoadingOverlay;
 
     private MarketConfiguration configuration;
 
@@ -131,6 +142,7 @@ public class OnboardingDesk extends StackPane {
         loadRememberedCredentials();
         getChildren().setAll(createLoginStep());
     }
+
     private @NotNull BorderPane createLoginStep() {
         rememberMeCheckBox.setText(t("onboarding.rememberMe"));
 
@@ -205,14 +217,13 @@ public class OnboardingDesk extends StackPane {
 
         form.add(spacer(), 0, row++);
 
-
         form.add(rememberMeCheckBox, 0, row++);
 
         form.add(spacer(), 0, row++);
         form.add(buttonBox, 0, row++);
         form.add(validation, 0, row);
         form.add(spacer(), 0, row++);
-        form.add(forgotPasswordButton, 1, row+1);
+        form.add(forgotPasswordButton, 1, row + 1);
 
         VBox card = new VBox(20, badge("SECURE TERMINAL ACCESS"), title, prompt, form);
         card.setAlignment(Pos.TOP_LEFT);
@@ -222,7 +233,8 @@ public class OnboardingDesk extends StackPane {
         return createShell(card, true, () -> getChildren().setAll(createLoginStep()));
     }
 
-    private @NotNull BorderPane createShell(@NotNull VBox card, boolean showLanguageSelector, Runnable onLanguageChanged) {
+    private @NotNull BorderPane createShell(@NotNull VBox card, boolean showLanguageSelector,
+            Runnable onLanguageChanged) {
         BorderPane pane = new BorderPane();
         pane.setStyle("-fx-background-color: linear-gradient(to bottom right, #020617, #0f172a, #111827);");
 
@@ -260,16 +272,18 @@ public class OnboardingDesk extends StackPane {
         Region glow = new Region();
         glow.setPrefSize(360, 360);
         glow.setMaxSize(360, 360);
-        glow.setStyle("""
-                -fx-background-color: radial-gradient(center 50% 50%, radius 65%, rgba(56,189,248,0.22), rgba(37,99,235,0.08), transparent);
-                -fx-background-radius: 999;
-                """);
+        glow.setStyle(
+                """
+                        -fx-background-color: radial-gradient(center 50% 50%, radius 65%, rgba(56,189,248,0.22), rgba(37,99,235,0.08), transparent);
+                        -fx-background-radius: 999;
+                        """);
 
         StackPane logoStage = new StackPane(glow);
         logoStage.setAlignment(Pos.CENTER);
 
         try {
-            Image backgroundImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/Invest.png")));
+            Image backgroundImage = new Image(
+                    Objects.requireNonNull(getClass().getResourceAsStream("/images/Invest.png")));
             ImageView imageView = new ImageView(backgroundImage);
             imageView.setFitWidth(390);
             imageView.setFitHeight(390);
@@ -365,7 +379,6 @@ public class OnboardingDesk extends StackPane {
     private @NotNull Button createSecondaryButton(String text) {
         return createButton(text, "#1e40af");
     }
-
 
     private @NotNull Button createButton(String text, String color) {
         Button button = new Button(text);
@@ -578,6 +591,7 @@ public class OnboardingDesk extends StackPane {
         selectedTradingModeChoiceBox.getItems().setAll("PAPER TRADING", "LIVE");
         selectedTradingModeChoiceBox.setValue(loadSavedTradingMode());
         styleChoiceBox(selectedTradingModeChoiceBox);
+        boolean isIbkr = selectedExchange == SupportedExchange.INTERACTIVE_BROKERS;
 
         TextField apiKeyField = new TextField();
         styleInputField(apiKeyField, apiKeyPrompt(selectedExchange));
@@ -585,17 +599,54 @@ public class OnboardingDesk extends StackPane {
         PasswordField apiSecretField = getPasswordField(selectedExchange);
 
         TextField accountIdField = new TextField();
-        styleInputField(accountIdField, selectedExchange == SupportedExchange.OANDA ? "OANDA Account ID" : "Account ID (optional)");
+        styleInputField(accountIdField,
+                selectedExchange == SupportedExchange.OANDA
+                        ? "OANDA Account ID"
+                        : isIbkr ? "IBKR Account ID (recommended for live)" : "Account ID (optional)");
+        TextField ibkrTwoFactorCodeField = new TextField();
+        styleInputField(ibkrTwoFactorCodeField, "Two-Factor Code (optional note)");
+        ibkrTwoFactorCodeField.setVisible(isIbkr);
+        ibkrTwoFactorCodeField.setManaged(isIbkr);
         boolean showAccountId = selectedExchange == SupportedExchange.OANDA
                 || selectedExchange == SupportedExchange.STELLAR_NETWORK
-                || selectedExchange == SupportedExchange.SOLANA_NETWORK;
+                || selectedExchange == SupportedExchange.SOLANA_NETWORK
+                || isIbkr;
         accountIdField.setVisible(showAccountId);
         accountIdField.setManaged(showAccountId);
+
+        TextField ibkrClientPortalUrlField = new TextField();
+        styleInputField(ibkrClientPortalUrlField, "IBKR Client Portal URL (optional)");
+        ibkrClientPortalUrlField.setVisible(isIbkr);
+        ibkrClientPortalUrlField.setManaged(isIbkr);
+
+        TextField ibkrHostField = new TextField();
+        styleInputField(ibkrHostField, "IB Gateway Host (default: 127.0.0.1)");
+        ibkrHostField.setVisible(isIbkr);
+        ibkrHostField.setManaged(isIbkr);
+
+        TextField ibkrPaperPortField = new TextField();
+        styleInputField(ibkrPaperPortField, "Paper Port (default: 4002)");
+        ibkrPaperPortField.setVisible(isIbkr);
+        ibkrPaperPortField.setManaged(isIbkr);
+
+        TextField ibkrLivePortField = new TextField();
+        styleInputField(ibkrLivePortField, "Live Port (default: 4001)");
+        ibkrLivePortField.setVisible(isIbkr);
+        ibkrLivePortField.setManaged(isIbkr);
+
+        TextField ibkrClientIdField = new TextField();
+        styleInputField(ibkrClientIdField, "Client ID (default: 1)");
+        ibkrClientIdField.setVisible(isIbkr);
+        ibkrClientIdField.setManaged(isIbkr);
 
         styleInputField(telegramToken, "Telegram Bot Token (optional)");
         styleInputField(openAiField, "OpenAI API Key (optional)");
 
         loadRememberedExchangeCredentials(selectedExchangeName, apiKeyField, apiSecretField, accountIdField);
+        if (isIbkr) {
+            loadSavedIbkrSettings(ibkrClientPortalUrlField, ibkrHostField, ibkrPaperPortField, ibkrLivePortField,
+                    ibkrClientIdField);
+        }
         loadSavedOptionalTokens();
 
         GridPane credGrid = formGrid();
@@ -603,13 +654,27 @@ public class OnboardingDesk extends StackPane {
 
         int row = 1;
         if (selectedExchange != SupportedExchange.OANDA && selectedExchange != SupportedExchange.SOLANA_NETWORK) {
-            credGrid.addRow(row++, createLabel(selectedExchange == SupportedExchange.STELLAR_NETWORK ? "Secret Seed" : "API Secret"), apiSecretField);
+            credGrid.addRow(row++,
+                    createLabel(selectedExchange == SupportedExchange.STELLAR_NETWORK
+                            ? "Secret Seed"
+                            : isIbkr ? "Password" : "API Secret"),
+                    apiSecretField);
         }
         if (showAccountId) {
-            String accountLabel = selectedExchange == SupportedExchange.STELLAR_NETWORK || selectedExchange == SupportedExchange.SOLANA_NETWORK
-                    ? "Public Account"
-                    : "Account ID";
+            String accountLabel = selectedExchange == SupportedExchange.STELLAR_NETWORK
+                    || selectedExchange == SupportedExchange.SOLANA_NETWORK
+                            ? "Public Account"
+                            : isIbkr ? "IBKR Account ID" : "Account ID";
             credGrid.addRow(row++, createLabel(accountLabel), accountIdField);
+        }
+
+        if (isIbkr) {
+            credGrid.addRow(row++, createLabel("Two-Factor Code"), ibkrTwoFactorCodeField);
+            credGrid.addRow(row++, createLabel("Client Portal URL"), ibkrClientPortalUrlField);
+            credGrid.addRow(row++, createLabel("Gateway Host"), ibkrHostField);
+            credGrid.addRow(row++, createLabel("Paper Port"), ibkrPaperPortField);
+            credGrid.addRow(row++, createLabel("Live Port"), ibkrLivePortField);
+            credGrid.addRow(row++, createLabel("Client ID"), ibkrClientIdField);
         }
 
         credGrid.addRow(row++, createLabel("Telegram"), telegramToken);
@@ -626,6 +691,8 @@ public class OnboardingDesk extends StackPane {
         backButton.setPrefWidth(138);
         Button helpButton = createSecondaryButton("Format Help");
         helpButton.setPrefWidth(138);
+        helpButton.setVisible(!isIbkr);
+        helpButton.setManaged(!isIbkr);
 
         Label validation = inlineValidationLabel();
 
@@ -634,6 +701,12 @@ public class OnboardingDesk extends StackPane {
                 apiKeyField,
                 apiSecretField,
                 accountIdField,
+                ibkrTwoFactorCodeField,
+                ibkrClientPortalUrlField,
+                ibkrHostField,
+                ibkrPaperPortField,
+                ibkrLivePortField,
+                ibkrClientIdField,
                 rememberCredentialsCheckBox,
                 selectedExchangeName,
                 validation));
@@ -643,16 +716,22 @@ public class OnboardingDesk extends StackPane {
         Label title = new Label("Exchange Credentials");
         title.setStyle(titleStyle(30));
 
-        Label subtitle = new Label("Connect with paper trading first. Use live mode only after validating strategies and risk controls.");
+        Label subtitle = new Label(
+                "Connect with paper trading first. Use live mode only after validating strategies and risk controls.");
         subtitle.setStyle(subtitleStyle());
         subtitle.setWrapText(true);
 
         Label info = createExchangeInfo(selectedExchange);
 
-        HBox buttonBox = new HBox(12, backButton, continueButton, helpButton);
+        ScrollPane credentialScroll = getScrollPane(credGrid, isIbkr);
+
+        HBox buttonBox = new HBox(12, backButton, continueButton);
+        if (!isIbkr) {
+            buttonBox.getChildren().add(helpButton);
+        }
         buttonBox.setAlignment(Pos.CENTER);
 
-        VBox card = new VBox(18, badge("SECURE BROKER CONNECTION"), title, subtitle, info, credGrid,
+        VBox card = new VBox(14, badge("SECURE BROKER CONNECTION"), title, subtitle, info, credentialScroll,
                 rememberCredentialsCheckBox, buttonBox, validation);
         card.setAlignment(Pos.TOP_LEFT);
         card.setMaxWidth(540);
@@ -661,7 +740,22 @@ public class OnboardingDesk extends StackPane {
         fadeTo(createShell(card, false, null));
     }
 
+    private @NonNull ScrollPane getScrollPane(GridPane credGrid, boolean isIbkr) {
+        ScrollPane credentialScroll = new ScrollPane(credGrid);
+        credentialScroll.setFitToWidth(true);
+        credentialScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        credentialScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        credentialScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        credentialScroll.setPannable(true);
+        credentialScroll.setPrefViewportHeight(isIbkr ? 340 : 420);
+        credentialScroll.setMaxHeight(isIbkr ? 360 : 430);
+        return credentialScroll;
+    }
+
     private String apiKeyPrompt(SupportedExchange selectedExchange) {
+        if (selectedExchange == SupportedExchange.INTERACTIVE_BROKERS) {
+            return "IBKR Username";
+        }
         if (selectedExchange == SupportedExchange.OANDA) {
             return "OANDA Token (Bearer Token)";
         }
@@ -675,6 +769,9 @@ public class OnboardingDesk extends StackPane {
     }
 
     private String apiKeyLabel(SupportedExchange selectedExchange) {
+        if (selectedExchange == SupportedExchange.INTERACTIVE_BROKERS) {
+            return "Username";
+        }
         if (selectedExchange == SupportedExchange.OANDA) {
             return "Token";
         }
@@ -688,15 +785,22 @@ public class OnboardingDesk extends StackPane {
     }
 
     private void handleExchangeCredentials(SupportedExchange selectedExchange,
-                                           TextField apiKeyField,
-                                           PasswordField apiSecretField,
-                                           TextField accountIdField,
-                                           CheckBox rememberCheckBox,
-                                           String selectedExchangeName,
-                                           Label validation) {
+            TextField apiKeyField,
+            PasswordField apiSecretField,
+            TextField accountIdField,
+            TextField ibkrTwoFactorCodeField,
+            TextField ibkrClientPortalUrlField,
+            TextField ibkrHostField,
+            TextField ibkrPaperPortField,
+            TextField ibkrLivePortField,
+            TextField ibkrClientIdField,
+            CheckBox rememberCheckBox,
+            String selectedExchangeName,
+            Label validation) {
         String apiKey = apiKeyField.getText().trim();
         String apiSecret = apiSecretField.getText().trim();
         String accountId = accountIdField.getText().trim();
+        String ibkrTwoFactorCode = ibkrTwoFactorCodeField.getText().trim();
         String tradingMode = selectedTradingModeChoiceBox.getValue();
 
         if (tradingMode == null || tradingMode.isBlank()) {
@@ -709,6 +813,21 @@ public class OnboardingDesk extends StackPane {
                 return;
             }
             apiSecret = accountId;
+        } else if (selectedExchange == SupportedExchange.INTERACTIVE_BROKERS) {
+            if (apiKey.isBlank() || apiSecret.isBlank()) {
+                validation.setText("IBKR username and password are required.");
+                return;
+            }
+
+            String normalizedTradingMode = safe(tradingMode).toUpperCase(Locale.ROOT);
+            if (("LIVE".equals(normalizedTradingMode) || "LIVE TRADING".equals(normalizedTradingMode))
+                    && accountId.isBlank()) {
+                validation.setText("IBKR Account ID is required for live trading mode.");
+                return;
+            }
+
+            applyIbkrRuntimeProperties(ibkrClientPortalUrlField.getText(), ibkrHostField.getText(),
+                    ibkrPaperPortField.getText(), ibkrLivePortField.getText(), ibkrClientIdField.getText());
         } else if (selectedExchange == SupportedExchange.STELLAR_NETWORK) {
             if (apiKey.isBlank() || apiSecret.isBlank()) {
                 validation.setText("Stellar public account and secret seed are required.");
@@ -743,7 +862,8 @@ public class OnboardingDesk extends StackPane {
         validation.setStyle("-fx-text-fill: " + WARNING + "; -fx-font-size: 11;");
         validation.setText("Authenticating with %s...".formatted(selectedExchange.getDisplayName()));
 
-        AuthResult authResult = authenticateExchange(selectedExchange.getFactoryKey(), apiKey, apiSecret, accountId, tradingMode);
+        AuthResult authResult = authenticateExchange(selectedExchange.getFactoryKey(), apiKey, apiSecret, accountId,
+                ibkrTwoFactorCode, tradingMode);
         if (!authResult.success()) {
             validation.setStyle("-fx-text-fill: " + DANGER + "; -fx-font-size: 11;");
             validation.setText(authResult.message());
@@ -754,7 +874,12 @@ public class OnboardingDesk extends StackPane {
         validation.setText("Authentication successful!");
 
         if (rememberCheckBox.isSelected()) {
-            saveRememberedExchangeCredentials(selectedExchangeName, apiKey, apiSecret, accountId, telegramToken.getText().trim());
+            saveRememberedExchangeCredentials(selectedExchangeName, apiKey, apiSecret, accountId,
+                    telegramToken.getText().trim());
+            if (selectedExchange == SupportedExchange.INTERACTIVE_BROKERS) {
+                saveIbkrSettings(ibkrClientPortalUrlField.getText(), ibkrHostField.getText(),
+                        ibkrPaperPortField.getText(), ibkrLivePortField.getText(), ibkrClientIdField.getText());
+            }
         }
 
         saveConfiguration(configuration);
@@ -766,9 +891,7 @@ public class OnboardingDesk extends StackPane {
         info.setStyle("""
                 -fx-font-size: 11px;
                 -fx-text-fill: #94a3b8;
-                -fx-wrap-text: true;
                 -fx-padding: 12;
-                -fx-background-color: rgba(2, 6, 23, 0.50);
                 -fx-border-color: rgba(71, 85, 105, 0.65);
                 -fx-border-radius: 12;
                 -fx-background-radius: 12;
@@ -812,6 +935,18 @@ public class OnboardingDesk extends StackPane {
                     API Secret: from Dashboard → API Keys
                     Tip: use Alpaca paper account first.""";
         }
+        if (selectedExchange == SupportedExchange.INTERACTIVE_BROKERS) {
+            return """
+                    Interactive Brokers
+                    Username and Password: used for your profile and runtime settings
+                    Authentication flow: sign in through the local Gateway browser page and complete 2FA there
+                    Brokerage session: initialized through /iserver/auth/ssodh/init after browser login
+                    Account ID: required for live order routing
+                    Client Portal URL: defaults to https://localhost:5000/v1/api
+                    Gateway Host/Ports/Client ID: configure TWS or IB Gateway socket session
+                    Paper mode note: use your dedicated paper username for paper login
+                    Tip: if a competing session exists (TWS/Mobile), close it before API trading.""";
+        }
         if (selectedExchange == SupportedExchange.STELLAR_NETWORK) {
             return """
                     Stellar Network
@@ -839,26 +974,96 @@ public class OnboardingDesk extends StackPane {
 
     private @NotNull PasswordField getPasswordField(SupportedExchange selectedExchange) {
         PasswordField apiSecretField = new PasswordField();
-        styleInputField(apiSecretField, selectedExchange == SupportedExchange.STELLAR_NETWORK ? "Secret Seed (S...)" : "API Secret");
-        boolean visible = selectedExchange != SupportedExchange.OANDA && selectedExchange != SupportedExchange.SOLANA_NETWORK;
+        styleInputField(apiSecretField,
+                selectedExchange == SupportedExchange.STELLAR_NETWORK
+                        ? "Secret Seed (S...)"
+                        : selectedExchange == SupportedExchange.INTERACTIVE_BROKERS
+                                ? "IBKR Password"
+                                : "API Secret");
+        boolean visible = selectedExchange != SupportedExchange.OANDA
+                && selectedExchange != SupportedExchange.SOLANA_NETWORK;
         apiSecretField.setVisible(visible);
         apiSecretField.setManaged(visible);
         return apiSecretField;
     }
 
     private void showLoadingOverlay() {
-        statusLabel.setText("Saving settings...");
-        statusLabel.setStyle("-fx-text-fill: " + TEXT + ";");
-        progressBar.setProgress(0);
-        progressBar.setPrefWidth(430);
-        progressBar.setStyle("-fx-accent: " + ACCENT + ";");
+        if (!launchTransitionStarted.compareAndSet(false, true)) {
+            return;
+        }
+
+        Label overlayStatus = new Label("Saving settings...");
+        overlayStatus.setStyle("-fx-text-fill: " + TEXT + "; -fx-font-size: 13;");
+
+        ProgressBar overlayProgress = new ProgressBar(0);
+        overlayProgress.setPrefWidth(430);
+        overlayProgress.setStyle("-fx-accent: " + ACCENT + ";");
+
+        VBox overlay = buildOverlayBox(overlayStatus, overlayProgress);
+
+        StackPane loadingPane = new StackPane(overlay);
+        loadingPane.setStyle("-fx-background-color: rgba(2, 6, 23, 0.78);");
+        activeLoadingOverlay = loadingPane;
+        getChildren().add(loadingPane);
+
+        Timeline timeline = new Timeline(
+                frameFor(overlayStatus, overlayProgress, 0.20, "Saving configuration..."),
+                frameFor(overlayStatus, overlayProgress, 0.42, "Connecting to market venue..."),
+                frameFor(overlayStatus, overlayProgress, 0.65, "Loading exchange instruments..."),
+                frameFor(overlayStatus, overlayProgress, 0.84, "Preparing trading workstation..."),
+                frameFor(overlayStatus, overlayProgress, 1.0, "Market data is ready."));
+        timeline.setOnFinished(event -> {
+            PauseTransition pause = new PauseTransition(Duration.millis(420));
+            pause.setOnFinished(pauseEvent -> dispatchReadyTransition());
+            pause.play();
+        });
+        timeline.play();
+    }
+
+    private void dispatchReadyTransition() {
+        if (configuration == null) {
+            resetLoadingState("Configuration is missing. Please try again.");
+            return;
+        }
+
+        Runnable transition = () -> {
+            try {
+                onReady.accept(configuration);
+            } catch (Exception exception) {
+                log.error("Failed to open trading desk from onboarding", exception);
+                resetLoadingState("Failed to open trading desk. Please try again.");
+            }
+        };
+
+        if (Platform.isFxApplicationThread()) {
+            transition.run();
+        } else {
+            Platform.runLater(transition);
+        }
+    }
+
+    private void resetLoadingState(String message) {
+        if (message != null && !message.isBlank()) {
+            statusLabel.setText(message);
+            statusLabel.setStyle("-fx-text-fill: " + DANGER + "; -fx-font-size: 12;");
+        }
+
+        if (activeLoadingOverlay != null) {
+            getChildren().remove(activeLoadingOverlay);
+            activeLoadingOverlay = null;
+        }
+
+        launchTransitionStarted.set(false);
+    }
+
+    private static @NonNull VBox buildOverlayBox(Label overlayStatus, ProgressBar overlayProgress) {
         Label title = new Label("Preparing Terminal");
         title.setStyle("-fx-text-fill: " + TEXT + "; -fx-font-size: 18px; -fx-font-weight: 900;");
 
         Label subtitle = new Label("InvestPro is loading your workspace.");
         subtitle.setStyle("-fx-text-fill: " + MUTED + "; -fx-font-size: 12;");
 
-        VBox overlay = new VBox(16, title, subtitle, statusLabel, progressBar);
+        VBox overlay = new VBox(16, title, subtitle, overlayStatus, overlayProgress);
         overlay.setAlignment(Pos.CENTER);
         overlay.setPadding(new Insets(36));
         overlay.setMaxSize(540, 250);
@@ -870,30 +1075,13 @@ public class OnboardingDesk extends StackPane {
                 -fx-border-width: 1;
                 -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.48), 30, 0.20, 0, 14);
                 """);
-
-        StackPane loadingPane = new StackPane(overlay);
-        loadingPane.setStyle("-fx-background-color: rgba(2, 6, 23, 0.78);");
-        getChildren().add(loadingPane);
-
-        Timeline timeline = new Timeline(
-                frame(0.20, "Saving configuration..."),
-                frame(0.42, "Connecting to market venue..."),
-                frame(0.65, "Loading exchange instruments..."),
-                frame(0.84, "Preparing trading workstation..."),
-                frame(1.0, "Market data is ready."));
-        timeline.setOnFinished(event -> {
-            PauseTransition pause = new PauseTransition(Duration.millis(420));
-            pause.setOnFinished(pauseEvent -> onReady.accept(configuration));
-            pause.play();
-        });
-        timeline.play();
+        return overlay;
     }
 
-    @Contract("_, _ -> new")
-    private @NotNull KeyFrame frame(double progress, String message) {
+    private static @NotNull KeyFrame frameFor(Label label, ProgressBar bar, double progress, String message) {
         return new KeyFrame(Duration.millis(2400 * progress),
-                event -> statusLabel.setText(message),
-                new KeyValue(progressBar.progressProperty(), progress));
+                event -> label.setText(message),
+                new KeyValue(bar.progressProperty(), progress));
     }
 
     private void showForgotPasswordDialog(Label validation) {
@@ -907,9 +1095,9 @@ public class OnboardingDesk extends StackPane {
         DialogPane dialogPane = lookupDialog.getDialogPane();
         dialogPane.setPrefSize(420, 260);
         dialogPane.setStyle("""
-            -fx-background-color: #0f172a;
-            -fx-text-fill: #e2e8f0;
-            """);
+                -fx-background-color: #0f172a;
+                -fx-text-fill: #e2e8f0;
+                """);
 
         lookupDialog.showAndWait().ifPresent(lookup -> {
             ResetTokenResult tokenResult = authService.beginPasswordReset(lookup);
@@ -966,7 +1154,8 @@ public class OnboardingDesk extends StackPane {
                         return;
                     }
                     char[] password = newPasswordField.getText().toCharArray();
-                    AuthResult result = authService.resetPassword(accountField.getText(), tokenField.getText(), password);
+                    AuthResult result = authService.resetPassword(accountField.getText(), tokenField.getText(),
+                            password);
                     Arrays.fill(password, '\0');
                     validation.setStyle("-fx-text-fill: %s;".formatted(result.success() ? SUCCESS : DANGER));
                     validation.setText(result.message());
@@ -1072,10 +1261,8 @@ public class OnboardingDesk extends StackPane {
         }
     }
 
-
-
     private void saveRememberedExchangeCredentials(String exchange, String apiKey, String apiSecret, String accountId,
-                                                   String token) {
+            String token) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
         preferences.put("exchange_api_key_%s".formatted(exchange), safe(apiKey));
         preferences.put("exchange_api_secret_%s".formatted(exchange), safe(apiSecret));
@@ -1085,9 +1272,9 @@ public class OnboardingDesk extends StackPane {
     }
 
     private void loadRememberedExchangeCredentials(String exchange,
-                                                   @NonNull TextField apiKeyField,
-                                                   @NonNull PasswordField apiSecretField,
-                                                   @NonNull TextField accountIdField) {
+            @NonNull TextField apiKeyField,
+            @NonNull PasswordField apiSecretField,
+            @NonNull TextField accountIdField) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
         apiKeyField.setText(preferences.get("exchange_api_key_%s".formatted(exchange), ""));
         apiSecretField.setText(preferences.get("exchange_api_secret_%s".formatted(exchange), ""));
@@ -1104,13 +1291,15 @@ public class OnboardingDesk extends StackPane {
     }
 
     private @NotNull Exchange createExchange(String selectedExchange,
-                                             String apiKey,
-                                             String apiSecret,
-                                             String accountId,
-                                             String tradingMode) {
+            String apiKey,
+            String apiSecret,
+            String accountId,
+            String twoFactorCode,
+            String tradingMode) {
         String exchangeId = normalizeExchangeId(selectedExchange);
 
-        CredentialProvider credentialProvider = new UiCredentialProvider(exchangeId, apiKey, apiSecret, accountId, tradingMode);
+        CredentialProvider credentialProvider = createCredentialProvider(exchangeId, apiKey, apiSecret, accountId,
+                twoFactorCode, tradingMode);
         ExchangeFactory exchangeFactory = new ExchangeFactory(credentialProvider);
 
         Exchange exchange = exchangeFactory.create(exchangeId);
@@ -1120,24 +1309,187 @@ public class OnboardingDesk extends StackPane {
         return exchange;
     }
 
-    private @NotNull AuthResult authenticateExchange(String selectedExchange,
-                                                     String apiKey,
-                                                     String apiSecret,
-                                                     String accountId,
-                                                     String tradingMode) {
+    private @NotNull CredentialProvider createCredentialProvider(String exchangeId,
+            String apiKey,
+            String apiSecret,
+            String accountId,
+            String twoFactorCode,
+            String tradingMode) {
         try {
-            Exchange exchange = createExchange(selectedExchange, apiKey, apiSecret, accountId, tradingMode);
+            Class<?> providerClass = Class.forName("org.investpro.exchange.providers.UiCredentialProvider");
+            Object instance = providerClass
+                    .getConstructor(String.class, String.class, String.class, String.class, String.class,
+                            String.class)
+                    .newInstance(exchangeId, apiKey, apiSecret, accountId, tradingMode, twoFactorCode);
+            if (instance instanceof CredentialProvider credentialProvider) {
+                return credentialProvider;
+            }
+        } catch (Throwable throwable) {
+            log.warn("UiCredentialProvider is unavailable at runtime; using onboarding fallback provider");
+        }
+
+        Map<String, String> values = new LinkedHashMap<>();
+        String prefix = normalizeCredentialPrefix(exchangeId);
+
+        putCredential(values, prefix + "_API_KEY", apiKey);
+        putCredential(values, prefix + "_API_SECRET", apiSecret);
+        putCredential(values, prefix + "_ACCOUNT_ID", accountId);
+        putCredential(values, prefix + "_TWO_FACTOR_CODE", twoFactorCode);
+        putCredential(values, prefix + "_TRADING_MODE", tradingMode);
+
+        switch (prefix) {
+            case "coinbase" -> {
+                putCredential(values, "COINBASE_API_KEY", apiKey);
+                putCredential(values, "COINBASE_API_SECRET", apiSecret);
+                putCredential(values, "COINBASE_KEY_NAME", apiKey);
+                putCredential(values, "COINBASE_PRIVATE_KEY", apiSecret);
+            }
+            case "binance" -> {
+                putCredential(values, "BINANCE_API_KEY", apiKey);
+                putCredential(values, "BINANCE_API_SECRET", apiSecret);
+            }
+            case "binance_us" -> {
+                putCredential(values, "BINANCE_US_API_KEY", apiKey);
+                putCredential(values, "BINANCE_US_API_SECRET", apiSecret);
+            }
+            case "oanda" -> {
+                putCredential(values, "OANDA_API_KEY", apiKey);
+                putCredential(values, "OANDA_API_SECRET", apiSecret);
+                putCredential(values, "OANDA_ACCOUNT_ID", accountId);
+            }
+            case "alpaca" -> {
+                putCredential(values, "ALPACA_API_KEY", apiKey);
+                putCredential(values, "ALPACA_API_SECRET", apiSecret);
+            }
+            case "bitfinex" -> {
+                putCredential(values, "BITFINEX_API_KEY", apiKey);
+                putCredential(values, "BITFINEX_API_SECRET", apiSecret);
+            }
+            case "interactive_brokers" -> {
+                putCredential(values, "IBKR_API_KEY", apiKey);
+                putCredential(values, "IBKR_API_SECRET", apiSecret);
+                putCredential(values, "IBKR_ACCOUNT_ID", accountId);
+                putCredential(values, "IBKR_USERNAME", apiKey);
+                putCredential(values, "IBKR_PASSWORD", apiSecret);
+                putCredential(values, "IBKR_TWO_FACTOR_CODE", twoFactorCode);
+                putCredential(values, "IBKR_CLIENT_PORTAL_URL", System.getProperty("investpro.ibkr.clientPortalUrl"));
+                putCredential(values, "IBKR_HOST", System.getProperty("investpro.ibkr.host"));
+                putCredential(values, "IBKR_PAPER_PORT", System.getProperty("investpro.ibkr.paperPort"));
+                putCredential(values, "IBKR_LIVE_PORT", System.getProperty("investpro.ibkr.livePort"));
+                putCredential(values, "IBKR_CLIENT_ID", System.getProperty("investpro.ibkr.clientId"));
+                putCredential(values, "IBK_API_KEY", apiKey);
+                putCredential(values, "IBK_API_SECRET", apiSecret);
+                putCredential(values, "IBK_ACCOUNT_ID", accountId);
+                putCredential(values, "IBK_USERNAME", apiKey);
+                putCredential(values, "IBK_PASSWORD", apiSecret);
+                putCredential(values, "IBK_TWO_FACTOR_CODE", twoFactorCode);
+            }
+            case "stellar_network", "stellar" -> {
+                putCredential(values, "STELLAR_PUBLIC_KEY",
+                        accountId != null && !accountId.isBlank() ? accountId : apiKey);
+                putCredential(values, "STELLAR_SECRET_KEY", apiSecret);
+                putCredential(values, "STELLAR_NETWORK", tradingMode);
+            }
+            default -> {
+                // No additional aliases required.
+            }
+        }
+
+        return key -> {
+            if (key == null || key.isBlank()) {
+                return Optional.empty();
+            }
+            String value = values.get(key);
+            return value == null || value.isBlank() ? Optional.empty() : Optional.of(value);
+        };
+    }
+
+    private String normalizeCredentialPrefix(String exchangeId) {
+        String normalized = exchangeId == null ? ""
+                : exchangeId.trim().toLowerCase(Locale.ROOT)
+                        .replace('-', '_')
+                        .replaceAll("[^a-z0-9_]", "");
+
+        return switch (normalized) {
+            case "binanceus", "binance_us" -> "binance_us";
+            case "interactivebrokers", "interactive_brokers", "ibkr", "ibk" -> "interactive_brokers";
+            case "stellarnetwork", "stellar_network" -> "stellar_network";
+            default -> normalized;
+        };
+    }
+
+    private void putCredential(Map<String, String> values, String key, String value) {
+        if (key != null && value != null && !value.isBlank()) {
+            values.put(key, value.trim());
+        }
+    }
+
+    private @NotNull AuthResult authenticateExchange(String selectedExchange,
+            String apiKey,
+            String apiSecret,
+            String accountId,
+            String twoFactorCode,
+            String tradingMode) {
+        try {
+            Exchange exchange = createExchange(selectedExchange, apiKey, apiSecret, accountId, twoFactorCode,
+                    tradingMode);
             AuthResult authResult = exchange.AuthCheckResult(selectedExchange);
+            if (authResult != null && !authResult.success()) {
+                return authResult;
+            }
+
+            AuthResult accountValidation = validateAccountAccess(exchange, selectedExchange);
+            if (!accountValidation.success()) {
+                return accountValidation;
+            }
+
             if (authResult != null) {
                 return authResult;
             }
+
             if (Boolean.TRUE.equals(exchange.isConnected())) {
                 return AuthResult.success("%s connected successfully.".formatted(selectedExchange));
             }
             return AuthResult.failure("%s did not confirm a connection.".formatted(selectedExchange));
-        } catch (Exception exception) {
-            log.warn("Broker authentication failed for {}", selectedExchange, exception);
-            return AuthResult.failure("Authentication failed for %s: %s".formatted(selectedExchange, rootMessage(exception)));
+        } catch (Throwable throwable) {
+            log.warn("Broker authentication failed for {}", selectedExchange, throwable);
+            return AuthResult
+                    .failure("Authentication failed for %s: %s".formatted(selectedExchange, rootMessage(throwable)));
+        }
+    }
+
+    private @NotNull AuthResult validateAccountAccess(@NotNull Exchange exchange, String selectedExchange) {
+        CompletableFuture<Account> accountFuture = exchange.fetchAccount();
+        if (accountFuture == null) {
+            return AuthResult.failure(
+                    "Authentication failed for %s: broker adapter cannot validate account access yet."
+                            .formatted(selectedExchange));
+        }
+
+        try {
+            Account account = accountFuture.orTimeout(20, TimeUnit.SECONDS).join();
+            if (account == null) {
+                return AuthResult.failure(
+                        "Authentication failed for %s: broker returned no account data.".formatted(selectedExchange));
+            }
+            return AuthResult.success("Account access verified.");
+        } catch (RuntimeException exception) {
+            String detail = rootMessage(exception);
+            String normalizedDetail = detail.toLowerCase(Locale.ROOT);
+            if ("interactive-brokers".equalsIgnoreCase(selectedExchange)
+                    && normalizedDetail.contains("unable to verify ibkr authentication status")) {
+                detail = detail
+                        + " Check Client Portal Gateway login in browser and confirm the Client Portal URL (localhost vs 127.0.0.1).";
+            }
+            if ("interactive-brokers".equalsIgnoreCase(selectedExchange)
+                    && (normalizedDetail.contains("closedchannelexception")
+                            || normalizedDetail.contains("tls handshake")
+                            || normalizedDetail.contains("ssl"))) {
+                detail = "Client Portal Gateway closed the connection during authentication. "
+                        + "Open https://localhost:5000, complete login/2FA, and retry. "
+                        + "If it is already open, restart Client Portal Gateway and retry.";
+            }
+            return AuthResult.failure("Authentication failed for %s: %s".formatted(selectedExchange, detail));
         }
     }
 
@@ -1147,7 +1499,10 @@ public class OnboardingDesk extends StackPane {
             current = current.getCause();
         }
         String message = current == null ? null : current.getMessage();
-        return message == null || message.isBlank() ? "Unknown error" : message;
+        if (message != null && !message.isBlank()) {
+            return message;
+        }
+        return current == null ? "Unknown error" : current.getClass().getSimpleName();
     }
 
     private @NotNull String normalizeExchangeId(String value) {
@@ -1170,8 +1525,9 @@ public class OnboardingDesk extends StackPane {
             case "binance" -> "binance";
             case "binanceus", "binance_us", "binance_us_spot" -> "binance-us";
             case "coinbase", "coinbaseadvanced", "coinbase_advanced",
-                 "coinbaseadvancedtrade",
-                 "coinbase_advanced_trade", "coinbasepro", "coinbase_pro" -> "coinbase";
+                    "coinbaseadvancedtrade",
+                    "coinbase_advanced_trade", "coinbasepro", "coinbase_pro" ->
+                "coinbase";
             case "oanda", "oanda_fx", "oanda_forex" -> "oanda";
             case "alpaca", "alpaca_stocks", "alpaca_equities" -> "alpaca";
             case "bitfinex" -> "bitfinex";
@@ -1179,11 +1535,89 @@ public class OnboardingDesk extends StackPane {
             case "interactivebrokers", "interactive_brokers", "ibkr", "ibk" -> "interactive-brokers";
             case "kraken" -> "kraken";
             case "ig", "bittrex", "bitmex", "kucoin", "kucoinus", "kucoin_us", "bitstamp", "poloniex" ->
-                    normalized.replace("_", "-");
+                normalized.replace("_", "-");
             case "stellar", "stellar_network", "stellarnetwork" -> "stellar-network";
             case "solana", "solana_network", "solananetwork", "sol" -> "solana-network";
             default -> throw new IllegalArgumentException("Unsupported exchange: " + value);
         };
 
+    }
+
+    private void applyIbkrRuntimeProperties(String clientPortalUrl,
+            String host,
+            String paperPort,
+            String livePort,
+            String clientId) {
+        String sanitizedClientPortalUrl = sanitizeIbkrClientPortalUrl(clientPortalUrl);
+        putSystemPropertyIfNotBlank("investpro.ibkr.clientPortalUrl", sanitizedClientPortalUrl);
+        putSystemPropertyIfNotBlank("investpro.ibkr.host", host);
+        putSystemPropertyIfNotBlank("investpro.ibkr.paperPort", parseIntOrDefault(paperPort, 4002));
+        putSystemPropertyIfNotBlank("investpro.ibkr.livePort", parseIntOrDefault(livePort, 4001));
+        putSystemPropertyIfNotBlank("investpro.ibkr.clientId", parseIntOrDefault(clientId, 1));
+    }
+
+    private void saveIbkrSettings(String clientPortalUrl, String host, String paperPort, String livePort,
+            String clientId) {
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
+        preferences.put("ibkr_client_portal_url", safe(sanitizeIbkrClientPortalUrl(clientPortalUrl)));
+        preferences.put("ibkr_host", safe(host));
+        preferences.put("ibkr_paper_port", parseIntOrDefault(paperPort, 4002));
+        preferences.put("ibkr_live_port", parseIntOrDefault(livePort, 4001));
+        preferences.put("ibkr_client_id", parseIntOrDefault(clientId, 1));
+        flushPreferences(preferences);
+    }
+
+    private void loadSavedIbkrSettings(TextField clientPortalUrlField, TextField hostField, TextField paperPortField,
+            TextField livePortField, TextField clientIdField) {
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
+
+        clientPortalUrlField.setText(preferences.get("ibkr_client_portal_url", ""));
+        hostField.setText(preferences.get("ibkr_host", "127.0.0.1"));
+        paperPortField.setText(preferences.get("ibkr_paper_port", "4002"));
+        livePortField.setText(preferences.get("ibkr_live_port", "4001"));
+        clientIdField.setText(preferences.get("ibkr_client_id", "1"));
+
+        applyIbkrRuntimeProperties(clientPortalUrlField.getText(), hostField.getText(), paperPortField.getText(),
+                livePortField.getText(), clientIdField.getText());
+    }
+
+    private String parseIntOrDefault(String value, int fallback) {
+        if (value == null || value.isBlank()) {
+            return String.valueOf(fallback);
+        }
+        try {
+            int parsed = Integer.parseInt(value.trim());
+            return String.valueOf(parsed > 0 ? parsed : fallback);
+        } catch (NumberFormatException ignored) {
+            return String.valueOf(fallback);
+        }
+    }
+
+    private String sanitizeIbkrClientPortalUrl(String clientPortalUrl) {
+        if (clientPortalUrl == null || clientPortalUrl.isBlank()) {
+            return "";
+        }
+
+        String normalized = clientPortalUrl.trim();
+        try {
+            URI uri = URI.create(normalized);
+            int port = uri.getPort();
+            if (port == 4001 || port == 4002) {
+                log.warn("Ignoring IBKR Client Portal URL '{}' because {} is a socket API port. "
+                        + "Use https://localhost:5000/v1/api for Client Portal.", normalized, port);
+                return "";
+            }
+            return normalized;
+        } catch (Exception exception) {
+            log.warn("Ignoring invalid IBKR Client Portal URL '{}'", normalized);
+            return "";
+        }
+    }
+
+    private void putSystemPropertyIfNotBlank(String key, String value) {
+        if (key == null || key.isBlank() || value == null || value.isBlank()) {
+            return;
+        }
+        System.setProperty(key, value.trim());
     }
 }

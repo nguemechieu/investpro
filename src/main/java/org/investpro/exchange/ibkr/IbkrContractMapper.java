@@ -2,6 +2,7 @@ package org.investpro.exchange.ibkr;
 
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.MARKET_TYPES;
+import org.investpro.utils.ORDER_TYPES;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Locale;
@@ -26,11 +27,21 @@ public final class IbkrContractMapper {
             return new IbkrContract(symbol, "FUT", "GLOBEX", currency, defaultFutureExpiry(), null, null, "1");
         }
 
-        if (marketTypeHint == MARKET_TYPES.STOP_LIMIT || symbol.length() > 5) {
+        if (symbol.length() > 5) {
             return new IbkrContract(symbol, "OPT", "SMART", currency, defaultOptionExpiry(), 100.0, "C", "100");
         }
 
         return new IbkrContract(symbol, "STK", "SMART", currency, null, null, null, null);
+    }
+
+    public IbkrContract toContract(@NotNull TradePair pair, ORDER_TYPES orderTypeHint) {
+        Objects.requireNonNull(pair, "pair must not be null");
+        if (orderTypeHint == ORDER_TYPES.STOP_LIMIT) {
+            String symbol = pair.getBaseCurrency().getCode().toUpperCase(Locale.ROOT);
+            String currency = pair.getCounterCurrency().getCode().toUpperCase(Locale.ROOT);
+            return new IbkrContract(symbol, "OPT", "SMART", currency, defaultOptionExpiry(), 100.0, "C", "100");
+        }
+        return toContract(pair, MARKET_TYPES.STOCKS);
     }
 
     public IbkrContract toContract(@NotNull TradePair pair) {

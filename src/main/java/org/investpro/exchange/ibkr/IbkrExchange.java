@@ -94,10 +94,7 @@ public class IbkrExchange extends InteractiveBrokers {
         return marketType == null
                 || marketType == MARKET_TYPES.STOCKS
                 || marketType == MARKET_TYPES.FOREX
-                || marketType == MARKET_TYPES.FUTURES
-                || marketType == MARKET_TYPES.LIMIT
-                || marketType == MARKET_TYPES.MARKET
-                || marketType == MARKET_TYPES.STOP_LIMIT;
+                || marketType == MARKET_TYPES.FUTURES;
     }
 
     @Override
@@ -318,11 +315,16 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public Account getUserAccountDetails() throws ExecutionException, InterruptedException {
+        ensureAuthenticatedSessionForAccountAccess();
         return fetchAccount().get();
     }
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
+        if (shouldRequireClientPortalAuth() && !clientPortalClient.isAuthenticated()) {
+            return CompletableFuture.failedFuture(
+                    new SecurityException("IBKR access denied: " + clientPortalClient.authenticationFailureReason()));
+        }
         return CompletableFuture.completedFuture(accountService.toAccount(this, currentSnapshot()));
     }
 
@@ -428,7 +430,9 @@ public class IbkrExchange extends InteractiveBrokers {
         if (isPaperTrading()) {
             return false;
         }
+        boolean clientPortalBlocked = shouldRequireClientPortalAuth() && !clientPortalClient.isAuthenticated();
         return !connectionManager.isConnected()
+                || clientPortalBlocked
                 || !marketDataProvider.isMarketDataHealthy()
                 || !liveRiskApprovalGate.getAsBoolean()
                 || !liveTradingLicenseGate.getAsBoolean();
@@ -439,10 +443,47 @@ public class IbkrExchange extends InteractiveBrokers {
     }
 
     private IbkrAccountSnapshot currentSnapshot() {
+        ensureAuthenticatedSessionForAccountAccess();
         if (modeRequestsPaperNetwork()) {
             return accountService.snapshot();
         }
         return accountService.refreshFromBrokerIfAvailable();
+    }
+
+    private void ensureAuthenticatedSessionForAccountAccess() {
+        if (shouldRequireClientPortalAuth() && !clientPortalClient.isAuthenticated()) {
+            throw new SecurityException("IBKR access denied: " + clientPortalClient.authenticationFailureReason());
+        }
+    }
+
+    private boolean shouldRequireClientPortalAuth() {
+        if (modeRequestsPaperNetwork()) {
+            return false;
+        }
+
+        String mode = firstNonBlank(
+                System.getProperty("investpro.ibkr.authMode"),
+                System.getenv("IBKR_AUTH_MODE"),
+                "gateway");
+        String normalized = mode == null ? "gateway" : mode.trim().toLowerCase(Locale.ROOT);
+
+        return switch (normalized) {
+            case "client-portal", "client_portal", "portal", "webapi", "web-api" -> true;
+            case "gateway", "tws", "socket", "ib-gateway", "ib_gateway" -> false;
+            default -> false;
+        };
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private String normalize(String currency) {

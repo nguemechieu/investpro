@@ -1,5 +1,7 @@
 package org.investpro.exchange;
 
+import lombok.Getter;
+
 import java.util.Locale;
 
 /**
@@ -8,6 +10,7 @@ import java.util.Locale;
  *
  * @author NOEL NGUEMECHIEU
  */
+@Getter
 public enum SupportedExchange {
     BINANCE_US("Binance US", "binance-us"),
     COINBASE("Coinbase", "coinbase"),
@@ -28,30 +31,24 @@ public enum SupportedExchange {
     STELLAR_NETWORK("Stellar Network", "stellar-network"),
     SOLANA_NETWORK("Solana Network", "solana-network");
 
+    /**
+     * -- GETTER --
+     *  Get the user-friendly display name for this exchange.
+     *
+     * @return display name suitable for UI labels
+     */
     private final String displayName;
+    /**
+     * -- GETTER --
+     *  Get the factory key used to instantiate this exchange.
+     *
+     * @return key for ExchangeFactory.create()
+     */
     private final String factoryKey;
 
     SupportedExchange(String displayName, String factoryKey) {
         this.displayName = displayName;
         this.factoryKey = factoryKey;
-    }
-
-    /**
-     * Get the user-friendly display name for this exchange.
-     * 
-     * @return display name suitable for UI labels
-     */
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    /**
-     * Get the factory key used to instantiate this exchange.
-     * 
-     * @return key for ExchangeFactory.create()
-     */
-    public String getFactoryKey() {
-        return factoryKey;
     }
 
     /**

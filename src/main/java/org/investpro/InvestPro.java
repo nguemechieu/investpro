@@ -6,14 +6,13 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.TextArea;
 import javafx.scene.image.Image;
-import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundImage;
 import javafx.scene.layout.BackgroundPosition;
 import javafx.scene.layout.BackgroundRepeat;
 import javafx.scene.layout.BackgroundSize;
+import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.ai.local.grpc.LocalAiRuntimeLauncher;
@@ -25,9 +24,10 @@ import org.investpro.persistence.repository.OrderRepository;
 import org.investpro.persistence.repository.RepositoryFactory;
 import org.investpro.persistence.repository.TradeRepository;
 import org.investpro.strategy.StrategyBootstrapper;
+import org.investpro.ui.navigation.ScreenManager;
+import org.investpro.ui.screens.OnboardingScreen;
+import org.investpro.ui.screens.TradingScreen;
 import org.investpro.ui.theme.MarketConfiguration;
-import org.investpro.ui.OnboardingDesk;
-import org.investpro.ui.TradingDesk;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.PrintWriter;
@@ -59,7 +59,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 @EqualsAndHashCode(callSuper = true)
 @Slf4j
-@Data
 public class InvestPro extends Application {
 
     private static final double DEFAULT_WIDTH = 1530;
@@ -72,17 +71,16 @@ public class InvestPro extends Application {
     private static final String APP_CSS_RESOURCE = "css/app.css";
     private static final String COMPONENTS_CSS_RESOURCE = "css/components.css";
     private static final AtomicBoolean ERROR_DIALOG_SHOWING = new AtomicBoolean(false);
+    private final AtomicBoolean openingTradingTerminal = new AtomicBoolean(false);
 
     private Stage primaryStage;
     private Scene mainScene;
 
-    private final AnchorPane root = new AnchorPane();
-
-    private TradingDesk tradingDesk;
-
     private TradeRepository tradeRepository;
     private OrderRepository orderRepository;
     private CurrencyRepository currencyRepository;
+    private BorderPane root;
+    private ScreenManager screenManager;
 
     public static void main(String[] args) {
         initializeGlobalExceptionHandling();
@@ -153,7 +151,9 @@ public class InvestPro extends Application {
     }
 
     private void configurePrimaryStage() {
+        root = new BorderPane();
         root.getStyleClass().add("root");
+        screenManager = new ScreenManager(root);
 
         mainScene = new Scene(root, DEFAULT_WIDTH, DEFAULT_HEIGHT);
 
@@ -177,24 +177,25 @@ public class InvestPro extends Application {
     }
 
     public void showOnboarding() {
-        OnboardingDesk onboardingView = new OnboardingDesk(this::showTradingTerminal);
-        setRootContent(onboardingView);
+        screenManager.show(new OnboardingScreen(this::showTradingTerminal));
         primaryStage.setTitle(buildWindowTitle("Onboarding"));
     }
 
     private void showTradingTerminal(MarketConfiguration configuration) {
         Objects.requireNonNull(configuration, "configuration must not be null");
 
-        try {
-            shutdownTradingTerminal();
+        if (!openingTradingTerminal.compareAndSet(false, true)) {
+            log.debug("Trading terminal transition already in progress; ignoring duplicate request.");
+            return;
+        }
 
-            tradingDesk = new TradingDesk(
+        try {
+            TradingScreen tradingScreen = new TradingScreen(
                     configuration,
                     tradeRepository,
                     orderRepository,
                     currencyRepository);
-
-            setRootContent(tradingDesk.getView());
+            screenManager.show(tradingScreen);
 
             primaryStage.setTitle(buildWindowTitle("Trading Desk"));
 
@@ -203,18 +204,10 @@ public class InvestPro extends Application {
         } catch (Exception exception) {
             log.error("Failed to open trading terminal", exception);
             showErrorAlert("Trading Terminal Error", "Failed to open the trading terminal.", exception);
+            throw (RuntimeException) exception;
+        } finally {
+            openingTradingTerminal.set(false);
         }
-    }
-
-    private void setRootContent(javafx.scene.Node node) {
-        Objects.requireNonNull(node, "node must not be null");
-
-        root.getChildren().setAll(node);
-
-        AnchorPane.setTopAnchor(node, 0.0);
-        AnchorPane.setRightAnchor(node, 0.0);
-        AnchorPane.setBottomAnchor(node, 0.0);
-        AnchorPane.setLeftAnchor(node, 0.0);
     }
 
     private void loadWindowIcon() {
@@ -309,7 +302,9 @@ public class InvestPro extends Application {
 
     private void closeApplication(boolean exitPlatform) {
         try {
-            shutdownTradingTerminal();
+            if (screenManager != null) {
+                screenManager.shutdown();
+            }
             LocalAiRuntimeLauncher.stopManagedProcess();
             log.info("InvestPro shutdown completed.");
 
@@ -320,41 +315,6 @@ public class InvestPro extends Application {
             if (exitPlatform) {
                 Platform.exit();
             }
-        }
-    }
-
-    private void shutdownTradingTerminal() {
-        if (tradingDesk == null) {
-            return;
-        }
-
-        try {
-            tryInvokeShutdown(tradingDesk);
-            log.info("Trading desk shutdown completed.");
-
-        } catch (Exception exception) {
-            log.error("Trading terminal shutdown failed: {}", exception.getMessage(), exception);
-
-        } finally {
-            tradingDesk = null;
-        }
-    }
-
-    private void tryInvokeShutdown(Object target) {
-        if (target == null) {
-            return;
-        }
-
-        try {
-            target.getClass().getMethod("shutdown").invoke(target);
-
-        } catch (NoSuchMethodException ignored) {
-            log.debug("{} does not expose shutdown().", target.getClass().getSimpleName());
-
-        } catch (Exception exception) {
-            throw new RuntimeException(
-                    "Failed to invoke shutdown on " + target.getClass().getSimpleName(),
-                    exception);
         }
     }
 

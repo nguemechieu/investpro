@@ -1,6 +1,5 @@
 package org.investpro.exchange.credentials;
 
-
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.contracts.CredentialProvider;
 
@@ -8,7 +7,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-
 
 @Slf4j
 public record ExchangeCredentialResolver(CredentialProvider provider) {
@@ -23,6 +21,7 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
             case "binance" -> resolveBinance();
             case "binance_us" -> resolveBinanceUs();
             case "bitfinex" -> resolveBitfinex();
+            case "kraken" -> resolveKraken();
             case "oanda" -> resolveOanda();
             case "alpaca" -> resolveAlpaca();
             case "interactive_brokers" -> resolveInteractiveBrokers();
@@ -34,14 +33,17 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
     private ExchangeCredentials resolveInteractiveBrokers() {
         return new ExchangeCredentials(
                 "interactive_brokers",
-                firstPresent(provider.getOrNull("IBKR_API_KEY"), provider.getOrNull("IBK_API_KEY")),
-                firstPresent(provider.getOrNull("IBKR_API_SECRET"), provider.getOrNull("IBK_API_SECRET")),
-                null,
-                null,
-                firstPresent(provider.getOrNull("IBKR_ACCESS_TOKEN"), provider.getOrNull("IBK_ACCESS_TOKEN")),
+                firstPresent(provider.getOrNull("IBKR_API_KEY"), provider.getOrNull("IBK_API_KEY"),
+                        provider.getOrNull("IBKR_USERNAME"), provider.getOrNull("IBK_USERNAME")),
+                firstPresent(provider.getOrNull("IBKR_API_SECRET"), provider.getOrNull("IBK_API_SECRET"),
+                        provider.getOrNull("IBKR_PASSWORD"), provider.getOrNull("IBK_PASSWORD")),
+                firstPresent(provider.getOrNull("IBKR_USERNAME"), provider.getOrNull("IBK_USERNAME")),
+                firstPresent(provider.getOrNull("IBKR_PASSWORD"), provider.getOrNull("IBK_PASSWORD")),
+                firstPresent(provider.getOrNull("IBKR_ACCESS_TOKEN"), provider.getOrNull("IBK_ACCESS_TOKEN"),
+                        provider.getOrNull("IBKR_TWO_FACTOR_CODE"), provider.getOrNull("IBK_TWO_FACTOR_CODE")),
                 firstPresent(provider.getOrNull("IBKR_ACCOUNT_ID"), provider.getOrNull("IBK_ACCOUNT_ID")),
-                Boolean.parseBoolean(firstPresent(provider.getOrNull("IBKR_SANDBOX"), provider.getOrNull("IBK_SANDBOX")))
-        );
+                Boolean.parseBoolean(
+                        firstPresent(provider.getOrNull("IBKR_SANDBOX"), provider.getOrNull("IBK_SANDBOX"))));
     }
 
     private ExchangeCredentials resolveCoinbase() {
@@ -53,8 +55,7 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
                 provider.getOrNull("COINBASE_PRIVATE_KEY"),
                 null,
                 null,
-                false
-        );
+                false);
     }
 
     private ExchangeCredentials resolveBinance() {
@@ -66,8 +67,7 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
                 null,
                 null,
                 null,
-                false
-        );
+                false);
     }
 
     private ExchangeCredentials resolveBinanceUs() {
@@ -79,8 +79,7 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
                 null,
                 null,
                 null,
-                false
-        );
+                false);
     }
 
     private ExchangeCredentials resolveBitfinex() {
@@ -92,8 +91,19 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
                 null,
                 null,
                 null,
-                false
-        );
+                false);
+    }
+
+    private ExchangeCredentials resolveKraken() {
+        return new ExchangeCredentials(
+                "kraken",
+                provider.getOrNull("KRAKEN_API_KEY"),
+                provider.getOrNull("KRAKEN_API_SECRET"),
+                null,
+                null,
+                provider.getOrNull("KRAKEN_API_PASSPHRASE"),
+                provider.getOrNull("KRAKEN_ACCOUNT_ID"),
+                Boolean.parseBoolean(provider.getOrNull("KRAKEN_SANDBOX")));
     }
 
     private ExchangeCredentials resolveOanda() {
@@ -105,8 +115,7 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
                 null,
                 null,
                 provider.getOrNull("OANDA_ACCOUNT_ID"),
-                Boolean.parseBoolean(provider.getOrNull("OANDA_SANDBOX"))
-        );
+                Boolean.parseBoolean(provider.getOrNull("OANDA_SANDBOX")));
     }
 
     private ExchangeCredentials resolveAlpaca() {
@@ -118,8 +127,7 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
                 null,
                 null,
                 null,
-                Boolean.parseBoolean(provider.getOrNull("ALPACA_PAPER"))
-        );
+                Boolean.parseBoolean(provider.getOrNull("ALPACA_PAPER")));
     }
 
     private ExchangeCredentials resolveStellar() {
@@ -141,8 +149,7 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
                 secretKey,
                 null,
                 publicKey,
-                isPaperStellarNetwork(network)
-        );
+                isPaperStellarNetwork(network));
     }
 
     private String firstPresent(String... values) {
@@ -187,6 +194,7 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
         addAliases(aliases, "binance", "binance", "binanceglobal", "binanceinternational");
         addAliases(aliases, "binance_us", "binanceus", "binanceusa", "binanceamerica", "binanceunitedstates");
         addAliases(aliases, "bitfinex", "bitfinex", "bitfinexus");
+        addAliases(aliases, "kraken", "kraken", "krakenpro");
         addAliases(aliases, "coinbase", "coinbase", "coinbasepro", "coinbaseadvanced", "coinbaseadvancedtrade",
                 "coinbaseat", "coinbasebrokerage");
         addAliases(aliases, "interactive_brokers", "interactivebrokers", "interactivebroker", "ib",

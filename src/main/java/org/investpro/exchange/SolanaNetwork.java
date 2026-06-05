@@ -2,6 +2,8 @@ package org.investpro.exchange;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import javafx.beans.property.SimpleIntegerProperty;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.investpro.config.AppConfig;
 import org.investpro.data.InProgressCandleData;
@@ -52,6 +54,8 @@ import java.util.concurrent.ExecutionException;
  * execution service is available.
  * </p>
  */
+@EqualsAndHashCode(callSuper = true)
+@Data
 public class SolanaNetwork extends Exchange {
 
     private static final String EXCHANGE_NAME = "SOLANA NETWORK";
@@ -59,7 +63,7 @@ public class SolanaNetwork extends Exchange {
     private static final String DEFAULT_WALLET_KEY = "solana.walletAddress";
 
     private final ExchangeCredentials credentials;
-    @Getter
+
     private final SolanaNetworkAdapter adapter;
     private volatile boolean connected;
 
@@ -135,7 +139,7 @@ public class SolanaNetwork extends Exchange {
 
     @Override
     public boolean supportsMarketType(MARKET_TYPES marketType) {
-        return marketType == null || marketType == MARKET_TYPES.SPOT || marketType == MARKET_TYPES.MARKET;
+        return marketType == null || marketType == MARKET_TYPES.SPOT;
     }
 
     @Override

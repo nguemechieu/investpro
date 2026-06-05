@@ -9,7 +9,6 @@ import javafx.util.StringConverter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-
 public class InstantAxisFormatter extends StringConverter<Number> {
     private final DateTimeFormatter dateTimeFormat;
 
@@ -30,7 +29,15 @@ public class InstantAxisFormatter extends StringConverter<Number> {
 
     @Override
     public Number fromString(String string) {
-        return Integer.valueOf(string);
+        if (string == null || string.isBlank()) {
+            return 0;
+        }
+
+        try {
+            return Integer.parseInt(string.trim());
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
 }

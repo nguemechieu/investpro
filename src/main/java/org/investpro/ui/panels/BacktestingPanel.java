@@ -43,7 +43,7 @@ import org.investpro.strategy.impl.UnifiedStrategy;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.UniversalTradabilityService;
 import org.investpro.utils.HistoricalDataPrefetcher;
-import org.investpro.utils.MARKET_TYPES;
+import org.investpro.utils.ORDER_TYPES;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 import java.io.File;
@@ -56,7 +56,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.investpro.utils.MARKET_TYPES.STOP_LIMIT;
 import static org.investpro.utils.Side.BUY;
 import static org.investpro.utils.Side.HOLD;
 import static org.investpro.utils.Side.SELL;
@@ -442,7 +441,7 @@ public class BacktestingPanel extends StackPane {
         sideCol.setCellValueFactory(new PropertyValueFactory<>("side"));
         sideCol.setPrefWidth(70);
 
-        TableColumn<BacktestTrade, MARKET_TYPES> orderTypeCol = new TableColumn<>("Order Type");
+        TableColumn<BacktestTrade, ORDER_TYPES> orderTypeCol = new TableColumn<>("Order Type");
         orderTypeCol.setCellValueFactory(new PropertyValueFactory<>("orderType"));
         orderTypeCol.setPrefWidth(90);
 
@@ -802,7 +801,7 @@ public class BacktestingPanel extends StackPane {
         String strategyName = strategyCombo.getValue();
         TradePair selectedPair = symbolCombo.getValue();
         Timeframe selectedTimeframe = timeframeCombo.getValue();
-        MARKET_TYPES orderType = resolveOrderType(orderTypeCombo.getValue());
+        ORDER_TYPES orderType = resolveOrderType(orderTypeCombo.getValue());
         double initialBalance = readDoubleSpinner(initialBalanceSpinner);
         LocalDate startDate = startDatePicker.getValue();
         LocalDate endDate = endDatePicker.getValue();
@@ -825,7 +824,7 @@ public class BacktestingPanel extends StackPane {
             String strategyName = input.strategyName();
             TradePair selectedPair = input.selectedPair();
             Timeframe selectedTimeframe = input.selectedTimeframe();
-            MARKET_TYPES orderType = input.orderType();
+            ORDER_TYPES orderType = input.orderType();
             double initialBalance = input.initialBalance();
             LocalDate startDate = input.startDate();
             LocalDate endDate = input.endDate();
@@ -1127,7 +1126,7 @@ public class BacktestingPanel extends StackPane {
     }
 
     private List<BacktestTrade> executeBacktest(String strategyName, TradePair selectedPair, String timeframeCode,
-            MARKET_TYPES orderType, List<CandleData> candles, double initialBalance) {
+            ORDER_TYPES orderType, List<CandleData> candles, double initialBalance) {
         List<BacktestTrade> trades = new ArrayList<>();
 
         if (strategyName == null || strategyName.isBlank()) {
@@ -1307,29 +1306,29 @@ public class BacktestingPanel extends StackPane {
                 .build();
     }
 
-    private MARKET_TYPES resolveOrderType(String orderTypeText) {
+    private ORDER_TYPES resolveOrderType(String orderTypeText) {
         if (orderTypeText == null || orderTypeText.isBlank()) {
-            return MARKET_TYPES.MARKET;
+            return ORDER_TYPES.MARKET;
         }
 
         String normalized = orderTypeText.trim().toUpperCase(Locale.ROOT);
 
         return switch (normalized) {
-            case "LIMIT" -> MARKET_TYPES.LIMIT;
-            case "STOP_LIMIT", "STOP LIMIT" -> STOP_LIMIT;
-            default -> MARKET_TYPES.MARKET;
+            case "LIMIT" -> ORDER_TYPES.LIMIT;
+            case "STOP_LIMIT", "STOP LIMIT" -> ORDER_TYPES.STOP_LIMIT;
+            default -> ORDER_TYPES.MARKET;
         };
     }
 
-    private Optional<Double> resolveEntryFillPrice(MARKET_TYPES orderType, Side side, StrategySignal signal,
+    private Optional<Double> resolveEntryFillPrice(ORDER_TYPES orderType, Side side, StrategySignal signal,
             CandleData candle) {
         double requestedEntry = signal.getEntryPrice() > 0.0 ? signal.getEntryPrice() : candle.closePrice();
 
-        if (orderType == MARKET_TYPES.MARKET) {
+        if (orderType == ORDER_TYPES.MARKET) {
             return Optional.of(candle.closePrice());
         }
 
-        if (orderType == MARKET_TYPES.LIMIT) {
+        if (orderType == ORDER_TYPES.LIMIT) {
             if (side == BUY && candle.lowPrice() <= requestedEntry) {
                 return Optional.of(requestedEntry);
             }
@@ -1341,7 +1340,7 @@ public class BacktestingPanel extends StackPane {
             return Optional.empty();
         }
 
-        if (orderType.equals(STOP_LIMIT)) {
+        if (orderType == ORDER_TYPES.STOP_LIMIT) {
             if (side == BUY && candle.highPrice() >= requestedEntry) {
                 return Optional.of(requestedEntry);
             }
@@ -2162,11 +2161,11 @@ public class BacktestingPanel extends StackPane {
     }
 
     private record BacktestInput(String strategyName, TradePair selectedPair, Timeframe selectedTimeframe,
-            MARKET_TYPES orderType, double initialBalance, LocalDate startDate, LocalDate endDate, int requestedBars,
+            ORDER_TYPES orderType, double initialBalance, LocalDate startDate, LocalDate endDate, int requestedBars,
             String validationMessage) {
 
         static BacktestInput invalid(String validationMessage) {
-            return new BacktestInput(null, null, null, MARKET_TYPES.MARKET, DEFAULT_INITIAL_EQUITY, null, null,
+            return new BacktestInput(null, null, null, ORDER_TYPES.MARKET, DEFAULT_INITIAL_EQUITY, null, null,
                     MIN_ABSOLUTE_TEST_BARS, validationMessage);
         }
 
@@ -2183,7 +2182,7 @@ public class BacktestingPanel extends StackPane {
     public static class BacktestTrade {
         private LocalDate date;
         private Side side;
-        private MARKET_TYPES orderType;
+        private ORDER_TYPES orderType;
         private double price;
         private double exitPrice;
         private double quantity;

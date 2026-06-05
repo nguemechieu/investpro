@@ -65,13 +65,12 @@ public class PluginManagerPanel extends BorderPane {
         TableView<PluginRow> table = new TableView<>(FXCollections.observableArrayList(rows));
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.setPlaceholder(new Label("No providers loaded"));
-        table.getColumns().setAll(
-                column("ID", PluginRow::id, 150),
-                column("Display Name", PluginRow::displayName, 220),
-                column("Version", PluginRow::version, 80),
-                column("Enabled", PluginRow::enabledByDefault, 80),
-                column("Type / Category", PluginRow::type, 150),
-                column("Aliases / Supports", PluginRow::details, 280));
+        table.getColumns().add(column("ID", PluginRow::id, 150));
+        table.getColumns().add(column("Display Name", PluginRow::displayName, 220));
+        table.getColumns().add(column("Version", PluginRow::version, 80));
+        table.getColumns().add(column("Enabled", PluginRow::enabledByDefault, 80));
+        table.getColumns().add(column("Type / Category", PluginRow::type, 150));
+        table.getColumns().add(column("Aliases / Supports", PluginRow::details, 280));
 
         Tab tab = new Tab(title, table);
         tab.setClosable(false);

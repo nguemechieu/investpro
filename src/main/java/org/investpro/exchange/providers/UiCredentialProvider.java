@@ -20,8 +20,17 @@ public class UiCredentialProvider implements CredentialProvider {
             String apiKey,
             String apiSecret,
             String accountId,
-            String tradingMode
-    ) {
+            String tradingMode) {
+        this(exchangeId, apiKey, apiSecret, accountId, tradingMode, null);
+    }
+
+    public UiCredentialProvider(
+            String exchangeId,
+            String apiKey,
+            String apiSecret,
+            String accountId,
+            String tradingMode,
+            String twoFactorCode) {
         String prefix = normalize(exchangeId);
 
         put(prefix + "_API_KEY", apiKey);
@@ -69,11 +78,15 @@ public class UiCredentialProvider implements CredentialProvider {
                 put("IBKR_API_KEY", apiKey);
                 put("IBKR_API_SECRET", apiSecret);
                 put("IBKR_ACCOUNT_ID", accountId);
-                put("IBKR_ACCESS_TOKEN", apiSecret);
+                put("IBKR_USERNAME", apiKey);
+                put("IBKR_PASSWORD", apiSecret);
+                put("IBKR_TWO_FACTOR_CODE", twoFactorCode);
                 put("IBK_API_KEY", apiKey);
                 put("IBK_API_SECRET", apiSecret);
                 put("IBK_ACCOUNT_ID", accountId);
-                put("IBK_ACCESS_TOKEN", apiSecret);
+                put("IBK_USERNAME", apiKey);
+                put("IBK_PASSWORD", apiSecret);
+                put("IBK_TWO_FACTOR_CODE", twoFactorCode);
             }
 
             case "stellar_network", "stellar" -> {

@@ -45,21 +45,18 @@ import java.util.function.Consumer;
  * Usage:
  * <p>
  * HistoricalDataPrefetcher preFetcher =
- *         HistoricalDataPrefetcher.forCurrentExchange(exchange, repository);
-
+ * HistoricalDataPrefetcher.forCurrentExchange(exchange, repository);
+ * <p>
  * List<CandleData> candles = preFetcher.fetchAndCacheDataSync(
- *         tradePair,
- *         start,
- *         LocalDateTime.now(),
- *         "1h",
- *         progress -> System.out.println("Progress: " + progress + "%")
+ * tradePair,
+ * start,
+ * LocalDateTime.now(),
+ * "1h",
+ * progress -> System.out.println("Progress: " + progress + "%")
  * );
  */
 @Slf4j
-public class HistoricalDataPrefetcher {
-
-    private final HistoricalDataRepository repository;
-    private final DataSupplierFactory supplierFactory;
+public record HistoricalDataPrefetcher(HistoricalDataRepository repository, DataSupplierFactory supplierFactory) {
 
     /**
      * Minimum candles usually needed before a backtest becomes useful.
@@ -412,7 +409,7 @@ public class HistoricalDataPrefetcher {
 
     @Contract(pure = true)
     public static boolean hasEnoughDataForBasicTesting(int candleCount) {
-        return candleCount >= MIN_CANDLES_FOR_BASIC_TEST;
+        return candleCount < MIN_CANDLES_FOR_BASIC_TEST;
     }
 
     public static boolean hasEnoughDataForGoodTesting(int candleCount) {

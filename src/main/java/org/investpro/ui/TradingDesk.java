@@ -120,6 +120,7 @@ import org.investpro.ui.operations.SystemOperationsBoard;
 import org.investpro.ui.panels.*;
 import org.investpro.ui.tools.DataWindow;
 import org.investpro.ui.utils.CurrencyIconLoader;
+import org.investpro.transfer.TransferPanel;
 import org.investpro.utils.DraggableTab;
 import org.investpro.utils.ZoomDirection;
 import org.investpro.utils.CandleDataSupplier;
@@ -404,6 +405,10 @@ public class TradingDesk extends BorderPane {
     private boolean initialized;
     private TextArea pemArea;
 
+    public Parent getView() {
+        return getScrollPane();
+    }
+
     private record BotStartPlan(List<TradePair> selectedSymbols, List<TradePair> streamingSymbols) {
     }
 
@@ -462,6 +467,8 @@ public class TradingDesk extends BorderPane {
 
         // Initialize NotificationService (disabled by default, can be enabled via
         // settings)
+        this.stage = new Stage();
+
         this.notificationService = NotificationService.disabled();
 
         // Initialize MarketDataEngine (central market data cache and services)
@@ -486,10 +493,6 @@ public class TradingDesk extends BorderPane {
         scrollPane.setContent(root);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-    }
-
-    public Parent getView() {
-        return scrollPane;
     }
 
     private NewsEventOverlay newsEventOverlay;
@@ -707,6 +710,15 @@ public class TradingDesk extends BorderPane {
                 menuItem(t("menu.refreshLocalPositions"), null, this::refreshPositions),
                 menuItem(t("menu.cancelAllOrders"), null, this::cancelAllOrders));
 
+        // ── Accounts ─────────────────────────────────────────────────────────
+        Menu accountsMenu = new Menu("Accounts");
+        accountsMenu.getItems().setAll(
+                menuItem("Portfolio", null, this::openPortfolioWindow),
+                menuItem("Positions", null, this::openPositionsWindow),
+                menuItem("Deposits & Withdrawals", null, this::openDepositsWithdrawalsWindow),
+                menuItem("Transfer Funds", null, this::openTransferFundsWindow),
+                menuItem("Account Management", null, this::openAccountManagementWindow));
+
         // ── Strategy ─────────────────────────────────────────────────────────
         Menu strategyMenu = new Menu(t("menu.strategy"));
         strategyMenu.getItems().setAll(
@@ -748,7 +760,6 @@ public class TradingDesk extends BorderPane {
         reviewMenu.getItems().setAll(
                 menuItem("Performances", null, this::showPerformancesReview),
                 menuItem("Trades", null, this::showTradesReview),
-                menuItem("Account Activity", null, this::showAccountActivity),
                 new SeparatorMenuItem(),
                 menuItem("Recommendation", null, this::showRecommendations),
                 menuItem("Journal", null, this::showTradingJournal),
@@ -820,7 +831,7 @@ public class TradingDesk extends BorderPane {
 
         Menu languageMenu = createLanguageMenu();
 
-        return new MenuBar(fileMenu, editMenu, viewMenu, chartsMenu, tradeMenu, strategyMenu,
+        return new MenuBar(fileMenu, editMenu, viewMenu, chartsMenu, tradeMenu, accountsMenu, strategyMenu,
                 researchMenu, reviewMenu, systemMenu, educationMenu, settingsMenu, languageMenu, helpMenu);
     }
 
@@ -851,6 +862,11 @@ public class TradingDesk extends BorderPane {
                 case "operations-center" -> openSystemOperationsBoard();
                 case "plugin-manager" -> openPluginManagerPanel();
                 case "data-window" -> openDataWindow();
+                case "portfolio" -> openPortfolioWindow();
+                case "positions" -> openPositionsWindow();
+                case "deposits-withdrawals" -> openDepositsWithdrawalsWindow();
+                case "transfer-funds" -> openTransferFundsWindow();
+                case "account-management" -> openAccountManagementWindow();
                 case "resource-monitor" -> showResourceMonitor();
                 case "trading-system-status" -> tradingSystemStatus();
                 case "console" -> openSystemConsolePanel();
@@ -874,6 +890,63 @@ public class TradingDesk extends BorderPane {
         }
     }
 
+    private void openPortfolioWindow() {
+        createIndependentWindow("Portfolio", buildPortfolioPane(), 1120, 740);
+        journal("Portfolio panel opened");
+    }
+
+    private void openPositionsWindow() {
+        Node content = createPositionsTab().getContent();
+        createIndependentWindow("Positions", content, 980, 680);
+        journal("Positions panel opened");
+    }
+
+    private void openDepositsWithdrawalsWindow() {
+        Label title = new Label("Deposits & Withdrawals");
+        title.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #e2e8f0;");
+
+        Label subtitle = new Label(
+                "Funding ledger and settlement activity. Use Transfer Funds to initiate broker-to-broker and wallet transfers.");
+        subtitle.setWrapText(true);
+        subtitle.setStyle("-fx-font-size: 12; -fx-text-fill: #94a3b8;");
+
+        TableView<TransferFundingRow> table = new TableView<>();
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        table.getColumns().addAll(
+                tableColumn("Date", TransferFundingRow::date, 120),
+                tableColumn("Provider", TransferFundingRow::provider, 140),
+                tableColumn("Type", TransferFundingRow::type, 120),
+                tableColumn("Currency", TransferFundingRow::currency, 90),
+                tableColumn("Amount", TransferFundingRow::amount, 110),
+                tableColumn("Status", TransferFundingRow::status, 110),
+                tableColumn("Reference", TransferFundingRow::reference, 180));
+
+        table.setItems(FXCollections.observableArrayList(
+                new TransferFundingRow("2026-06-03 10:22", "Coinbase", "Deposit", "USD", "$5,000.00", "Completed",
+                        "CB-DEP-84A2"),
+                new TransferFundingRow("2026-06-03 11:03", "Interactive Brokers", "Withdrawal", "USD", "$2,000.00",
+                        "Processing", "IBKR-WD-19F1")));
+
+        VBox content = new VBox(10, title, subtitle, table);
+        content.setPadding(new Insets(16));
+        content.getStyleClass().add("pro-panel");
+        VBox.setVgrow(table, Priority.ALWAYS);
+
+        createIndependentWindow("Deposits & Withdrawals", content, 1050, 680);
+        journal("Deposits & Withdrawals panel opened");
+    }
+
+    private void openTransferFundsWindow() {
+        TransferPanel transferPanel = new TransferPanel(this::journal);
+        createIndependentWindow("Transfer Funds", transferPanel, 1120, 780);
+        journal("Transfer Funds panel opened");
+    }
+
+    private void openAccountManagementWindow() {
+        showAccountActivity();
+        journal("Account Management panel opened");
+    }
+
     private Menu createLanguageMenu() {
         Menu languageMenu = new Menu(t("language.menu"));
         ToggleGroup group = new ToggleGroup();
@@ -887,6 +960,15 @@ public class TradingDesk extends BorderPane {
         }
 
         return languageMenu;
+    }
+
+    private record TransferFundingRow(String date,
+            String provider,
+            String type,
+            String currency,
+            String amount,
+            String status,
+            String reference) {
     }
 
     private MenuItem menuItem(String text, KeyCodeCombination accelerator, Runnable action) {
@@ -958,41 +1040,49 @@ public class TradingDesk extends BorderPane {
         closeAllButton.getStyleClass().add("danger-button");
         closeAllButton.setOnAction(event -> showInfo("Close All", "Close-all positions command is not wired yet."));
 
+        Label modeLabel = new Label("Mode");
+        modeLabel.getStyleClass().add("toolbar-chip-label");
+        Label brokerLabel = new Label("Broker");
+        brokerLabel.getStyleClass().add("toolbar-chip-label");
+        Label symbolLabel = new Label("Symbol");
+        symbolLabel.getStyleClass().add("toolbar-chip-label");
+        Label typeLabel = new Label("Type");
+        typeLabel.getStyleClass().add("toolbar-chip-label");
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox modeGroup = createToolbarGroup("toolbar-group-mode", modeLabel, tradingModeSelector);
+        HBox venueGroup = createToolbarGroup("toolbar-group-venue", brokerLabel, exchangeSelector, connectControl);
+        HBox marketGroup = createToolbarGroup("toolbar-group-market", symbolLabel, symbolSelector, timeframeSelector,
+                createTimeframeStrip());
+        HBox actionGroup = createToolbarGroup("toolbar-group-actions", refreshSymbolsButton, addChartButton,
+                newOrderButton);
+        HBox executionGroup = createToolbarGroup("toolbar-group-execution", typeLabel, orderTypeSelector,
+                exchangeVenueLabel, buyButton, sellButton, cancelAllButton, closeAllButton);
+        HBox chartGroup = createToolbarGroup("toolbar-group-chart", autoScrollButton, crosshairToolbarButton(),
+                chartToolsButton);
+
+        Label toolboxLabel = new Label("Toolbox");
+        toolboxLabel.getStyleClass().add("toolbar-toolbox-label");
 
         ToolBar toolBar = new ToolBar(
                 brand,
                 createVerticalSeparator(),
-                tradingModeSelector,
+                modeGroup,
                 createVerticalSeparator(),
-                new Label("Broker"),
-                exchangeSelector,
-                connectControl,
+                venueGroup,
                 createVerticalSeparator(),
-                new Label("Symbol"),
-                symbolSelector,
-                timeframeSelector,
-                refreshSymbolsButton,
-                addChartButton,
+                marketGroup,
                 createVerticalSeparator(),
-                createTimeframeStrip(),
+                actionGroup,
                 createVerticalSeparator(),
-                newOrderButton,
-                new Label("Type"),
-                orderTypeSelector,
-                exchangeVenueLabel,
-                buyButton,
-                sellButton,
-                cancelAllButton,
-                closeAllButton,
+                executionGroup,
                 createVerticalSeparator(),
-                autoScrollButton,
-                crosshairToolbarButton(),
-                chartToolsButton,
+                chartGroup,
                 createVerticalSeparator(),
                 spacer,
-                new Label("Toolbox"));
+                toolboxLabel);
         toolBar.getStyleClass().addAll("main-trading-toolbar", "mt5-toolbar");
         return toolBar;
     }
@@ -1021,7 +1111,11 @@ public class TradingDesk extends BorderPane {
         strip.setAlignment(Pos.CENTER_LEFT);
         strip.getStyleClass().add("desk-command-strip");
 
-        strip.getChildren().setAll(
+        HBox metricCluster = new HBox(8);
+        metricCluster.setAlignment(Pos.CENTER_LEFT);
+        metricCluster.getStyleClass().add("desk-metric-cluster");
+
+        metricCluster.getChildren().setAll(
                 createDeskMetric("Connection", deskConnectionLabel, "desk-metric-connection"),
                 createDeskMetric("Guardrail", deskRiskLabel, "desk-metric-risk"),
                 createDeskMetric("Exposure", deskExposureLabel, "desk-metric-exposure"),
@@ -1039,10 +1133,33 @@ public class TradingDesk extends BorderPane {
         Button orderTicketButton = createDeskActionButton("Order Ticket", this::openOrderPanel);
         configureWorkspaceBotControls();
 
+        Label botLabel = new Label("Bot");
+        botLabel.getStyleClass().add("toolbar-chip-label");
+
+        HBox actionCluster = new HBox(8,
+                deskUpdatedLabel,
+                refreshDeskButton,
+                riskButton,
+                analysisButton,
+                orderTicketButton,
+                createVerticalSeparator(),
+                botLabel,
+                botSymbolScopeSelector,
+                botTradeButton);
+        actionCluster.setAlignment(Pos.CENTER_LEFT);
+        actionCluster.getStyleClass().add("desk-action-cluster");
+
         deskUpdatedLabel.getStyleClass().add("desk-updated-label");
-        strip.getChildren().addAll(spacer, deskUpdatedLabel, refreshDeskButton, riskButton, analysisButton,
-                orderTicketButton, createVerticalSeparator(), new Label("Bot"), botSymbolScopeSelector, botTradeButton);
+        strip.getChildren().addAll(metricCluster, spacer, actionCluster);
         return strip;
+    }
+
+    private @NotNull HBox createToolbarGroup(String styleClass, Node... nodes) {
+        HBox group = new HBox(6);
+        group.setAlignment(Pos.CENTER_LEFT);
+        group.getStyleClass().addAll("toolbar-group", styleClass);
+        group.getChildren().addAll(nodes);
+        return group;
     }
 
     private void configureWorkspaceBotControls() {
@@ -2603,9 +2720,9 @@ public class TradingDesk extends BorderPane {
     }
 
     private @NotNull VBox createTradingConsole() {
-        Label title = new Label("Toolbox");
+        Label title = new Label("System Console");
         title.getStyleClass().add("terminal-title");
-        Label product = new Label("InvestPro Terminal");
+        Label product = new Label("Logs, alerts, account state, and diagnostics");
         product.getStyleClass().add("panel-meta");
         VBox titleBlock = new VBox(1, title, product);
 
@@ -2624,6 +2741,8 @@ public class TradingDesk extends BorderPane {
         terminalTabPane.setSide(Side.TOP);
         terminalTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         terminalTabPane.getStyleClass().addAll("console-tab-pane", "mt5-terminal-tabs");
+        terminalTabPane.setMinHeight(CONSOLE_HEIGHT - 64);
+        terminalTabPane.setPrefHeight(CONSOLE_HEIGHT);
         terminalTabPane.getTabs().setAll(
                 createTerminalTab("Transactions", buildTransactionsPane()),
                 createTerminalTab("Account Summary", buildAccountSummaryPane()),
@@ -2637,7 +2756,27 @@ public class TradingDesk extends BorderPane {
 
         Node terminalTabStrip = createTerminalTabStrip(terminalTabPane);
 
-        VBox terminalSurface = new VBox(0, header, terminalTabStrip, terminalTabPane);
+        Label activeTabLabel = new Label();
+        activeTabLabel.getStyleClass().add("panel-meta");
+        activeTabLabel.setText("Active: " + terminalTabPane.getSelectionModel().getSelectedItem().getText());
+
+        Label scrollHintLabel = new Label("Each tab supports scrolling for long tables and logs.");
+        scrollHintLabel.getStyleClass().add("panel-meta");
+
+        terminalTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
+            if (newTab != null) {
+                activeTabLabel.setText("Active: " + newTab.getText());
+            }
+        });
+
+        Region tabMetaSpacer = new Region();
+        HBox.setHgrow(tabMetaSpacer, Priority.ALWAYS);
+        HBox tabMetaRow = new HBox(10, activeTabLabel, tabMetaSpacer, scrollHintLabel);
+        tabMetaRow.setAlignment(Pos.CENTER_LEFT);
+        tabMetaRow.setPadding(new Insets(4, 8, 6, 8));
+        tabMetaRow.getStyleClass().add("console-tab-meta");
+
+        VBox terminalSurface = new VBox(0, header, terminalTabStrip, tabMetaRow, terminalTabPane);
         terminalSurface.getStyleClass().add("terminal-scroll-content");
         VBox.setVgrow(terminalTabPane, Priority.ALWAYS);
 
@@ -2658,9 +2797,38 @@ public class TradingDesk extends BorderPane {
     }
 
     private @NotNull Tab createTerminalTab(String title, Node content) {
-        Tab tab = new Tab(title, content == null ? new Pane() : content);
+        Tab tab = new Tab(title, createScrollableConsoleTabContent(title, content));
         tab.setClosable(false);
         return tab;
+    }
+
+    private @NotNull Node createScrollableConsoleTabContent(String title, Node content) {
+        Node resolvedContent = content == null ? new Pane() : content;
+
+        if (resolvedContent instanceof ScrollPane
+                || resolvedContent instanceof TableView<?>
+                || resolvedContent instanceof TreeTableView<?>
+                || resolvedContent instanceof TextArea
+                || resolvedContent instanceof ListView<?>
+                || resolvedContent instanceof TabPane
+                || resolvedContent instanceof SplitPane) {
+            return resolvedContent;
+        }
+
+        VBox container = new VBox(resolvedContent);
+        container.setFillWidth(true);
+        container.setPadding(new Insets(8));
+        VBox.setVgrow(resolvedContent, Priority.ALWAYS);
+
+        ScrollPane scrollPane = new ScrollPane(container);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(false);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setPannable(true);
+        scrollPane.getStyleClass().add("terminal-tab-scroll-pane");
+        scrollPane.setId("console-tab-scroll-" + title.toLowerCase(Locale.ROOT).replace(' ', '-'));
+        return scrollPane;
     }
 
     private @NotNull Node createNewsPlaceholder() {
@@ -3044,17 +3212,20 @@ public class TradingDesk extends BorderPane {
     }
 
     private @NotNull DraggableTab createDetachableTerminalTab(@NonNull TabName tabName, Node content) {
-        DraggableTab tab = new DraggableTab(tabName.getTabId(), content);
+        Node tabContent = createScrollableConsoleTabContent(tabName.getDisplayName(), content);
+        DraggableTab tab = new DraggableTab(tabName.getTabId(), tabContent);
 
         tab.setTooltip(new Tooltip(tabName.getDisplayName()));
-        tab.setContent(content);
+        tab.setContent(tabContent);
         return tab;
     }
 
     private @NotNull DraggableTab createFixedTab(@NonNull TabName tabName, Node content) {
-        DraggableTab tab = new DraggableTab(tabName.getTabId(), content);
+        Node tabContent = createScrollableConsoleTabContent(tabName.getDisplayName(), content);
+        DraggableTab tab = new DraggableTab(tabName.getTabId(), tabContent);
         tab.setClosable(true);
         tab.setTooltip(new Tooltip(tabName.getDisplayName()));
+        tab.setContent(tabContent);
         return tab;
     }
 
@@ -4499,13 +4670,13 @@ public class TradingDesk extends BorderPane {
         orderManagementTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         orderManagementTabPane.setSide(Side.TOP);
 
-        // Orders Tab (Open Orders)
-        TableView<OpenOrder> ordersTable = buildOpenOrdersTable();
+        // Orders Tab (order history)
+        TableView<Order> ordersTable = buildOrderHistoryTable();
         Tab ordersTab = new Tab("Orders", ordersTable);
         ordersTab.setClosable(false);
 
-        // Fills Tab (Filled Orders / Order History)
-        TableView<Order> fillsTable = buildOrderHistoryTable();
+        // Fills Tab (executed trades/fills)
+        TableView<Trade> fillsTable = buildAccountTradesTable();
         Tab fillsTab = new Tab("Fills", fillsTable);
         fillsTab.setClosable(false);
 
@@ -7533,16 +7704,15 @@ public class TradingDesk extends BorderPane {
         refreshes.add(tradesRefresh);
 
         CompletableFuture<?> openOrdersRefresh = fetchAccountWorkspaceAsync("open orders",
-                current -> current.fetchOpenOrders(null))
-                .thenAccept(orders -> runOnFx(() -> updateAccountOpenOrders(orders)));
+                this::fetchOpenOrdersForWorkspace)
+                .thenAccept(orders -> runOnFx(() -> updateAccountOpenOrders((List<OpenOrder>) orders)));
         refreshes.add(openOrdersRefresh);
 
-        if (Duration.between(lastAccountHistoryRefreshAt, Instant.now())
+        if (accountHistoryItems.isEmpty() || Duration.between(lastAccountHistoryRefreshAt, Instant.now())
                 .toSeconds() >= ACCOUNT_HISTORY_REFRESH_SECONDS) {
             lastAccountHistoryRefreshAt = Instant.now();
-            TradePair historySymbol = selectedSymbolSnapshot();
             CompletableFuture<?> orderHistoryRefresh = fetchAccountWorkspaceAsync("order history",
-                    current -> current.fetchOrderHistory(historySymbol, Instant.now().minus(90, ChronoUnit.DAYS)))
+                    current -> current.fetchOrderHistory(null, Instant.now().minus(90, ChronoUnit.DAYS)))
                     .thenAccept(orders -> runOnFx(() -> updateAccountHistory(orders)));
             refreshes.add(orderHistoryRefresh);
         }
@@ -7570,6 +7740,31 @@ public class TradingDesk extends BorderPane {
                 return null;
             }
         }, autoRefreshExecutor);
+    }
+
+    private CompletableFuture<? extends List<?>> fetchOpenOrdersForWorkspace(Exchange current) {
+        if (current == null) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        return current.fetchOpenOrders(null).thenCompose(openOrders -> {
+            if (openOrders != null && !openOrders.isEmpty()) {
+                return CompletableFuture.completedFuture(openOrders);
+            }
+
+            TradePair selected = selectedSymbolSnapshot();
+            if (selected == null) {
+                return CompletableFuture.completedFuture(openOrders == null ? List.of() : openOrders);
+            }
+
+            return current.fetchOpenOrders(selected).thenApply(selectedOrders -> selectedOrders == null
+                    ? (openOrders == null ? List.of() : openOrders)
+                    : selectedOrders);
+        }).exceptionally(ex -> {
+            log.debug("Open orders workspace refresh failed", ex);
+
+            return (List<OpenOrder>) new ArrayList<OpenOrder>();
+        });
     }
 
     private TradePair selectedSymbolSnapshot() {
@@ -9634,6 +9829,9 @@ public class TradingDesk extends BorderPane {
         dialog.setHeaderText("Application and broker settings");
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
 
+        boolean ibkrSelected = "INTERACTIVE BROKERS"
+                .equalsIgnoreCase(normalizeExchangeName(safe(exchangeSelector.getValue())));
+
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
@@ -9645,7 +9843,7 @@ public class TradingDesk extends BorderPane {
         TextField telegramField = new TextField(telegramToken);
 
         grid.addRow(0, new Label("API Key"), apiKeyField);
-        grid.addRow(1, new Label("API Secret / Account ID"), secretField);
+        grid.addRow(1, new Label(ibkrSelected ? "Password / Account ID" : "API Secret / Account ID"), secretField);
         grid.addRow(2, new Label("Telegram Token"), telegramField);
 
         Button saveButton = new Button("Save");
@@ -9888,9 +10086,11 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        boolean oanda = "OANDA".equalsIgnoreCase(selectedExchange);
-        boolean stellar = "STELLAR NETWORK".equalsIgnoreCase(selectedExchange);
-        boolean isCoinbase = "Coinbase".equalsIgnoreCase(selectedExchange);
+        String normalizedExchange = normalizeExchangeName(selectedExchange);
+        boolean oanda = "OANDA".equalsIgnoreCase(normalizedExchange);
+        boolean stellar = "STELLAR NETWORK".equalsIgnoreCase(normalizedExchange);
+        boolean ibkr = "INTERACTIVE BROKERS".equalsIgnoreCase(normalizedExchange);
+        boolean isCoinbase = "COINBASE".equalsIgnoreCase(normalizedExchange);
         boolean hasCreds = !configuredApiKey.isBlank();
 
         // ── Dialog shell ──────────────────────────────────────────────────────
@@ -9943,17 +10143,18 @@ public class TradingDesk extends BorderPane {
         // ── Credentials section ───────────────────────────────────────────────
         String apiLabelText = oanda
                 ? "API Token"
-                : (stellar ? "Account ID (Public G... Key)" : "API Key");
+                : (stellar ? "Account ID (Public G... Key)" : (ibkr ? "Username" : "API Key"));
         String secretLabelText = oanda
                 ? "Account ID"
-                : (stellar ? "Secret Seed (S...)" : "API Secret");
+                : (stellar ? "Secret Seed (S...)" : (ibkr ? "Password" : "API Secret"));
         String apiPrompt = oanda
                 ? "Enter your OANDA v20 API token"
-                : (stellar ? "Paste your Stellar public account ID (G...)" : "Paste your API key here");
+                : (stellar ? "Paste your Stellar public account ID (G...)"
+                        : (ibkr ? "Enter your IBKR username" : "Paste your API key here"));
         String secretPrompt = oanda
                 ? "Account ID (e.g. 001-001-123456-001)"
                 : (stellar ? "Paste your Stellar secret seed (S...) for live trading"
-                        : "Paste your API secret / private key");
+                        : (ibkr ? "Enter your IBKR password" : "Paste your API secret / private key"));
 
         String apiFieldInitialValue = configuredApiKey;
         if (stellar && apiFieldInitialValue.isBlank() && !configuredAccountId.isBlank()) {
@@ -12439,11 +12640,11 @@ public class TradingDesk extends BorderPane {
 
         Stage orderStage = new Stage();
         orderStage.setTitle("Order Manager - " + (selectedSymbol != null ? selectedSymbol.getSymbol() : "Trading"));
-        orderStage.setScene(new Scene(orderPanel, 1180, 780));
-        orderStage.setWidth(1180);
-        orderStage.setHeight(780);
-        orderStage.setMinWidth(1060);
-        orderStage.setMinHeight(720);
+        orderStage.setScene(new Scene(orderPanel, 460, 760));
+        orderStage.setWidth(460);
+        orderStage.setHeight(760);
+        orderStage.setMinWidth(420);
+        orderStage.setMinHeight(640);
         orderStage.setResizable(true);
         orderStage.show();
 
@@ -13396,13 +13597,14 @@ public class TradingDesk extends BorderPane {
                 .build();
     }
 
-    Stage stage = new Stage();
-
     private void showError(String s) {
 
-        AnchorPane rt = new AnchorPane(new Text(s));
+        StackPane rt = new StackPane(new Text(s));
         Scene sc = new Scene(rt, 400, 400);
         stage.setScene(sc);
         stage.show();
     }
+
+    private Stage stage;
+
 }

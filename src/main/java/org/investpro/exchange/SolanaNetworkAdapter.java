@@ -1,7 +1,9 @@
 package org.investpro.exchange;
 
+import lombok.Data;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.event.EventBusManager;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +37,7 @@ import java.util.concurrent.CompletableFuture;
  *   solana.maxRetries=3
  * </pre>
  */
+@Data
 public class SolanaNetworkAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(SolanaNetworkAdapter.class);
@@ -186,17 +189,11 @@ public class SolanaNetworkAdapter {
                 });
     }
 
-    // ── Service accessors ─────────────────────────────────────────────────────
 
-    public SolanaNetworkConfig      getConfig()         { return config; }
-    public SolanaWalletService      getWalletService()  { return walletService; }
-    public SolanaTokenService       getTokenService()   { return tokenService; }
-    public SolanaBalanceService     getBalanceService() { return balanceService; }
-    public SolanaTransactionService getTxService()      { return txService; }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static String safePrefix(String address) {
+    private static @NonNull String safePrefix(String address) {
         if (address == null || address.length() < 6) return "???";
         return address.substring(0, 6);
     }

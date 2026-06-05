@@ -5,6 +5,7 @@ import org.investpro.models.Account;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.MARKET_TYPES;
+import org.investpro.utils.ORDER_TYPES;
 import org.investpro.utils.Side;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +37,7 @@ class IbkrIntegrationTest {
 
         assertThat(mapper.toContract(pair, MARKET_TYPES.STOCKS).secType()).isEqualTo("CASH");
         assertThat(mapper.toContract(pair, MARKET_TYPES.FUTURES).secType()).isEqualTo("FUT");
-        assertThat(mapper.toContract(pair, MARKET_TYPES.STOP_LIMIT).secType()).isEqualTo("OPT");
+        assertThat(mapper.toContract(pair, ORDER_TYPES.STOP_LIMIT).secType()).isEqualTo("OPT");
     }
 
     @Test

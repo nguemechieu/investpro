@@ -227,12 +227,12 @@ public final class ExchangeFactory {
             case BITFINEX, BITFINEX_US -> new Bitfinex(credentials);
             case COINBASE -> new Coinbase(credentials);
             case INTERACTIVE_BROKERS -> new IbkrExchange(credentials);
+            case KRAKEN -> new Kraken(credentials);
             case OANDA -> new Oanda(credentials);
             case STELLAR_NETWORK -> new StellarNetwork(credentials);
             case SOLANA_NETWORK -> new SolanaNetwork(credentials);
             case POLONIEX -> throw new IllegalArgumentException("Poloniex adapter not implemented yet");
             case IG -> throw new IllegalArgumentException("IG adapter not implemented yet");
-            case KRAKEN -> throw new IllegalArgumentException("Kraken adapter not implemented yet");
             case BITTREX -> throw new IllegalArgumentException("Bittrex adapter not implemented yet");
             case BITMEX -> throw new IllegalArgumentException("Bitmex adapter not implemented yet");
             case KUCOIN, KUCOIN_US -> throw new IllegalArgumentException("Kucoin adapter not implemented yet");

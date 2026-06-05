@@ -11,6 +11,7 @@ public class IbkrConnectionPanel extends VBox {
 
     private final Label endpointLabel = new Label("Endpoint: -");
     private final Label statusLabel = new Label("Status: Disconnected");
+    private final Label authLabel = new Label("Auth: -");
     private final Label heartbeatLabel = new Label("Heartbeat: -");
 
     public IbkrConnectionPanel(IbkrExchange exchange) {
@@ -51,6 +52,7 @@ public class IbkrConnectionPanel extends VBox {
                 new Label("IBKR Connection Panel"),
                 endpointLabel,
                 statusLabel,
+            authLabel,
                 heartbeatLabel,
                 connectPaper,
                 connectLive,
@@ -68,6 +70,10 @@ public class IbkrConnectionPanel extends VBox {
         statusLabel.setText("Status: " + (health.connected() ? "Connected" : "Disconnected")
                 + ", MarketData=" + health.marketDataAvailable()
                 + ", Reconnects=" + health.reconnectAttempts());
+        String authStatus = exchange.getClientPortalClient().isAuthenticated()
+            ? "Ready"
+            : exchange.getClientPortalClient().authenticationFailureReason();
+        authLabel.setText("Auth: " + authStatus);
         heartbeatLabel.setText("Heartbeat latency=" + health.latencyMs() + "ms, stale=" + health.heartbeatStale());
     }
 }
