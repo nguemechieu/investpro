@@ -31,6 +31,31 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
     }
 
     private ExchangeCredentials resolveInteractiveBrokers() {
+        Map<String, String> params = new HashMap<>();
+        putIfPresent(params, "host", provider.getOrNull("IBKR_HOST"), provider.getOrNull("IBK_HOST"));
+        putIfPresent(params, "port", provider.getOrNull("IBKR_PORT"), provider.getOrNull("IBK_PORT"));
+        putIfPresent(params, "clientId", provider.getOrNull("IBKR_CLIENT_ID"), provider.getOrNull("IBK_CLIENT_ID"));
+        putIfPresent(params, "environment", provider.getOrNull("IBKR_ENVIRONMENT"), provider.getOrNull("IBK_ENVIRONMENT"));
+        putIfPresent(params, "authMode", provider.getOrNull("IBKR_AUTH_MODE"), provider.getOrNull("IBK_AUTH_MODE"));
+        putIfPresent(params, "clientPortalUrl",
+                provider.getOrNull("IBKR_CLIENT_PORTAL_URL"),
+                provider.getOrNull("IBK_CLIENT_PORTAL_URL"));
+        putIfPresent(params, "allowCompeteTakeover",
+                provider.getOrNull("IBKR_ALLOW_COMPETE_TAKEOVER"),
+                provider.getOrNull("IBK_ALLOW_COMPETE_TAKEOVER"));
+        putIfPresent(params, "username", provider.getOrNull("IBKR_USERNAME"), provider.getOrNull("IBK_USERNAME"));
+        putIfPresent(params, "password", provider.getOrNull("IBKR_PASSWORD"), provider.getOrNull("IBK_PASSWORD"));
+        putIfPresent(params, "twoFactorCode",
+                provider.getOrNull("IBKR_TWO_FACTOR_CODE"),
+                provider.getOrNull("IBK_TWO_FACTOR_CODE"));
+
+        String sandbox = firstPresent(
+                provider.getOrNull("IBKR_SANDBOX"),
+                provider.getOrNull("IBK_SANDBOX"));
+        String environment = firstPresent(
+                provider.getOrNull("IBKR_ENVIRONMENT"),
+                provider.getOrNull("IBK_ENVIRONMENT"));
+
         return new ExchangeCredentials(
                 "interactive_brokers",
                 firstPresent(provider.getOrNull("IBKR_API_KEY"), provider.getOrNull("IBK_API_KEY"),
@@ -42,8 +67,8 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
                 firstPresent(provider.getOrNull("IBKR_ACCESS_TOKEN"), provider.getOrNull("IBK_ACCESS_TOKEN"),
                         provider.getOrNull("IBKR_TWO_FACTOR_CODE"), provider.getOrNull("IBK_TWO_FACTOR_CODE")),
                 firstPresent(provider.getOrNull("IBKR_ACCOUNT_ID"), provider.getOrNull("IBK_ACCOUNT_ID")),
-                Boolean.parseBoolean(
-                        firstPresent(provider.getOrNull("IBKR_SANDBOX"), provider.getOrNull("IBK_SANDBOX"))));
+                isSandbox(sandbox, environment),
+                params);
     }
 
     private ExchangeCredentials resolveCoinbase() {
@@ -162,6 +187,28 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
             }
         }
         return null;
+    }
+
+    private void putIfPresent(Map<String, String> target, String key, String... values) {
+        String value = firstPresent(values);
+        if (value != null) {
+            target.put(key, value);
+            target.put(key.toLowerCase(Locale.ROOT), value);
+        }
+    }
+
+    private boolean isSandbox(String sandbox, String environment) {
+        if (sandbox != null && !sandbox.isBlank()) {
+            return Boolean.parseBoolean(sandbox.trim());
+        }
+        if (environment == null || environment.isBlank()) {
+            return false;
+        }
+        String normalized = environment.trim();
+        return "paper".equalsIgnoreCase(normalized)
+                || "sandbox".equalsIgnoreCase(normalized)
+                || "demo".equalsIgnoreCase(normalized)
+                || "practice".equalsIgnoreCase(normalized);
     }
 
     private boolean isPaperStellarNetwork(String network) {

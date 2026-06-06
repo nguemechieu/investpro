@@ -31,12 +31,26 @@ public class UiCredentialProvider implements CredentialProvider {
             String accountId,
             String tradingMode,
             String twoFactorCode) {
+        this(exchangeId, apiKey, apiSecret, accountId, tradingMode, twoFactorCode, Map.of());
+    }
+
+    public UiCredentialProvider(
+            String exchangeId,
+            String apiKey,
+            String apiSecret,
+            String accountId,
+            String tradingMode,
+            String twoFactorCode,
+            Map<String, String> exchangeParams) {
         String prefix = normalize(exchangeId);
 
         put(prefix + "_API_KEY", apiKey);
         put(prefix + "_API_SECRET", apiSecret);
         put(prefix + "_ACCOUNT_ID", accountId);
         put(prefix + "_TRADING_MODE", tradingMode);
+        if (exchangeParams != null) {
+            exchangeParams.forEach(this::put);
+        }
 
         switch (prefix) {
             case "coinbase" -> {
@@ -81,12 +95,25 @@ public class UiCredentialProvider implements CredentialProvider {
                 put("IBKR_USERNAME", apiKey);
                 put("IBKR_PASSWORD", apiSecret);
                 put("IBKR_TWO_FACTOR_CODE", twoFactorCode);
+                put("IBKR_AUTH_MODE", firstParam(exchangeParams, "IBKR_AUTH_MODE"));
+                put("IBKR_ENVIRONMENT", firstParam(exchangeParams, "IBKR_ENVIRONMENT"));
+                put("IBKR_SANDBOX", firstParam(exchangeParams, "IBKR_SANDBOX"));
+                put("IBKR_CLIENT_PORTAL_URL", firstParam(exchangeParams, "IBKR_CLIENT_PORTAL_URL"));
+                put("IBKR_HOST", firstParam(exchangeParams, "IBKR_HOST"));
+                put("IBKR_PORT", firstParam(exchangeParams, "IBKR_PORT"));
+                put("IBKR_PAPER_PORT", firstParam(exchangeParams, "IBKR_PAPER_PORT"));
+                put("IBKR_LIVE_PORT", firstParam(exchangeParams, "IBKR_LIVE_PORT"));
+                put("IBKR_CLIENT_ID", firstParam(exchangeParams, "IBKR_CLIENT_ID"));
                 put("IBK_API_KEY", apiKey);
                 put("IBK_API_SECRET", apiSecret);
                 put("IBK_ACCOUNT_ID", accountId);
                 put("IBK_USERNAME", apiKey);
                 put("IBK_PASSWORD", apiSecret);
                 put("IBK_TWO_FACTOR_CODE", twoFactorCode);
+                put("IBK_AUTH_MODE", firstParam(exchangeParams, "IBK_AUTH_MODE"));
+                put("IBK_HOST", firstParam(exchangeParams, "IBK_HOST"));
+                put("IBK_PORT", firstParam(exchangeParams, "IBK_PORT"));
+                put("IBK_CLIENT_ID", firstParam(exchangeParams, "IBK_CLIENT_ID"));
             }
 
             case "stellar_network", "stellar" -> {
@@ -116,6 +143,14 @@ public class UiCredentialProvider implements CredentialProvider {
         if (key != null && value != null && !value.isBlank()) {
             values.put(key, value.trim());
         }
+    }
+
+    private String firstParam(Map<String, String> source, String key) {
+        if (source == null || key == null) {
+            return null;
+        }
+        String value = source.get(key);
+        return value == null || value.isBlank() ? null : value;
     }
 
     private String normalize(String value) {

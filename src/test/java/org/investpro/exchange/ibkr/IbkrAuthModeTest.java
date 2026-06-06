@@ -104,6 +104,47 @@ class IbkrAuthModeTest {
     }
 
     @Test
+    void clientPortalModeUsesExchangeCredentialParams() throws Exception {
+        try (MockIbkrGateway gateway = new MockIbkrGateway()) {
+            gateway.endpoint("/v1/api/iserver/auth/status",
+                    "{\"authenticated\":true,\"connected\":true,\"competing\":false}");
+            gateway.endpoint("/v1/api/iserver/auth/ssodh/init", "{\"ok\":true}");
+            gateway.endpoint("/v1/api/tickle", "{\"session\":\"alive\"}");
+            gateway.endpoint("/v1/api/portfolio/" + TEST_ACCOUNT_ID + "/summary",
+                    """
+                            {
+                              "NetLiquidation": "101000.00",
+                              "AvailableFunds": "82000.00",
+                              "MaintMarginReq": "10000.00",
+                              "BuyingPower": "180000.00"
+                            }
+                            """);
+            gateway.start();
+
+            ExchangeCredentials credentials = new ExchangeCredentials(
+                    "interactive_brokers",
+                    TEST_USERNAME,
+                    TEST_PASSWORD,
+                    null,
+                    null,
+                    null,
+                    TEST_ACCOUNT_ID,
+                    false,
+                    Map.of(
+                            "authMode", "client-portal",
+                            "clientPortalUrl", gateway.baseUrl()));
+            IbkrExchange exchange = new IbkrExchange(credentials);
+            exchange.setUserSelectedTradingMode("LIVE");
+            exchange.connect();
+
+            Account account = exchange.fetchAccount().join();
+
+            assertThat(account.getAccountId()).isEqualTo(TEST_ACCOUNT_ID);
+            assertThat(gateway.hitCount("/v1/api/iserver/auth/status")).isGreaterThanOrEqualTo(1);
+        }
+    }
+
+    @Test
     void clientPortalAuthenticationFailureBlocksAccountFetch() throws Exception {
         try (MockIbkrGateway gateway = new MockIbkrGateway()) {
             gateway.endpoint("/v1/api/iserver/auth/status",

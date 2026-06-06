@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -94,6 +95,30 @@ class IbkrIntegrationTest {
 
         assertThat(health.connected()).isTrue();
         assertThat(health.reconnectAttempts()).isGreaterThanOrEqualTo(0);
+    }
+
+    @Test
+    void connectionUsesEndpointParamsFromExchangeCredentials() {
+        ExchangeCredentials credentials = new ExchangeCredentials(
+                "interactive_brokers",
+                "paper-key",
+                "paper-secret",
+                null,
+                null,
+                null,
+                "DU123456",
+                true,
+                Map.of(
+                        "host", "192.0.2.10",
+                        "port", "7497",
+                        "clientId", "42"));
+
+        IbkrExchange exchange = new IbkrExchange(credentials);
+        exchange.connect();
+
+        assertThat(exchange.getConnectionManager().getHost()).isEqualTo("192.0.2.10");
+        assertThat(exchange.getConnectionManager().getPort()).isEqualTo(7497);
+        assertThat(exchange.getConnectionManager().getClientId()).isEqualTo(42);
     }
 
     @Test

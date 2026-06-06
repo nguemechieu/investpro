@@ -63,6 +63,7 @@ import org.investpro.exchange.*;
 import org.investpro.exchange.contracts.CredentialProvider;
 import org.investpro.exchange.factory.ExchangeFactory;
 import org.investpro.exchange.ibkr.IbkrExchange;
+import org.investpro.exchange.ibkr.IbkrSessionState;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.exchange.services.ExchangeService;
 import org.investpro.exchange.blockchain.execution.ArbitrumExecutionProvider;
@@ -115,6 +116,7 @@ import org.investpro.ui.docking.DockableChartPanel;
 import org.investpro.ui.docking.DockManager;
 import org.investpro.ui.docking.DockRegionType;
 import org.investpro.ui.docking.SimpleDockablePane;
+import org.investpro.ui.ibkr.IbkrContractSearchController;
 import org.investpro.ui.modules.IndicatorDialogModule;
 import org.investpro.ui.operations.SystemOperationsBoard;
 import org.investpro.ui.panels.*;
@@ -259,6 +261,7 @@ public class TradingDesk extends BorderPane {
             () -> withActiveChart(CandleStickChart::fitChart),
             () -> withActiveChart(CandleStickChart::refreshChart),
             () -> withActiveChart(CandleStickChart::toggleCrosshair),
+            this::detachActiveChartTab,
             this::closeAllCharts,
             this::updateOrderBookForChartTab,
             this::updateChartHeader);
@@ -429,10 +432,7 @@ public class TradingDesk extends BorderPane {
     private BacktestReportPanel backtestReportPanel;
     private org.investpro.ui.panels.ThemeCustomizationPanel themeCustomizationPanel;
     private IbkrConnectionPanel ibkrConnectionPanel;
-    private IbkrAccountSummaryPanel ibkrAccountSummaryPanel;
-    private IbkrPortfolioPanel ibkrPortfolioPanel;
-    private IbkrOpenPositionsPanel ibkrOpenPositionsPanel;
-    private IbkrOpenOrdersPanel ibkrOpenOrdersPanel;
+    private boolean ibkrDeskBlocked;
     private MarketWatchPanel symbolAgentMarketWatch; // Symbol-level trading status (from SymbolAgentManager)
     private Navigation navigationPanel; // Exchange navigator
     private DataWindow dataWindow; // Data window for OHLCV display
@@ -441,6 +441,7 @@ public class TradingDesk extends BorderPane {
 
     // Track open independent windows to prevent duplicate Scene root assignments
     private final Map<String, Stage> openIndependentWindows = new java.util.HashMap<>();
+    private final Map<String, DetachedChartWindow> detachedChartWindows = new java.util.HashMap<>();
 
     private record BrokerSession(Exchange exchange, boolean accessGranted, Account account) {
     }
@@ -449,6 +450,22 @@ public class TradingDesk extends BorderPane {
     }
 
     private record AssetBalanceRow(String asset, double balance, double equity, double margin, double freeMargin) {
+    }
+
+    private static final class DetachedChartWindow {
+        private final String title;
+        private final Tab originalTab;
+        private final Tab floatingTab;
+        private final Stage stage;
+        private boolean closingForReattach;
+        private boolean closingForDispose;
+
+        private DetachedChartWindow(String title, Tab originalTab, Tab floatingTab, Stage stage) {
+            this.title = title;
+            this.originalTab = originalTab;
+            this.floatingTab = floatingTab;
+            this.stage = stage;
+        }
     }
 
     public TradingDesk(
@@ -474,6 +491,7 @@ public class TradingDesk extends BorderPane {
 
         // Initialize MarketDataEngine (central market data cache and services)
         this.marketDataEngine = new MarketDataEngine();
+        org.investpro.asset.AssetCatalogRuntime.addListener(this::onAssetCatalogChanged);
         initializeBlockchainExecutionInfrastructure();
 
         // Wire ExchangeService to SystemOperationsService for monitoring
@@ -549,11 +567,15 @@ public class TradingDesk extends BorderPane {
 
         setupKeyboardShortcuts();
         createInitialExchange(configuration);
-        loadSymbolsForSelectedExchange();
+        refreshIbkrDeskGate();
+        if (!ibkrDeskBlocked) {
+            loadSymbolsForSelectedExchange();
+        }
         // Candlestick charts now open only on user request, not automatically
 
-        if (hasExchangeCredentials(exchangeSelector.getSelectionModel().getSelectedItem())
-                || hasConfiguredCredentials()) {
+        if (!ibkrDeskBlocked
+                && (hasExchangeCredentials(exchangeSelector.getSelectionModel().getSelectedItem())
+                        || hasConfiguredCredentials())) {
             proceedWithConnection();
         }
 
@@ -780,11 +802,7 @@ public class TradingDesk extends BorderPane {
                 menuItem("Performance Metrics", null, this::showSystemMetrics),
                 menuItem("Resource Monitor", null, this::showResourceMonitor),
                 new SeparatorMenuItem(),
-                menuItem("IBKR Connection Panel", null, this::openIbkrConnectionPanel),
-                menuItem("IBKR Account Summary", null, this::openIbkrAccountSummaryPanel),
-                menuItem("IBKR Portfolio", null, this::openIbkrPortfolioPanel),
-                menuItem("IBKR Open Positions", null, this::openIbkrOpenPositionsPanel),
-                menuItem("IBKR Open Orders", null, this::openIbkrOpenOrdersPanel));
+                menuItem("IBKR Control Panel", null, this::openIbkrConnectionPanel));
 
         // ── Education ────────────────────────────────────────────────────────
         Menu educationMenu = new Menu("Education");
@@ -877,10 +895,6 @@ public class TradingDesk extends BorderPane {
                 case "analysis" -> openAnalysis();
                 case "backtesting" -> openBacktesting();
                 case "ibkr-connection" -> openIbkrConnectionPanel();
-                case "ibkr-account-summary" -> openIbkrAccountSummaryPanel();
-                case "ibkr-portfolio" -> openIbkrPortfolioPanel();
-                case "ibkr-open-positions" -> openIbkrOpenPositionsPanel();
-                case "ibkr-open-orders" -> openIbkrOpenOrdersPanel();
                 case "settings" -> openSettingsPanel();
                 case "theme-customization" -> openThemeCustomization();
                 default -> log.warn("No TradingDesk panel action registered for id: {}", panelId);
@@ -1684,6 +1698,89 @@ public class TradingDesk extends BorderPane {
         return mainVerticalWorkbench;
     }
 
+    private void refreshIbkrDeskGate() {
+        if (!isActiveSelectionInteractiveBrokers()) {
+            if (ibkrDeskBlocked) {
+                ibkrDeskBlocked = false;
+                setCenter(createMainWorkbench());
+            }
+            return;
+        }
+
+        if (isIbkrSessionReady()) {
+            if (ibkrDeskBlocked) {
+                ibkrDeskBlocked = false;
+                setCenter(createMainWorkbench());
+            }
+            return;
+        }
+
+        ibkrDeskBlocked = true;
+        setCenter(createIbkrConnectionRequiredView());
+    }
+
+    private boolean isActiveSelectionInteractiveBrokers() {
+        return isInteractiveBrokersExchange(normalizeExchangeName(exchangeSelector.getSelectionModel().getSelectedItem()));
+    }
+
+    private boolean isIbkrSessionReady() {
+        if (!(exchange instanceof IbkrExchange ibkrExchange)) {
+            return false;
+        }
+        IbkrSessionState state = ibkrExchange.ibkrSessionState();
+        return state != null && state.connectionSuccessful();
+    }
+
+    private Node createIbkrConnectionRequiredView() {
+        VBox instructions = new VBox(14);
+        instructions.setPadding(new Insets(34));
+        instructions.setAlignment(Pos.TOP_LEFT);
+        instructions.getStyleClass().addAll("pro-panel", "mt5-panel");
+
+        Label title = new Label("IBKR Gateway Connection Required");
+        title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold;");
+
+        Label summary = new Label(ibkrBlockingMessage());
+        summary.setWrapText(true);
+        summary.setStyle("-fx-font-size: 13px;");
+
+        Label steps = new Label("""
+                1. Start TWS, IB Gateway, or Client Portal Gateway.
+                2. Sign in and complete IBKR two-factor authentication in IBKR-approved software.
+                3. Enable API socket access in TWS/Gateway when using the TWS API path.
+                4. Return to InvestPro and connect from the IBKR Control Panel.
+                """);
+        steps.setWrapText(true);
+        steps.setStyle("-fx-font-size: 12px;");
+
+        Button openControlPanel = new Button("Open IBKR Control Panel");
+        openControlPanel.getStyleClass().add("primary-button");
+        openControlPanel.setOnAction(event -> openIbkrConnectionPanel());
+
+        instructions.getChildren().setAll(title, summary, steps, openControlPanel);
+        return new StackPane(instructions);
+    }
+
+    private String ibkrBlockingMessage() {
+        if (!(exchange instanceof IbkrExchange ibkrExchange)) {
+            return "Interactive Brokers is selected, but the InvestPro IBKR adapter is not initialized.";
+        }
+        IbkrSessionState state = ibkrExchange.ibkrSessionState();
+        if (state == null) {
+            return "Interactive Brokers is selected, but no IBKR connection state is available.";
+        }
+        if (!state.socketConnected()) {
+            return "InvestPro cannot reach an active IBKR Gateway/TWS/Client Portal session. " + state.message();
+        }
+        if (!state.apiReady()) {
+            return "IBKR accepted the socket connection, but the API is not ready yet. " + state.message();
+        }
+        if (!state.managedAccountsReceived()) {
+            return "IBKR is connected, but no managed account was received. Check account permissions and API settings.";
+        }
+        return state.message();
+    }
+
     private SplitPane createDockedWorkbench() {
         // Keep references so existing actions can target the same modules.
         systemConsole = createTradingConsoleSurface();
@@ -1744,11 +1841,28 @@ public class TradingDesk extends BorderPane {
                 "Refresh market watch symbols");
         refreshButton.setOnAction(event -> refreshMarketWatchSymbols());
 
+        Button addTrustlineButton = marketWatchActionButton("Trustline", "/img/add.png",
+                "Add Stellar trustline asset");
+        addTrustlineButton.setOnAction(event -> showAddStellarTrustlineAssetDialog());
+        addTrustlineButton.setVisible(isStellarExchangeSelected());
+        addTrustlineButton.managedProperty().bind(addTrustlineButton.visibleProperty());
+
+        Button resolveIbkrButton = marketWatchActionButton("Resolve", "/img/search.png",
+                "Search and resolve an IBKR contract");
+        resolveIbkrButton.setOnAction(event -> showIbkrContractSearchDialog());
+        resolveIbkrButton.setVisible(exchange instanceof IbkrExchange);
+        resolveIbkrButton.managedProperty().bind(resolveIbkrButton.visibleProperty());
+        exchangeSelector.valueProperty().addListener((obs, oldValue, newValue) ->
+                addTrustlineButton.setVisible(isStellarExchangeSelected()));
+        exchangeSelector.valueProperty().addListener((obs, oldValue, newValue) ->
+                resolveIbkrButton.setVisible(exchange instanceof IbkrExchange));
+
         Button detachButton = marketWatchActionButton("Detach", "/img/expand-solid.png", "Detach market watch");
         detachButton.setOnAction(event -> detachMarketWatch());
 
         Button closeButton = createCloseButton(this::toggleMarketWatchVisibility);
-        HBox header = createPanelHeader("Market Watch", count, openSelectedButton, refreshButton, detachButton,
+        HBox header = createPanelHeader("Market Watch", count, openSelectedButton, refreshButton, addTrustlineButton,
+                resolveIbkrButton, detachButton,
                 closeButton);
 
         configureMarketWatchFilterSelector();
@@ -1785,6 +1899,14 @@ public class TradingDesk extends BorderPane {
                 "Refresh market watch symbols");
         refreshButton.setOnAction(event -> refreshMarketWatchSymbols());
 
+        Button resolveIbkrButton = marketWatchActionButton("Resolve", "/img/search.png",
+                "Search and resolve an IBKR contract");
+        resolveIbkrButton.setOnAction(event -> showIbkrContractSearchDialog());
+        resolveIbkrButton.setVisible(exchange instanceof IbkrExchange);
+        resolveIbkrButton.managedProperty().bind(resolveIbkrButton.visibleProperty());
+        exchangeSelector.valueProperty().addListener((obs, oldValue, newValue) ->
+                resolveIbkrButton.setVisible(exchange instanceof IbkrExchange));
+
         Button detachButton = marketWatchActionButton("Detach", "/img/expand-solid.png", "Detach market watch");
         detachButton.setOnAction(event -> detachMarketWatch());
 
@@ -1794,7 +1916,8 @@ public class TradingDesk extends BorderPane {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox header = new HBox(8, title, count, spacer, openSelectedButton, refreshButton, detachButton, closeButton);
+        HBox header = new HBox(8, title, count, spacer, openSelectedButton, refreshButton, resolveIbkrButton,
+                detachButton, closeButton);
         header.setAlignment(Pos.CENTER_LEFT);
         header.getStyleClass().add("panel-header");
 
@@ -2414,47 +2537,73 @@ public class TradingDesk extends BorderPane {
     }
 
     private @NotNull Node createIbkrWorkspaceView(@NotNull IbkrExchange ibkrExchange) {
-        TabPane ibkrTabs = new TabPane();
-        ibkrTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-
-        ibkrConnectionPanel = new IbkrConnectionPanel(ibkrExchange);
-        ibkrAccountSummaryPanel = new IbkrAccountSummaryPanel(ibkrExchange);
-        ibkrPortfolioPanel = new IbkrPortfolioPanel(ibkrExchange);
-        ibkrOpenPositionsPanel = new IbkrOpenPositionsPanel(ibkrExchange);
-        ibkrOpenOrdersPanel = new IbkrOpenOrdersPanel(ibkrExchange);
-
-        ibkrTabs.getTabs().setAll(
-                new Tab("Connection", ibkrConnectionPanel),
-                new Tab("Account", ibkrAccountSummaryPanel),
-                new Tab("Portfolio", ibkrPortfolioPanel),
-                new Tab("Positions", ibkrOpenPositionsPanel),
-                new Tab("Orders", ibkrOpenOrdersPanel));
-        return ibkrTabs;
+        ibkrConnectionPanel = new IbkrConnectionPanel(ibkrExchange, this::onIbkrControlPanelStateChanged);
+        return ibkrConnectionPanel;
     }
 
     private void openIbkrConnectionPanel() {
-        withCurrentIbkrExchange("IBKR Connection",
-                ibkr -> createIndependentWindow("IBKR Connection Panel", new IbkrConnectionPanel(ibkr), 560, 460));
+        String selectedExchange = normalizeExchangeName(exchangeSelector.getSelectionModel().getSelectedItem());
+        if (!(exchange instanceof IbkrExchange) && isInteractiveBrokersExchange(selectedExchange)) {
+            openIbkrSetupWizardForSelection(selectedExchange);
+            return;
+        }
+        withCurrentIbkrExchange("IBKR Control Panel",
+                ibkr -> createIndependentWindow("IBKR Control Panel",
+                        new IbkrConnectionPanel(ibkr, this::onIbkrControlPanelStateChanged),
+                        760,
+                        760));
     }
 
-    private void openIbkrAccountSummaryPanel() {
-        withCurrentIbkrExchange("IBKR Account",
-                ibkr -> createIndependentWindow("IBKR Account Summary", new IbkrAccountSummaryPanel(ibkr), 560, 460));
+    private void openIbkrSetupWizardForSelection(String selectedExchange) {
+        String normalizedExchange = normalizeExchangeName(selectedExchange);
+        if (!isInteractiveBrokersExchange(normalizedExchange)) {
+            return;
+        }
+
+        if (!(exchange instanceof IbkrExchange) || !Objects.equals(activeExchangeName(), normalizedExchange)) {
+            exchange = createExchange(normalizedExchange, "", "", "", configuredTradingMode);
+            if (exchange != null && configuredTradingMode != null && !configuredTradingMode.isBlank()) {
+                exchange.setUserSelectedTradingMode(configuredTradingMode);
+            }
+        }
+
+        if (exchange instanceof IbkrExchange ibkrExchange) {
+            createIndependentWindow("IBKR Control Panel",
+                    new IbkrConnectionPanel(ibkrExchange, this::onIbkrControlPanelStateChanged),
+                    760,
+                    760);
+            journal("Opened IBKR Control Panel. InvestPro does not ask for or store IBKR passwords.");
+        } else {
+            showWarning("IBKR Setup", "Interactive Brokers adapter is not available.");
+        }
     }
 
-    private void openIbkrPortfolioPanel() {
-        withCurrentIbkrExchange("IBKR Portfolio",
-                ibkr -> createIndependentWindow("IBKR Portfolio", new IbkrPortfolioPanel(ibkr), 560, 460));
-    }
+    private void onIbkrControlPanelStateChanged() {
+        if (!(exchange instanceof IbkrExchange ibkrExchange)) {
+            refreshIbkrDeskGate();
+            return;
+        }
 
-    private void openIbkrOpenPositionsPanel() {
-        withCurrentIbkrExchange("IBKR Positions",
-                ibkr -> createIndependentWindow("IBKR Open Positions", new IbkrOpenPositionsPanel(ibkr), 760, 520));
-    }
+        IbkrSessionState state = ibkrExchange.ibkrSessionState();
+        if (state == null || !state.connectionSuccessful()) {
+            brokerAccessGranted = false;
+            refreshIbkrDeskGate();
+            updateConnectionStatus();
+            journal(ibkrBlockingMessage());
+            return;
+        }
 
-    private void openIbkrOpenOrdersPanel() {
-        withCurrentIbkrExchange("IBKR Orders",
-                ibkr -> createIndependentWindow("IBKR Open Orders", new IbkrOpenOrdersPanel(ibkr), 760, 520));
+        connectButton.setDisable(true);
+        connectButton.setText(t("toolbar.validating"));
+        ibkrExchange.fetchAccount()
+                .thenAccept(account -> runOnFx(() -> completeConnectionValidation(account)))
+                .exceptionally(error -> {
+                    runOnFx(() -> {
+                        refreshIbkrDeskGate();
+                        rejectConnectionValidation(error);
+                    });
+                    return null;
+                });
     }
 
     private void withCurrentIbkrExchange(String panelName, Consumer<IbkrExchange> action) {
@@ -2995,6 +3144,10 @@ public class TradingDesk extends BorderPane {
         crosshairButton.getStyleClass().add("terminal-button");
         crosshairButton.setOnAction(event -> withActiveChart(CandleStickChart::toggleCrosshair));
 
+        Button detachButton = new Button("Detach");
+        detachButton.getStyleClass().add("terminal-button");
+        detachButton.setOnAction(event -> detachActiveChartTab());
+
         Button closeAllButton = new Button("Close All");
         closeAllButton.getStyleClass().add("terminal-button");
         closeAllButton.setOnAction(event -> closeAllCharts());
@@ -3010,6 +3163,7 @@ public class TradingDesk extends BorderPane {
                 fitButton,
                 refreshButton,
                 crosshairButton,
+                detachButton,
                 closeAllButton);
         headerActions.setAlignment(Pos.CENTER_RIGHT);
         headerActions.getStyleClass().add("workspace-header-actions");
@@ -5580,6 +5734,16 @@ public class TradingDesk extends BorderPane {
                 chart.refreshChart();
             }
         });
+        detachedChartWindows.values().forEach(window -> {
+            if (window.floatingTab.getContent() instanceof ChartContainer container) {
+                Integer seconds = org.investpro.utils.CandleAggregator.TIMEFRAME_SECONDS.get(timeframe);
+                if (seconds != null && seconds > 0) {
+                    container.setSecondsPerCandle(seconds);
+                }
+            } else if (window.floatingTab.getContent() instanceof CandleStickChart chart) {
+                chart.refreshChart();
+            }
+        });
     }
 
     private void configureButtons() {
@@ -5759,6 +5923,17 @@ public class TradingDesk extends BorderPane {
         positionHealthItems.clear();
         accountSummaryArea.clear();
 
+        refreshIbkrDeskGate();
+        if (ibkrDeskBlocked) {
+            updateConnectionStatus();
+            updateExchangeVenueLabel();
+            refreshOrderTypeOptions();
+            journal("Exchange changed to %s. IBKR Control Panel must connect before Trading Desk opens."
+                    .formatted(selectedExchange));
+            saveAppState();
+            return;
+        }
+
         loadSymbolsForSelectedExchange();
         updateConnectionStatus();
         updateExchangeVenueLabel();
@@ -5803,7 +5978,11 @@ public class TradingDesk extends BorderPane {
             refreshAccountWorkspace();
         } else {
             // Exchange not connected — always prompt for credentials and trading venue
-            showExchangeCredentialDialog(selectedExchange);
+            if (isInteractiveBrokersExchange(selectedExchange)) {
+                openIbkrSetupWizardForSelection(selectedExchange);
+            } else {
+                showExchangeCredentialDialog(selectedExchange);
+            }
         }
     }
 
@@ -5812,6 +5991,11 @@ public class TradingDesk extends BorderPane {
 
         if (selectedExchange.isBlank()) {
             showWarning("Connection", "No exchange selected.");
+            return;
+        }
+
+        if (isInteractiveBrokersExchange(selectedExchange)) {
+            openIbkrSetupWizardForSelection(selectedExchange);
             return;
         }
 
@@ -5973,6 +6157,7 @@ public class TradingDesk extends BorderPane {
 
         brokerAccessGranted = true;
         brokerSessions.put(brokerSessionKey(exchangeSelector.getValue()), new BrokerSession(exchange, true, account));
+        refreshIbkrDeskGate();
 
         // Bootstrap instruments into MarketDataEngine
         bootstrapInstrumentsForExchange();
@@ -6142,6 +6327,7 @@ public class TradingDesk extends BorderPane {
 
         accountSummaryArea.setText("Broker access blocked. Check credentials and try again.");
         updateConnectionStatus();
+        refreshIbkrDeskGate();
 
         log.warn("Broker credential validation failed for {}: {}", exchangeSelector.getValue(), rootMessage(throwable));
         showWarning(
@@ -6236,7 +6422,7 @@ public class TradingDesk extends BorderPane {
             default -> OpenOrder.OrderType.TRAILING_STOP;
         };
 
-        if (!canSubmitOrderByTradability(tradePair, mappedOrderType)) {
+        if (!canSubmitOrderByTradability(tradePair, mappedOrderType, amount)) {
             return;
         }
 
@@ -6404,6 +6590,13 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
+        if (exchange instanceof IbkrExchange ibkrExchange && ibkrExchange.cachedContract(tradePair).isEmpty()) {
+            journal("Resolve %s as an IBKR contract before requesting order book or market data."
+                    .formatted(tradePair.toString('/')));
+            runOnFx(() -> orderBookSymbolLabel.setText(tradePair.toString('/') + " - resolve IBKR contract"));
+            return;
+        }
+
         activeOrderBookPair = tradePair;
         runOnFx(() -> orderBookSymbolLabel.setText(tradePair.toString('/')));
         // DO NOT clear orderbook data - keep displaying previous data while fetching
@@ -6415,7 +6608,15 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        exchange.fetchOrderBook(tradePair)
+        CompletableFuture<OrderBook> orderBookFuture;
+        try {
+            orderBookFuture = exchange.fetchOrderBook(tradePair);
+        } catch (IllegalStateException exception) {
+            journal(rootMessage(exception));
+            return;
+        }
+
+        orderBookFuture
                 .thenAccept(orderBook -> {
                     if (Objects.equals(activeOrderBookPair, tradePair)) {
                         displayOrderBook(orderBook);
@@ -7071,10 +7272,10 @@ public class TradingDesk extends BorderPane {
         if (status == null || status.status() == null) {
             return false;
         }
-        return switch (status.status()) {
-            case FULLY_TRADABLE, LIMIT_ONLY, POST_ONLY, AUCTION_ONLY -> true;
-            default -> false;
-        };
+        return status.status() == org.investpro.trading.tradability.TradabilityStatus.FULLY_TRADABLE
+                || status.status() == org.investpro.trading.tradability.TradabilityStatus.LIMIT_ONLY
+                || status.status() == org.investpro.trading.tradability.TradabilityStatus.POST_ONLY
+                || status.status() == org.investpro.trading.tradability.TradabilityStatus.AUCTION_ONLY;
     }
 
     private String summarizeExceptionForLog(Throwable throwable) {
@@ -7362,6 +7563,9 @@ public class TradingDesk extends BorderPane {
         }
 
         if (filter == MarketWatchTradabilityFilter.TRADABLE_ONLY) {
+            if (isStellarTrustedIssuerMarketWatchPair(status)) {
+                return true;
+            }
             return status.isFullyTradable();
         }
         if (filter == MarketWatchTradabilityFilter.MARKET_DATA_ONLY
@@ -7372,6 +7576,16 @@ public class TradingDesk extends BorderPane {
             return !status.isFullyTradable();
         }
         return true;
+    }
+
+    private boolean isStellarTrustedIssuerMarketWatchPair(SymbolTradability status) {
+        if (status == null || status.rawMetadata() == null) {
+            return false;
+        }
+        Object trustedIssuerPair = status.rawMetadata().get("stellar.trustedIssuerPair");
+        return "stellar".equalsIgnoreCase(status.exchangeId())
+                && Boolean.parseBoolean(String.valueOf(trustedIssuerPair))
+                && status.canBeDisplayedInMarketWatch();
     }
 
     private void applyCurrentMarketWatchFilter() {
@@ -7420,7 +7634,7 @@ public class TradingDesk extends BorderPane {
         }
     }
 
-    private boolean canSubmitOrderByTradability(TradePair pair, OpenOrder.OrderType orderType) {
+    private boolean canSubmitOrderByTradability(TradePair pair, OpenOrder.OrderType orderType, double amount) {
         SymbolTradability status = fetchTradabilityForOrder(pair);
         if (status == null) {
             showWarning("Order Blocked", "Tradability could not be verified for %s."
@@ -7448,6 +7662,30 @@ public class TradingDesk extends BorderPane {
             return false;
         }
 
+        org.investpro.asset.TradabilityService localTradabilityService = new org.investpro.asset.TradabilityService(
+                new org.investpro.asset.SqliteLocalAssetRepository(java.nio.file.Path.of("data", "asset-catalog.db")));
+        org.investpro.asset.ExchangeId exchangeId = org.investpro.asset.AssetCatalogService.exchangeId(exchange);
+        boolean stellarTrustlineExists = Boolean.parseBoolean(
+                String.valueOf(metadataValue(status, "stellar.trustlineExists", "false")));
+        org.investpro.asset.OrderTradabilityDecision catalogDecision = localTradabilityService.validateOrder(
+                new org.investpro.asset.OrderTradabilityRequest(
+                        exchangeId,
+                        pair == null ? "" : pair.toString('/'),
+                        orderType,
+                        java.math.BigDecimal.valueOf(amount),
+                        exchange != null && !exchange.isPaperTrading(),
+                        exchange != null && Boolean.TRUE.equals(exchange.isConnected()),
+                        Boolean.parseBoolean(String.valueOf(metadataValue(status, "session.orderSubmissionOpen",
+                                status.orderSubmissionAllowed())))),
+                status,
+                stellarTrustlineExists);
+        if (!catalogDecision.allowed()) {
+            showWarning("Order Blocked", catalogDecision.reason());
+            journal("Trade blocked by local asset catalog: " + catalogDecision.reason());
+            log.warn("Order blocked by local asset catalog. {}", buildTradabilityDiagnostics(pair, status, orderType));
+            return false;
+        }
+
         return true;
     }
 
@@ -7462,6 +7700,7 @@ public class TradingDesk extends BorderPane {
 
         return "symbol=" + symbol
                 + ", exchange=" + exchangeName
+                + ", assetClass=" + inferTradabilityAssetClass(pair, status)
                 + ", connected=" + (exchange != null && Boolean.TRUE.equals(exchange.isConnected()))
                 + ", mode=" + (exchange == null ? "-" : exchange.getResolvedTradingMode())
                 + ", paper=" + (exchange != null && exchange.isPaperTrading())
@@ -7469,11 +7708,66 @@ public class TradingDesk extends BorderPane {
                 + ", supportsPaper=" + (exchange != null && exchange.supportsPaperTradingMode())
                 + ", canSubmitLiveOrders=" + (exchange != null && exchange.canSubmitLiveOrders())
                 + ", canSubmitOrders=" + (exchange != null && exchange.canSubmitOrders())
+                + ", productStatus=" + (status == null ? "UNKNOWN" : status.status())
+                + ", accountPermission=" + metadataValue(status, "accountPermission", exchange != null && exchange.canSubmitOrders())
                 + ", requestedOrderType=" + (orderType == null ? "-" : orderType)
+                + ", typeAllowed=" + typeAllowance
+                + ", requiresActiveSession=" + metadataValue(status, "requiresActiveSession", "unknown")
+                + ", sessionState.orderSubmissionOpen=" + metadataValue(status, "session.orderSubmissionOpen", "unknown")
+                + ", orderSubmissionAllowed=" + (status != null && status.orderSubmissionAllowed())
+                + ", finalTradable=" + (status != null && status.orderSubmissionAllowed() && "true".equals(typeAllowance))
                 + ", status=" + (status == null ? "UNKNOWN" : status.status())
                 + ", reason=" + (status == null ? "unavailable" : safe(status.reason()))
-                + ", orderSubmissionAllowed=" + (status != null && status.orderSubmissionAllowed())
-                + ", typeAllowed=" + typeAllowance;
+                + ", sessionReason=" + metadataValue(status, "session.reason", "");
+    }
+
+    private Object metadataValue(SymbolTradability status, String key, Object fallback) {
+        if (status == null || status.rawMetadata() == null) {
+            return fallback;
+        }
+        Object value = status.rawMetadata().get(key);
+        return value == null ? fallback : value;
+    }
+
+    private String inferTradabilityAssetClass(TradePair pair, SymbolTradability status) {
+        Object productType = metadataValue(status, "product_type", "");
+        if (productType != null && !productType.toString().isBlank()) {
+            String text = productType.toString().toUpperCase(java.util.Locale.ROOT);
+            if (text.contains("SPOT") || text.contains("CRYPTO")) {
+                return "CRYPTO";
+            }
+            if (text.contains("FUTURE") || text.contains("PERPETUAL")) {
+                return "FUTURE";
+            }
+        }
+        if (exchange != null && exchange.getExchangeId() != null
+                && exchange.getExchangeId().toLowerCase(java.util.Locale.ROOT).contains("stellar")) {
+            return "CRYPTO_STELLAR";
+        }
+        if (exchange != null && exchange.getExchangeId() != null
+                && exchange.getExchangeId().toLowerCase(java.util.Locale.ROOT).contains("oanda")) {
+            return "FOREX";
+        }
+        if (pair == null) {
+            return "UNKNOWN";
+        }
+        String base = pair.getBaseCode();
+        String quote = pair.getCounterCode();
+        if (isCryptoDiagnosticCode(base) || isCryptoDiagnosticCode(quote)) {
+            return "CRYPTO";
+        }
+        if (base != null && quote != null && base.length() == 3 && quote.length() == 3) {
+            return "FOREX";
+        }
+        return "UNKNOWN";
+    }
+
+    private boolean isCryptoDiagnosticCode(String code) {
+        return switch (code == null ? "" : code.toUpperCase(java.util.Locale.ROOT)) {
+            case "BTC", "ETH", "SOL", "XLM", "XRP", "USDC", "USDT", "DAI", "LTC", "BCH", "DOGE", "ADA", "AVAX",
+                    "1INCH" -> true;
+            default -> false;
+        };
     }
 
     private boolean isTradabilityAllowedForOrderType(SymbolTradability status, OpenOrder.OrderType orderType) {
@@ -7543,48 +7837,25 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        ensureTradabilityService();
-
-        List<TradePair> tradePairs;
-        try {
-            // Prefer ExchangeInstrumentService (cached, async-safe) when available.
-            org.investpro.trading.tradability.ExchangeInstrumentService instrSvc = exchange.instrumentService();
-            if (instrSvc != null) {
-                try {
-                    tradePairs = instrSvc.getTradeablePairs().get(10, java.util.concurrent.TimeUnit.SECONDS);
-                } catch (Exception instrEx) {
-                    log.warn("InstrumentService failed for {}; falling back to getTradePairSymbol: {}",
-                            exchange.getDisplayName(), rootMessage(instrEx));
-                    tradePairs = exchange.getTradePairSymbol();
-                }
-            } else {
-                tradePairs = exchange.getTradePairSymbol();
-            }
-        } catch (Exception exception) {
-            log.error("Failed to load trade pairs from {}", exchangeSelector.getValue(), exception);
-            if (isStellarExchangeSelected()) {
-                showStellarTrustlinePrompt("Unable to load Stellar account balances/trustlines: %s"
-                        .formatted(rootMessage(exception)));
-                updateConnectionStatus();
-                return;
-            }
-            tradePairs = fallbackMarketWatchPairs();
-            showWarning("API Error", "Failed to load live trade pairs from %s: %s. Showing default symbols."
-                    .formatted(exchangeSelector.getValue(), rootMessage(exception)));
+        refreshIbkrDeskGate();
+        if (ibkrDeskBlocked) {
+            updateConnectionStatus();
+            return;
         }
 
-        if (tradePairs == null || tradePairs.isEmpty()) {
-            if (isStellarExchangeSelected()) {
-                showStellarTrustlinePrompt("""
-                        No Stellar trusted assets were found for Market Watch.
+        ensureTradabilityService();
 
-                        Add a trustline for the asset issuer you want to trade, then refresh/reconnect Stellar. \
-                        Market Watch only uses assets already present in your Stellar balances/trustlines.
-                        """);
-                updateConnectionStatus();
-                return;
-            }
+        org.investpro.asset.AssetCatalogService assetCatalog = org.investpro.asset.AssetCatalogRuntime.service();
+        org.investpro.asset.ExchangeId exchangeId = org.investpro.asset.AssetCatalogService.exchangeId(exchange);
+        List<TradePair> tradePairs = assetCatalog.loadMarketWatchPairs(exchangeId);
+
+        if (tradePairs == null || tradePairs.isEmpty()) {
             tradePairs = fallbackMarketWatchPairs();
+            journal("Market Watch is using fallback symbols while the local %s asset catalog is refreshed."
+                    .formatted(exchangeId.id()));
+        } else if (assetCatalog.isStaleOrMissing(exchangeId)) {
+            journal("Market Watch loaded %d cached %s assets. Background refresh queued."
+                    .formatted(tradePairs.size(), exchangeId.id()));
         }
 
         if (tradePairs.isEmpty()) {
@@ -7594,8 +7865,18 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        tradePairs = filterPaperSymbolsForExchange(tradePairs);
-        tradePairs = filterReservedMarketWatchSymbols(tradePairs);
+        if (exchange instanceof IbkrExchange) {
+            tradePairs = mergeCachedIbkrContracts(List.of());
+            if (tradePairs.isEmpty()) {
+                journal("IBKR Market Watch has no resolved contracts yet. Use Resolve to search IBKR and save a contract before requesting market data.");
+                symbolCountLabel.setText(t("label.symbols", 0));
+                updateConnectionStatus();
+                return;
+            }
+        } else {
+            tradePairs = filterPaperSymbolsForExchange(tradePairs);
+            tradePairs = filterReservedMarketWatchSymbols(tradePairs);
+        }
 
         refreshTradabilitySnapshot(tradePairs);
         marketWatchUniverse.addAll(tradePairs);
@@ -7655,6 +7936,13 @@ public class TradingDesk extends BorderPane {
         loadOrderBook(selected);
 
         updateConnectionStatus();
+        assetCatalog.refreshIfStale(exchange)
+                .exceptionally(exception -> {
+                    log.warn("Asset catalog refresh failed for {}: {}", exchangeId.id(), rootMessage(exception));
+                    Platform.runLater(() -> journal("Asset catalog refresh failed for %s. Showing last known local catalog."
+                            .formatted(exchangeId.id())));
+                    return null;
+                });
 
     }
 
@@ -7740,6 +8028,102 @@ public class TradingDesk extends BorderPane {
         showWarning("Stellar Trustline Required", message);
     }
 
+    private void showAddStellarTrustlineAssetDialog() {
+        StellarNetwork stellar = activeStellarNetwork();
+        if (stellar == null) {
+            showWarning("Add Trustline Asset", "Select Stellar before adding a trustline asset.");
+            return;
+        }
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Add Trustline Asset");
+        dialog.setHeaderText("Add Trustline Asset");
+        dialog.getDialogPane().getButtonTypes().setAll(ButtonType.CANCEL, ButtonType.OK);
+
+        TextField codeField = new TextField();
+        codeField.setPromptText("Code");
+        TextField issuerField = new TextField();
+        issuerField.setPromptText("Issuer public key");
+        TextField homeDomainField = new TextField();
+        homeDomainField.setPromptText("Home Domain");
+
+        Label warning = new Label(
+                "User-added Stellar assets are not automatically trusted. Liquidity and issuer checks are required before trading.");
+        warning.setWrapText(true);
+        warning.getStyleClass().add("panel-meta");
+
+        GridPane grid = new GridPane();
+        grid.setHgap(8);
+        grid.setVgap(8);
+        grid.setPadding(new Insets(8));
+        grid.addRow(0, new Label("Code"), codeField);
+        grid.addRow(1, new Label("Issuer"), issuerField);
+        grid.addRow(2, new Label("Home Domain"), homeDomainField);
+        grid.add(warning, 0, 3, 2, 1);
+        dialog.getDialogPane().setContent(grid);
+
+        Node saveButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
+        saveButton.disableProperty().bind(codeField.textProperty().isEmpty()
+                .or(issuerField.textProperty().isEmpty()));
+
+        dialog.showAndWait()
+                .filter(ButtonType.OK::equals)
+                .ifPresent(button -> saveStellarTrustlineAsset(
+                        stellar,
+                        codeField.getText(),
+                        issuerField.getText(),
+                        homeDomainField.getText()));
+    }
+
+    private StellarNetwork activeStellarNetwork() {
+        return exchange instanceof StellarNetwork stellarNetwork ? stellarNetwork : null;
+    }
+
+    private void saveStellarTrustlineAsset(StellarNetwork stellar, String code, String issuer, String homeDomain) {
+        try {
+            stellar.addUserTrustlineAsset(code, issuer, homeDomain);
+            String normalizedCode = safe(code).trim().toUpperCase(Locale.ROOT);
+            org.investpro.asset.AssetCatalogRuntime.service().addManualAsset(new org.investpro.asset.AssetCatalogEntry(
+                    null,
+                    org.investpro.asset.ExchangeId.STELLAR,
+                    normalizedCode + "/XLM",
+                    normalizedCode + "/XLM",
+                    normalizedCode,
+                    "XLM",
+                    org.investpro.asset.AssetType.STELLAR_ASSET,
+                    org.investpro.asset.AssetStatus.ACTIVE,
+                    org.investpro.asset.TradabilityStatus.TRUSTLINE_REQUIRED,
+                    false,
+                    false,
+                    true,
+                    false,
+                    true,
+                    true,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    issuer,
+                    homeDomain,
+                    true,
+                    false,
+                    false,
+                    false,
+                    true,
+                    true,
+                    java.time.Instant.now(),
+                    java.time.Instant.now(),
+                    "{\"source\":\"user-trustline\"}"));
+            stellar.recheckStellarPairLiquidity();
+            refreshMarketWatchSymbols();
+            showInfo("Add Trustline Asset", "Trustline asset saved. Pair liquidity is being rechecked.");
+        } catch (Exception exception) {
+            showWarning("Add Trustline Asset", rootMessage(exception));
+        }
+    }
+
     private @NotNull List<TradePair> fallbackMarketWatchPairs() {
         try {
             List<TradePair> pairs = new ArrayList<>();
@@ -7770,8 +8154,89 @@ public class TradingDesk extends BorderPane {
     }
 
     private void refreshMarketWatchSymbols() {
+        if (exchange != null) {
+            org.investpro.asset.AssetCatalogRuntime.service().refreshNow(exchange)
+                    .exceptionally(exception -> {
+                        log.warn("Manual asset catalog refresh failed: {}", rootMessage(exception));
+                        Platform.runLater(() -> journal("Manual asset catalog refresh failed: " + rootMessage(exception)));
+                        return null;
+                    });
+        }
         loadSymbolsForSelectedExchange();
         marketWatchTable.refresh();
+    }
+
+    private void showIbkrContractSearchDialog() {
+        if (!(exchange instanceof IbkrExchange ibkrExchange)) {
+            showWarning("IBKR Contract Search", "Select Interactive Brokers before resolving an IBKR contract.");
+            return;
+        }
+        new IbkrContractSearchController(ibkrExchange, this::addResolvedIbkrPairToMarketWatch).showSearchDialog();
+    }
+
+    private void addResolvedIbkrPairToMarketWatch(TradePair pair) {
+        if (pair == null) {
+            return;
+        }
+        String key = pair.toString('/');
+        boolean exists = marketWatchUniverse.stream().anyMatch(existing -> existing.toString('/').equals(key));
+        if (!exists) {
+            marketWatchUniverse.add(pair);
+        }
+        exists = marketWatchItems.stream().anyMatch(existing -> existing.toString('/').equals(key));
+        if (!exists) {
+            marketWatchItems.add(pair);
+        }
+        if (!symbolSelector.getItems().contains(pair)) {
+            symbolSelector.getItems().add(pair);
+        }
+        symbolSelector.getSelectionModel().select(pair);
+        marketWatchTable.getSelectionModel().select(pair);
+        symbolCountLabel.setText(t("label.symbols", marketWatchItems.size()));
+        marketWatchTable.refresh();
+    }
+
+    private List<TradePair> mergeCachedIbkrContracts(List<TradePair> tradePairs) {
+        if (!(exchange instanceof IbkrExchange ibkrExchange)) {
+            return tradePairs;
+        }
+        List<TradePair> merged = new ArrayList<>(tradePairs == null ? List.of() : tradePairs);
+        Set<String> seen = merged.stream()
+                .filter(Objects::nonNull)
+                .map(pair -> pair.toString('/'))
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        for (org.investpro.exchange.ibkr.IbkrResolvedContract contract : ibkrExchange.cachedContracts()) {
+            try {
+                TradePair pair = TradePair.fromSymbol(contract.symbol() + "_" + contract.currency());
+                pair.setNativeSymbol(contract.userFriendlySymbol());
+                if (seen.add(pair.toString('/'))) {
+                    merged.add(pair);
+                }
+            } catch (Exception exception) {
+                log.debug("Unable to add cached IBKR contract {} to MarketWatch: {}",
+                        contract.userFriendlySymbol(),
+                        exception.getMessage());
+            }
+        }
+        return merged;
+    }
+
+    private void onAssetCatalogChanged(org.investpro.asset.AssetCatalogEvent event) {
+        if (event == null || exchange == null) {
+            return;
+        }
+        org.investpro.asset.ExchangeId activeExchange = org.investpro.asset.AssetCatalogService.exchangeId(exchange);
+        if (event.exchangeId() != activeExchange) {
+            return;
+        }
+        Platform.runLater(() -> {
+            journal("Asset catalog updated for %s: added=%d updated=%d inactive=%d reactivated=%d"
+                    .formatted(event.exchangeId().id(), event.added().size(), event.changed().size(),
+                            event.inactive().size(), event.reactivated().size()));
+            loadSymbolsForSelectedExchange();
+            marketWatchTable.refresh();
+        });
     }
 
     private void openSelectedSymbolChart() {
@@ -7800,16 +8265,170 @@ public class TradingDesk extends BorderPane {
                 return;
             }
         }
+        DetachedChartWindow detachedWindow = detachedChartWindows.get(tabTitle);
+        if (detachedWindow != null && detachedWindow.stage.isShowing()) {
+            detachedWindow.stage.toFront();
+            detachedWindow.stage.requestFocus();
+            return;
+        }
 
         // Create chart container
         ChartContainer container = getChartContainer(selected);
 
         // Create and add chart tab to chart pane (not terminal pane)
-        Tab tab = new Tab(tabTitle, container);
-        tab.setClosable(true);
-        tab.setOnClosed(event -> container.dispose());
+        Tab tab = createChartTab(tabTitle, container);
         chartTabPane.getTabs().add(tab);
         chartTabPane.getSelectionModel().select(tab);
+        saveAppState();
+    }
+
+    private Tab createChartTab(String title, ChartContainer container) {
+        Tab tab = new Tab(title, container);
+        tab.setClosable(true);
+        tab.setOnClosed(event -> {
+            detachedChartWindows.remove(title);
+            container.dispose();
+        });
+        tab.setContextMenu(createChartTabContextMenu(tab));
+        return tab;
+    }
+
+    private ContextMenu createChartTabContextMenu(Tab tab) {
+        MenuItem detachItem = new MenuItem("Detach");
+        detachItem.setOnAction(event -> detachChartTab(tab));
+
+        MenuItem closeItem = new MenuItem("Close");
+        closeItem.setOnAction(event -> {
+            if (tab != null && tab.getTabPane() != null) {
+                tab.getTabPane().getTabs().remove(tab);
+            }
+            if (tab != null && tab.getContent() instanceof ChartContainer container) {
+                container.dispose();
+            }
+        });
+
+        return new ContextMenu(detachItem, closeItem);
+    }
+
+    private void detachActiveChartTab() {
+        detachChartTab(chartTabPane.getSelectionModel().getSelectedItem());
+    }
+
+    private void detachChartTab(Tab tab) {
+        if (tab == null) {
+            showWarning("Charts", "Select a chart tab to detach.");
+            return;
+        }
+        String title = safe(tab.getText());
+        DetachedChartWindow existing = detachedChartWindows.get(title);
+        if (existing != null && existing.stage.isShowing()) {
+            existing.stage.toFront();
+            existing.stage.requestFocus();
+            return;
+        }
+        Node content = tab.getContent();
+        if (content == null) {
+            showWarning("Charts", "The selected chart tab has no content to detach.");
+            return;
+        }
+
+        tab.setContent(null);
+        chartTabPane.getTabs().remove(tab);
+
+        Tab floatingTab = new Tab(title, content);
+        floatingTab.setClosable(false);
+        TabPane floatingTabs = new TabPane(floatingTab);
+        floatingTabs.setSide(Side.TOP);
+        floatingTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        floatingTabs.getStyleClass().addAll("chart-tabs", "mt5-chart-tabs");
+
+        Button reattachButton = new Button("Reattach");
+        reattachButton.getStyleClass().add("terminal-button");
+        Button closeChartButton = new Button("Close Chart");
+        closeChartButton.getStyleClass().add("terminal-button");
+
+        Label titleLabel = new Label(title);
+        titleLabel.getStyleClass().add("terminal-title");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox header = new HBox(8, titleLabel, spacer, reattachButton, closeChartButton);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setPadding(new Insets(8));
+        header.getStyleClass().add("workspace-header");
+
+        BorderPane root = new BorderPane(floatingTabs);
+        root.setTop(header);
+        root.getStyleClass().add("workspace-pane");
+
+        Stage stage = new Stage();
+        stage.setTitle(title);
+        stage.setScene(new Scene(root, 1100, 720));
+
+        DetachedChartWindow window = new DetachedChartWindow(title, tab, floatingTab, stage);
+        detachedChartWindows.put(title, window);
+
+        reattachButton.setOnAction(event -> reattachDetachedChart(title));
+        closeChartButton.setOnAction(event -> disposeDetachedChart(title));
+        stage.setOnCloseRequest(event -> {
+            event.consume();
+            reattachDetachedChart(title);
+        });
+        stage.setOnHidden(event -> {
+            DetachedChartWindow current = detachedChartWindows.get(title);
+            if (current == window && !window.closingForReattach && !window.closingForDispose) {
+                detachedChartWindows.remove(title);
+            }
+        });
+
+        stage.show();
+        journal("Chart detached: " + title);
+        saveAppState();
+    }
+
+    private void reattachDetachedChart(String title) {
+        DetachedChartWindow window = detachedChartWindows.remove(safe(title));
+        if (window == null) {
+            return;
+        }
+        Node content = window.floatingTab.getContent();
+        window.floatingTab.setContent(null);
+        window.closingForReattach = true;
+        if (window.stage.getScene() != null) {
+            window.stage.getScene().setRoot(new Pane());
+        }
+        window.stage.close();
+
+        if (content != null) {
+            window.originalTab.setContent(content);
+            window.originalTab.setContextMenu(createChartTabContextMenu(window.originalTab));
+            if (!chartTabPane.getTabs().contains(window.originalTab)) {
+                chartTabPane.getTabs().add(window.originalTab);
+            }
+            chartTabPane.getSelectionModel().select(window.originalTab);
+            updateOrderBookForChartTab(window.originalTab);
+        }
+        journal("Chart reattached: " + title);
+        saveAppState();
+    }
+
+    private void disposeDetachedChart(String title) {
+        DetachedChartWindow window = detachedChartWindows.remove(safe(title));
+        if (window == null) {
+            return;
+        }
+        Node content = window.floatingTab.getContent();
+        window.floatingTab.setContent(null);
+        if (content instanceof ChartContainer container) {
+            container.dispose();
+        } else if (content instanceof CandleStickChart chart) {
+            chart.dispose();
+        }
+        window.closingForDispose = true;
+        if (window.stage.getScene() != null) {
+            window.stage.getScene().setRoot(new Pane());
+        }
+        window.stage.close();
+        journal("Chart closed: " + title);
         saveAppState();
     }
 
@@ -7986,6 +8605,9 @@ public class TradingDesk extends BorderPane {
             }
         }
         chartTabPane.getTabs().clear();
+        for (String title : new ArrayList<>(detachedChartWindows.keySet())) {
+            disposeDetachedChart(title);
+        }
     }
 
     private void saveActiveChartSnapshot() {
@@ -10226,15 +10848,25 @@ public class TradingDesk extends BorderPane {
         TextField telegramField = new TextField(telegramToken);
 
         grid.addRow(0, new Label("API Key"), apiKeyField);
-        grid.addRow(1, new Label(ibkrSelected ? "Password / Account ID" : "API Secret / Account ID"), secretField);
+        grid.addRow(1, new Label(ibkrSelected ? "Connection profile metadata only" : "API Secret / Account ID"),
+                secretField);
         grid.addRow(2, new Label("Telegram Token"), telegramField);
+
+        if (ibkrSelected) {
+            apiKeyField.setDisable(true);
+            secretField.setDisable(true);
+            apiKeyField.setPromptText("Use Interactive Brokers advanced setup");
+            secretField.setPromptText("IBKR passwords are never stored in InvestPro");
+        }
 
         Button saveButton = new Button("Save");
         saveButton.setOnAction(event -> {
             configuredApiKey = safe(apiKeyField.getText());
             configuredApiSecret = safe(secretField.getText());
             setTelegramToken(telegramField.getText());
-            saveExchangeCredentials(safe(exchangeSelector.getValue()));
+            if (!ibkrSelected) {
+                saveExchangeCredentials(safe(exchangeSelector.getValue()));
+            }
             journal("Settings saved.");
             dialog.close();
         });
@@ -10470,9 +11102,12 @@ public class TradingDesk extends BorderPane {
         }
 
         String normalizedExchange = normalizeExchangeName(selectedExchange);
+        if (isInteractiveBrokersExchange(normalizedExchange)) {
+            openIbkrSetupWizardForSelection(normalizedExchange);
+            return;
+        }
         boolean oanda = "OANDA".equalsIgnoreCase(normalizedExchange);
         boolean stellar = "STELLAR NETWORK".equalsIgnoreCase(normalizedExchange);
-        boolean ibkr = "INTERACTIVE BROKERS".equalsIgnoreCase(normalizedExchange);
         boolean isCoinbase = "COINBASE".equalsIgnoreCase(normalizedExchange);
         boolean hasCreds = !configuredApiKey.isBlank();
 
@@ -10526,18 +11161,18 @@ public class TradingDesk extends BorderPane {
         // ── Credentials section ───────────────────────────────────────────────
         String apiLabelText = oanda
                 ? "API Token"
-                : (stellar ? "Account ID (Public G... Key)" : (ibkr ? "Username" : "API Key"));
+                : (stellar ? "Account ID (Public G... Key)" : "API Key");
         String secretLabelText = oanda
                 ? "Account ID"
-                : (stellar ? "Secret Seed (S...)" : (ibkr ? "Password" : "API Secret"));
+                : (stellar ? "Secret Seed (S...)" : "API Secret");
         String apiPrompt = oanda
                 ? "Enter your OANDA v20 API token"
                 : (stellar ? "Paste your Stellar public account ID (G...)"
-                        : (ibkr ? "Enter your IBKR username" : "Paste your API key here"));
+                        : "Paste your API key here");
         String secretPrompt = oanda
                 ? "Account ID (e.g. 001-001-123456-001)"
                 : (stellar ? "Paste your Stellar secret seed (S...) for live trading"
-                        : (ibkr ? "Enter your IBKR password" : "Paste your API secret / private key"));
+                        : "Paste your API secret / private key");
 
         String apiFieldInitialValue = configuredApiKey;
         if (stellar && apiFieldInitialValue.isBlank() && !configuredAccountId.isBlank()) {
@@ -10919,10 +11554,17 @@ public class TradingDesk extends BorderPane {
 
     private boolean hasExchangeCredentials(String exchangeName) {
         loadExchangeCredentials(exchangeName);
+        if (isInteractiveBrokersExchange(exchangeName)) {
+            return true;
+        }
         if ("OANDA".equalsIgnoreCase(exchangeName)) {
             return !configuredApiKey.isBlank();
         }
         return !configuredApiKey.isBlank() && !configuredApiSecret.isBlank();
+    }
+
+    private boolean isInteractiveBrokersExchange(String exchangeName) {
+        return "INTERACTIVE BROKERS".equalsIgnoreCase(normalizeExchangeName(exchangeName));
     }
 
     private void loadExchangeCredentials(String exchangeName) {
@@ -11209,12 +11851,16 @@ public class TradingDesk extends BorderPane {
 
     private @NotNull String normalizeExchangeName(String exchangeName) {
         String name = safe(exchangeName).toUpperCase(Locale.ROOT).replace('-', ' ').replace('_', ' ').trim();
+        if (name.startsWith("INTERACTIVE BROKERS") && name.contains("ADVANCED SETUP REQUIRED")) {
+            return "INTERACTIVE BROKERS";
+        }
         return switch (name) {
             case "BINANCEUS", "BINANCE US" -> "BINANCE US";
             case "COINBASE", "COINBASE ADVANCED", "COINBASE ADVANCED TRADE" -> "COINBASE";
             case "OANDA", "OANDA FX", "OANDA FOREX" -> "OANDA";
             case "ALPACA", "ALPACA STOCKS", "ALPACA EQUITIES" -> "ALPACA";
-            case "INTERACTIVE BROKERS", "INTERACTIVEBROKERS", "IBKR", "IBK" -> "INTERACTIVE BROKERS";
+            case "INTERACTIVE BROKERS", "INTERACTIVEBROKERS", "IBKR", "IBK" ->
+                "INTERACTIVE BROKERS";
             case "SCHWAB", "CHARLES SCHWAB", "CHARLESSCHWAB" -> "SCHWAB";
             case "STELLAR", "STELLAR NETWORK", "STELLARNETWORK" -> "STELLAR NETWORK";
             case "SOLONA", "SOLONA NETWORK", "SOLONANETWORK", "SOL" ->

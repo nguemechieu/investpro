@@ -879,7 +879,7 @@ public class Kraken extends Exchange {
             JsonNode root = OBJECT_MAPPER.readTree(response.body());
             JsonNode errors = root.path("error");
             if (errors.isArray() && !errors.isEmpty()) {
-                throw new IllegalStateException("Kraken private request returned errors: " + errors.toString());
+                throw new IllegalStateException("Kraken private request returned errors: " + errors);
             }
             return root;
         } catch (Exception exception) {
@@ -970,6 +970,7 @@ public class Kraken extends Exchange {
         String normalized = symbol.trim().toUpperCase(Locale.ROOT);
         return switch (normalized) {
             case "BTC" -> "XBT";
+            case "XETH" -> "XETH";
             default -> normalized;
         };
     }

@@ -18,6 +18,7 @@ import org.investpro.spi.ExchangeProvider;
 import org.investpro.spi.ExchangeProviderContext;
 import org.investpro.spi.PluginRegistry;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -215,7 +216,7 @@ public final class ExchangeFactory {
         return createLegacyExchange(exchangeEnum);
     }
 
-    private Exchange createLegacyExchange(@NotNull ENUM_EXCHANGE_LIST exchangeEnum) {
+    private @NonNull Exchange createLegacyExchange(@NotNull ENUM_EXCHANGE_LIST exchangeEnum) {
         ExchangeCredentials credentials = credentialResolver.resolve(exchangeEnum.name().toLowerCase(Locale.ROOT));
         log.info("Creating exchange adapter: {}", exchangeEnum);
         return switch (exchangeEnum) {

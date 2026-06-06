@@ -35,6 +35,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.net.URI;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -593,6 +595,10 @@ public class OnboardingDesk extends StackPane {
         selectedTradingModeChoiceBox.setValue(loadSavedTradingMode());
         styleChoiceBox(selectedTradingModeChoiceBox);
         boolean isIbkr = selectedExchange == SupportedExchange.INTERACTIVE_BROKERS;
+        if (isIbkr) {
+            showIbkrControlPanelCredentialsStep(selectedExchange, selectedExchangeName);
+            return;
+        }
 
         TextField apiKeyField = new TextField();
         styleInputField(apiKeyField, apiKeyPrompt(selectedExchange));
@@ -603,51 +609,44 @@ public class OnboardingDesk extends StackPane {
         styleInputField(accountIdField,
                 selectedExchange == SupportedExchange.OANDA
                         ? "OANDA Account ID"
-                        : isIbkr ? "IBKR Account ID (recommended for live)" : "Account ID (optional)");
+                        : "Account ID (optional)");
         TextField ibkrTwoFactorCodeField = new TextField();
         styleInputField(ibkrTwoFactorCodeField, "Two-Factor Code (optional note)");
-        ibkrTwoFactorCodeField.setVisible(isIbkr);
-        ibkrTwoFactorCodeField.setManaged(isIbkr);
-        boolean showAccountId = selectedExchange == SupportedExchange.OANDA
-                || selectedExchange == SupportedExchange.STELLAR_NETWORK
-                || selectedExchange == SupportedExchange.SOLONA_NETWORK
-                || isIbkr;
+        ibkrTwoFactorCodeField.setVisible(false);
+        ibkrTwoFactorCodeField.setManaged(false);
+        boolean showAccountId = selectedExchange == SupportedExchange.OANDA || selectedExchange == SupportedExchange.STELLAR_NETWORK || selectedExchange == SupportedExchange.SOLONA_NETWORK;
         accountIdField.setVisible(showAccountId);
         accountIdField.setManaged(showAccountId);
 
         TextField ibkrClientPortalUrlField = new TextField();
         styleInputField(ibkrClientPortalUrlField, "IBKR Client Portal URL (optional)");
-        ibkrClientPortalUrlField.setVisible(isIbkr);
-        ibkrClientPortalUrlField.setManaged(isIbkr);
+        ibkrClientPortalUrlField.setVisible(false);
+        ibkrClientPortalUrlField.setManaged(false);
 
         TextField ibkrHostField = new TextField();
         styleInputField(ibkrHostField, "IB Gateway Host (default: 127.0.0.1)");
-        ibkrHostField.setVisible(isIbkr);
-        ibkrHostField.setManaged(isIbkr);
+        ibkrHostField.setVisible(false);
+        ibkrHostField.setManaged(false);
 
         TextField ibkrPaperPortField = new TextField();
         styleInputField(ibkrPaperPortField, "Paper Port (default: 4002)");
-        ibkrPaperPortField.setVisible(isIbkr);
-        ibkrPaperPortField.setManaged(isIbkr);
+        ibkrPaperPortField.setVisible(false);
+        ibkrPaperPortField.setManaged(false);
 
         TextField ibkrLivePortField = new TextField();
         styleInputField(ibkrLivePortField, "Live Port (default: 4001)");
-        ibkrLivePortField.setVisible(isIbkr);
-        ibkrLivePortField.setManaged(isIbkr);
+        ibkrLivePortField.setVisible(false);
+        ibkrLivePortField.setManaged(false);
 
         TextField ibkrClientIdField = new TextField();
         styleInputField(ibkrClientIdField, "Client ID (default: 1)");
-        ibkrClientIdField.setVisible(isIbkr);
-        ibkrClientIdField.setManaged(isIbkr);
+        ibkrClientIdField.setVisible(false);
+        ibkrClientIdField.setManaged(false);
 
         styleInputField(telegramToken, "Telegram Bot Token (optional)");
         styleInputField(openAiField, "OpenAI API Key (optional)");
 
         loadRememberedExchangeCredentials(selectedExchangeName, apiKeyField, apiSecretField, accountIdField);
-        if (isIbkr) {
-            loadSavedIbkrSettings(ibkrClientPortalUrlField, ibkrHostField, ibkrPaperPortField, ibkrLivePortField,
-                    ibkrClientIdField);
-        }
         loadSavedOptionalTokens();
 
         GridPane credGrid = formGrid();
@@ -658,24 +657,14 @@ public class OnboardingDesk extends StackPane {
             credGrid.addRow(row++,
                     createLabel(selectedExchange == SupportedExchange.STELLAR_NETWORK
                             ? "Secret Seed"
-                            : isIbkr ? "Password" : "API Secret"),
+                            : "API Secret"),
                     apiSecretField);
         }
         if (showAccountId) {
-            String accountLabel = selectedExchange == SupportedExchange.STELLAR_NETWORK
-                    || selectedExchange == SupportedExchange.SOLONA_NETWORK
+            String accountLabel = selectedExchange == SupportedExchange.STELLAR_NETWORK || selectedExchange == SupportedExchange.SOLONA_NETWORK
                             ? "Public Account"
-                            : isIbkr ? "IBKR Account ID" : "Account ID";
+                            : "Account ID";
             credGrid.addRow(row++, createLabel(accountLabel), accountIdField);
-        }
-
-        if (isIbkr) {
-            credGrid.addRow(row++, createLabel("Two-Factor Code"), ibkrTwoFactorCodeField);
-            credGrid.addRow(row++, createLabel("Client Portal URL"), ibkrClientPortalUrlField);
-            credGrid.addRow(row++, createLabel("Gateway Host"), ibkrHostField);
-            credGrid.addRow(row++, createLabel("Paper Port"), ibkrPaperPortField);
-            credGrid.addRow(row++, createLabel("Live Port"), ibkrLivePortField);
-            credGrid.addRow(row++, createLabel("Client ID"), ibkrClientIdField);
         }
 
         credGrid.addRow(row++, createLabel("Telegram"), telegramToken);
@@ -692,8 +681,8 @@ public class OnboardingDesk extends StackPane {
         backButton.setPrefWidth(138);
         Button helpButton = createSecondaryButton("Format Help");
         helpButton.setPrefWidth(138);
-        helpButton.setVisible(!isIbkr);
-        helpButton.setManaged(!isIbkr);
+        helpButton.setVisible(true);
+        helpButton.setManaged(true);
 
         Label validation = inlineValidationLabel();
 
@@ -724,16 +713,96 @@ public class OnboardingDesk extends StackPane {
 
         Label info = createExchangeInfo(selectedExchange);
 
-        ScrollPane credentialScroll = getScrollPane(credGrid, isIbkr);
+        ScrollPane credentialScroll = getScrollPane(credGrid, false);
 
         HBox buttonBox = new HBox(12, backButton, continueButton);
-        if (!isIbkr) {
-            buttonBox.getChildren().add(helpButton);
-        }
+        buttonBox.getChildren().add(helpButton);
         buttonBox.setAlignment(Pos.CENTER);
 
         VBox card = new VBox(14, badge("SECURE BROKER CONNECTION"), title, subtitle, info, credentialScroll,
                 rememberCredentialsCheckBox, buttonBox, validation);
+        card.setAlignment(Pos.TOP_LEFT);
+        card.setMaxWidth(540);
+        card.setStyle(CARD_STYLE);
+
+        fadeTo(createShell(card, false, null));
+    }
+
+    private void showIbkrControlPanelCredentialsStep(
+            SupportedExchange selectedExchange,
+            String selectedExchangeName) {
+        TextField accountIdField = new TextField();
+        styleInputField(accountIdField, "IBKR Account ID (optional for paper)");
+
+        TextField clientPortalUrlField = new TextField();
+        styleInputField(clientPortalUrlField, "Client Portal URL (optional)");
+
+        TextField hostField = new TextField();
+        styleInputField(hostField, "Host");
+
+        TextField paperPortField = new TextField();
+        styleInputField(paperPortField, "Paper port");
+
+        TextField livePortField = new TextField();
+        styleInputField(livePortField, "Live port");
+
+        TextField clientIdField = new TextField();
+        styleInputField(clientIdField, "Client ID");
+
+        ChoiceBox<String> authModeChoiceBox = new ChoiceBox<>();
+        authModeChoiceBox.getItems().setAll("TWS / IB Gateway", "Client Portal Gateway");
+        authModeChoiceBox.setValue(loadSavedIbkrAuthModeDisplay());
+        styleChoiceBox(authModeChoiceBox);
+
+        loadRememberedIbkrAccount(selectedExchangeName, accountIdField);
+        loadSavedIbkrSettings(clientPortalUrlField, hostField, paperPortField, livePortField, clientIdField);
+
+        GridPane controlGrid = formGrid();
+        int row = 0;
+        controlGrid.addRow(row++, createLabel("Auth mode"), authModeChoiceBox);
+        controlGrid.addRow(row++, createLabel("Account ID"), accountIdField);
+        controlGrid.addRow(row++, createLabel("Client Portal URL"), clientPortalUrlField);
+        controlGrid.addRow(row++, createLabel("Host"), hostField);
+        controlGrid.addRow(row++, createLabel("Paper port"), paperPortField);
+        controlGrid.addRow(row++, createLabel("Live port"), livePortField);
+        controlGrid.addRow(row++, createLabel("Client ID"), clientIdField);
+        controlGrid.addRow(row, createLabel("Trading Mode"), selectedTradingModeChoiceBox);
+
+        Label title = new Label("Exchange Credentials");
+        title.setStyle(titleStyle(30));
+
+        Label subtitle = new Label(
+                "Connect to your local IBKR Gateway session. The trading desk opens only after InvestPro verifies the selected gateway endpoint.");
+        subtitle.setStyle(subtitleStyle());
+        subtitle.setWrapText(true);
+
+        Label info = createExchangeInfo(selectedExchange);
+        Label validation = inlineValidationLabel();
+
+        Button continueButton = createPrimaryButton("Connect");
+        continueButton.setPrefWidth(138);
+        Button backButton = createSecondaryButton("Back");
+        backButton.setPrefWidth(138);
+
+        continueButton.setOnAction(event -> handleIbkrControlPanelCredentials(
+                selectedExchange,
+                selectedExchangeName,
+                authModeChoiceBox,
+                accountIdField,
+                clientPortalUrlField,
+                hostField,
+                paperPortField,
+                livePortField,
+                clientIdField,
+                validation));
+        backButton.setOnAction(event -> showConfigurationStep());
+
+        HBox buttonBox = new HBox(12, backButton, continueButton);
+        buttonBox.setAlignment(Pos.CENTER);
+
+        ScrollPane credentialScroll = getScrollPane(controlGrid, true);
+        VBox card = new VBox(14, badge("IBKR GATEWAY"), title, subtitle, info, credentialScroll, buttonBox,
+                validation);
         card.setAlignment(Pos.TOP_LEFT);
         card.setMaxWidth(540);
         card.setStyle(CARD_STYLE);
@@ -864,7 +933,7 @@ public class OnboardingDesk extends StackPane {
         validation.setText("Authenticating with %s...".formatted(selectedExchange.getDisplayName()));
 
         AuthResult authResult = authenticateExchange(selectedExchange.getFactoryKey(), apiKey, apiSecret, accountId,
-                ibkrTwoFactorCode, tradingMode);
+                ibkrTwoFactorCode, tradingMode, Map.of());
         if (!authResult.success()) {
             validation.setStyle("-fx-text-fill: " + DANGER + "; -fx-font-size: 11;");
             validation.setText(authResult.message());
@@ -883,6 +952,98 @@ public class OnboardingDesk extends StackPane {
             }
         }
 
+        saveConfiguration(configuration);
+        showLoadingOverlay();
+    }
+
+    private void handleIbkrControlPanelCredentials(
+            SupportedExchange selectedExchange,
+            String selectedExchangeName,
+            ChoiceBox<String> authModeChoiceBox,
+            TextField accountIdField,
+            TextField clientPortalUrlField,
+            TextField hostField,
+            TextField paperPortField,
+            TextField livePortField,
+            TextField clientIdField,
+            Label validation) {
+        String tradingMode = selectedTradingModeChoiceBox.getValue();
+        if (tradingMode == null || tradingMode.isBlank()) {
+            tradingMode = "PAPER TRADING";
+        }
+
+        String normalizedTradingMode = safe(tradingMode).toUpperCase(Locale.ROOT);
+        String accountId = accountIdField.getText().trim();
+        if (("LIVE".equals(normalizedTradingMode) || "LIVE TRADING".equals(normalizedTradingMode))
+                && accountId.isBlank()) {
+            validation.setText("IBKR Account ID is required for live trading mode.");
+            return;
+        }
+
+        String authMode = ibkrAuthModeValue(authModeChoiceBox.getValue());
+        String selectedPort = normalizedTradingMode.startsWith("LIVE")
+                ? parseIntOrDefault(livePortField.getText(), 4001)
+                : parseIntOrDefault(paperPortField.getText(), 4002);
+        String sanitizedClientPortalUrl = sanitizeIbkrClientPortalUrl(clientPortalUrlField.getText());
+        Map<String, String> ibkrParams = new LinkedHashMap<>();
+        putCredential(ibkrParams, "IBKR_AUTH_MODE", authMode);
+        putCredential(ibkrParams, "IBKR_ACCOUNT_ID", accountId);
+        putCredential(ibkrParams, "IBKR_ENVIRONMENT", normalizedTradingMode.startsWith("LIVE") ? "live" : "paper");
+        putCredential(ibkrParams, "IBKR_SANDBOX", String.valueOf(!normalizedTradingMode.startsWith("LIVE")));
+        putCredential(ibkrParams, "IBKR_CLIENT_PORTAL_URL", sanitizedClientPortalUrl);
+        putCredential(ibkrParams, "IBKR_HOST", hostField.getText());
+        putCredential(ibkrParams, "IBKR_PORT", selectedPort);
+        putCredential(ibkrParams, "IBKR_PAPER_PORT", parseIntOrDefault(paperPortField.getText(), 4002));
+        putCredential(ibkrParams, "IBKR_LIVE_PORT", parseIntOrDefault(livePortField.getText(), 4001));
+        putCredential(ibkrParams, "IBKR_CLIENT_ID", parseIntOrDefault(clientIdField.getText(), 1));
+        putCredential(ibkrParams, "IBK_AUTH_MODE", authMode);
+        putCredential(ibkrParams, "IBK_ACCOUNT_ID", accountId);
+        putCredential(ibkrParams, "IBK_HOST", hostField.getText());
+        putCredential(ibkrParams, "IBK_PORT", selectedPort);
+        putCredential(ibkrParams, "IBK_CLIENT_ID", parseIntOrDefault(clientIdField.getText(), 1));
+
+        applyIbkrRuntimeProperties(sanitizedClientPortalUrl, hostField.getText(), paperPortField.getText(),
+                livePortField.getText(), clientIdField.getText(), authMode);
+
+        configuration = new MarketConfiguration(
+                usernameField.getText().trim(),
+                marketTypeBox.getValue(),
+                venueBox.getValue(),
+                selectedExchange.getFactoryKey(),
+                "",
+                "",
+                accountId,
+                "",
+                "",
+                null,
+                null,
+                tradingMode);
+
+        validation.setStyle("-fx-text-fill: " + WARNING + "; -fx-font-size: 11;");
+        validation.setText("Connecting to IBKR session...");
+
+        AuthResult gatewayCheck = validateIbkrGatewayEndpoint(authMode, hostField.getText(), selectedPort,
+                sanitizedClientPortalUrl);
+        if (!gatewayCheck.success()) {
+            validation.setStyle("-fx-text-fill: " + DANGER + "; -fx-font-size: 11;");
+            validation.setText(gatewayCheck.message());
+            return;
+        }
+
+        AuthResult authResult = authenticateExchange(selectedExchange.getFactoryKey(), "", "", accountId,
+                "", tradingMode, ibkrParams);
+        if (!authResult.success()) {
+            validation.setStyle("-fx-text-fill: " + DANGER + "; -fx-font-size: 11;");
+            validation.setText(authResult.message());
+            return;
+        }
+
+        validation.setStyle("-fx-text-fill: " + SUCCESS + "; -fx-font-size: 11;");
+        validation.setText("IBKR session connected.");
+
+        saveRememberedIbkrAccount(selectedExchangeName, accountId);
+        saveIbkrSettings(sanitizedClientPortalUrl, hostField.getText(), paperPortField.getText(),
+                livePortField.getText(), clientIdField.getText(), authModeChoiceBox.getValue());
         saveConfiguration(configuration);
         showLoadingOverlay();
     }
@@ -1284,6 +1445,17 @@ public class OnboardingDesk extends StackPane {
         telegramToken.setText(preferences.get("telegram_token_%s".formatted(exchange), ""));
     }
 
+    private void saveRememberedIbkrAccount(String exchange, String accountId) {
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
+        preferences.put("exchange_account_id_%s".formatted(exchange), safe(accountId));
+        flushPreferences(preferences);
+    }
+
+    private void loadRememberedIbkrAccount(String exchange, @NonNull TextField accountIdField) {
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
+        accountIdField.setText(preferences.get("exchange_account_id_%s".formatted(exchange), ""));
+    }
+
     private void flushPreferences(Preferences preferences) {
         try {
             preferences.flush();
@@ -1292,16 +1464,19 @@ public class OnboardingDesk extends StackPane {
         }
     }
 
+
+
     private @NotNull Exchange createExchange(String selectedExchange,
             String apiKey,
             String apiSecret,
             String accountId,
             String twoFactorCode,
-            String tradingMode) {
+            String tradingMode,
+            Map<String, String> exchangeParams) {
         String exchangeId = normalizeExchangeId(selectedExchange);
 
         CredentialProvider credentialProvider = createCredentialProvider(exchangeId, apiKey, apiSecret, accountId,
-                twoFactorCode, tradingMode);
+                twoFactorCode, tradingMode, exchangeParams);
         ExchangeFactory exchangeFactory = new ExchangeFactory(credentialProvider);
 
         Exchange exchange = exchangeFactory.create(exchangeId);
@@ -1311,18 +1486,22 @@ public class OnboardingDesk extends StackPane {
         return exchange;
     }
 
+
+
     private @NotNull CredentialProvider createCredentialProvider(String exchangeId,
             String apiKey,
             String apiSecret,
             String accountId,
             String twoFactorCode,
-            String tradingMode) {
+            String tradingMode,
+            Map<String, String> exchangeParams) {
         try {
             Class<?> providerClass = Class.forName("org.investpro.exchange.providers.UiCredentialProvider");
             Object instance = providerClass
                     .getConstructor(String.class, String.class, String.class, String.class, String.class,
-                            String.class)
-                    .newInstance(exchangeId, apiKey, apiSecret, accountId, tradingMode, twoFactorCode);
+                            String.class, Map.class)
+                    .newInstance(exchangeId, apiKey, apiSecret, accountId, tradingMode, twoFactorCode,
+                            exchangeParams == null ? Map.of() : exchangeParams);
             if (instance instanceof CredentialProvider credentialProvider) {
                 return credentialProvider;
             }
@@ -1338,6 +1517,9 @@ public class OnboardingDesk extends StackPane {
         putCredential(values, prefix + "_ACCOUNT_ID", accountId);
         putCredential(values, prefix + "_TWO_FACTOR_CODE", twoFactorCode);
         putCredential(values, prefix + "_TRADING_MODE", tradingMode);
+        if (exchangeParams != null) {
+            exchangeParams.forEach((key, value) -> putCredential(values, key, value));
+        }
 
         switch (prefix) {
             case "coinbase" -> {
@@ -1374,17 +1556,36 @@ public class OnboardingDesk extends StackPane {
                 putCredential(values, "IBKR_USERNAME", apiKey);
                 putCredential(values, "IBKR_PASSWORD", apiSecret);
                 putCredential(values, "IBKR_TWO_FACTOR_CODE", twoFactorCode);
-                putCredential(values, "IBKR_CLIENT_PORTAL_URL", System.getProperty("investpro.ibkr.clientPortalUrl"));
-                putCredential(values, "IBKR_HOST", System.getProperty("investpro.ibkr.host"));
-                putCredential(values, "IBKR_PAPER_PORT", System.getProperty("investpro.ibkr.paperPort"));
-                putCredential(values, "IBKR_LIVE_PORT", System.getProperty("investpro.ibkr.livePort"));
-                putCredential(values, "IBKR_CLIENT_ID", System.getProperty("investpro.ibkr.clientId"));
+                putCredential(values, "IBKR_CLIENT_PORTAL_URL", firstParam(exchangeParams,
+                        "IBKR_CLIENT_PORTAL_URL", System.getProperty("investpro.ibkr.clientPortalUrl")));
+                putCredential(values, "IBKR_HOST", firstParam(exchangeParams,
+                        "IBKR_HOST", System.getProperty("investpro.ibkr.host")));
+                putCredential(values, "IBKR_PORT", firstParam(exchangeParams,
+                        "IBKR_PORT", System.getProperty("investpro.ibkr.port")));
+                putCredential(values, "IBKR_PAPER_PORT", firstParam(exchangeParams,
+                        "IBKR_PAPER_PORT", System.getProperty("investpro.ibkr.paperPort")));
+                putCredential(values, "IBKR_LIVE_PORT", firstParam(exchangeParams,
+                        "IBKR_LIVE_PORT", System.getProperty("investpro.ibkr.livePort")));
+                putCredential(values, "IBKR_CLIENT_ID", firstParam(exchangeParams,
+                        "IBKR_CLIENT_ID", System.getProperty("investpro.ibkr.clientId")));
+                putCredential(values, "IBKR_AUTH_MODE", firstParam(exchangeParams,
+                        "IBKR_AUTH_MODE", System.getProperty("investpro.ibkr.authMode")));
+                putCredential(values, "IBKR_ENVIRONMENT", firstParam(exchangeParams,
+                        "IBKR_ENVIRONMENT", tradingMode));
+                putCredential(values, "IBKR_SANDBOX", firstParam(exchangeParams,
+                        "IBKR_SANDBOX", String.valueOf(!"LIVE".equalsIgnoreCase(safe(tradingMode)))));
                 putCredential(values, "IBK_API_KEY", apiKey);
                 putCredential(values, "IBK_API_SECRET", apiSecret);
                 putCredential(values, "IBK_ACCOUNT_ID", accountId);
                 putCredential(values, "IBK_USERNAME", apiKey);
                 putCredential(values, "IBK_PASSWORD", apiSecret);
                 putCredential(values, "IBK_TWO_FACTOR_CODE", twoFactorCode);
+                putCredential(values, "IBK_AUTH_MODE", firstParam(exchangeParams,
+                        "IBK_AUTH_MODE", values.get("IBKR_AUTH_MODE")));
+                putCredential(values, "IBK_HOST", firstParam(exchangeParams, "IBK_HOST", values.get("IBKR_HOST")));
+                putCredential(values, "IBK_PORT", firstParam(exchangeParams, "IBK_PORT", values.get("IBKR_PORT")));
+                putCredential(values, "IBK_CLIENT_ID", firstParam(exchangeParams,
+                        "IBK_CLIENT_ID", values.get("IBKR_CLIENT_ID")));
             }
             case "stellar_network", "stellar" -> {
                 putCredential(values, "STELLAR_PUBLIC_KEY",
@@ -1432,15 +1633,26 @@ public class OnboardingDesk extends StackPane {
         }
     }
 
+    private String firstParam(Map<String, String> values, String key, String fallback) {
+        if (values == null || key == null) {
+            return fallback;
+        }
+        String value = values.get(key);
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+
+
     private @NotNull AuthResult authenticateExchange(String selectedExchange,
             String apiKey,
             String apiSecret,
             String accountId,
             String twoFactorCode,
-            String tradingMode) {
+            String tradingMode,
+            Map<String, String> exchangeParams) {
         try {
             Exchange exchange = createExchange(selectedExchange, apiKey, apiSecret, accountId, twoFactorCode,
-                    tradingMode);
+                    tradingMode, exchangeParams);
             AuthResult authResult = exchange.AuthCheckResult(selectedExchange);
             if (authResult != null && !authResult.success()) {
                 return authResult;
@@ -1556,22 +1768,38 @@ public class OnboardingDesk extends StackPane {
             String paperPort,
             String livePort,
             String clientId) {
+        applyIbkrRuntimeProperties(clientPortalUrl, host, paperPort, livePort, clientId, null);
+    }
+
+    private void applyIbkrRuntimeProperties(String clientPortalUrl,
+            String host,
+            String paperPort,
+            String livePort,
+            String clientId,
+            String authMode) {
         String sanitizedClientPortalUrl = sanitizeIbkrClientPortalUrl(clientPortalUrl);
         putSystemPropertyIfNotBlank("investpro.ibkr.clientPortalUrl", sanitizedClientPortalUrl);
         putSystemPropertyIfNotBlank("investpro.ibkr.host", host);
         putSystemPropertyIfNotBlank("investpro.ibkr.paperPort", parseIntOrDefault(paperPort, 4002));
         putSystemPropertyIfNotBlank("investpro.ibkr.livePort", parseIntOrDefault(livePort, 4001));
         putSystemPropertyIfNotBlank("investpro.ibkr.clientId", parseIntOrDefault(clientId, 1));
+        putSystemPropertyIfNotBlank("investpro.ibkr.authMode", authMode);
     }
 
     private void saveIbkrSettings(String clientPortalUrl, String host, String paperPort, String livePort,
             String clientId) {
+        saveIbkrSettings(clientPortalUrl, host, paperPort, livePort, clientId, "TWS / IB Gateway");
+    }
+
+    private void saveIbkrSettings(String clientPortalUrl, String host, String paperPort, String livePort,
+            String clientId, String authModeDisplay) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
         preferences.put("ibkr_client_portal_url", safe(sanitizeIbkrClientPortalUrl(clientPortalUrl)));
         preferences.put("ibkr_host", safe(host));
         preferences.put("ibkr_paper_port", parseIntOrDefault(paperPort, 4002));
         preferences.put("ibkr_live_port", parseIntOrDefault(livePort, 4001));
         preferences.put("ibkr_client_id", parseIntOrDefault(clientId, 1));
+        preferences.put("ibkr_auth_mode", safe(authModeDisplay));
         flushPreferences(preferences);
     }
 
@@ -1586,7 +1814,94 @@ public class OnboardingDesk extends StackPane {
         clientIdField.setText(preferences.get("ibkr_client_id", "1"));
 
         applyIbkrRuntimeProperties(clientPortalUrlField.getText(), hostField.getText(), paperPortField.getText(),
-                livePortField.getText(), clientIdField.getText());
+                livePortField.getText(), clientIdField.getText(), ibkrAuthModeValue(loadSavedIbkrAuthModeDisplay()));
+    }
+
+    private String loadSavedIbkrAuthModeDisplay() {
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
+        String saved = preferences.get("ibkr_auth_mode", "TWS / IB Gateway");
+        return "Client Portal Gateway".equalsIgnoreCase(saved) ? "Client Portal Gateway" : "TWS / IB Gateway";
+    }
+
+    private String ibkrAuthModeValue(String displayValue) {
+        if ("Client Portal Gateway".equalsIgnoreCase(safe(displayValue))) {
+            return "client-portal";
+        }
+        return "gateway";
+    }
+
+    private AuthResult validateIbkrGatewayEndpoint(
+            String authMode,
+            String host,
+            String port,
+            String clientPortalUrl) {
+        if ("client-portal".equalsIgnoreCase(authMode)) {
+            URI uri = parseUriOrNull(firstNonBlank(clientPortalUrl, "https://localhost:5000/v1/api"));
+            String portalHost = uri == null || uri.getHost() == null ? "localhost" : uri.getHost();
+            int portalPort = uri == null || uri.getPort() <= 0 ? 5000 : uri.getPort();
+            if (canOpenSocket(portalHost, portalPort)) {
+                return AuthResult.success("Client Portal Gateway endpoint is reachable.");
+            }
+            return AuthResult.failure("""
+                    IBKR Client Portal Gateway is not reachable at %s:%d.
+                    Start IBKR Client Portal Gateway, open https://localhost:5000 in a browser, sign in, complete 2FA, then retry.
+                    Keep Client Portal URL as https://localhost:5000/v1/api unless you changed the gateway port.""".formatted(
+                    portalHost,
+                    portalPort));
+        }
+
+        String gatewayHost = firstNonBlank(host, "127.0.0.1");
+        int gatewayPort = parsePositiveInt(port);
+        if (canOpenSocket(gatewayHost, gatewayPort)) {
+            return AuthResult.success("IB Gateway endpoint is reachable.");
+        }
+        return AuthResult.failure("""
+                IB Gateway/TWS is not reachable at %s:%d.
+                Start TWS or IB Gateway, log in to the correct paper/live account, enable API socket clients, and confirm the port.
+                Default IB Gateway ports are 4002 for paper and 4001 for live. TWS often uses 7497 for paper and 7496 for live.""".formatted(
+                gatewayHost,
+                gatewayPort));
+    }
+
+    private boolean canOpenSocket(String host, int port) {
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(firstNonBlank(host, "127.0.0.1"), port), 1500);
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private URI parseUriOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return URI.create(value.trim());
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private int parsePositiveInt(String value) {
+        try {
+            int parsed = Integer.parseInt(safe(value).trim());
+            return parsed > 0 ? parsed : 4002;
+        } catch (NumberFormatException exception) {
+            return 4002;
+        }
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private String parseIntOrDefault(String value, int fallback) {

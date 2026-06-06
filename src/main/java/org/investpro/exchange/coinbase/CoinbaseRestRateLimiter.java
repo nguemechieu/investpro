@@ -1,6 +1,7 @@
 package org.investpro.exchange.coinbase;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.net.URLDecoder;
@@ -80,7 +81,7 @@ public class CoinbaseRestRateLimiter {
 	}
 
 	/**
-	 * Register a 429 rate-limit event for a product and potentially open a short circuit.
+	 * Regiaster a 429 rate-limit event for a product and potentially open a short circuit.
 	 */
 	public void onRateLimited(String productId) {
 		long now = System.currentTimeMillis();
@@ -150,7 +151,7 @@ public class CoinbaseRestRateLimiter {
 			return "GLOBAL";
 		}
 
-		String fromQuery = queryParam(uri, "product_id");
+		String fromQuery = queryParam(uri);
 		if (fromQuery != null && !fromQuery.isBlank()) {
 			return fromQuery;
 		}
@@ -190,7 +191,7 @@ public class CoinbaseRestRateLimiter {
 		nextAllowedAtMs = now + MIN_SPACING_MS;
 	}
 
-	private static String queryParam(@NonNull URI uri, String key) {
+	private static @Nullable String queryParam(@NonNull URI uri) {
 		String query = uri.getRawQuery();
 		if (query == null || query.isBlank()) {
 			return null;
@@ -202,7 +203,7 @@ public class CoinbaseRestRateLimiter {
 				continue;
 			}
 			String paramKey = URLDecoder.decode(pair.substring(0, eq), StandardCharsets.UTF_8);
-			if (!Objects.equals(paramKey, key)) {
+			if (!Objects.equals(paramKey, "product_id")) {
 				continue;
 			}
 			return URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8);
@@ -210,7 +211,7 @@ public class CoinbaseRestRateLimiter {
 		return null;
 	}
 
-	private static String normalizeProduct(String productId) {
+	private static @NonNull String normalizeProduct(String productId) {
 		if (productId == null || productId.isBlank()) {
 			return "GLOBAL";
 		}

@@ -16,8 +16,8 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class IbkrConnectionManager {
 
     public static final String DEFAULT_HOST = "127.0.0.1";
-    public static final int PAPER_PORT = 4002;
-    public static final int LIVE_PORT = 4001;
+    public static final int PAPER_PORT = IbkrConnectionProfile.GATEWAY_PAPER_PORT;
+    public static final int LIVE_PORT = IbkrConnectionProfile.GATEWAY_LIVE_PORT;
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread thread = new Thread(r, "ibkr-health-monitor");
@@ -31,6 +31,10 @@ public final class IbkrConnectionManager {
     private volatile int port = PAPER_PORT;
     @Getter
     private volatile Mode mode = Mode.PAPER;
+    @Getter
+    private volatile int clientId = 1;
+    @Getter
+    private volatile IbkrConnectionMode connectionMode = IbkrConnectionMode.TWS_API;
 
     private final AtomicBoolean connected = new AtomicBoolean(false);
     private final AtomicBoolean marketDataAvailable = new AtomicBoolean(false);
@@ -42,11 +46,32 @@ public final class IbkrConnectionManager {
         this.mode = Objects.requireNonNull(mode, "mode must not be null");
         this.host = DEFAULT_HOST;
         this.port = mode == Mode.PAPER ? PAPER_PORT : LIVE_PORT;
+        this.clientId = 1;
+        this.connectionMode = IbkrConnectionMode.TWS_API;
         this.connected.set(true);
         this.lastHeartbeatEpochMs.set(System.currentTimeMillis());
         this.reconnectAttempts.set(0);
         startHeartbeatMonitor();
         log.info("IBKR connected to IB Gateway {}:{} ({})", host, port, mode);
+    }
+
+    public synchronized void connect(IbkrConnectionProfile profile) {
+        IbkrConnectionProfile safeProfile = profile == null ? IbkrConnectionProfile.twsPaper() : profile;
+        this.connectionMode = safeProfile.mode();
+        this.mode = safeProfile.paper() ? Mode.PAPER : Mode.LIVE;
+        this.host = safeProfile.host();
+        this.port = safeProfile.port();
+        this.clientId = safeProfile.clientId();
+        this.connected.set(true);
+        this.lastHeartbeatEpochMs.set(System.currentTimeMillis());
+        this.reconnectAttempts.set(0);
+        startHeartbeatMonitor();
+        log.info("IBKR connected to {} {}:{} clientId={} ({})",
+                connectionMode,
+                host,
+                port,
+                clientId,
+                mode);
     }
 
     public synchronized void disconnect() {

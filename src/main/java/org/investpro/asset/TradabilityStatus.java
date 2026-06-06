@@ -1,0 +1,19 @@
+package org.investpro.asset;
+
+public enum TradabilityStatus {
+    FULLY_TRADABLE,
+    VIEW_ONLY,
+    MARKET_CLOSED,
+    DISABLED,
+    HALTED,
+    CANCEL_ONLY,
+    LIMIT_ONLY,
+    UNSUPPORTED_ORDER_TYPE,
+    UNSUPPORTED_PRODUCT_TYPE,
+    MIN_SIZE_INVALID,
+    MAX_SIZE_INVALID,
+    TRUSTLINE_REQUIRED,
+    PERMISSION_DENIED,
+    INACTIVE,
+    UNKNOWN
+}

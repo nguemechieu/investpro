@@ -27,6 +27,8 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
@@ -79,6 +81,11 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     private volatile String lastErrorMessage = "";
     private volatile long lastErrorLoggedAtMs = 0L;
     private volatile boolean authenticationFailed = false;
+    private final ExecutorService subscriptionExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "Coinbase-WS-Subscription");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     public CoinbaseWebSocketClient(@NotNull URI uri, @NotNull Draft draft, String jwt) {
         super(uri, draft);
@@ -360,9 +367,21 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         }
 
         try {
-            sendSubscribe(tradePair, MARKET_TRADES_CHANNEL);
+            sendSubscribeAsync(tradePair, MARKET_TRADES_CHANNEL,
+                    () -> {
+                        pendingSubscriptions.remove(tradePair);
+                        log.info("Subscribed Coinbase market trades for {}", tradePair);
+                    },
+                    exception -> {
+                        pendingSubscriptions.add(tradePair);
+                        log.error(
+                                "Failed to subscribe Coinbase trades for {}: {}",
+                                tradePair,
+                                exception.getMessage(),
+                                exception
+                        );
+                    });
             pendingSubscriptions.remove(tradePair);
-            log.info("Subscribed Coinbase market trades for {}", tradePair);
         } catch (Exception exception) {
             pendingSubscriptions.add(tradePair);
             log.error(
@@ -390,13 +409,17 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
         if (sendUnsubscribe && isOpen()) {
             try {
-                sendUnsubscribe(tradePair, MARKET_TRADES_CHANNEL);
+                sendUnsubscribeAsync(tradePair, MARKET_TRADES_CHANNEL,
+                        () -> log.info("Unsubscribed Coinbase market trades for {}", tradePair),
+                        exception -> log.warn("Unable to send Coinbase unsubscribe for {}", tradePair, exception));
             } catch (Exception exception) {
                 log.warn("Unable to send Coinbase unsubscribe for {}", tradePair, exception);
             }
         }
 
-        log.info("Unsubscribed Coinbase market trades for {}", tradePair);
+        if (!sendUnsubscribe || !isOpen()) {
+            log.info("Unsubscribed Coinbase market trades for {}", tradePair);
+        }
     }
 
     public void stopAllStreamLiveTrades() {
@@ -413,13 +436,12 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     public boolean supportsStreamingTrades(@NotNull TradePair tradePair) {
         return !toCoinbaseProductId(tradePair).isBlank();
     }
-    private CoinbaseStream stream;
     @Override
     public void subscribeStream(@NotNull String streamName, @NotNull Consumer<String> handler) {
         Objects.requireNonNull(streamName, "streamName must not be null");
         Objects.requireNonNull(handler, "handler must not be null");
 
-        stream = parseCoinbaseStream(streamName);
+        CoinbaseStream stream = parseCoinbaseStream(streamName);
 
         if (stream == null) {
             log.warn("Invalid Coinbase stream name: {}", streamName);
@@ -434,19 +456,19 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             return;
         }
 
-        try {
-            sendSubscribe(stream.tradePair(), stream.channel());
-            log.info("Subscribed Coinbase raw stream {}", stream.key());
-        } catch (Exception exception) {
-            rawStreamHandlers.remove(stream.key());
-            removeHandler(stream.key());
-            log.error("Failed to subscribe Coinbase raw stream {}", stream.key(), exception);
-        }
+        CoinbaseStream requestedStream = stream;
+        sendSubscribeAsync(requestedStream.tradePair(), requestedStream.channel(),
+                () -> log.info("Subscribed Coinbase raw stream {}", requestedStream.key()),
+                exception -> {
+                    rawStreamHandlers.remove(requestedStream.key());
+                    removeHandler(requestedStream.key());
+                    log.error("Failed to subscribe Coinbase raw stream {}", requestedStream.key(), exception);
+                });
     }
 
     @Override
     public void unsubscribeStream(@NotNull String streamName) {
-         stream = parseCoinbaseStream(streamName);
+        CoinbaseStream stream = parseCoinbaseStream(streamName);
 
         if (stream == null) {
             log.warn("Invalid Coinbase stream name for unsubscribe: {}", streamName);
@@ -460,12 +482,10 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             return;
         }
 
-        try {
-            sendUnsubscribe(stream.tradePair(), stream.channel());
-            log.info("Unsubscribed Coinbase raw stream {}", stream.key());
-        } catch (Exception exception) {
-            log.warn("Failed to unsubscribe Coinbase raw stream {}", stream.key(), exception);
-        }
+        CoinbaseStream requestedStream = stream;
+        sendUnsubscribeAsync(requestedStream.tradePair(), requestedStream.channel(),
+                () -> log.info("Unsubscribed Coinbase raw stream {}", requestedStream.key()),
+                exception -> log.warn("Failed to unsubscribe Coinbase raw stream {}", requestedStream.key(), exception));
     }
 
     protected void sendSubscribe( TradePair tradePair, @NotNull String channel) {
@@ -474,6 +494,41 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
     protected void sendUnsubscribe( TradePair tradePair, @NotNull String channel) {
         sendSubscriptionMessage("unsubscribe", tradePair, channel);
+    }
+
+    private void sendSubscribeAsync(
+            TradePair tradePair,
+            @NotNull String channel,
+            @NotNull Runnable onSuccess,
+            @NotNull Consumer<Exception> onFailure
+    ) {
+        sendSubscriptionAsync("subscribe", tradePair, channel, onSuccess, onFailure);
+    }
+
+    private void sendUnsubscribeAsync(
+            TradePair tradePair,
+            @NotNull String channel,
+            @NotNull Runnable onSuccess,
+            @NotNull Consumer<Exception> onFailure
+    ) {
+        sendSubscriptionAsync("unsubscribe", tradePair, channel, onSuccess, onFailure);
+    }
+
+    private void sendSubscriptionAsync(
+            @NotNull String type,
+            TradePair tradePair,
+            @NotNull String channel,
+            @NotNull Runnable onSuccess,
+            @NotNull Consumer<Exception> onFailure
+    ) {
+        subscriptionExecutor.execute(() -> {
+            try {
+                sendSubscriptionMessage(type, tradePair, channel);
+                onSuccess.run();
+            } catch (Exception exception) {
+                onFailure.accept(exception);
+            }
+        });
     }
 
     private void sendSubscriptionMessage(
@@ -558,6 +613,16 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             case "candles", "candle", "klines", "kline" -> "candles";
             default -> normalized;
         };
+    }
+
+    @Override
+    public void shutdown() {
+        try {
+            subscriptionExecutor.shutdownNow();
+        } catch (Exception exception) {
+            log.debug("Coinbase subscription executor shutdown failed: {}", exception.getMessage());
+        }
+        super.shutdown();
     }
 
     private String normalizeCoinbaseProductId(String productId) {

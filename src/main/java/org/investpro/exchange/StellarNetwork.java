@@ -55,8 +55,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -79,6 +77,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * Stellar Network adapter for InvestPro.
@@ -112,14 +111,21 @@ public class StellarNetwork extends Exchange {
     private static final String STELLAR_TEST_URL = "https://horizon-testnet.stellar.org";
 
     private static final String MAINNET_USDC_ISSUER = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
-    private static final String TESTNET_USDC_ISSUER = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
+    private static final String TESTNET_USDC_ISSUER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 
     private static final double DEFAULT_XLM_USDC_PRICE = 0.50;
     private static final int DEFAULT_ORDER_BOOK_LIMIT = 200;
     private static final int MAX_RECENT_TRADES = 200;
+    private static final long PAIR_DISCOVERY_TTL_MS = 10 * 60_000L;
+    private static final double STELLAR_DISCOVERY_MAX_SPREAD_PERCENT = 5.0;
+    private static final double STELLAR_DISCOVERY_MIN_DEPTH = 1.0;
+    private static final double STELLAR_BOT_MAX_SPREAD_PERCENT = 1.0;
     private static final long DEFAULT_BASE_FEE_STROOPS = 100L;
     private static final long DEFAULT_TX_TIMEOUT_SECONDS = 45L;
     private static final double MARKET_ORDER_SLIPPAGE_BUFFER = 0.01;
+    private static final int DEFAULT_ASSETS_NUMBER = 1000;
+    private static final int MAX_CANDLE_LIMIT = 50000;
+    private static final int SECONDS_M1 =60 ;
 
     private final Map<String, Double> balances = new ConcurrentHashMap<>();
     private final Map<String, String> trustedAssetIssuers = new ConcurrentHashMap<>();
@@ -128,6 +134,7 @@ public class StellarNetwork extends Exchange {
     private final List<Position> positions = new CopyOnWriteArrayList<>();
     private final List<Trade> tradeHistory = new CopyOnWriteArrayList<>();
     private final AtomicLong nextOrderId = new AtomicLong(1000);
+    private final Object pairDiscoveryLock = new Object();
     private final ExecutorService ioExecutor = Executors.newFixedThreadPool(
             Math.max(2, Math.min(6, Runtime.getRuntime().availableProcessors())),
             new ThreadFactory() {
@@ -155,6 +162,10 @@ public class StellarNetwork extends Exchange {
     private volatile OkHttpClient submitHttpClient;
     private volatile boolean connected;
     private volatile boolean websocketAvailable;
+    private volatile StellarTrustedAssetRegistry trustedAssetRegistry;
+    private volatile Boolean trustedAssetRegistryTestnet;
+    private volatile List<TradePair> cachedDiscoveredPairs = List.of();
+    private volatile long cachedDiscoveredPairsExpiresAtMs;
     private ExchangeWebSocketClient websocketClient;
 
     public StellarNetwork(@NotNull ExchangeCredentials exchangeCredentials) {
@@ -168,12 +179,14 @@ public class StellarNetwork extends Exchange {
         this.submitHttpClient = buildSubmitHttpClient();
         this.connected = false;
         this.websocketAvailable = false;
+        this.trustedAssetRegistry = trustedAssetRegistryForMode();
 
         initializePaperTradingAccount();
         this.server = createServer();
     }
 
-    private OkHttpClient buildReadHttpClient() {
+    @Contract(" -> new")
+    private @NonNull OkHttpClient buildReadHttpClient() {
         return new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -181,22 +194,33 @@ public class StellarNetwork extends Exchange {
                 .build();
     }
 
-    private OkHttpClient buildSubmitHttpClient() {
+    @Contract(" -> new")
+    private @NonNull OkHttpClient buildSubmitHttpClient() {
         return new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(70, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .build();
     }
+    private @NonNull Server createServer() {
+        boolean paperMode = isPaperTrading();
+        String url = horizonUrl(paperMode);
 
-    private Server createServer() {
-        String url = horizonUrl();
         log.debug("Creating Stellar Horizon Server for {}", url);
-        Server created = new Server(url, okHttpClient, submitHttpClient);
-        serverPaperMode = isPaperTrading();
-        return created;
+
+        serverPaperMode = paperMode;
+        return new Server(url, okHttpClient, submitHttpClient);
     }
 
+
+
+    private String horizonUrl(boolean paperMode) {
+        return paperMode ? STELLAR_TEST_URL : STELLAR_API_URL;
+    }
+
+    private Network stellarNetwork() {
+        return isPaperTrading() ? Network.TESTNET : Network.PUBLIC;
+    }
     private @NotNull Server activeServer() {
         Server current = server;
         boolean paperMode = isPaperTrading();
@@ -265,8 +289,53 @@ public class StellarNetwork extends Exchange {
         balances.put("EURC", 1_000.0);
 
         trustedAssetIssuers.put("USDC", isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
+        syncTrustedIssuerCache();
 
         log.info("Stellar paper account initialized with 1000 USDC and 1000 XLM");
+    }
+
+    private StellarTrustedAssetRegistry trustedAssetRegistryForMode() {
+        boolean testnet = isPaperTrading();
+        StellarTrustedAssetRegistry current = trustedAssetRegistry;
+        if (current == null || trustedAssetRegistryTestnet == null || !trustedAssetRegistryTestnet.equals(testnet)) {
+            current = new StellarTrustedAssetRegistry(testnet);
+            trustedAssetRegistry = current;
+            trustedAssetRegistryTestnet = testnet;
+            syncTrustedIssuerCache();
+        }
+        return current;
+    }
+
+    private void syncTrustedIssuerCache() {
+        StellarTrustedAssetRegistry registry = trustedAssetRegistry;
+        if (registry == null) {
+            return;
+        }
+        for (StellarAssetIdentity asset : registry.allAssets()) {
+            if (!asset.isNative() && !asset.issuer().isBlank()) {
+                trustedAssetIssuers.put(asset.code(), asset.issuer());
+                if ("USDC".equalsIgnoreCase(asset.code())) {
+                    trustedAssetIssuers.put("USD", asset.issuer());
+                }
+            }
+        }
+    }
+
+    public void addUserTrustlineAsset(String code, String issuer, String homeDomain) {
+        trustedAssetRegistryForMode().addUserTrustlineAsset(code, issuer, homeDomain);
+        syncTrustedIssuerCache();
+        invalidateStellarPairDiscovery();
+    }
+
+    public void recheckStellarPairLiquidity() {
+        invalidateStellarPairDiscovery();
+    }
+
+    private void invalidateStellarPairDiscovery() {
+        synchronized (pairDiscoveryLock) {
+            cachedDiscoveredPairs = List.of();
+            cachedDiscoveredPairsExpiresAtMs = 0L;
+        }
     }
 
     @Override
@@ -362,9 +431,6 @@ public class StellarNetwork extends Exchange {
         return isPaperTrading() ? STELLAR_TEST_URL : STELLAR_API_URL;
     }
 
-    private Network stellarNetwork() {
-        return isPaperTrading() ? Network.TESTNET : Network.PUBLIC;
-    }
 
     private boolean hasLiveCredentials() {
         return accountId != null && !accountId.isBlank() && apiSecret != null && !apiSecret.isBlank();
@@ -506,6 +572,10 @@ public class StellarNetwork extends Exchange {
                 trustedAssetIssuers.putAll(liveIssuers);
                 trustedAssetIssuers.put("USDC", isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
                 trustedAssetIssuers.put("USD", isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
+                for (Map.Entry<String, String> entry : liveIssuers.entrySet()) {
+                    trustedAssetRegistryForMode().addUserTrustlineAsset(entry.getKey(), entry.getValue(), "");
+                }
+                syncTrustedIssuerCache();
 
                 return buildAccount(accountResponse.getAccountId());
             } catch (Exception exception) {
@@ -515,7 +585,7 @@ public class StellarNetwork extends Exchange {
         });
     }
 
-    private Account buildAccount(String id) {
+    private @NonNull Account buildAccount(String id) {
         Account account = new Account();
         account.setAccountId(id);
         account.setBalances(new LinkedHashMap<>(balances));
@@ -525,7 +595,7 @@ public class StellarNetwork extends Exchange {
         return account;
     }
 
-    private String balanceCode(AccountResponse.Balance balance) {
+    private @NonNull String balanceCode(AccountResponse.Balance balance) {
         String assetType = trimToNull(balance.getAssetType());
         if ("native".equalsIgnoreCase(assetType)) {
             return "XLM";
@@ -534,7 +604,7 @@ public class StellarNetwork extends Exchange {
         return code == null ? "UNKNOWN" : normalizeCurrency(code);
     }
 
-    private String balanceIssuer(AccountResponse.Balance balance) {
+    private String balanceIssuer(AccountResponse.@NonNull Balance balance) {
         String assetType = trimToNull(balance.getAssetType());
         if ("native".equalsIgnoreCase(assetType)) {
             return null;
@@ -948,12 +1018,103 @@ public class StellarNetwork extends Exchange {
     }
 
     private void validateOrderNow(TradePair tradePair, double quantity) {
-        if (!supportsTradePair(tradePair)) {
+        Optional<StellarPairIdentity> resolvedPair = resolvePairIdentity(tradePair);
+        if (resolvedPair.isEmpty()) {
             throw new IllegalArgumentException("Unsupported Stellar pair: " + tradePair);
         }
         if (normalizeAmount(tradePair, quantity) < getMinOrderAmount(tradePair)) {
             throw new IllegalArgumentException("Order quantity is below Stellar precision minimum");
         }
+        if (!isPaperTrading()) {
+            StellarPairIdentity pair = resolvedPair.get();
+            Optional<PairQuality> quality = evaluatePairWithInversion(pair);
+            if (quality.isEmpty() || !quality.get().tradeable()) {
+                throw new IllegalArgumentException("Stellar pair is not currently tradeable: "
+                        + quality.map(PairQuality::reason).orElse("LIQUIDITY_UNAVAILABLE"));
+            }
+            if (!hasTrustline(pair.base()) || !hasTrustline(pair.quote())) {
+                throw new IllegalArgumentException("Missing required Stellar trustline for " + pair.displaySymbol());
+            }
+        }
+    }
+
+    public CompletableFuture<org.investpro.trading.tradability.SymbolTradability> evaluateStellarTradability(
+            TradePair tradePair,
+            org.investpro.trading.tradability.TradabilityScope scope,
+            boolean forceRefresh
+    ) {
+        return supplyAsyncIo(() -> {
+            Optional<StellarPairIdentity> resolvedPair = resolvePairIdentity(tradePair);
+            if (resolvedPair.isEmpty()) {
+                return defaultTradability(tradePair,
+                        org.investpro.trading.tradability.TradabilityStatus.UNSUPPORTED_PRODUCT_TYPE,
+                        unresolvedReason(tradePair));
+            }
+
+            StellarPairIdentity pair = resolvedPair.get();
+            if (forceRefresh && !isPaperTrading()) {
+                fetchAccount().join();
+            }
+
+            Optional<PairQuality> quality = evaluatePairWithInversion(pair);
+            PairQuality resolvedQuality = quality.orElse(new PairQuality(
+                    pair,
+                    false,
+                    false,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    "LIQUIDITY_UNAVAILABLE"));
+
+            return StellarTradabilityEvaluator.buildStatus(
+                    this,
+                    pair,
+                    scope == null ? org.investpro.trading.tradability.TradabilityScope.LIVE_TRADING : scope,
+                    resolvedQuality,
+                    hasTrustline(pair.base()),
+                    hasTrustline(pair.quote()),
+                    resolvedQuality.reason());
+        });
+    }
+
+    private String unresolvedReason(TradePair tradePair) {
+        if (tradePair == null) {
+            return "TRADE_PAIR_REQUIRED";
+        }
+        boolean baseResolved = trustedAssetRegistryForMode().resolve(tradePair.getBaseCode()).isPresent();
+        boolean quoteResolved = trustedAssetRegistryForMode().resolve(tradePair.getCounterCode()).isPresent();
+        if (!baseResolved) {
+            return "UNRESOLVED_BASE_ISSUER";
+        }
+        if (!quoteResolved) {
+            return "UNRESOLVED_QUOTE_ISSUER";
+        }
+        return "UNRESOLVED_STELLAR_PAIR";
+    }
+
+    public boolean requiresTrustline(StellarAssetIdentity asset) {
+        return asset != null && !asset.isNative();
+    }
+
+    public boolean hasTrustline(StellarAssetIdentity asset) {
+        if (asset == null) {
+            return false;
+        }
+        if (!requiresTrustline(asset)) {
+            return true;
+        }
+        if (isPaperTrading()) {
+            return trustedAssetRegistryForMode().resolve(asset.code(), asset.issuer()).isPresent()
+                    || balances.containsKey(asset.code());
+        }
+        return Objects.equals(trustedAssetIssuers.get(asset.code()), asset.issuer())
+                || balances.containsKey(asset.code());
+    }
+
+    public boolean canReceiveAsset(StellarAssetIdentity asset) {
+        return !requiresTrustline(asset) || hasTrustline(asset);
     }
 
     private void applyPaperFill(TradePair pair, Side side, double quantity, double price) {
@@ -1247,26 +1408,12 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public List<TradePair> getTradablePairs() throws SQLException, ClassNotFoundException {
-        refreshBalancesForMarketWatch();
-
-        List<String> tradableAssets = balances.keySet().stream()
-                .map(this::normalizeCurrency)
-                .filter(code -> !code.isBlank())
-                .distinct()
-                .sorted()
-                .toList();
-
-        List<TradePair> pairs = new ArrayList<>(defaultPairs());
-
-        for (String base : tradableAssets) {
-            for (String counter : tradableAssets) {
-                if (!base.equals(counter)) {
-                    addPairIfMissing(pairs, new TradePair(base, counter));
-                }
-            }
+        try {
+            return getGoodTradingPairs().get(5, TimeUnit.SECONDS);
+        } catch (Exception exception) {
+            log.warn("Unable to discover Stellar trading pairs, using safe defaults: {}", exception.getMessage());
+            return defaultStellarPairs();
         }
-
-        return pairs.stream().filter(this::supportsTradePair).toList();
     }
 
     private void refreshBalancesForMarketWatch() {
@@ -1288,23 +1435,353 @@ public class StellarNetwork extends Exchange {
         }
     }
 
+    public CompletableFuture<List<TradePair>> getGoodTradingPairs() {
+        long nowMs = System.currentTimeMillis();
+        List<TradePair> cached = cachedDiscoveredPairs;
+        if (!cached.isEmpty() && nowMs < cachedDiscoveredPairsExpiresAtMs) {
+            return CompletableFuture.completedFuture(cached);
+        }
+
+        return discoverTradablePairs()
+                .thenApply(discovered -> {
+                    List<TradePair> resolved = discovered == null || discovered.isEmpty()
+                            ? defaultStellarPairs()
+                            : discovered;
+                    if (!resolved.isEmpty()) {
+                        synchronized (pairDiscoveryLock) {
+                            cachedDiscoveredPairs = List.copyOf(resolved);
+                            cachedDiscoveredPairsExpiresAtMs = System.currentTimeMillis() + PAIR_DISCOVERY_TTL_MS;
+                        }
+                    }
+                    return resolved;
+                })
+                .exceptionally(exception -> {
+                    log.warn("Unable to discover Stellar trading pairs, using safe defaults: {}", exception.getMessage());
+                    return defaultStellarPairs();
+                });
+    }
+
+    public CompletableFuture<List<TradePair>> discoverTradablePairs() {
+        return supplyAsyncIo(() -> {
+            List<StellarPairIdentity> candidates = buildTrustedPairCandidates();
+            log.info("stellar.pair.discovery.started candidates={}", candidates.size());
+
+            List<PairQuality> accepted = new ArrayList<>();
+            for (StellarPairIdentity candidate : candidates) {
+                Optional<PairQuality> quality = evaluatePairWithInversion(candidate);
+                if (quality.isPresent() && quality.get().tradeable()) {
+                    PairQuality acceptedQuality = quality.get();
+                    accepted.add(acceptedQuality);
+                    log.info("stellar.pair.discovery.accepted pair={} inverted={} spread={} bidDepth={} askDepth={}",
+                            candidate.displaySymbol(),
+                            acceptedQuality.inverted(),
+                            acceptedQuality.spreadPercent(),
+                            acceptedQuality.bidDepth(),
+                            acceptedQuality.askDepth());
+                } else {
+                    log.info("stellar.pair.discovery.rejected pair={} reason={}",
+                            candidate.displaySymbol(),
+                            quality.map(PairQuality::reason).orElse("NO_DIRECT_ORDERBOOK;NO_INVERTED_ORDERBOOK"));
+                }
+            }
+
+            LinkedHashMap<String, TradePair> marketWatchPairs = new LinkedHashMap<>();
+
+            for (StellarPairIdentity candidate : candidates) {
+                if (isBalanceCounterMarketWatchPair(candidate)) {
+                    TradePair tradePair = candidate.toTradePair();
+                    marketWatchPairs.putIfAbsent(tradePair.toString('/'), tradePair);
+                }
+            }
+
+            accepted.stream()
+                    .sorted(Comparator
+                            .comparing((PairQuality quality) -> trustedQuoteRank(quality.pair().quote()))
+                            .thenComparingDouble(PairQuality::spreadPercent)
+                            .thenComparing(Comparator.comparingDouble(
+                                    (PairQuality quality) -> quality.bidDepth() + quality.askDepth()).reversed())
+                            .thenComparing(quality -> quality.pair().displaySymbol()))
+                    .map(quality -> quality.pair().toTradePair())
+                    .forEach(pair -> marketWatchPairs.putIfAbsent(pair.toString('/'), pair));
+
+            for (StellarPairIdentity candidate : candidates) {
+                if (isTrustedIssuerMarketWatchPair(candidate)) {
+                    TradePair tradePair = candidate.toTradePair();
+                    marketWatchPairs.putIfAbsent(tradePair.toString('/'), tradePair);
+                }
+            }
+
+            for (TradePair defaultPair : defaultStellarPairs()) {
+                marketWatchPairs.putIfAbsent(defaultPair.toString('/'), defaultPair);
+            }
+
+            return List.copyOf(marketWatchPairs.values());
+        });
+    }
+
+    private boolean isTrustedIssuerMarketWatchPair(StellarPairIdentity pair) {
+        if (pair == null) {
+            return false;
+        }
+        return isTrustedOrNative(pair.base()) && isTrustedOrNative(pair.quote());
+    }
+
+    private boolean isTrustedOrNative(StellarAssetIdentity asset) {
+        return asset != null && (asset.isNative() || asset.trusted());
+    }
+
+    private int trustedQuoteRank(StellarAssetIdentity quote) {
+        if (quote == null) {
+            return 100;
+        }
+        return switch (quote.code()) {
+            case "USDC" -> 0;
+            case "XLM" -> 1;
+            case "EURC" -> 2;
+            default -> quote.trusted() ? 10 : 50;
+        };
+    }
+
+    private @NonNull @Unmodifiable List<StellarPairIdentity> buildTrustedPairCandidates() {
+        StellarTrustedAssetRegistry registry = trustedAssetRegistryForMode();
+        List<StellarAssetIdentity> assets = registry.allAssets();
+        List<StellarAssetIdentity> preferredQuotes = Stream.of("USDC", "XLM")
+                .map(registry::resolve)
+                .flatMap(Optional::stream)
+                .toList();
+
+        LinkedHashMap<String, StellarPairIdentity> candidates = new LinkedHashMap<>();
+        for (StellarAssetIdentity balanceAsset : balanceBackedAssets(registry)) {
+            addBalanceCounterCandidates(candidates, balanceAsset, preferredQuotes);
+        }
+
+        for (StellarAssetIdentity base : assets) {
+            if (base == null) {
+                continue;
+            }
+            for (StellarAssetIdentity quote : preferredQuotes) {
+                if (quote == null || base.canonicalKey().equals(quote.canonicalKey())) {
+                    continue;
+                }
+                StellarPairIdentity pair = new StellarPairIdentity(base, quote);
+                candidates.putIfAbsent(pair.canonicalKey(), pair);
+            }
+        }
+
+        addCandidateIfResolved(candidates, "XLM", "USDC");
+        addCandidateIfResolved(candidates, "USDC", "XLM");
+        addCandidateIfResolved(candidates, "EURC", "USDC");
+        addCandidateIfResolved(candidates, "EURC", "XLM");
+
+        return List.copyOf(candidates.values());
+    }
+
+    private List<StellarAssetIdentity> balanceBackedAssets(StellarTrustedAssetRegistry registry) {
+        LinkedHashMap<String, StellarAssetIdentity> result = new LinkedHashMap<>();
+        for (String code : balances.keySet()) {
+            if (code == null || code.isBlank()) {
+                continue;
+            }
+            Optional<StellarAssetIdentity> asset = resolveBalanceAsset(registry, code);
+            asset.ifPresent(identity -> result.putIfAbsent(identity.canonicalKey(), identity));
+        }
+        return List.copyOf(result.values());
+    }
+
+    private Optional<StellarAssetIdentity> resolveBalanceAsset(StellarTrustedAssetRegistry registry, String code) {
+        String normalized = normalizeCurrency(code);
+        if (normalized.isBlank()) {
+            return Optional.empty();
+        }
+        if ("XLM".equalsIgnoreCase(normalized)) {
+            return registry.resolve("XLM");
+        }
+
+        String issuer = trimToNull(trustedAssetIssuers.get(normalized));
+        if (issuer != null) {
+            Optional<StellarAssetIdentity> registered = registry.resolve(normalized, issuer);
+            if (registered.isPresent()) {
+                return registered;
+            }
+            try {
+                registry.addUserTrustlineAsset(normalized, issuer, "");
+                return registry.resolve(normalized, issuer);
+            } catch (Exception exception) {
+                log.debug("Unable to register Stellar balance asset {}:{} for Market Watch: {}",
+                        normalized, issuer, exception.getMessage());
+                return Optional.of(new StellarAssetIdentity(
+                        normalized,
+                        issuer,
+                        false,
+                        "",
+                        false,
+                        true,
+                        "account-balance"));
+            }
+        }
+        return registry.resolve(normalized);
+    }
+
+    private void addBalanceCounterCandidates(
+            Map<String, StellarPairIdentity> candidates,
+            StellarAssetIdentity balanceAsset,
+            List<StellarAssetIdentity> counters
+    ) {
+        if (balanceAsset == null || counters == null) {
+            return;
+        }
+        for (StellarAssetIdentity counter : counters) {
+            if (counter == null || balanceAsset.canonicalKey().equals(counter.canonicalKey())) {
+                continue;
+            }
+            StellarPairIdentity pair = new StellarPairIdentity(balanceAsset, counter);
+            candidates.putIfAbsent(pair.canonicalKey(), pair);
+        }
+    }
+
+    private boolean isBalanceCounterMarketWatchPair(StellarPairIdentity pair) {
+        if (pair == null || pair.base() == null || pair.quote() == null) {
+            return false;
+        }
+        String quoteCode = pair.quote().code();
+        boolean preferredCounter = "XLM".equalsIgnoreCase(quoteCode) || "USDC".equalsIgnoreCase(quoteCode);
+        if (!preferredCounter) {
+            return false;
+        }
+        boolean balanceBackedBase = pair.base().isNative() || balances.containsKey(pair.base().code());
+        boolean quoteUsable = pair.quote().isNative()
+                || trustedAssetRegistryForMode().resolve(pair.quote().code(), pair.quote().issuer()).isPresent()
+                || balances.containsKey(pair.quote().code());
+        return balanceBackedBase && quoteUsable;
+    }
+
+    private void addCandidateIfResolved(Map<String, StellarPairIdentity> candidates, String baseCode, String quoteCode) {
+        Optional<StellarPairIdentity> pair = resolvePairIdentity(baseCode, quoteCode);
+        pair.ifPresent(identity -> candidates.putIfAbsent(identity.canonicalKey(), identity));
+    }
+
+    public Optional<StellarPairIdentity> resolvePairIdentity(TradePair tradePair) {
+        if (tradePair == null) {
+            return Optional.empty();
+        }
+        return resolvePairIdentity(tradePair.getBaseCode(), tradePair.getCounterCode());
+    }
+
+    public Optional<StellarPairIdentity> resolvePairIdentity(String baseCode, String quoteCode) {
+        StellarTrustedAssetRegistry registry = trustedAssetRegistryForMode();
+        Optional<StellarAssetIdentity> base = registry.resolve(baseCode);
+        Optional<StellarAssetIdentity> quote = registry.resolve(quoteCode);
+        if (base.isEmpty() || quote.isEmpty()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(new StellarPairIdentity(base.get(), quote.get()));
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+    }
+
+    public Optional<PairQuality> evaluatePairWithInversion(StellarPairIdentity pair) {
+        Optional<PairQuality> direct = evaluateDirectOrderBook(pair, false);
+        if (direct.isPresent() && direct.get().tradeable()) {
+            return direct;
+        }
+
+        Optional<PairQuality> inverted = evaluateDirectOrderBook(pair.inverted(), true);
+        if (inverted.isPresent() && inverted.get().tradeable()) {
+            PairQuality invertedQuality = inverted.get();
+            double displayBid = 1.0 / invertedQuality.bestAsk();
+            double displayAsk = 1.0 / invertedQuality.bestBid();
+            double spreadPercent = spreadPercent(displayBid, displayAsk);
+            return Optional.of(new PairQuality(
+                    pair,
+                    isAcceptableLiquidity(displayBid, displayAsk, spreadPercent,
+                            invertedQuality.bidDepth(), invertedQuality.askDepth()),
+                    true,
+                    displayBid,
+                    displayAsk,
+                    spreadPercent,
+                    invertedQuality.askDepth(),
+                    invertedQuality.bidDepth(),
+                    "ORDERBOOK_INVERTED"));
+        }
+
+        return Optional.of(new PairQuality(pair, false, false, 0.0, 0.0, 0.0, 0.0, 0.0,
+                direct.map(PairQuality::reason).orElse("NO_DIRECT_ORDERBOOK")
+                        + ";"
+                        + inverted.map(PairQuality::reason).orElse("NO_INVERTED_ORDERBOOK")));
+    }
+
+    private Optional<PairQuality> evaluateDirectOrderBook(StellarPairIdentity pair, boolean inverted) {
+        Optional<OrderBook> orderBook = fetchRealOrderBookForDiscovery(pair);
+        if (orderBook.isEmpty()) {
+            return Optional.of(new PairQuality(pair, false, inverted, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    inverted ? "NO_INVERTED_ORDERBOOK" : "NO_DIRECT_ORDERBOOK"));
+        }
+
+        OrderBook book = orderBook.get();
+        OrderBook.PriceLevel bestBid = book.getBestBid();
+        OrderBook.PriceLevel bestAsk = book.getBestAsk();
+        if (bestBid == null || bestAsk == null) {
+            return Optional.of(new PairQuality(pair, false, inverted, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    "MISSING_BID_ASK"));
+        }
+
+        double bid = bestBid.getPrice();
+        double ask = bestAsk.getPrice();
+        double bidDepth = book.getTotalBidVolume();
+        double askDepth = book.getTotalAskVolume();
+        double spread = spreadPercent(bid, ask);
+        boolean tradeable = isAcceptableLiquidity(bid, ask, spread, bidDepth, askDepth);
+        String reason = tradeable
+                ? "TRADABLE"
+                : liquidityRejectionReason(bid, ask, spread, bidDepth, askDepth);
+        return Optional.of(new PairQuality(pair, tradeable, inverted, bid, ask, spread, bidDepth, askDepth, reason));
+    }
+
+    private boolean isAcceptableLiquidity(double bid, double ask, double spreadPercent, double bidDepth, double askDepth) {
+        return Double.isFinite(bid)
+                && Double.isFinite(ask)
+                && bid > 0.0
+                && ask > 0.0
+                && ask >= bid
+                && Double.isFinite(spreadPercent)
+                && spreadPercent <= STELLAR_DISCOVERY_MAX_SPREAD_PERCENT
+                && bidDepth >= STELLAR_DISCOVERY_MIN_DEPTH
+                && askDepth >= STELLAR_DISCOVERY_MIN_DEPTH;
+    }
+
+    private String liquidityRejectionReason(double bid, double ask, double spreadPercent, double bidDepth, double askDepth) {
+        if (!Double.isFinite(bid) || !Double.isFinite(ask) || bid <= 0.0 || ask <= 0.0) {
+            return "INVALID_PRICES";
+        }
+        if (ask < bid) {
+            return "INVALID_SPREAD";
+        }
+        if (!Double.isFinite(spreadPercent) || spreadPercent > STELLAR_DISCOVERY_MAX_SPREAD_PERCENT) {
+            return "SPREAD_TOO_WIDE";
+        }
+        if (bidDepth < STELLAR_DISCOVERY_MIN_DEPTH || askDepth < STELLAR_DISCOVERY_MIN_DEPTH) {
+            return "INSUFFICIENT_DEPTH";
+        }
+        return "LIQUIDITY_UNAVAILABLE";
+    }
+
+    private double spreadPercent(double bid, double ask) {
+        if (!Double.isFinite(bid) || !Double.isFinite(ask) || bid <= 0.0 || ask <= 0.0) {
+            return Double.POSITIVE_INFINITY;
+        }
+        double mid = (bid + ask) / 2.0;
+        return mid <= 0.0 ? Double.POSITIVE_INFINITY : ((ask - bid) / mid) * 100.0;
+    }
+
+    public double getStellarBotMaxSpreadPercent() {
+        return STELLAR_BOT_MAX_SPREAD_PERCENT;
+    }
+
     @Override
     public boolean supportsTradePair(TradePair tradePair) {
-        if (tradePair == null) {
-            return false;
-        }
-
-        String base = normalizeCurrency(tradePair.getBaseCode());
-        String quote = normalizeCurrency(tradePair.getCounterCode());
-
-        if (base.isBlank() || quote.isBlank() || base.equals(quote)) {
-            return false;
-        }
-
-        boolean baseSupported = "XLM".equalsIgnoreCase(base) || !resolveIssuer(base).isBlank();
-        boolean quoteSupported = "XLM".equalsIgnoreCase(quote) || !resolveIssuer(quote).isBlank();
-
-        return baseSupported && quoteSupported;
+        return resolvePairIdentity(tradePair).isPresent();
     }
 
     @Override
@@ -1409,6 +1886,52 @@ public class StellarNetwork extends Exchange {
         return supplyAsyncIo(() -> fetchStellarOrderBook(tradePair));
     }
 
+    public Optional<OrderBook> fetchRealOrderBookForDiscovery(StellarPairIdentity pair) {
+        if (pair == null) {
+            return Optional.empty();
+        }
+
+        try {
+            var orderBookRequest = activeMarketDataServer().orderBook()
+                    .sellingAsset(toStellarAsset(pair.base()))
+                    .buyingAsset(toStellarAsset(pair.quote()));
+            orderBookRequest.limit(DEFAULT_ORDER_BOOK_LIMIT);
+            OrderBookResponse response = orderBookRequest.execute();
+
+            List<OrderBook.PriceLevel> bids = parsePriceLevels(response == null ? null : response.getBids());
+            List<OrderBook.PriceLevel> asks = parsePriceLevels(response == null ? null : response.getAsks());
+            if (bids.isEmpty() || asks.isEmpty()) {
+                return Optional.empty();
+            }
+
+            bids.sort(Comparator.comparingDouble(OrderBook.PriceLevel::getPrice).reversed());
+            asks.sort(Comparator.comparingDouble(OrderBook.PriceLevel::getPrice));
+
+            OrderBook orderBook = new OrderBook(pair.toTradePair(), bids, asks);
+            orderBook.setTimestamp(Instant.now());
+            return Optional.of(orderBook);
+        } catch (Exception exception) {
+            log.debug("Strict Stellar order book fetch failed for {}: {}", pair.displaySymbol(), exception.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private List<OrderBook.PriceLevel> parsePriceLevels(List<OrderBookResponse.Row> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+
+        List<OrderBook.PriceLevel> levels = new ArrayList<>();
+        for (OrderBookResponse.Row row : rows) {
+            double price = parseDouble(row.getPrice(), 0.0);
+            double amount = parseDouble(row.getAmount(), 0.0);
+            if (price > 0.0 && amount > 0.0) {
+                levels.add(new OrderBook.PriceLevel(price, amount));
+            }
+        }
+        return levels;
+    }
+
     private @NonNull OrderBook fetchStellarOrderBook(TradePair tradePair) {
         TradePair pair = pairOrDefault(tradePair);
         if (!supportsTradePair(pair)) {
@@ -1481,7 +2004,7 @@ public class StellarNetwork extends Exchange {
                 .toList());
     }
 
-    private List<Trade> fetchRecentTrades(TradePair tradePair) {
+    private @NonNull List<Trade> fetchRecentTrades(TradePair tradePair) {
         TradePair pair = pairOrDefault(tradePair);
         int safeLimit = Math.min(StellarNetwork.MAX_RECENT_TRADES <= 0 ? 100 : StellarNetwork.MAX_RECENT_TRADES,
                 MAX_RECENT_TRADES);
@@ -1631,8 +2154,10 @@ public class StellarNetwork extends Exchange {
             case 300 -> "M5";
             case 900 -> "M15";
             case 3_600 -> "H1";
+
             case 86_400 -> "D1";
             case 604_800 -> "W1";
+              case  2_419_200 ->"MN";
             default -> "N/A";
         };
     }
@@ -1643,103 +2168,310 @@ public class StellarNetwork extends Exchange {
         );
     }
 
-    private List<CandleData> buildCandlesFromTrades(TradePair tradePair, int secondsPerCandle, int limit,
-            Long startTime, Long endTime) {
-        int safeSeconds = Math.max(60, secondsPerCandle);
-        int safeLimit = Math.max(1, Math.min(limit, 1_000));
+    private List<CandleData> buildCandlesFromTrades(
+            TradePair tradePair,
+            int secondsPerCandle,
+            int limit,
+            Long startTime,
+            Long endTime
+    ) {
+        int safeSeconds = Math.max(SECONDS_M1, secondsPerCandle);
+        int safeLimit = clampCandleLimit(limit);
+
         long end = endTime == null ? Instant.now().getEpochSecond() : endTime;
         long start = startTime == null ? end - (long) safeLimit * safeSeconds : startTime;
+
         long resolution = aggregationResolutionMillis(safeSeconds);
-
         if (resolution <= 0) {
-            log.debug("Unsupported Stellar candle resolution: {} seconds", safeSeconds);
             throw new IllegalArgumentException("Unsupported Stellar candle resolution: " + safeSeconds);
-
         }
 
-        TradePair pair = pairOrDefault(tradePair);
-        return fetchAggregationCandles(pair, start, end, resolution, safeSeconds, safeLimit);
-
+        return fetchAggregationCandles(
+                pairOrDefault(tradePair),
+                start,
+                end,
+                resolution,
+                safeSeconds,
+                safeLimit
+        );
     }
 
-    private List<CandleData> fetchAggregationCandles(@NonNull TradePair pair, long requestedStart, long requestedEnd,
-                                                     long resolution, int secondsPerCandle, int limit) {
-        long requestedWindow = Math.max(requestedEnd - requestedStart, (long) limit * secondsPerCandle);
+    private int clampCandleLimit(int limit) {
+        return Math.max(1, Math.min(limit, MAX_CANDLE_LIMIT));
+    }
+    private List<CandleData> fetchAggregationCandles(
+            @NonNull TradePair pair,
+            long requestedStart,
+            long requestedEnd,
+            long resolution,
+            int secondsPerCandle,
+            int limit
+    ) {
+        int safeLimit = clampCandleLimit(limit);
+        int safeSeconds = Math.max(SECONDS_M1, secondsPerCandle);
+
+        long alignedEnd = alignToCandleBoundary(requestedEnd, safeSeconds);
+        long window = candleWindowSeconds(requestedStart, requestedEnd, safeSeconds, safeLimit);
+
         Asset base = toStellarMarketDataAsset(pair.getBaseCode());
         Asset counter = toStellarMarketDataAsset(pair.getCounterCode());
 
+        RuntimeException lastFailure = null;
+        TreeMap<Integer, CandleData> accumulatedCandles = new TreeMap<>();
+
         for (int attempt = 0; attempt < 6; attempt++) {
-            long end = requestedEnd - attempt * requestedWindow;
-            long start = Math.max(0, end - requestedWindow);
+            long end = alignedEnd - attempt * window;
+            long start = Math.max(0, end - window);
+
             if (end <= 0 || start >= end) {
                 break;
             }
 
             try {
-                long offset= LocalDateTime.now().atOffset(ZoneOffset.UTC).toEpochSecond();
-                Page<TradeAggregationResponse> page = activeMarketDataServer().tradeAggregations(
+                List<TradeAggregationResponse> records = fetchAggregationRecords(
                         base,
                         counter,
-                        start * 1000L,
-                        end * 1000L,
-                        resolution,
-                        0).execute();
+                        start,
+                        end,
+                        resolution
+                );
+                boolean inverted = false;
 
-                List<TradeAggregationResponse> records = page == null || page.getRecords() == null
-                        ? List.of()
-                        : page.getRecords().stream()
-                                .filter(record -> record.getTimestamp() != null)
-                                .sorted(Comparator.comparingLong(TradeAggregationResponse::getTimestamp))
-                                .toList();
-
-                if (!records.isEmpty()) {
-                    return normalizeCandlePage(denseCandlesFromAggregations(records, secondsPerCandle, limit),
-                            limit);
+                if (records.isEmpty()) {
+                    records = fetchAggregationRecords(
+                            counter,
+                            base,
+                            start,
+                            end,
+                            resolution
+                    );
+                    inverted = !records.isEmpty();
                 }
-            } catch (Exception exception) {
-                throw new RuntimeException(exception);
 
+                if (records.isEmpty()) {
+                    continue;
+                }
+
+                List<CandleData> candles = sparseCandlesFromAggregations(
+                        records,
+                        safeSeconds,
+                        safeLimit,
+                        inverted
+                );
+
+                for (CandleData candle : candles) {
+                    accumulatedCandles.put(candle.openTime(), candle);
+                }
+
+                if (accumulatedCandles.size() >= safeLimit) {
+                    return normalizeCandlePage(new ArrayList<>(accumulatedCandles.values()), safeLimit);
+                }
+
+            } catch (Exception exception) {
+                lastFailure = new RuntimeException(
+                        "Failed to fetch Stellar aggregation candles for "
+                                + pair
+                                + " from "
+                                + start
+                                + " to "
+                                + end,
+                        exception
+                );
+
+                log.debug(
+                        "Stellar aggregation attempt {} failed for {}: {}",
+                        attempt + 1,
+                        pair,
+                        exception.getMessage()
+                );
             }
         }
 
-        return List.of();
+        if (lastFailure != null) {
+            log.warn("No Stellar aggregation candles loaded after retries: {}", lastFailure.getMessage());
+        }
+
+        return normalizeCandlePage(new ArrayList<>(accumulatedCandles.values()), safeLimit);
     }
 
+    private long alignToCandleBoundary(long epochSeconds, int secondsPerCandle) {
+        return (epochSeconds / secondsPerCandle) * secondsPerCandle;
+    }
 
-
-    private List<CandleData> denseCandlesFromAggregations(List<TradeAggregationResponse> records,
+    private long candleWindowSeconds(
+            long requestedStart,
+            long requestedEnd,
             int secondsPerCandle,
-            int limit) {
+            int limit
+    ) {
+        long requestedWindow = Math.max(
+                requestedEnd - requestedStart,
+                (long) limit * secondsPerCandle
+        );
+
+        long alignedWindow = alignToCandleBoundary(requestedWindow, secondsPerCandle);
+
+        if (alignedWindow <= 0) {
+            return (long) limit * secondsPerCandle;
+        }
+
+        return alignedWindow;
+    }
+
+    private List<TradeAggregationResponse> fetchAggregationRecords(
+            Asset base,
+            Asset counter,
+            long startSeconds,
+            long endSeconds,
+            long resolution
+    ) {
+        try {
+            Page<TradeAggregationResponse> page = activeMarketDataServer()
+                    .tradeAggregations(
+                            base,
+                            counter,
+                            startSeconds * 1000L,
+                            endSeconds * 1000L,
+                            resolution,
+                            0L
+                    )
+                    .execute();
+
+            if (page == null || page.getRecords() == null) {
+                return List.of();
+            }
+
+            return page.getRecords()
+                    .stream()
+                    .filter(record -> record != null && record.getTimestamp() != null)
+                    .sorted(Comparator.comparingLong(TradeAggregationResponse::getTimestamp))
+                    .toList();
+
+        } catch (Exception exception) {
+            throw new IllegalStateException("Unable to fetch Stellar trade aggregations", exception);
+        }
+    }
+    private List<CandleData> denseCandlesFromAggregations(
+            List<TradeAggregationResponse> records,
+            int secondsPerCandle,
+            int limit
+    ) {
         if (records == null || records.isEmpty()) {
             return List.of();
         }
 
-        TreeMap<Long, TradeAggregationResponse> byOpenTime = new TreeMap<>();
+        int safeLimit = clampCandleLimit(limit);
+        int safeSeconds = Math.max(SECONDS_M1, secondsPerCandle);
+
+        TreeMap<Long, CandleData> realCandlesByOpenTime = new TreeMap<>();
+
         for (TradeAggregationResponse record : records) {
-            long openTime = (record.getTimestamp() / 1000L / secondsPerCandle) * secondsPerCandle;
-            byOpenTime.put(openTime, record);
+            CandleData candle = candleFromAggregation(record);
+            if (!isValidCandle(candle)) {
+                continue;
+            }
+
+            long openTime = alignToCandleBoundary(candle.openTime(), safeSeconds);
+            realCandlesByOpenTime.put(openTime, candle);
         }
 
-        long lastOpen = byOpenTime.lastKey();
-        long firstOpen = Math.max(0, lastOpen - (long) (limit - 1) * secondsPerCandle);
-        double previousClose = false
-                ? invertPrice(parseDouble(records.get(0).getOpen(), 0.0))
-                : parseDouble(records.get(0).getOpen(), 0.0);
+        if (realCandlesByOpenTime.isEmpty()) {
+            return List.of();
+        }
 
-        List<CandleData> candles = new ArrayList<>();
-        for (long openTime = firstOpen; openTime <= lastOpen; openTime += secondsPerCandle) {
-            TradeAggregationResponse record = byOpenTime.get(openTime);
-            if (record != null) {
-                CandleData candle = false ? invertedCandleFromAggregation(record) : candleFromAggregation(record);
-                previousClose = candle.closePrice();
-                candles.add(candle);
-            } else if (previousClose > 0) {
-                candles.add(new CandleData(previousClose, previousClose, previousClose, previousClose, (int) openTime,
-                        0.0));
+        long lastOpen = realCandlesByOpenTime.lastKey();
+        long firstOpen = Math.max(0, lastOpen - (long) (safeLimit - 1) * safeSeconds);
+
+        double previousClose = realCandlesByOpenTime.firstEntry().getValue().closePrice();
+        List<CandleData> candles = new ArrayList<>(safeLimit);
+
+        for (long openTime = firstOpen; openTime <= lastOpen; openTime += safeSeconds) {
+            CandleData realCandle = realCandlesByOpenTime.get(openTime);
+
+            if (realCandle != null) {
+                previousClose = realCandle.closePrice();
+                candles.add(realCandle);
+            } else if (previousClose > 0.0) {
+                candles.add(placeholderCandle(previousClose, openTime));
             }
         }
 
-        return normalizeCandlePage(candles, limit);
+        return normalizeCandlePage(candles, safeLimit);
+    }
+
+    private List<CandleData> sparseCandlesFromAggregations(
+            List<TradeAggregationResponse> records,
+            int secondsPerCandle,
+            int limit,
+            boolean inverted
+    ) {
+        if (records == null || records.isEmpty()) {
+            return List.of();
+        }
+
+        int safeLimit = clampCandleLimit(limit);
+        int safeSeconds = Math.max(SECONDS_M1, secondsPerCandle);
+        TreeMap<Integer, CandleData> candlesByOpenTime = new TreeMap<>();
+
+        for (TradeAggregationResponse record : records) {
+            CandleData candle = inverted ? invertedCandleFromAggregation(record) : candleFromAggregation(record);
+            if (!isValidCandle(candle)) {
+                continue;
+            }
+
+            int openTime = (int) alignToCandleBoundary(candle.openTime(), safeSeconds);
+            candlesByOpenTime.put(openTime, new CandleData(
+                    candle.openPrice(),
+                    candle.closePrice(),
+                    candle.highPrice(),
+                    candle.lowPrice(),
+                    openTime,
+                    candle.volume(),
+                    candle.averagePrice(),
+                    candle.volumeWeightedAveragePrice(),
+                    false));
+        }
+
+        if (candlesByOpenTime.isEmpty()) {
+            return List.of();
+        }
+
+        return candlesByOpenTime.values()
+                .stream()
+                .skip(Math.max(0, candlesByOpenTime.size() - safeLimit))
+                .toList();
+    }
+
+    @Contract("_, _ -> new")
+    private @NonNull CandleData placeholderCandle(double price, long openTime) {
+        return new CandleData(
+                price,
+                price,
+                price,
+                price,
+                (int) openTime,
+                0.0,
+                price,
+                price,
+                true
+        );
+    }
+
+    private boolean isValidCandle(CandleData candle) {
+        return candle != null
+                && candle.openTime() > 0
+                && candle.openPrice() > 0.0
+                && candle.highPrice() > 0.0
+                && candle.lowPrice() > 0.0
+                && candle.closePrice() > 0.0;
+    }
+
+    private boolean isPlaceholderCandle(CandleData candle) {
+        return candle != null
+                && candle.volume() <= 0.0
+                && candle.openPrice() == candle.highPrice()
+                && candle.highPrice() == candle.lowPrice()
+                && candle.lowPrice() == candle.closePrice();
     }
 
     private List<CandleData> normalizeCandlePage(List<CandleData> candles, int limit) {
@@ -1747,21 +2479,23 @@ public class StellarNetwork extends Exchange {
             return List.of();
         }
 
-        int safeLimit = Math.max(1, Math.min(limit, 1_000));
-        TreeMap<Integer, CandleData> byOpenTime = candles.stream()
-                .filter(Objects::nonNull)
-                .filter(candle -> candle.openTime() > 0)
-                .filter(candle -> candle.openPrice() > 0.0
-                        && candle.highPrice() > 0.0
-                        && candle.lowPrice() > 0.0
-                        && candle.closePrice() > 0.0)
-                .collect(
-                        TreeMap::new,
-                        (collector, candle) -> collector.put(candle.openTime(), candle),
-                        TreeMap::putAll);
+        int safeLimit = clampCandleLimit(limit);
 
-        return byOpenTime
-                .values()
+        TreeMap<Integer, CandleData> byOpenTime = new TreeMap<>();
+
+        for (CandleData candle : candles) {
+            if (!isValidCandle(candle)) {
+                continue;
+            }
+
+            byOpenTime.put(candle.openTime(), candle);
+        }
+
+        if (byOpenTime.isEmpty()) {
+            return List.of();
+        }
+
+        return byOpenTime.values()
                 .stream()
                 .skip(Math.max(0, byOpenTime.size() - safeLimit))
                 .toList();
@@ -1794,8 +2528,24 @@ public class StellarNetwork extends Exchange {
 
     private long aggregationResolutionMillis(int secondsPerCandle) {
         return switch (secondsPerCandle) {
-            case 60, 300, 900, 3_600, 86_400, 604_800,(3600*24*7*4) -> secondsPerCandle * 1000L;
-            default -> -1L;
+            case 60, 300, 900, 3_600, 86_400, 604_800,2_419_200 -> secondsPerCandle * 1000L;
+            default -> -60;
+        };
+    }
+    private int secondsFor(Timeframe timeframe) {
+        if (timeframe == null) {
+            return 60;
+        }
+
+        return switch (timeframe) {
+            case M1 -> 60;
+            case M5 -> 300;
+            case M15 -> 900;
+            case H1 -> 3_600;
+            case D1 -> 86_400;
+            case W1 -> 604_800;
+            case MN -> 2_419_200;
+            default -> 60;
         };
     }
 
@@ -1957,20 +2707,7 @@ public class StellarNetwork extends Exchange {
         }
     }
 
-    private int secondsFor(Timeframe timeframe) {
-        if (timeframe == null) {
-            return 60;
-        }
-        return switch (timeframe) {
-            case M1 -> 60;
-            case M5 -> 300;
-            case M15 -> 900;
-            case H1 -> 3_600;
-            case D1 -> 86_400;
-            case W1 -> 604_800;
-            default -> 60;
-        };
-    }
+
 
     @Override
     public StreamTransport getStreamTransport() {
@@ -2207,12 +2944,27 @@ public class StellarNetwork extends Exchange {
             return Asset.createNativeAsset();
         }
 
-        String issuer = resolveIssuer(normalized);
+        String issuer = trustedAssetRegistryForMode().resolve(normalized)
+                .map(StellarAssetIdentity::issuer)
+                .orElseGet(() -> resolveIssuer(normalized));
         if (issuer.isBlank()) {
             throw new IllegalArgumentException("Unknown Stellar issuer for asset: " + normalized);
         }
 
         return Asset.createNonNativeAsset(normalized, issuer);
+    }
+
+    private Asset toStellarAsset(StellarAssetIdentity asset) {
+        if (asset == null) {
+            throw new IllegalArgumentException("Stellar asset identity is required");
+        }
+        if (asset.isNative()) {
+            return Asset.createNativeAsset();
+        }
+        if (asset.issuer().isBlank()) {
+            throw new IllegalArgumentException("Unknown Stellar issuer for asset: " + asset.code());
+        }
+        return Asset.createNonNativeAsset(asset.code(), asset.issuer());
     }
 
     private Asset toStellarMarketDataAsset(String code) {
@@ -2241,6 +2993,11 @@ public class StellarNetwork extends Exchange {
             return "";
         }
 
+        Optional<StellarAssetIdentity> registered = trustedAssetRegistryForMode().resolve(normalized);
+        if (registered.isPresent() && !registered.get().issuer().isBlank()) {
+            return registered.get().issuer();
+        }
+
         String trustedIssuer = trimToNull(trustedAssetIssuers.get(normalized));
         if (trustedIssuer != null) {
             return trustedIssuer;
@@ -2254,6 +3011,7 @@ public class StellarNetwork extends Exchange {
             Page<AssetResponse> page = activeServer()
                     .assets()
                     .assetCode(normalized)
+                    .limit(DEFAULT_ASSETS_NUMBER)
 
                     .execute();
 
@@ -2300,6 +3058,7 @@ public class StellarNetwork extends Exchange {
                 log.debug("No Stellar market-data issuer found for asset code {}", normalized);
                 return "";
             }
+            //saving assets
 
             return page.getRecords().stream()
                     .filter(asset -> asset.getAssetIssuer() != null && !asset.getAssetIssuer().isBlank())
@@ -2340,12 +3099,26 @@ public class StellarNetwork extends Exchange {
     }
 
     private List<TradePair> defaultPairs() {
+        return defaultStellarPairs();
+    }
+
+    private List<TradePair> defaultStellarPairs() {
         try {
+            List<TradePair> defaults = new ArrayList<>();
             TradePair xlmUsdc = TradePair.fromSymbol("XLM_USDC");
             xlmUsdc.setNativeSymbol("XLM_USDC");
-            TradePair btcUsdc = TradePair.fromSymbol("BTC_USDC");
-            btcUsdc.setNativeSymbol("BTC_USDC");
-            return List.of(xlmUsdc, btcUsdc);
+            defaults.add(xlmUsdc);
+
+            TradePair usdcXlm = TradePair.fromSymbol("USDC_XLM");
+            usdcXlm.setNativeSymbol("USDC_XLM");
+            defaults.add(usdcXlm);
+
+            if (trustedAssetRegistryForMode().resolve("EURC").isPresent()) {
+                TradePair eurcUsdc = TradePair.fromSymbol("EURC_USDC");
+                eurcUsdc.setNativeSymbol("EURC_USDC");
+                defaults.add(eurcUsdc);
+            }
+            return defaults;
         } catch (SQLException | ClassNotFoundException exception) {
             return List.of(defaultPair());
         }
@@ -2497,7 +3270,8 @@ public class StellarNetwork extends Exchange {
         future.completeExceptionally(throwable);
         return future;
     }
-
+    private static final int DEFAULT_CHART_CANDLES = 300;
+    private static final int MAX_CHART_CANDLES = 50000;
     private class StellarCandleDataSupplier extends CandleDataSupplier {
 
         StellarCandleDataSupplier(int numCandles, int secondsPerCandle, TradePair tradePair) {
@@ -2505,14 +3279,16 @@ public class StellarNetwork extends Exchange {
                     new SimpleIntegerProperty((int) Instant.now().getEpochSecond()));
         }
 
+        @Contract(" -> new")
         @Override
-        public Future<List<CandleData>> get() {
+        public @NonNull Future<List<CandleData>> get() {
             return supplyAsyncIo(this::loadAggregatedCandlePage);
         }
 
+        @Contract(value = " -> new", pure = true)
         @Override
-        public Set<Integer> getSupportedGranularities() {
-            return Set.of(60, 300, 900, 3_600, 86_400, 604_800,(3600*24*7*4));
+        public @NonNull @Unmodifiable Set<Integer> getSupportedGranularities() {
+            return Set.of(60, 300, 900, 3_600, 86_400, 604_800, 2_419_200);
         }
 
         @Override
@@ -2521,15 +3297,17 @@ public class StellarNetwork extends Exchange {
         }
 
         private @NonNull List<CandleData> loadAggregatedCandlePage() {
+
+
             int end = endTime.get();
             List<CandleData> candles = normalizeCandlePage(
-                    buildCandlesFromTrades(tradePair, secondsPerCandle, numCandles, null, (long) end),
-                    numCandles);
+                    buildCandlesFromTrades(tradePair, secondsPerCandle, DEFAULT_CHART_CANDLES, null, (long) end),
+                        DEFAULT_CHART_CANDLES);
 
             if (!candles.isEmpty()) {
                 int firstOpenTime = candles.stream()
                         .mapToInt(CandleData::openTime)
-                        .max()
+                        .min()
                         .orElse(end);
                 if (firstOpenTime < end) {
                     endTime.set(Math.max(0, firstOpenTime - 1));
@@ -2544,10 +3322,10 @@ public class StellarNetwork extends Exchange {
         }
 
         @Override
-        public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair,
-                Instant currentCandleStartedAt,
-                long secondsIntoCurrentCandle,
-                int secondsPerCandle) {
+        public @NonNull CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair,
+                                                                                          Instant currentCandleStartedAt,
+                                                                                          long secondsIntoCurrentCandle,
+                                                                                          int secondsPerCandle) {
             return StellarNetwork.this.fetchCandleDataForInProgressCandle(
                     tradePair,
                     currentCandleStartedAt,

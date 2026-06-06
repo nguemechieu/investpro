@@ -35,6 +35,7 @@ public final class DockableChartPanel implements DockablePane {
     private final Runnable fitAction;
     private final Runnable refreshAction;
     private final Runnable crosshairAction;
+    private final Runnable detachAction;
     private final Runnable closeAllAction;
     private final Consumer<Tab> tabSelectionAction;
     private final Runnable updateHeaderAction;
@@ -48,6 +49,7 @@ public final class DockableChartPanel implements DockablePane {
             Runnable fitAction,
             Runnable refreshAction,
             Runnable crosshairAction,
+            Runnable detachAction,
             Runnable closeAllAction,
             Consumer<Tab> tabSelectionAction,
             Runnable updateHeaderAction) {
@@ -57,6 +59,7 @@ public final class DockableChartPanel implements DockablePane {
         this.fitAction = fitAction;
         this.refreshAction = refreshAction;
         this.crosshairAction = crosshairAction;
+        this.detachAction = detachAction;
         this.closeAllAction = closeAllAction;
         this.tabSelectionAction = tabSelectionAction;
         this.updateHeaderAction = updateHeaderAction;
@@ -168,6 +171,7 @@ public final class DockableChartPanel implements DockablePane {
         Button fitButton = toolbarButton("Fit", fitAction, "Fit active chart");
         Button refreshButton = toolbarButton("Refresh", refreshAction, "Refresh active chart");
         Button crosshairButton = toolbarButton("Crosshair", crosshairAction, "Toggle active chart crosshair");
+        Button detachButton = toolbarButton("Detach", detachAction, "Detach active chart tab");
         Button closeAllButton = toolbarButton("Close All", closeAllAction, "Close all chart tabs");
 
         Region spacer = new Region();
@@ -183,6 +187,7 @@ public final class DockableChartPanel implements DockablePane {
                 fitButton,
                 refreshButton,
                 crosshairButton,
+                detachButton,
                 closeAllButton);
         header.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         header.getStyleClass().add("mt5-chart-header");

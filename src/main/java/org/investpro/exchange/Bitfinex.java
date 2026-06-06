@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.models.Account;
@@ -45,8 +46,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-@Getter
-@Setter
+@Data
 @Slf4j
 public class Bitfinex extends Exchange {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Bitfinex.class);

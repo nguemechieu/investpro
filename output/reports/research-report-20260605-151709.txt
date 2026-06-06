@@ -1,0 +1,8 @@
+[2026-05-05] Cryptocurrency Report - Bitcoin above $65K resistance
+
+ Market snapshot[2026-05-05] Cryptocurrency Report - Bitcoin above $65K resistance:
+Sentiment: Strong Bearish
+Sentiment index: 20
+Trading volume: N/A (24h)
+Active symbol: BTC/USDC
+Data source: live/cache

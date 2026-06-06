@@ -41,11 +41,18 @@ public class IbkrExchange extends InteractiveBrokers {
     private final IbkrMarketDataProvider marketDataProvider;
     private final IbkrPersistenceStore persistenceStore;
     private final IbkrAccountService accountService;
+    private final IbkrLocalServiceDetector localServiceDetector;
+    private final IbkrConnectionDiagnosticsService connectionDiagnosticsService;
+    private final IbkrConnectionService connectionService;
+    private final IbkrFeatureAvailabilityService featureAvailabilityService;
     private final IbkrPositionService positionService;
     private final IbkrPortfolioService portfolioService;
     private final IbkrOrderService orderService;
     private final IbkrPortfolioSynchronizer portfolioSynchronizer;
     private final IbkrExecutionAdapter executionAdapter;
+    private final IbkrContractRepository contractRepository;
+    private final IbkrContractCache contractCache;
+    private final IbkrContractResolver contractResolver;
     private final Map<String, Double> leverageBySymbol = new ConcurrentHashMap<>();
 
     private volatile BooleanSupplier liveTradingLicenseGate = () -> true;
@@ -56,8 +63,26 @@ public class IbkrExchange extends InteractiveBrokers {
         this.connectionManager = new IbkrConnectionManager();
         this.clientPortalClient = new IbkrClientPortalClient(credentials);
         this.contractMapper = new IbkrContractMapper();
-        this.marketDataProvider = new IbkrMarketDataProvider(connectionManager, clientPortalClient);
         this.persistenceStore = new IbkrPersistenceStore();
+        this.localServiceDetector = new IbkrLocalServiceDetector();
+        this.connectionDiagnosticsService = new IbkrConnectionDiagnosticsService(localServiceDetector);
+        this.connectionService = new IbkrConnectionService(
+                new TwsIbkrBrokerConnection(connectionManager),
+                new ClientPortalIbkrBrokerConnection(clientPortalClient));
+        this.contractRepository = new IbkrContractRepository();
+        this.contractCache = new IbkrContractCache(contractRepository);
+        IbkrContractSearchService twsSearch = new IbkrTwsContractSearchService(connectionManager);
+        IbkrContractDetailsService twsDetails = new IbkrTwsContractDetailsService(connectionManager);
+        IbkrContractSearchService clientPortalSearch = new IbkrClientPortalContractSearchService(clientPortalClient);
+        IbkrContractDetailsService clientPortalDetails = new IbkrClientPortalContractDetailsService(clientPortalClient);
+        this.contractResolver = new IbkrContractResolver(
+                new IbkrAdaptiveContractSearchService(connectionManager, twsSearch, clientPortalSearch,
+                        clientPortalClient),
+                new IbkrAdaptiveContractDetailsService(connectionManager, twsDetails, clientPortalDetails,
+                        clientPortalClient),
+                contractCache);
+        this.marketDataProvider = new IbkrMarketDataProvider(connectionManager, clientPortalClient, contractResolver);
+        this.featureAvailabilityService = new IbkrFeatureAvailabilityService();
         this.accountService = new IbkrAccountService(
                 connectionManager,
                 persistenceStore,
@@ -65,7 +90,8 @@ public class IbkrExchange extends InteractiveBrokers {
                 modeRequestsPaperNetwork());
         this.positionService = new IbkrPositionService(persistenceStore);
         this.portfolioService = new IbkrPortfolioService(positionService, accountService);
-        this.orderService = new IbkrOrderService(positionService, accountService, marketDataProvider, persistenceStore);
+        this.orderService = new IbkrOrderService(positionService, accountService, marketDataProvider, persistenceStore,
+                contractResolver);
         this.portfolioSynchronizer = new IbkrPortfolioSynchronizer(persistenceStore);
         this.executionAdapter = new IbkrExecutionAdapter(this);
     }
@@ -104,13 +130,25 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public void connect() {
-        connectionManager.connect(
-                modeRequestsPaperNetwork() ? IbkrConnectionManager.Mode.PAPER : IbkrConnectionManager.Mode.LIVE);
+        IbkrConnectionProfile profile = connectionProfileFromCredentials();
+        if (profile == null) {
+            connectionManager.connect(
+                    modeRequestsPaperNetwork() ? IbkrConnectionManager.Mode.PAPER : IbkrConnectionManager.Mode.LIVE);
+        } else {
+            connectionManager.connect(profile);
+        }
         accountService.refreshFromBrokerIfAvailable();
+    }
+
+    public IbkrSessionState connect(IbkrConnectionProfile profile) {
+        IbkrSessionState state = connectionService.connect(profile);
+        accountService.refreshFromBrokerIfAvailable();
+        return state;
     }
 
     @Override
     public void disconnect() {
+        connectionService.disconnect();
         connectionManager.disconnect();
     }
 
@@ -126,6 +164,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
+        ensureResolvedContract(tradePair);
         if (canTradeNow()) {
             return CompletableFuture
                     .failedFuture(new IllegalStateException("IBKR live trading gate denied market order"));
@@ -136,6 +175,7 @@ public class IbkrExchange extends InteractiveBrokers {
     @Override
     public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
             double limitPrice) {
+        ensureResolvedContract(tradePair);
         if (canTradeNow()) {
             return CompletableFuture
                     .failedFuture(new IllegalStateException("IBKR live trading gate denied limit order"));
@@ -145,6 +185,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice) {
+        ensureResolvedContract(tradePair);
         if (canTradeNow()) {
             return CompletableFuture
                     .failedFuture(new IllegalStateException("IBKR live trading gate denied stop order"));
@@ -159,6 +200,7 @@ public class IbkrExchange extends InteractiveBrokers {
             double entryPrice,
             double stopLoss,
             double takeProfit) {
+        ensureResolvedContract(tradePair);
         if (canTradeNow()) {
             return CompletableFuture
                     .failedFuture(new IllegalStateException("IBKR live trading gate denied bracket order"));
@@ -264,16 +306,21 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public Ticker getLivePrice(TradePair tradePair) {
+        ensureResolvedContract(tradePair);
         return marketDataProvider.fetchTicker(tradePair).join();
     }
 
     @Override
     public CompletableFuture<Ticker> fetchTicker(TradePair tradePair) {
+        ensureResolvedContract(tradePair);
         return marketDataProvider.fetchTicker(tradePair);
     }
 
     @Override
     public CompletableFuture<List<Ticker>> fetchTickers(List<TradePair> tradePairs) {
+        if (tradePairs != null) {
+            tradePairs.forEach(this::ensureResolvedContract);
+        }
         return marketDataProvider.fetchTickers(tradePairs);
     }
 
@@ -284,6 +331,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        ensureResolvedContract(tradePair);
         return marketDataProvider.candleDataSupplier(secondsPerCandle, tradePair);
     }
 
@@ -293,6 +341,7 @@ public class IbkrExchange extends InteractiveBrokers {
             Instant currentCandleStartedAt,
             long secondsIntoCurrentCandle,
             int secondsPerCandle) {
+        ensureResolvedContract(tradePair);
         return marketDataProvider.fetchCandleDataForInProgressCandle(
                 tradePair,
                 currentCandleStartedAt);
@@ -300,6 +349,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+        ensureResolvedContract(tradePair);
         return marketDataProvider.fetchRecentTradesUntil(tradePair, stopAt);
     }
 
@@ -356,6 +406,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<org.investpro.models.trading.OrderBook> fetchOrderBook(TradePair tradePair) {
+        ensureResolvedContract(tradePair);
         return marketDataProvider.fetchOrderBook(tradePair);
     }
 
@@ -426,6 +477,30 @@ public class IbkrExchange extends InteractiveBrokers {
         return connectionManager.snapshotHealth();
     }
 
+    public IbkrSessionState ibkrSessionState() {
+        return connectionService.getSessionState();
+    }
+
+    public CompletableFuture<List<IbkrContractCandidate>> searchContracts(String userSearchTerm) {
+        return contractResolver.search(userSearchTerm);
+    }
+
+    public CompletableFuture<IbkrResolvedContract> resolveContract(IbkrContractCandidate candidate) {
+        return contractResolver.resolve(candidate);
+    }
+
+    public Optional<IbkrResolvedContract> cachedContract(TradePair tradePair) {
+        return contractResolver.cached(tradePair);
+    }
+
+    public List<IbkrResolvedContract> cachedContracts() {
+        return contractResolver.cachedContracts();
+    }
+
+    private void ensureResolvedContract(TradePair tradePair) {
+        contractResolver.requireResolved(tradePair);
+    }
+
     private boolean canTradeNow() {
         if (isPaperTrading()) {
             return false;
@@ -462,6 +537,7 @@ public class IbkrExchange extends InteractiveBrokers {
         }
 
         String mode = firstNonBlank(
+                getCredentials() == null ? null : getCredentials().param("authMode"),
                 System.getProperty("investpro.ibkr.authMode"),
                 System.getenv("IBKR_AUTH_MODE"),
                 "gateway");
@@ -471,6 +547,42 @@ public class IbkrExchange extends InteractiveBrokers {
             case "client-portal", "client_portal", "portal", "webapi", "web-api" -> true;
             case "gateway", "tws", "socket", "ib-gateway", "ib_gateway" -> false;
             default -> false;
+        };
+    }
+
+    private IbkrConnectionProfile connectionProfileFromCredentials() {
+        ExchangeCredentials credentials = getCredentials();
+        if (credentials == null || !hasIbkrConnectionParams(credentials)) {
+            return null;
+        }
+
+        boolean paper = modeRequestsPaperNetwork();
+        IbkrConnectionMode connectionMode = ibkrConnectionMode(credentials.param("authMode"));
+        return new IbkrConnectionProfile(
+                connectionMode,
+                credentials.param("host"),
+                credentials.intParamOrDefault("port", 0),
+                credentials.intParamOrDefault("clientId", 1),
+                paper,
+                credentials.booleanParamOrDefault("autoDetect", true),
+                credentials.param("connectionName"),
+                null);
+    }
+
+    private boolean hasIbkrConnectionParams(ExchangeCredentials credentials) {
+        return firstNonBlank(
+                credentials.param("host"),
+                credentials.param("port"),
+                credentials.param("clientId"),
+                credentials.param("authMode")) != null;
+    }
+
+    private IbkrConnectionMode ibkrConnectionMode(String authMode) {
+        String normalized = authMode == null ? "" : authMode.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "client-portal", "client_portal", "portal", "webapi", "web-api" ->
+                    IbkrConnectionMode.CLIENT_PORTAL_GATEWAY;
+            default -> IbkrConnectionMode.TWS_API;
         };
     }
 

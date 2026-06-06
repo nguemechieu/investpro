@@ -197,6 +197,13 @@ public final class IbkrClientPortalClient {
         }
     }
 
+    public Optional<Ticker> fetchTicker(IbkrResolvedContract contract) {
+        if (!isAuthenticated() || contract == null) {
+            return Optional.empty();
+        }
+        return fetchTickerByConid(String.valueOf(contract.conId()));
+    }
+
     public Optional<OrderBook> fetchOrderBook(TradePair tradePair) {
         if (!isAuthenticated()) {
             return Optional.empty();
@@ -245,6 +252,174 @@ public final class IbkrClientPortalClient {
         }
     }
 
+    public Optional<OrderBook> fetchOrderBook(IbkrResolvedContract contract, TradePair tradePair) {
+        if (!isAuthenticated() || contract == null) {
+            return Optional.empty();
+        }
+        try {
+            String conid = String.valueOf(contract.conId());
+            String path = "/iserver/marketdata/snapshot?conids=%s&fields=84,85,86,88,31"
+                    .formatted(url(conid));
+            HttpResponse<String> response = HTTP_CLIENT.send(
+                    request(path).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            if (!isSuccess(response.statusCode())) {
+                log.debug("IBKR order book request returned HTTP {}: {}", response.statusCode(), response.body());
+                return Optional.empty();
+            }
+
+            JsonNode root = OBJECT_MAPPER.readTree(response.body());
+            JsonNode node = root.isArray() && !root.isEmpty() ? root.get(0) : root;
+            double bid = firstDouble(node, "84", "bid", "bidPrice");
+            double ask = firstDouble(node, "86", "ask", "askPrice");
+            double bidSize = firstDouble(node, "88", "bidSize", "bid_size");
+            double askSize = firstDouble(node, "85", "askSize", "ask_size");
+            double last = firstDouble(node, "31", "last", "lastPrice");
+
+            if (bid <= 0.0 && ask <= 0.0 && last <= 0.0) {
+                return Optional.empty();
+            }
+
+            OrderBook orderBook = new OrderBook(tradePair);
+            if (bid > 0.0) {
+                orderBook.setBids(List.of(new OrderBook.PriceLevel(bid, Math.max(1.0, bidSize), 1)));
+            }
+            if (ask > 0.0) {
+                orderBook.setAsks(List.of(new OrderBook.PriceLevel(ask, Math.max(1.0, askSize), 1)));
+            }
+            orderBook.setTimestamp(Instant.now());
+            orderBook.setSequence("ibkr-live-" + conid + "-" + System.currentTimeMillis());
+            return Optional.of(orderBook);
+        } catch (Exception exception) {
+            log.debug("Unable to fetch IBKR live order book for {}: {}", contract.userFriendlySymbol(),
+                    exception.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private Optional<Ticker> fetchTickerByConid(String conid) {
+        if (!notBlank(conid)) {
+            return Optional.empty();
+        }
+        try {
+            String path = "/iserver/marketdata/snapshot?conids=%s&fields=31,84,85,86,88,70,71,87"
+                    .formatted(url(conid));
+            HttpResponse<String> response = HTTP_CLIENT.send(
+                    request(path).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            if (!isSuccess(response.statusCode())) {
+                log.debug("IBKR ticker request returned HTTP {}: {}", response.statusCode(), response.body());
+                return Optional.empty();
+            }
+
+            JsonNode root = OBJECT_MAPPER.readTree(response.body());
+            JsonNode tickerNode = root.isArray() && !root.isEmpty() ? root.get(0) : root;
+            double last = firstDouble(tickerNode, "31", "last", "lastPrice", "last_price");
+            double bid = firstDouble(tickerNode, "84", "bid", "bidPrice");
+            double ask = firstDouble(tickerNode, "86", "ask", "askPrice");
+            double high = firstDouble(tickerNode, "70", "high", "highPrice");
+            double low = firstDouble(tickerNode, "71", "low", "lowPrice");
+            double volume = firstDouble(tickerNode, "87", "volume");
+            double mid = positiveOr(last, bid > 0 && ask > 0 ? (bid + ask) / 2.0 : 0.0);
+            if (mid <= 0.0) {
+                return Optional.empty();
+            }
+            return Optional.of(new Ticker(mid, bid, ask, mid, high, low, volume, System.currentTimeMillis()));
+        } catch (Exception exception) {
+            log.debug("Unable to fetch IBKR live ticker for conid {}: {}", conid, exception.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    public List<IbkrContractCandidate> searchSecurityDefinitions(String userSearchTerm) {
+        if (!isAuthenticated()) {
+            throw new IllegalStateException("IBKR session is not connected.");
+        }
+
+        String normalized = IbkrContractResolver.normalizeSearchTerm(userSearchTerm);
+        if (!notBlank(normalized)) {
+            return List.of();
+        }
+
+        Optional<IbkrContractCandidate> cash = forexCandidate(normalized);
+        if (cash.isPresent()) {
+            return List.of(cash.get());
+        }
+
+        String symbol = normalized.replace("/", "");
+        try {
+            String path = "/iserver/secdef/search?symbol=%s&name=true".formatted(url(symbol));
+            HttpResponse<String> response = HTTP_CLIENT.send(
+                    request(path).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            if (!isSuccess(response.statusCode())) {
+                log.debug("IBKR secdef search returned HTTP {}: {}", response.statusCode(), response.body());
+                return List.of();
+            }
+
+            JsonNode root = OBJECT_MAPPER.readTree(response.body());
+            List<IbkrContractCandidate> candidates = new ArrayList<>();
+            collectSecdefCandidates(root, candidates);
+            return candidates.stream()
+                    .filter(candidate -> candidate.symbol().equalsIgnoreCase(symbol)
+                            || candidate.displayLabel().toUpperCase(Locale.ROOT).contains(symbol))
+                    .distinct()
+                    .toList();
+        } catch (Exception exception) {
+            throw new IllegalStateException("IBKR contract search failed: " + exception.getMessage(), exception);
+        }
+    }
+
+    public Optional<IbkrResolvedContract> fetchSecurityDefinitionDetails(IbkrContractCandidate candidate) {
+        if (!isAuthenticated()) {
+            return Optional.empty();
+        }
+        if (candidate == null) {
+            return Optional.empty();
+        }
+
+        if (!candidate.hasConId() && "CASH".equalsIgnoreCase(candidate.secType())) {
+            return Optional.of(resolvedFromCandidate(candidate));
+        }
+
+        List<String> paths = new ArrayList<>();
+        if (candidate.hasConId()) {
+            String secType = firstNonBlank(candidate.secType(), candidate.securityType().ibkrCode());
+            String exchange = firstNonBlank(candidate.exchange(), "SMART");
+            paths.add("/iserver/secdef/info?conid=%d&sectype=%s&month=%s&exchange=%s"
+                    .formatted(candidate.conId(), url(secType), url(candidate.lastTradeDateOrContractMonth()), url(exchange)));
+            paths.add("/trsrv/secdef?conids=%d".formatted(candidate.conId()));
+            paths.add("/iserver/contract/%d/info".formatted(candidate.conId()));
+        }
+
+        for (String path : paths) {
+            try {
+                HttpResponse<String> response = HTTP_CLIENT.send(
+                        request(path).GET().build(),
+                        HttpResponse.BodyHandlers.ofString());
+                if (!isSuccess(response.statusCode())) {
+                    continue;
+                }
+                JsonNode root = OBJECT_MAPPER.readTree(response.body());
+                JsonNode detailsNode = firstContractDetailsNode(root);
+                if (detailsNode == null) {
+                    continue;
+                }
+                IbkrResolvedContract resolved = resolvedFromJson(candidate, detailsNode);
+                if (resolved.conId() > 0) {
+                    return Optional.of(resolved);
+                }
+            } catch (Exception exception) {
+                log.debug("Unable to fetch IBKR contract details from {}: {}", path, exception.getMessage());
+            }
+        }
+
+        if (candidate.hasConId()) {
+            return Optional.of(resolvedFromCandidate(candidate));
+        }
+        return Optional.empty();
+    }
+
     private Optional<String> resolveConid(TradePair tradePair) {
         if (!isAuthenticated()) {
             return Optional.empty();
@@ -281,6 +456,213 @@ public final class IbkrClientPortalClient {
             log.debug("Unable to resolve IBKR conid for {}: {}", tradePair, exception.getMessage());
         }
         return Optional.empty();
+    }
+
+    private Optional<IbkrContractCandidate> forexCandidate(String normalized) {
+        String[] parts = normalized.split("/");
+        if (parts.length != 2 || parts[0].length() != 3 || parts[1].length() != 3) {
+            return Optional.empty();
+        }
+        return Optional.of(new IbkrContractCandidate(
+                null,
+                parts[0],
+                parts[0] + "/" + parts[1],
+                IbkrSecurityType.FOREX,
+                "CASH",
+                "IDEALPRO",
+                "IDEALPRO",
+                parts[1],
+                parts[0] + "." + parts[1],
+                parts[0] + "." + parts[1],
+                "",
+                "",
+                "",
+                "CLIENT_PORTAL_SECDEF",
+                "{\"syntheticCashContract\":true}"));
+    }
+
+    private void collectSecdefCandidates(JsonNode node, List<IbkrContractCandidate> candidates) {
+        if (node == null || node.isNull()) {
+            return;
+        }
+        if (node.isArray()) {
+            for (JsonNode child : node) {
+                collectSecdefCandidates(child, candidates);
+            }
+            return;
+        }
+        if (!node.isObject()) {
+            return;
+        }
+
+        String symbol = firstText(node, "symbol", "ticker");
+        String description = firstText(node, "description", "companyName", "name");
+        String conidText = firstText(node, "conid", "con_id");
+        Long conid = parseLongOrNull(conidText);
+        String secType = firstText(node, "secType", "assetClass", "type");
+        JsonNode contracts = node.get("contracts");
+        if (contracts != null && contracts.isArray() && !contracts.isEmpty()) {
+            for (JsonNode contract : contracts) {
+                String contractSecType = firstNonBlank(firstText(contract, "secType"), secType);
+                candidates.add(new IbkrContractCandidate(
+                        parseLongOrNull(firstNonBlank(firstText(contract, "conid", "con_id"), conidText)),
+                        symbol,
+                        description,
+                        IbkrSecurityType.fromIbkrCode(contractSecType),
+                        contractSecType,
+                        firstText(contract, "exchange"),
+                        firstText(contract, "primaryExchange", "listingExchange"),
+                        firstText(contract, "currency"),
+                        firstText(contract, "localSymbol"),
+                        firstText(contract, "tradingClass"),
+                        firstText(contract, "lastTradeDateOrContractMonth", "maturityDate", "month"),
+                        firstText(contract, "multiplier"),
+                        firstText(node, "sections"),
+                        "CLIENT_PORTAL_SECDEF",
+                        contract.toString()));
+            }
+            return;
+        }
+
+        if (notBlank(symbol) || conid != null) {
+            candidates.add(new IbkrContractCandidate(
+                    conid,
+                    symbol,
+                    description,
+                    IbkrSecurityType.fromIbkrCode(secType),
+                    secType,
+                    firstText(node, "exchange"),
+                    firstText(node, "primaryExchange", "listingExchange"),
+                    firstText(node, "currency"),
+                    firstText(node, "localSymbol"),
+                    firstText(node, "tradingClass"),
+                    firstText(node, "lastTradeDateOrContractMonth", "maturityDate", "month"),
+                    firstText(node, "multiplier"),
+                    firstText(node, "sections"),
+                    "CLIENT_PORTAL_SECDEF",
+                    node.toString()));
+        }
+    }
+
+    private JsonNode firstContractDetailsNode(JsonNode root) {
+        if (root == null || root.isNull()) {
+            return null;
+        }
+        if (root.isArray()) {
+            return root.isEmpty() ? null : firstContractDetailsNode(root.get(0));
+        }
+        if (root.isObject()) {
+            JsonNode secdef = root.get("secdef");
+            if (secdef != null && secdef.isArray() && !secdef.isEmpty()) {
+                return secdef.get(0);
+            }
+            JsonNode contracts = root.get("contracts");
+            if (contracts != null && contracts.isArray() && !contracts.isEmpty()) {
+                return contracts.get(0);
+            }
+            return root;
+        }
+        return null;
+    }
+
+    private IbkrResolvedContract resolvedFromJson(IbkrContractCandidate candidate, JsonNode node) {
+        long conId = firstLongPositive(node, candidate.conId() == null ? 0L : candidate.conId(),
+                "conid", "con_id", "contractId");
+        String secType = firstNonBlank(firstText(node, "secType", "assetClass"), candidate.secType(),
+                candidate.securityType().ibkrCode());
+        Instant now = Instant.now();
+        return new IbkrResolvedContract(
+                conId,
+                firstNonBlank(firstText(node, "symbol", "ticker"), candidate.symbol()),
+                firstNonBlank(firstText(node, "localSymbol"), candidate.localSymbol()),
+                secType,
+                firstNonBlank(firstText(node, "currency"), candidate.currency(), "USD"),
+                firstNonBlank(firstText(node, "exchange"), candidate.exchange(), defaultExchange(secType)),
+                firstNonBlank(firstText(node, "primaryExchange", "listingExchange"), candidate.primaryExchange()),
+                firstNonBlank(firstText(node, "tradingClass"), candidate.tradingClass()),
+                firstNonBlank(firstText(node, "multiplier"), candidate.multiplier()),
+                firstNonBlank(firstText(node, "lastTradeDateOrContractMonth", "maturityDate", "month"),
+                        candidate.lastTradeDateOrContractMonth()),
+                parseDoubleOrNull(firstText(node, "strike")),
+                firstText(node, "right"),
+                parseLongOrNull(firstText(node, "underlyingConid", "underConid", "underlyingConId")),
+                parseDoubleOrNull(firstText(node, "minTick")),
+                firstText(node, "marketRuleIds", "marketRuleId"),
+                firstNonBlank(firstText(node, "longName", "companyName", "description"), candidate.description()),
+                firstText(node, "category"),
+                firstText(node, "subcategory"),
+                candidate.source(),
+                now,
+                now,
+                node.toString());
+    }
+
+    private IbkrResolvedContract resolvedFromCandidate(IbkrContractCandidate candidate) {
+        long conId = candidate.conId() == null || candidate.conId() <= 0
+                ? Math.abs((candidate.symbol() + candidate.currency() + candidate.secType()).hashCode())
+                : candidate.conId();
+        Instant now = Instant.now();
+        String secType = firstNonBlank(candidate.secType(), candidate.securityType().ibkrCode());
+        return new IbkrResolvedContract(
+                conId,
+                candidate.symbol(),
+                candidate.localSymbol(),
+                secType,
+                firstNonBlank(candidate.currency(), "USD"),
+                firstNonBlank(candidate.exchange(), defaultExchange(secType)),
+                candidate.primaryExchange(),
+                candidate.tradingClass(),
+                candidate.multiplier(),
+                candidate.lastTradeDateOrContractMonth(),
+                null,
+                "",
+                null,
+                null,
+                "",
+                candidate.description(),
+                "",
+                "",
+                candidate.source(),
+                now,
+                now,
+                candidate.metadataJson());
+    }
+
+    private String defaultExchange(String secType) {
+        if ("CASH".equalsIgnoreCase(secType)) {
+            return "IDEALPRO";
+        }
+        if ("FUT".equalsIgnoreCase(secType)) {
+            return "GLOBEX";
+        }
+        return "SMART";
+    }
+
+    private Long parseLongOrNull(String value) {
+        if (!notBlank(value)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value.replaceAll("[^0-9-]", ""));
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private long firstLongPositive(JsonNode node, long fallback, String... names) {
+        Long value = parseLongOrNull(firstText(node, names));
+        return value != null && value > 0 ? value : fallback;
+    }
+
+    private Double parseDoubleOrNull(String value) {
+        if (!notBlank(value)) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(value.replace(",", ""));
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     private HttpRequest.Builder request(String path) {
@@ -431,9 +813,9 @@ public final class IbkrClientPortalClient {
 
     private String bearerToken() {
         String token = firstNonBlank(
+                credentials == null ? null : credentials.accessToken(),
                 System.getenv("IBKR_ACCESS_TOKEN"),
-                System.getenv("IBK_ACCESS_TOKEN"),
-                credentials == null ? null : credentials.accessToken());
+                System.getenv("IBK_ACCESS_TOKEN"));
         if (!looksLikeBearerToken(token)) {
             return null;
         }
@@ -442,6 +824,7 @@ public final class IbkrClientPortalClient {
 
     private boolean allowCompetingSessionTakeover() {
         return Boolean.parseBoolean(firstNonBlank(
+                credentials == null ? null : credentials.param("allowCompeteTakeover"),
                 System.getProperty("investpro.ibkr.allowCompeteTakeover"),
                 System.getenv("IBKR_ALLOW_COMPETE_TAKEOVER"),
                 "false"));
@@ -481,6 +864,7 @@ public final class IbkrClientPortalClient {
 
     private String clientPortalBaseUrl() {
         String configured = firstNonBlank(
+                credentials == null ? null : credentials.param("clientPortalUrl"),
                 System.getenv("IBKR_CLIENT_PORTAL_URL"),
                 System.getProperty("investpro.ibkr.clientPortalUrl"));
         if (!notBlank(configured)) {
@@ -824,6 +1208,7 @@ public final class IbkrClientPortalClient {
 
     private boolean isClientPortalAuthMode() {
         String mode = firstNonBlank(
+                credentials == null ? null : credentials.param("authMode"),
                 System.getProperty("investpro.ibkr.authMode"),
                 System.getenv("IBKR_AUTH_MODE"),
                 "gateway");

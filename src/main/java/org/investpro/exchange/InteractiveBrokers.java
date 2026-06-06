@@ -5,8 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
+
 import org.investpro.models.Account;
 import org.investpro.data.CandleData;
 import org.investpro.data.InProgressCandleData;

@@ -20,6 +20,7 @@ public final class IbkrOrderService {
     private final IbkrAccountService accountService;
     private final IbkrMarketDataProvider marketDataProvider;
     private final IbkrPersistenceStore persistenceStore;
+    private final IbkrContractResolver contractResolver;
 
     private final ConcurrentHashMap<String, OpenOrder> openOrders = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<String> executions = new CopyOnWriteArrayList<>();
@@ -27,14 +28,17 @@ public final class IbkrOrderService {
     public IbkrOrderService(IbkrPositionService positionService,
             IbkrAccountService accountService,
             IbkrMarketDataProvider marketDataProvider,
-            IbkrPersistenceStore persistenceStore) {
+            IbkrPersistenceStore persistenceStore,
+            IbkrContractResolver contractResolver) {
         this.positionService = positionService;
         this.accountService = accountService;
         this.marketDataProvider = marketDataProvider;
         this.persistenceStore = persistenceStore;
+        this.contractResolver = contractResolver;
     }
 
     public String submitMarket(TradePair pair, Side side, double quantity) {
+        ensureResolved(pair);
         double fillPrice = marketDataProvider.fetchTicker(pair).join().getMidPrice();
         String executionId = executionId("MKT");
 
@@ -48,18 +52,22 @@ public final class IbkrOrderService {
     }
 
     public String submitLimit(TradePair pair, Side side, double quantity, double limitPrice) {
+        ensureResolved(pair);
         return createOpenOrder(pair, side, OpenOrder.OrderType.LIMIT, quantity, limitPrice, null);
     }
 
     public String submitStop(TradePair pair, Side side, double quantity, double stopPrice) {
+        ensureResolved(pair);
         return createOpenOrder(pair, side, OpenOrder.OrderType.STOP_LOSS, quantity, stopPrice, null);
     }
 
     public String submitStopLimit(TradePair pair, Side side, double quantity, double stopPrice, double limitPrice) {
+        ensureResolved(pair);
         return createOpenOrder(pair, side, OpenOrder.OrderType.STOP_LIMIT, quantity, limitPrice, "stop=" + stopPrice);
     }
 
     public String submitTrailingStop(TradePair pair, Side side, double quantity, double trailingDistance) {
+        ensureResolved(pair);
         return createOpenOrder(pair, side, OpenOrder.OrderType.TRAILING_STOP, quantity, trailingDistance,
                 "trailingDistance=" + trailingDistance);
     }
@@ -70,6 +78,7 @@ public final class IbkrOrderService {
             double entryPrice,
             double stopLoss,
             double takeProfit) {
+        ensureResolved(pair);
         String parentId = createOpenOrder(pair, side, OpenOrder.OrderType.LIMIT, quantity, entryPrice,
                 "bracket=parent");
         createOpenOrder(pair, opposite(side), OpenOrder.OrderType.STOP_LOSS, quantity, stopLoss,
@@ -152,6 +161,12 @@ public final class IbkrOrderService {
         openOrders.put(orderId, order);
         persistOpenOrders();
         return orderId;
+    }
+
+    private void ensureResolved(TradePair pair) {
+        if (contractResolver != null) {
+            contractResolver.requireResolved(pair);
+        }
     }
 
     private void persistOpenOrders() {

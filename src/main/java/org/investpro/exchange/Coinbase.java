@@ -38,6 +38,8 @@ import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.market.MarketDataCache;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.TradabilityStatus;
+import org.investpro.trading.tradability.session.ExchangeSessionService;
+import org.investpro.trading.tradability.session.SessionState;
 import org.java_websocket.drafts.Draft_6455;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -1444,18 +1446,39 @@ public class Coinbase extends Exchange {
             reason = "Coinbase product is tradable";
         }
 
-        boolean supportsOrders = canSubmitOrders();
-        boolean orderSubmissionAllowed = supportsOrders
-                && status != TradabilityStatus.VIEW_ONLY
-                && status != TradabilityStatus.DISABLED
-                && status != TradabilityStatus.HALTED
-                && status != TradabilityStatus.CANCEL_ONLY
-                && status != TradabilityStatus.AUCTION_ONLY
-                && status != TradabilityStatus.UNSUPPORTED_PRODUCT_TYPE
-                && status != TradabilityStatus.MIN_SIZE_INVALID;
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("is_disabled", isDisabled);
+        metadata.put("trading_disabled", tradingDisabled);
+        metadata.put("view_only", viewOnly);
+        metadata.put("cancel_only", cancelOnly);
+        metadata.put("limit_only", limitOnly);
+        metadata.put("post_only", postOnly);
+        metadata.put("auction_mode", auctionOnly);
+        metadata.put("product_type", productType);
+        metadata.put("productStatus", status.name());
+        metadata.put("base_min_size", baseMinSize.toPlainString());
+        metadata.put("quote_min_size", quoteMinSize.toPlainString());
 
-        if (!supportsOrders && status == TradabilityStatus.FULLY_TRADABLE) {
-            reason = "Coinbase product is tradable; order submission is unavailable until exchange session is active";
+        SessionState sessionState = new ExchangeSessionService()
+                .sessionState(this, pair, status, metadata);
+        boolean orderSubmissionAllowed = (status == TradabilityStatus.FULLY_TRADABLE
+                || status == TradabilityStatus.LIMIT_ONLY)
+                && sessionState.orderSubmissionOpen()
+                && sessionState.openNewPositionsAllowed();
+        boolean marketOrderAllowed = orderSubmissionAllowed
+                && status != TradabilityStatus.LIMIT_ONLY
+                && status != TradabilityStatus.POST_ONLY;
+        boolean limitOrderAllowed = orderSubmissionAllowed
+                || (status == TradabilityStatus.LIMIT_ONLY
+                && sessionState.orderSubmissionOpen()
+                && sessionState.openNewPositionsAllowed());
+
+        if (status == TradabilityStatus.FULLY_TRADABLE) {
+            reason = sessionState.reason();
+        } else if (status == TradabilityStatus.CANCEL_ONLY) {
+            reason = "Order blocked because product is cancel-only.";
+        } else if (status == TradabilityStatus.LIMIT_ONLY) {
+            reason = "Coinbase product supports limit-only trading.";
         }
 
         return new SymbolTradability(
@@ -1470,25 +1493,38 @@ public class Coinbase extends Exchange {
                 orderSubmissionAllowed,
                 orderSubmissionAllowed,
                 orderSubmissionAllowed,
-                status != TradabilityStatus.LIMIT_ONLY && status != TradabilityStatus.POST_ONLY,
-                status != TradabilityStatus.CANCEL_ONLY,
+                marketOrderAllowed,
+                limitOrderAllowed,
                 supportsStopLossTakeProfit(),
                 false,
                 supportsLeverage(),
                 supportsLeverage(),
                 reason,
                 Instant.now(),
-                Map.of(
-                        "is_disabled", isDisabled,
-                        "trading_disabled", tradingDisabled,
-                        "view_only", viewOnly,
-                        "cancel_only", cancelOnly,
-                        "limit_only", limitOnly,
-                        "post_only", postOnly,
-                        "auction_mode", auctionOnly,
-                        "product_type", productType,
-                        "base_min_size", baseMinSize.toPlainString(),
-                        "quote_min_size", quoteMinSize.toPlainString()));
+                sessionMetadata(metadata, sessionState, orderSubmissionAllowed, marketOrderAllowed, limitOrderAllowed));
+    }
+
+    private Map<String, Object> sessionMetadata(
+            Map<String, Object> metadata,
+            SessionState sessionState,
+            boolean orderSubmissionAllowed,
+            boolean marketOrderAllowed,
+            boolean limitOrderAllowed
+    ) {
+        Map<String, Object> result = new LinkedHashMap<>(metadata);
+        result.put("accountPermission", canSubmitOrders());
+        result.put("connected", Boolean.TRUE.equals(isConnected()));
+        result.put("requiresActiveSession", sessionState.requiresActiveSession());
+        result.put("session.marketDataAvailable", sessionState.marketDataAvailable());
+        result.put("session.orderSubmissionOpen", sessionState.orderSubmissionOpen());
+        result.put("session.cancelAllowed", sessionState.cancelAllowed());
+        result.put("session.reduceOnly", sessionState.reduceOnly());
+        result.put("session.openNewPositionsAllowed", sessionState.openNewPositionsAllowed());
+        result.put("session.reason", sessionState.reason());
+        result.put("orderSubmissionAllowed", orderSubmissionAllowed);
+        result.put("marketOrderAllowed", marketOrderAllowed);
+        result.put("limitOrderAllowed", limitOrderAllowed);
+        return result;
     }
 
     private BigDecimal safeDecimal(String value) {

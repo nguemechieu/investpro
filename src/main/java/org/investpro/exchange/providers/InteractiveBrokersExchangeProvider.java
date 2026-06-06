@@ -17,7 +17,7 @@ public final class InteractiveBrokersExchangeProvider implements ExchangeProvide
 
     @Override
     public String displayName() {
-        return "Interactive Brokers";
+        return "Interactive Brokers - IBKR Control Panel";
     }
 
     @Override

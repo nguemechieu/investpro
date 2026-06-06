@@ -28,17 +28,26 @@ public final class IbkrMarketDataProvider {
 
     private final IbkrConnectionManager connectionManager;
     private final IbkrClientPortalClient clientPortalClient;
+    private final IbkrContractResolver contractResolver;
     private final ConcurrentHashMap<String, Double> lastPriceBySymbol = new ConcurrentHashMap<>();
 
     public IbkrMarketDataProvider(IbkrConnectionManager connectionManager, IbkrClientPortalClient clientPortalClient) {
+        this(connectionManager, clientPortalClient, null);
+    }
+
+    public IbkrMarketDataProvider(IbkrConnectionManager connectionManager,
+            IbkrClientPortalClient clientPortalClient,
+            IbkrContractResolver contractResolver) {
         this.connectionManager = connectionManager;
         this.clientPortalClient = clientPortalClient;
+        this.contractResolver = contractResolver;
     }
 
     public CompletableFuture<Ticker> fetchTicker(TradePair pair) {
         return CompletableFuture.supplyAsync(() -> {
             if (connectionManager.getMode() == IbkrConnectionManager.Mode.LIVE && clientPortalClient != null) {
-                Optional<Ticker> liveTicker = clientPortalClient.fetchTicker(pair);
+                Optional<Ticker> liveTicker = resolvedContract(pair)
+                        .flatMap(clientPortalClient::fetchTicker);
                 if (liveTicker.isPresent()) {
                     connectionManager.markMarketDataAvailable(true);
                     return liveTicker.get();
@@ -55,7 +64,7 @@ public final class IbkrMarketDataProvider {
         return CompletableFuture.supplyAsync(() -> {
             if (connectionManager.getMode() == IbkrConnectionManager.Mode.LIVE && clientPortalClient != null) {
                 Optional<org.investpro.models.trading.OrderBook> liveOrderBook = clientPortalClient
-                        .fetchOrderBook(pair);
+                        .fetchOrderBook(resolvedContract(pair).orElse(null), pair);
                 if (liveOrderBook.isPresent()) {
                     connectionManager.markMarketDataAvailable(true);
                     return liveOrderBook.get();
@@ -198,6 +207,13 @@ public final class IbkrMarketDataProvider {
             log.warn("Failed to build ticker for {}", pair, exception);
             return Ticker.empty();
         }
+    }
+
+    private Optional<IbkrResolvedContract> resolvedContract(TradePair pair) {
+        if (contractResolver == null) {
+            return Optional.empty();
+        }
+        return Optional.of(contractResolver.requireResolved(pair));
     }
 
     private List<CandleData> syntheticCandles(TradePair pair, int secondsPerCandle, int count) {

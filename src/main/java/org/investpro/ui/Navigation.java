@@ -249,12 +249,7 @@ public class Navigation extends StackPane {
     private VBox createBrokerSection() {
         VBox section = createSection("Broker Integrations");
         section.getChildren().addAll(
-                createNavButton("IBKR Workspace", "Open the full Interactive Brokers workspace", "ibkr", true),
-                createNavButton("IBKR Connection", "Inspect IB Gateway health and reconnect", "ibkr-connection", false),
-                createNavButton("IBKR Account", "View balances and account summary", "ibkr-account-summary", false),
-                createNavButton("IBKR Portfolio", "Review portfolio and synchronisation", "ibkr-portfolio", false),
-                createNavButton("IBKR Positions", "Open position inventory", "ibkr-open-positions", false),
-                createNavButton("IBKR Orders", "View active broker orders", "ibkr-open-orders", false));
+                createNavButton("IBKR Control", "Configure and verify IB Gateway connectivity", "ibkr-connection", false));
         return section;
     }
 

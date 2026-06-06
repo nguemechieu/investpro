@@ -181,7 +181,7 @@ public final class LocalizationService {
         Map<String, String> index = new HashMap<>();
         for (String key : ENGLISH_BUNDLE.keySet()) {
             String value = ENGLISH_BUNDLE.getString(key);
-            if (value != null && !value.isBlank() && !value.contains("{")) {
+            if (!value.isBlank() && !value.contains("{")) {
                 index.putIfAbsent(value, key);
             }
         }

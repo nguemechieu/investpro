@@ -9,6 +9,8 @@
         <set>
           <option value="X-MBX-APIKEY" />
           <option value="Accept-Datetime-Format" />
+          <option value="API-Sign" />
+          <option value="API-Key" />
         </set>
       </option>
     </inspection_tool>

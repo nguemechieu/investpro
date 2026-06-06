@@ -1302,9 +1302,10 @@ public class CandleStickChart extends Region {
         chartStackPane.setPrefSize(canvasW, canvasH);
         chartStackPane.setMaxSize(canvasW, canvasH);
         xAxis.resizeRelocate(canvasX, canvasH, canvasW, TIME_AXIS_HEIGHT);
-        yAxis.resizeRelocate(canvasX + canvasW, 0, RIGHT_AXIS_WIDTH, canvasH);
-        double volumeH = canvasH * VOLUME_AREA_RATIO;
-        double volumeY = canvasH - volumeH;
+        double pricePlotH = pricePlotHeight();
+        yAxis.resizeRelocate(canvasX + canvasW, 0, RIGHT_AXIS_WIDTH, pricePlotH);
+        double volumeH = volumeAreaHeight();
+        double volumeY = volumeTopY();
         extraAxis.resizeRelocate(0, volumeY, leftAxisWidth, volumeH);
         extraAxis.setVisible(chartOptions.isShowVolume());
         if (leftToolPalette != null) {
@@ -1364,7 +1365,7 @@ public class CandleStickChart extends Region {
         recomputeVisiblePriceRange(visible);
         drawTradingBackground();
         drawGridLines();
-        double volumeScale = (canvas.getHeight() * VOLUME_AREA_RATIO) / visibleMaxVolume;
+        double volumeScale = volumeAreaHeight() / visibleMaxVolume;
         int highIndex = -1, lowIndex = -1;
         double high = Double.NEGATIVE_INFINITY, low = Double.POSITIVE_INFINITY;
 
@@ -1432,7 +1433,7 @@ public class CandleStickChart extends Region {
         graphicsContext.setStroke(Color.rgb(125, 211, 252, 0.16));
         graphicsContext.strokeLine(18, 10, w - 18, 10);
         if (chartOptions.isShowVolume()) {
-            double volumeTop = h * (1.0 - VOLUME_AREA_RATIO);
+            double volumeTop = volumeTopY();
             graphicsContext.setFill(Color.rgb(15, 23, 42, 0.62));
             graphicsContext.fillRoundRect(8, volumeTop, Math.max(1, w - 16), h - volumeTop - 12, 12, 12);
             graphicsContext.setStroke(Color.rgb(51, 65, 85, 0.65));
@@ -1469,6 +1470,9 @@ public class CandleStickChart extends Region {
         if (chartOptions.isHorizontalGridLinesVisible()) {
             for (Axis.TickMark<Number> tick : yAxis.getTickMarks()) {
                 double y = snapPixel(priceToY(tick.getValue().doubleValue()));
+                if (y < 0 || y > pricePlotHeight()) {
+                    continue;
+                }
                 graphicsContext.setStroke(THEME_GRID_MAJOR);
                 graphicsContext.strokeLine(0, y, canvas.getWidth(), y);
             }
@@ -1478,7 +1482,7 @@ public class CandleStickChart extends Region {
             for (int i = 0; i < visibleCandles; i += step) {
                 double x = candleCenterX(i);
                 graphicsContext.setStroke(i % (step * 2) == 0 ? THEME_GRID_MAJOR : THEME_GRID_MINOR);
-                graphicsContext.strokeLine(x, HEADER_HEIGHT, x, canvas.getHeight());
+                graphicsContext.strokeLine(x, HEADER_HEIGHT, x, pricePlotHeight());
             }
         }
     }
@@ -1783,7 +1787,7 @@ public class CandleStickChart extends Region {
     }
 
     private void drawVolumeBar(CandleData candle, double x, double width, Paint fill, double volumeScale) {
-        double maxH = canvas.getHeight() * VOLUME_AREA_RATIO;
+        double maxH = volumeAreaHeight();
         double height = Math.min(maxH, Math.max(1.0, candle.volume() * volumeScale));
         double y = canvas.getHeight() - height;
         graphicsContext.setGlobalAlpha(0.55);
@@ -1934,7 +1938,7 @@ public class CandleStickChart extends Region {
             if (!line.isVisible() || !line.isValid())
                 continue;
             double y = priceToY(line.getPrice());
-            if (y < 0 || y > canvas.getHeight())
+            if (y < 0 || y > pricePlotHeight())
                 continue;
             graphicsContext.setStroke(line.getColor());
             graphicsContext.setLineWidth(line.getLineWidth());
@@ -1985,7 +1989,7 @@ public class CandleStickChart extends Region {
                     graphicsContext.strokeLine(snapPixel(x1), snapPixel(y1), snapPixel(x2), snapPixel(y2));
                 case HORIZONTAL_LINE -> graphicsContext.strokeLine(0, snapPixel(y1), canvas.getWidth(), snapPixel(y1));
                 case VERTICAL_LINE ->
-                    graphicsContext.strokeLine(snapPixel(x1), HEADER_HEIGHT, snapPixel(x1), canvas.getHeight());
+                    graphicsContext.strokeLine(snapPixel(x1), HEADER_HEIGHT, snapPixel(x1), pricePlotHeight());
                 case RECTANGLE -> drawDrawingRectangle(x1, y1, x2, y2, drawing.color());
                 case TRIANGLE -> drawDrawingTriangle(x1, y1, x2, y2, drawing.color());
                 case CIRCLE -> drawDrawingCircle(x1, y1, x2, y2, drawing.color());
@@ -2128,8 +2132,9 @@ public class CandleStickChart extends Region {
             riskBottom = y1;
         }
 
-        riskTop = clamp(riskTop, HEADER_HEIGHT, canvas.getHeight());
-        riskBottom = clamp(riskBottom, HEADER_HEIGHT, canvas.getHeight());
+        double pricePlotH = pricePlotHeight();
+        riskTop = clamp(riskTop, HEADER_HEIGHT, pricePlotH);
+        riskBottom = clamp(riskBottom, HEADER_HEIGHT, pricePlotH);
         double riskY = Math.min(riskTop, riskBottom);
         double riskH = Math.max(1.0, Math.abs(riskBottom - riskTop));
         double rewardY = Math.min(rewardTop, rewardBottom);
@@ -2160,7 +2165,7 @@ public class CandleStickChart extends Region {
             Color accent) {
         double x = clamp(centerX - width / 2.0, 4, Math.max(4, canvas.getWidth() - width - 4));
         double y = clamp(centerY - height / 2.0, HEADER_HEIGHT,
-                Math.max(HEADER_HEIGHT, canvas.getHeight() - height - 4));
+                Math.max(HEADER_HEIGHT, pricePlotHeight() - height - 4));
         graphicsContext.setFill(Color.rgb(2, 6, 23, 0.86));
         graphicsContext.fillRoundRect(x, y, width, height, 8, 8);
         graphicsContext.setStroke(accent);
@@ -2610,14 +2615,15 @@ public class CandleStickChart extends Region {
     private void drawCurrentPriceBadge(CandleData candle) {
         double price = candle.closePrice();
         double y = priceToY(price);
-        if (y < 0 || y > canvas.getHeight()) {
+        double pricePlotH = pricePlotHeight();
+        if (y < 0 || y > pricePlotH) {
             return;
         }
         boolean bullish = candle.closePrice() >= candle.openPrice();
         Color color = bullish ? THEME_BUY : THEME_SELL;
         double x = canvas.getWidth() - PRICE_BADGE_WIDTH - 6;
         double badgeY = clamp(y - PRICE_BADGE_HEIGHT / 2.0, HEADER_HEIGHT + 2,
-                canvas.getHeight() - PRICE_BADGE_HEIGHT - 8);
+                pricePlotH - PRICE_BADGE_HEIGHT - 8);
         graphicsContext.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.50));
         graphicsContext.setLineWidth(1);
         graphicsContext.setLineDashes(6, 6);
@@ -2639,9 +2645,11 @@ public class CandleStickChart extends Region {
         graphicsContext.setLineWidth(1.0);
         graphicsContext.setLineDashes(4, 4);
         graphicsContext.strokeLine(crosshairMouseX, 0, crosshairMouseX, canvas.getHeight());
-        graphicsContext.strokeLine(0, crosshairMouseY, canvas.getWidth(), crosshairMouseY);
+        double pricePlotH = pricePlotHeight();
+        double priceMouseY = clamp(crosshairMouseY, 0.0, pricePlotH);
+        graphicsContext.strokeLine(0, priceMouseY, canvas.getWidth(), priceMouseY);
         graphicsContext.setLineDashes();
-        double price = yToPrice(crosshairMouseY);
+        double price = yToPrice(priceMouseY);
         hoveredPrice = price;
         int index = clampInt(
                 (int) Math.floor(crosshairMouseX / Math.max(1.0, canvas.getWidth() / Math.max(1, visibleCandles))), 0,
@@ -2650,8 +2658,8 @@ public class CandleStickChart extends Region {
         if (index < visible.size())
             hoveredTime = visible.get(index).openTime();
         drawLabelBadge(formatPrice(price), canvas.getWidth() - PRICE_BADGE_WIDTH,
-                clamp(crosshairMouseY - PRICE_BADGE_HEIGHT / 2.0, HEADER_HEIGHT + 2,
-                        canvas.getHeight() - PRICE_BADGE_HEIGHT - 2),
+                clamp(priceMouseY - PRICE_BADGE_HEIGHT / 2.0, HEADER_HEIGHT + 2,
+                        pricePlotH - PRICE_BADGE_HEIGHT - 2),
                 PRICE_BADGE_WIDTH);
         if (hoveredTime > 0) {
             String time = CROSSHAIR_TIME_FORMAT.format(Instant.ofEpochSecond(hoveredTime));
@@ -2947,12 +2955,40 @@ public class CandleStickChart extends Region {
 
     private double priceToY(double price) {
         double range = Math.max(0.00000001, visibleMaxPrice - visibleMinPrice);
-        return canvas.getHeight() - ((price - visibleMinPrice) / range * canvas.getHeight());
+        double plotHeight = pricePlotHeight();
+        return plotHeight - ((price - visibleMinPrice) / range * plotHeight);
     }
 
     private double yToPrice(double y) {
         double range = Math.max(0.00000001, visibleMaxPrice - visibleMinPrice);
-        return visibleMinPrice + ((canvas.getHeight() - y) / canvas.getHeight() * range);
+        double plotHeight = pricePlotHeight();
+        double clampedY = clamp(y, 0.0, plotHeight);
+        return visibleMinPrice + ((plotHeight - clampedY) / plotHeight * range);
+    }
+
+    private double pricePlotHeight() {
+        if (canvas == null) {
+            return 1.0;
+        }
+        double height = Math.max(1.0, canvas.getHeight());
+        if (!chartOptions.isShowVolume()) {
+            return height;
+        }
+        return Math.max(1.0, height - volumeAreaHeight());
+    }
+
+    private double volumeAreaHeight() {
+        if (canvas == null || !chartOptions.isShowVolume()) {
+            return 0.0;
+        }
+        return Math.max(1.0, canvas.getHeight() * VOLUME_AREA_RATIO);
+    }
+
+    private double volumeTopY() {
+        if (canvas == null) {
+            return 0.0;
+        }
+        return Math.max(0.0, canvas.getHeight() - volumeAreaHeight());
     }
 
     private long xToTime(double x) {
@@ -4442,7 +4478,7 @@ public class CandleStickChart extends Region {
         }
 
         double chartW = canvas.getWidth();
-        double chartH = canvas.getHeight();
+        double chartH = pricePlotHeight();
         double priceMin = yAxis.getLowerBound();
         double priceMax = yAxis.getUpperBound();
         int visibleCount = this.visibleCandles;

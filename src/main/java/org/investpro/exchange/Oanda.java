@@ -23,6 +23,8 @@ import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.TradabilityStatus;
+import org.investpro.trading.tradability.session.ExchangeSessionService;
+import org.investpro.trading.tradability.session.SessionState;
 import org.investpro.service.AuthResult;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
@@ -678,11 +680,33 @@ public class Oanda extends Exchange {
             }
         }
 
-        boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE && canSubmitOrders();
-        if (!canSubmitOrders() && status == TradabilityStatus.FULLY_TRADABLE) {
-            status = TradabilityStatus.API_KEY_RESTRICTED;
-            reason = "OANDA API/account cannot currently submit orders";
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("instrument", instrument);
+        metadata.put("session", String.valueOf(pair.getTradingSessionStatus()));
+        metadata.put("productStatus", status.name());
+
+        SessionState sessionState = new ExchangeSessionService().sessionState(this, pair, status, metadata);
+        boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE
+                && sessionState.orderSubmissionOpen()
+                && sessionState.openNewPositionsAllowed();
+        if (status == TradabilityStatus.FULLY_TRADABLE) {
+            reason = sessionState.reason();
+            if (!orderSubmissionAllowed && !canSubmitOrders()) {
+                status = TradabilityStatus.API_KEY_RESTRICTED;
+            } else if (!orderSubmissionAllowed) {
+                status = TradabilityStatus.MARKET_CLOSED;
+            }
         }
+
+        metadata.put("accountPermission", canSubmitOrders());
+        metadata.put("connected", Boolean.TRUE.equals(isConnected()));
+        metadata.put("requiresActiveSession", sessionState.requiresActiveSession());
+        metadata.put("session.marketDataAvailable", sessionState.marketDataAvailable());
+        metadata.put("session.orderSubmissionOpen", sessionState.orderSubmissionOpen());
+        metadata.put("session.cancelAllowed", sessionState.cancelAllowed());
+        metadata.put("session.reduceOnly", sessionState.reduceOnly());
+        metadata.put("session.openNewPositionsAllowed", sessionState.openNewPositionsAllowed());
+        metadata.put("session.reason", sessionState.reason());
 
         return new SymbolTradability(
                 getExchangeId(),
@@ -704,9 +728,7 @@ public class Oanda extends Exchange {
                 supportsLeverage(),
                 reason,
                 Instant.now(),
-                Map.of(
-                        "instrument", instrument,
-                        "session", String.valueOf(pair.getTradingSessionStatus())));
+                metadata);
     }
 
     @Override

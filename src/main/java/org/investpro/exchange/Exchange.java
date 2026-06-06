@@ -3,8 +3,7 @@ package org.investpro.exchange;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
+
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.contracts.*;
 import org.investpro.exchange.credentials.ExchangeCredentials;
@@ -15,6 +14,8 @@ import org.investpro.market.ExchangeMarketDataAdapter;
 import org.investpro.trading.tradability.ExchangeInstrumentService;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.TradabilityStatus;
+import org.investpro.trading.tradability.session.ExchangeSessionService;
+import org.investpro.trading.tradability.session.SessionState;
 import org.investpro.service.AuthResult;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
@@ -195,8 +196,22 @@ public abstract class Exchange implements
                 ? (marketOpen ? TradabilityStatus.FULLY_TRADABLE : TradabilityStatus.MARKET_CLOSED)
                 : TradabilityStatus.UNSUPPORTED_PRODUCT_TYPE;
 
-        boolean liveAllowed = supportsPair && marketOpen && canSubmitOrders();
-        boolean orderAllowed = supportsPair && canSubmitOrders();
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("source", "exchange-default");
+        metadata.put("productStatus", status.name());
+        SessionState sessionState = new ExchangeSessionService().sessionState(this, pair, status, metadata);
+
+        boolean orderAllowed = supportsPair && sessionState.orderSubmissionOpen() && sessionState.openNewPositionsAllowed();
+        boolean liveAllowed = supportsPair && marketOpen && orderAllowed;
+        metadata.put("accountPermission", canSubmitOrders());
+        metadata.put("connected", Boolean.TRUE.equals(isConnected()));
+        metadata.put("requiresActiveSession", sessionState.requiresActiveSession());
+        metadata.put("session.marketDataAvailable", sessionState.marketDataAvailable());
+        metadata.put("session.orderSubmissionOpen", sessionState.orderSubmissionOpen());
+        metadata.put("session.cancelAllowed", sessionState.cancelAllowed());
+        metadata.put("session.reduceOnly", sessionState.reduceOnly());
+        metadata.put("session.openNewPositionsAllowed", sessionState.openNewPositionsAllowed());
+        metadata.put("session.reason", sessionState.reason());
 
         SymbolTradability tradability = new SymbolTradability(
                 getExchangeId(),
@@ -216,10 +231,10 @@ public abstract class Exchange implements
                 false,
                 supportsPair && supportsLeverage(),
                 supportsPair && supportsLeverage(),
-                supportsPair ? (marketOpen ? "Tradable by default exchange policy" : "Market/session closed")
+                supportsPair ? (sessionState.reason())
                         : "Instrument is not supported by this exchange",
                 Instant.now(),
-                Map.of("source", "exchange-default"));
+                metadata);
 
         return CompletableFuture.completedFuture(tradability);
     }
@@ -227,8 +242,17 @@ public abstract class Exchange implements
     protected SymbolTradability defaultTradability(TradePair pair, TradabilityStatus status, String reason) {
         boolean supportsPair = pair != null && supportsTradePair(pair);
         boolean marketOpen = pair == null || marketDataEngine == null || marketDataEngine.isTradableNow(pair);
-        boolean orderAllowed = supportsPair && canSubmitOrders();
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("source", "exchange-default-helper");
+        metadata.put("productStatus", status == null ? "" : status.name());
+        SessionState sessionState = new ExchangeSessionService().sessionState(this, pair, status, metadata);
+        boolean orderAllowed = supportsPair && sessionState.orderSubmissionOpen() && sessionState.openNewPositionsAllowed();
         boolean liveAllowed = supportsPair && marketOpen && orderAllowed;
+        metadata.put("accountPermission", canSubmitOrders());
+        metadata.put("connected", Boolean.TRUE.equals(isConnected()));
+        metadata.put("requiresActiveSession", sessionState.requiresActiveSession());
+        metadata.put("session.orderSubmissionOpen", sessionState.orderSubmissionOpen());
+        metadata.put("session.reason", sessionState.reason());
 
         return new SymbolTradability(
                 getExchangeId(),
@@ -248,9 +272,9 @@ public abstract class Exchange implements
                 false,
                 supportsPair && supportsLeverage(),
                 supportsPair && supportsLeverage(),
-                reason == null ? "" : reason,
+                reason == null || reason.isBlank() ? sessionState.reason() : reason,
                 Instant.now(),
-                Map.of("source", "exchange-default-helper"));
+                metadata);
     }
 
     /**
