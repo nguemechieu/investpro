@@ -11,6 +11,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
 class ExchangeSessionServiceTest {
 
     private final ExchangeSessionService service = new ExchangeSessionService();
@@ -53,6 +54,21 @@ class ExchangeSessionServiceTest {
 
         assertFalse(state.orderSubmissionOpen());
         assertTrue(state.reason().contains("disconnected"));
+    }
+
+    @Test
+    void coinbaseConnectedWithoutLivePermissionReportsPermissionProblem() throws Exception {
+        ProviderSessionContext coinbase = exchange("coinbase", "Coinbase Advanced Trade", true, false);
+        SessionState state = service.sessionState(
+                coinbase,
+                TradePair.of("BTC", "USD"),
+                TradabilityStatus.FULLY_TRADABLE,
+                Map.of("product_type", "SPOT"),
+                Instant.parse("2026-06-06T12:00:00Z"));
+
+        assertFalse(state.orderSubmissionOpen());
+        assertTrue(state.reason().contains("account lacks live trading permission"));
+        assertFalse(state.reason().contains("disconnected"));
     }
 
     @Test

@@ -8,6 +8,8 @@ import org.investpro.ai.PositionActionIntent;
 import org.investpro.core.SystemCore;
 import org.investpro.data.Db1;
 import org.investpro.exchange.Exchange;
+import org.investpro.models.market.MarketInstrument;
+import org.investpro.models.market.MarketType;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.TradePair;
 import org.investpro.persistence.repository.CurrencyRepository;
@@ -426,6 +428,64 @@ public class ExecutionEngine {
                 riskContext,
                 finalDecision,
                 "LEGACY_SIDE_SIGNAL");
+    }
+
+    public CompletableFuture<PositionExecutionResult> executeApprovedOrder(
+            @NotNull MarketInstrument instrument,
+            @NotNull Side side,
+            @NotNull TradeRiskContext riskContext,
+            @NotNull FinalRiskGate.OrderApprovalDecision finalDecision) {
+        Objects.requireNonNull(instrument, "instrument cannot be null");
+        Objects.requireNonNull(side, "side cannot be null");
+        Objects.requireNonNull(riskContext, "riskContext cannot be null");
+        Objects.requireNonNull(finalDecision, "finalDecision cannot be null");
+
+        PositionExecutionResult instrumentFailure = validateMarketInstrumentForOrder(instrument);
+        if (instrumentFailure != null) {
+            return CompletableFuture.completedFuture(instrumentFailure);
+        }
+
+        if (instrument.tradePair() == null) {
+            return CompletableFuture.completedFuture(PositionExecutionResult.failed(
+                    "Order blocked: " + instrument.nativeSymbol() + " has no safe TradePair mapping."));
+        }
+
+        return executeApprovedOrderInternal(
+                side,
+                instrument.tradePair(),
+                riskContext.getEntryPrice(),
+                riskContext,
+                finalDecision,
+                "MARKET_INSTRUMENT");
+    }
+
+    private @Nullable PositionExecutionResult validateMarketInstrumentForOrder(@NotNull MarketInstrument instrument) {
+        if (instrument.marketType() == MarketType.UNKNOWN) {
+            return PositionExecutionResult.failed(
+                    "Order blocked: " + instrument.nativeSymbol() + " has UNKNOWN market type.");
+        }
+
+        if (instrument.tradability() != null
+                && (!instrument.tradability().orderSubmissionAllowed()
+                || !instrument.tradability().isFullyTradable())) {
+            return PositionExecutionResult.failed(
+                    "Order blocked by tradability policy for " + instrument.nativeSymbol()
+                            + ": " + instrument.tradability().reason());
+        }
+
+        if (instrument.isDerivative()) {
+            return PositionExecutionResult.failed(
+                    "Order blocked: " + instrument.nativeSymbol()
+                            + " is a derivative contract and derivative order routing is not implemented or not permitted.");
+        }
+
+        if (instrument.marketType() != MarketType.SPOT) {
+            return PositionExecutionResult.failed(
+                    "Order blocked: " + instrument.nativeSymbol() + " is " + instrument.marketBadge()
+                            + "; current route supports spot products only.");
+        }
+
+        return null;
     }
 
     private CompletableFuture<PositionExecutionResult> executeApprovedOrderInternal(

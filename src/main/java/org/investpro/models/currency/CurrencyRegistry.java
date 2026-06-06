@@ -105,8 +105,8 @@ public final class CurrencyRegistry {
             return existing;
         }
 
-        if (isReservedCode(normalized)) {
-            log.debug("Skipping reserved currency code: {}", normalized);
+        if (isNonCurrencyToken(normalized)) {
+            log.debug("Skipping non-currency token: {}", normalized);
             return UnknownCurrency.of(normalized);
         }
 
@@ -179,8 +179,8 @@ public final class CurrencyRegistry {
             return;
         }
 
-        if (isReservedCode(code)) {
-            log.info("Skipping reserved currency code {} from provider {}", code, provider.providerId());
+        if (isNonCurrencyToken(code)) {
+            log.info("Skipping non-currency token {} from provider {}", code, provider.providerId());
             return;
         }
 
@@ -236,7 +236,7 @@ public final class CurrencyRegistry {
         return CurrencyRegistry.class.getClassLoader().getResource(normalized) != null;
     }
 
-    private String normalizeCode(String code) {
+    private static String normalizeCode(String code) {
         if (code == null) {
             return "";
         }
@@ -250,7 +250,18 @@ public final class CurrencyRegistry {
         return symbol.trim().toUpperCase(Locale.ROOT);
     }
 
-    private boolean isReservedCode(String code) {
-        return code != null && code.startsWith("00");
+    public static boolean isNonCurrencyToken(String code) {
+        String normalized = normalizeCode(code);
+        return normalized.isBlank()
+                || "UNKNOWN".equals(normalized)
+                || "CDE".equals(normalized)
+                || "PERP".equals(normalized)
+                || "CDE-USD".equals(normalized)
+                || "CDE-USDC".equals(normalized)
+                || normalized.startsWith("00")
+                || normalized.matches("\\d{2}[A-Z]{3}\\d{2}")
+                || normalized.matches("\\d{2}[A-Z]{3}\\d{4}")
+                || normalized.matches(".*-CDE(?:-.+)?")
+                || normalized.matches(".*-PERP(?:-.+)?");
     }
 }

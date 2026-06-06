@@ -1,6 +1,7 @@
 package org.investpro.core.agents.symbol;
 
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.models.market.MarketInstrument;
 import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -41,6 +42,27 @@ public class SymbolAgentManager {
         return symbolStates.computeIfAbsent(symbolKey(symbol), ignored -> defaultState(symbol));
     }
 
+    public Optional<SymbolAgentState> getState(@NotNull MarketInstrument instrument) {
+        if (instrument.tradePair() == null) {
+            return Optional.empty();
+        }
+        SymbolAgentState state = symbolStates.get(instrumentKey(instrument));
+        return state == null ? getState(instrument.tradePair()) : Optional.of(state);
+    }
+
+    public Optional<SymbolAgentState> ensureInstrument(@NotNull MarketInstrument instrument) {
+        if (instrument.tradePair() == null || !instrument.canBotTrade()) {
+            return Optional.empty();
+        }
+        SymbolAgentState state = symbolStates.computeIfAbsent(
+                instrumentKey(instrument),
+                ignored -> defaultState(instrument.tradePair()));
+        state.setMarketInstrument(instrument);
+        state.setCanTradeLive(instrument.tradability() != null && instrument.tradability().liveTradingAllowed());
+        state.setBlockReason(resolveInstrumentBlockReason(instrument));
+        return Optional.of(state);
+    }
+
     /**
      * Seed the manager with all currently loaded market-watch symbols.
      */
@@ -51,6 +73,17 @@ public class SymbolAgentManager {
         for (TradePair symbol : symbols) {
             if (symbol != null) {
                 ensureSymbol(symbol);
+            }
+        }
+    }
+
+    public void initializeInstruments(@Nullable Collection<MarketInstrument> instruments) {
+        if (instruments == null || instruments.isEmpty()) {
+            return;
+        }
+        for (MarketInstrument instrument : instruments) {
+            if (instrument != null) {
+                ensureInstrument(instrument);
             }
         }
     }
@@ -135,6 +168,19 @@ public class SymbolAgentManager {
         return symbol.toString('/').trim().toUpperCase(Locale.ROOT);
     }
 
+    private static @NotNull String instrumentKey(@NotNull MarketInstrument instrument) {
+        String exchange = safeKey(instrument.exchangeId());
+        String routingExchange = safeKey(instrument.routingExchange());
+        String nativeSymbol = safeKey(instrument.nativeSymbol());
+        String pair = instrument.tradePair() == null ? "" : symbolKey(instrument.tradePair());
+        String symbol = nativeSymbol.isBlank() ? pair : nativeSymbol;
+        return String.join("|", exchange, routingExchange, symbol);
+    }
+
+    private static String safeKey(String value) {
+        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+    }
+
     private SymbolAgentState defaultState(@NotNull TradePair symbol) {
         SymbolAgentState state = SymbolAgentState.builder()
                 .symbol(symbol)
@@ -144,6 +190,19 @@ public class SymbolAgentManager {
                 .build();
         state.updateTimestamp();
         return state;
+    }
+
+    private String resolveInstrumentBlockReason(@NotNull MarketInstrument instrument) {
+        if (instrument.tradePair() == null) {
+            return "No safe TradePair mapping";
+        }
+        if (instrument.marketType() == org.investpro.models.market.MarketType.UNKNOWN) {
+            return "Unknown market type";
+        }
+        if (!instrument.canBotTrade()) {
+            return instrument.tradability() == null ? "Tradability unknown" : instrument.tradability().reason();
+        }
+        return "";
     }
 
     /**

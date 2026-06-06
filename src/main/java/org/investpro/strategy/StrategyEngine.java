@@ -7,6 +7,7 @@ import org.investpro.core.agents.execution.TradeExecutionCoordinator;
 import org.investpro.enums.AssetClass;
 import org.investpro.enums.ContractType;
 import org.investpro.enums.TradingSessionStatus;
+import org.investpro.models.market.MarketInstrument;
 import org.investpro.models.trading.TradePair;
 import org.investpro.research.StrategyRankingEngine;
 import org.investpro.risk.TradeRiskContext;
@@ -53,6 +54,8 @@ public class StrategyEngine {
     private final Map<String, Long> lastSignalTimestampCache = new ConcurrentHashMap<>();
 
     private StrategyRankingEngine strategyRankingEngine;
+    private final StrategyInstrumentCompatibilityService instrumentCompatibilityService =
+            new StrategyInstrumentCompatibilityService();
 
     public StrategyEngine(@NotNull TradeExecutionCoordinator tradeExecutionCoordinator) {
         this.tradeExecutionCoordinator = Objects.requireNonNull(
@@ -184,6 +187,22 @@ public class StrategyEngine {
             return false;
         }
 
+        MarketInstrument instrument = context.getMarketInstrument();
+        if (instrument != null) {
+            String definitionName = strategy.getMetadata() == null
+                    ? safeStrategyId(strategy)
+                    : firstNonBlank(strategy.getMetadata().getDisplayName(), strategy.getMetadata().getStrategyId());
+            StrategyDefinition definition = StrategyCatalog.definition(definitionName);
+            if (definition != null && !instrumentCompatibilityService.supports(definition, instrument)) {
+                log.debug(
+                        "StrategyEngine: Strategy {} incompatible with {} marketType={}",
+                        safeStrategyId(strategy),
+                        instrument.nativeSymbol(),
+                        instrument.marketType());
+                return false;
+            }
+        }
+
         if (context.getTimeframe() == null) {
             return false;
         }
@@ -221,6 +240,10 @@ public class StrategyEngine {
 
         return context.getMarketBehavior() == null
                 || strategy.supportsMarketBehavior(context.getMarketBehavior());
+    }
+
+    private String firstNonBlank(String first, String second) {
+        return first == null || first.isBlank() ? second : first;
     }
 
     // ============================================================================

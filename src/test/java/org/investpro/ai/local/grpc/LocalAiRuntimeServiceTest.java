@@ -6,6 +6,7 @@ import org.investpro.ai.AiDecision;
 import org.investpro.ai.AiReasoningService;
 import org.investpro.ai.AiTradeReviewRequest;
 import org.investpro.ai.AiTradeReviewResponse;
+import org.investpro.ai.local.grpc.generated.SignalReviewRequest;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -97,7 +98,7 @@ class LocalAiRuntimeServiceTest {
         }
 
         @Override
-        public SignalReviewResult analyzeSignal(org.investpro.ai.local.grpc.generated.SignalReviewRequest request) {
+        public SignalReviewResult analyzeSignal(SignalReviewRequest request) {
             if (fail) {
                 throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("simulated"));
             }

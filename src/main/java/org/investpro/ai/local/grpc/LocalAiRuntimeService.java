@@ -45,7 +45,7 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
         this.conservativeModeState = Objects.requireNonNull(conservativeModeState, "conservativeModeState cannot be null");
     }
 
-    public static LocalAiRuntimeService fromConfiguration() {
+    public static @NonNull LocalAiRuntimeService fromConfiguration() {
         String host = AppConfig.get(AppConfigKeys.AI_LOCAL_GRPC_HOST, "127.0.0.1");
         int port = AppConfig.getInt(AppConfigKeys.AI_LOCAL_GRPC_PORT, 8010);
         long timeoutMs = AppConfig.getLong(AppConfigKeys.AI_LOCAL_GRPC_TIMEOUT_MS, 1500L);
@@ -137,7 +137,7 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
                 lastError.get());
     }
 
-    private SignalReviewRequest toGrpcSignalRequest(AiTradeReviewRequest request) {
+    private @NonNull SignalReviewRequest toGrpcSignalRequest(@NonNull AiTradeReviewRequest request) {
         String symbol = request.getSymbol() == null ? "UNKNOWN" : request.getSymbol().toString('/');
         String regime = request.getRiskContext() == null || request.getRiskContext().getMarketBehavior() == null
                 ? "UNKNOWN"
@@ -145,7 +145,7 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
 
         return SignalReviewRequest.newBuilder()
                 .setSymbol(symbol)
-            .setTimeframe("1h")
+                .setTimeframe("1h")
                 .setSide(request.getSignalSide() == null ? "HOLD" : request.getSignalSide())
                 .setConfidence(request.getSignalConfidence())
                 .setPrice(request.getCurrentPrice())
@@ -159,7 +159,7 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
 
     private AiTradeReviewResponse mapToTradeReviewResponse(
             AiTradeReviewRequest request,
-            PythonAiGrpcClient.SignalReviewResult result,
+            PythonAiGrpcClient.@NonNull SignalReviewResult result,
             long latencyMs) {
         AiDecision decision;
         if (result.approved()) {

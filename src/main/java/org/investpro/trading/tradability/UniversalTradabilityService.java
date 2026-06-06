@@ -8,6 +8,7 @@ import org.investpro.exchange.StellarTradabilityEvaluator;
 import org.investpro.market.MarketDataEngine;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.TradePair;
+import org.jetbrains.annotations.Unmodifiable;
 import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
@@ -147,7 +148,7 @@ public final class UniversalTradabilityService {
                 .thenApply(statuses -> resolveBatchStatuses(sanitized, statuses));
     }
 
-    public List<TradePair> filterForMarketWatch(List<TradePair> pairs) {
+    public @NonNull @Unmodifiable List<TradePair> filterForMarketWatch(List<TradePair> pairs) {
         return sanitizePairs(pairs)
                 .stream()
                 .filter(this::canDisplayInMarketWatch)

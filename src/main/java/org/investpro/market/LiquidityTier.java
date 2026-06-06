@@ -1,11 +1,14 @@
 package org.investpro.market;
 
+import lombok.Getter;
+
 /**
  * BIS-derived FX market liquidity tier classification.
  * <p>
  * Based on BIS Triennial Central Bank Survey data on FX turnover.
  * Controls risk multiplier, auto-trading eligibility, and strategy recommendations.
  */
+@Getter
 public enum LiquidityTier {
 
     /** EUR/USD, USD/JPY, GBP/USD, USD/CHF, AUD/USD, USD/CAD, NZD/USD — deepest markets */
@@ -39,22 +42,6 @@ public enum LiquidityTier {
         this.autoTradingAllowed = autoTradingAllowed;
         this.recommendedStrategyStyle = recommendedStrategyStyle;
         this.description = description;
-    }
-
-    public double getRiskMultiplier() {
-        return riskMultiplier;
-    }
-
-    public boolean isAutoTradingAllowed() {
-        return autoTradingAllowed;
-    }
-
-    public String getRecommendedStrategyStyle() {
-        return recommendedStrategyStyle;
-    }
-
-    public String getDescription() {
-        return description;
     }
 
     public String getDisplayName() {

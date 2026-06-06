@@ -1,6 +1,7 @@
 package org.investpro.ui;
 
 import javafx.application.Platform;
+
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -56,6 +57,10 @@ import org.investpro.operations.SystemSnapshot;
 import org.investpro.ui.charts.ChartContainer;
 import org.investpro.ui.theme.MarketConfiguration;
 import org.investpro.ui.theme.ThemeManager;
+import org.investpro.models.market.ContractType;
+import org.investpro.models.market.InstrumentType;
+import org.investpro.models.market.MarketInstrument;
+import org.investpro.models.market.MarketType;
 import org.investpro.models.market.NewsEvent;
 import org.investpro.service.NewsDataProvider;
 import org.investpro.models.Account;
@@ -108,6 +113,7 @@ import org.investpro.trading.tradability.MarketWatchTradabilityFilter;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.TradabilityScope;
 import org.investpro.trading.tradability.UniversalTradabilityService;
+import org.investpro.trading.market.MarketInstrumentService;
 import org.investpro.persistence.repository.StrategyAssignmentRepository;
 import org.investpro.ui.charts.CandleStickChart;
 import org.investpro.ui.charts.DepthChart;
@@ -117,12 +123,16 @@ import org.investpro.ui.docking.DockManager;
 import org.investpro.ui.docking.DockRegionType;
 import org.investpro.ui.docking.SimpleDockablePane;
 import org.investpro.ui.ibkr.IbkrContractSearchController;
+import org.investpro.ui.market.MarketWatchSymbolFormatter;
 import org.investpro.ui.modules.IndicatorDialogModule;
 import org.investpro.ui.operations.SystemOperationsBoard;
 import org.investpro.ui.panels.*;
+import org.investpro.ui.tradingdesk.TradingDeskContext;
+import org.investpro.ui.tradingdesk.TradingDeskState;
+import org.investpro.ui.tradingdesk.controllers.FundingController;
+import org.investpro.ui.tradingdesk.services.TradingDeskFundingService;
 import org.investpro.ui.tools.DataWindow;
 import org.investpro.ui.utils.CurrencyIconLoader;
-import org.investpro.transfer.TransferPanel;
 import org.investpro.utils.DraggableTab;
 import org.investpro.utils.ZoomDirection;
 import org.investpro.utils.CandleDataSupplier;
@@ -135,7 +145,6 @@ import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigDecimal;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -190,6 +199,8 @@ public class TradingDesk extends BorderPane {
     private static final DateTimeFormatter SNAPSHOT_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
     private static final DateTimeFormatter STATUS_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final Duration MARKET_WATCH_CACHE_FRESHNESS = Duration.ofSeconds(15);
+    private static final Duration ORDER_TRADABILITY_REFRESH_TIMEOUT = Duration.ofMillis(1500);
+    private static final Duration ORDER_TRADABILITY_FALLBACK_MAX_AGE = Duration.ofSeconds(60);
     private static final String DOCK_LEFT_SIDEBAR_ID = "dock.left.sidebar";
     private static final String DOCK_CENTER_CHARTS_ID = "dock.center.charts";
     private static final String DOCK_RIGHT_ORDERBOOK_ID = "dock.right.orderbook";
@@ -342,6 +353,9 @@ public class TradingDesk extends BorderPane {
     private final CurrencyService currencyService;
     private final TradingService tradingService;
     private final NotificationService notificationService;
+    private TradingDeskContext tradingDeskContext;
+    private TradingDeskState tradingDeskState;
+    private FundingController fundingController;
     private final Preferences preferences = Preferences.userNodeForPackage(TradingDesk.class);
 
     private final ScheduledExecutorService autoRefreshExecutor = Executors.newScheduledThreadPool(3, runnable -> {
@@ -374,6 +388,8 @@ public class TradingDesk extends BorderPane {
     private UniversalTradabilityService universalTradabilityService;
     private String tradabilityServiceExchangeId = "";
     private final Map<String, SymbolTradability> tradabilityBySymbol = new java.util.concurrent.ConcurrentHashMap<>();
+    private final MarketInstrumentService marketInstrumentService = new MarketInstrumentService();
+    private final Map<String, MarketInstrument> marketInstrumentBySymbol = new java.util.concurrent.ConcurrentHashMap<>();
     private final List<TradePair> marketWatchUniverse = new ArrayList<>();
     private volatile MarketSnapshot cachedMarketSnapshot = MarketSnapshot.empty();
     private volatile Instant cachedMarketSnapshotAt = Instant.EPOCH;
@@ -403,6 +419,8 @@ public class TradingDesk extends BorderPane {
     private String configuredApiSecret = "";
     private String configuredAccountId = "";
     private String configuredTradingMode = "LIVE";
+    private InstrumentType configuredInstrumentType = InstrumentType.UNKNOWN;
+    private ContractType configuredContractType = ContractType.UNKNOWN;
     private String telegramToken = "";
     private String configuredOpenAiApiKey = "";
     private String oandaEmailNotification = "";
@@ -451,9 +469,9 @@ public class TradingDesk extends BorderPane {
 
     private record AssetBalanceRow(String asset, double balance, double equity, double margin, double freeMargin) {
     }
-
-    private static final class DetachedChartWindow {
-        private final String title;
+@Data
+private static final class DetachedChartWindow {
+        private String title;
         private final Tab originalTab;
         private final Tab floatingTab;
         private final Stage stage;
@@ -496,11 +514,53 @@ public class TradingDesk extends BorderPane {
 
         // Wire ExchangeService to SystemOperationsService for monitoring
         SystemOperationsService.getInstance().setExchangeService(exchangeService);
+        initializeTradingDeskModules();
 
         initialize(configuration);
+        installTradingDeskStateBindings();
         setupUI();
         initializeUiStreamConsumer();
         this.desktopStreamBridge = new DesktopExchangeStreamBridge(this);
+    }
+
+    private void initializeTradingDeskModules() {
+        TradingDeskFundingService fundingService = new TradingDeskFundingService(
+                () -> exchange,
+                this::connectedFundingExchanges,
+                () -> List.copyOf(symbolSelector.getItems()));
+        this.tradingDeskState = new TradingDeskState();
+        this.tradingDeskContext = new TradingDeskContext(
+                () -> systemCore,
+                () -> exchange,
+                () -> marketDataEngine,
+                () -> universalTradabilityService,
+                tradingService,
+                tradeService,
+                orderService,
+                notificationService,
+                fundingService);
+        this.fundingController = new FundingController(tradingDeskContext, tradingDeskState, this::journal);
+    }
+
+    private void installTradingDeskStateBindings() {
+        tradingDeskState.setSelectedExchange(exchangeSelector.getValue());
+        tradingDeskState.setSelectedTradePair(symbolSelector.getValue());
+        tradingDeskState.setSelectedTimeframe(timeframeSelector.getValue());
+        tradingDeskState.setPaperMode("PAPER".equalsIgnoreCase(safe(tradingModeSelector.getValue())));
+
+        exchangeSelector.valueProperty().addListener((obs, oldValue, newValue) ->
+                tradingDeskState.setSelectedExchange(newValue));
+        symbolSelector.valueProperty().addListener((obs, oldValue, newValue) ->
+                tradingDeskState.setSelectedTradePair(newValue));
+        timeframeSelector.valueProperty().addListener((obs, oldValue, newValue) ->
+                tradingDeskState.setSelectedTimeframe(newValue));
+        tradingModeSelector.valueProperty().addListener((obs, oldValue, newValue) -> {
+            boolean paper = "PAPER".equalsIgnoreCase(safe(newValue))
+                    || "SANDBOX".equalsIgnoreCase(safe(newValue))
+                    || "PRACTICE".equalsIgnoreCase(safe(newValue))
+                    || "TESTNET".equalsIgnoreCase(safe(newValue));
+            tradingDeskState.setPaperMode(paper);
+        });
     }
 
     private void setupUI() {
@@ -539,6 +599,8 @@ public class TradingDesk extends BorderPane {
         configuredApiSecret = configuration == null ? "" : safe(configuration.apiSecret());
         configuredAccountId = configuration == null ? "" : safe(configuration.accountId());
         configuredTradingMode = configuration == null ? "LIVE" : safe(configuration.tradingMode());
+        configuredInstrumentType = configuration == null ? InstrumentType.UNKNOWN : configuration.normalizedInstrumentType();
+        configuredContractType = configuration == null ? ContractType.UNKNOWN : configuration.normalizedContractType();
         if (configuredTradingMode.isBlank()) {
             configuredTradingMode = "LIVE";
         }
@@ -737,7 +799,7 @@ public class TradingDesk extends BorderPane {
         Menu accountsMenu = new Menu("Accounts");
         accountsMenu.getItems().setAll(
                 menuItem("Portfolio", null, this::openPortfolioWindow),
-                menuItem("Positions", null, this::openPositionsWindow),
+
                 menuItem("Deposits & Withdrawals", null, this::openDepositsWithdrawalsWindow),
                 menuItem("Transfer Funds", null, this::openTransferFundsWindow),
                 menuItem("Account Management", null, this::openAccountManagementWindow));
@@ -917,191 +979,25 @@ public class TradingDesk extends BorderPane {
     }
 
     private void openDepositsWithdrawalsWindow() {
-        Label title = new Label("Deposits & Withdrawals");
-        title.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #e2e8f0;");
-
-        Label subtitle = new Label(
-                "Submit live funding requests for connected exchanges that expose deposit/withdraw APIs. Cross-exchange movement is crypto-only and should be executed from Transfer Funds.");
-        subtitle.setWrapText(true);
-        subtitle.setStyle("-fx-font-size: 12; -fx-text-fill: #94a3b8;");
-
-        TableView<TransferFundingRow> table = new TableView<>();
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
-        table.getColumns().addAll(
-                tableColumn("Date", TransferFundingRow::date, 120),
-                tableColumn("Provider", TransferFundingRow::provider, 140),
-                tableColumn("Type", TransferFundingRow::type, 120),
-                tableColumn("Currency", TransferFundingRow::currency, 90),
-                tableColumn("Amount", TransferFundingRow::amount, 110),
-                tableColumn("Status", TransferFundingRow::status, 110),
-                tableColumn("Reference", TransferFundingRow::reference, 180));
-
-        ObservableList<TransferFundingRow> fundingRows = FXCollections.observableArrayList(
-                new TransferFundingRow("2026-06-03 10:22", "Coinbase", "Deposit", "USD", "$5,000.00", "Completed",
-                        "CB-DEP-84A2"),
-                new TransferFundingRow("2026-06-03 11:03", "Interactive Brokers", "Withdrawal", "USD", "$2,000.00",
-                        "Processing", "IBKR-WD-19F1"));
-        table.setItems(fundingRows);
-
-        ComboBox<String> actionType = new ComboBox<>(FXCollections.observableArrayList("Deposit", "Withdrawal"));
-        actionType.getSelectionModel().selectFirst();
-
-        ObservableList<String> fundingProviders = FXCollections.observableArrayList(fundingCapableProviders());
-        ComboBox<String> providerBox = new ComboBox<>(fundingProviders);
-        if (!fundingProviders.isEmpty()) {
-            providerBox.getSelectionModel().selectFirst();
-        }
-
-        ComboBox<String> currencyBox = new ComboBox<>(
-                FXCollections.observableArrayList("USD", "USDC", "BTC", "ETH", "SOL"));
-        currencyBox.getSelectionModel().select("USD");
-
-        TextField amountField = new TextField();
-        amountField.setPromptText("Amount (e.g. 100.00)");
-
-        TextField destinationField = new TextField();
-        destinationField.setPromptText("payment_method_id or bank_account:<id> / debit_card:<id>");
-
-        TextField networkField = new TextField();
-        networkField.setPromptText("Network (optional, e.g. ERC20, SOL)");
-
-        Label statusLabel = new Label();
-        statusLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #94a3b8;");
-
-        if (fundingProviders.isEmpty()) {
-            statusLabel.setText("No connected exchange currently exposes live deposit/withdraw operations.");
-        }
-
-        actionType.valueProperty().addListener((obs, oldValue, newValue) -> {
-            String action = Optional.ofNullable(newValue).orElse("Deposit");
-            if ("Deposit".equalsIgnoreCase(action)) {
-                destinationField.setPromptText("bank_account:<id>, debit_card:<id>, or payment_method_id");
-            } else {
-                destinationField.setPromptText("payment_method_id (fiat) or wallet address (crypto)");
-            }
-        });
-
-        Button submitButton = new Button("Submit Request");
-        submitButton.setDisable(fundingProviders.isEmpty());
-        submitButton.setOnAction(event -> {
-            String type = Optional.ofNullable(actionType.getValue()).orElse("Deposit");
-            String provider = Optional.ofNullable(providerBox.getValue()).orElse("");
-            String currency = Optional.ofNullable(currencyBox.getValue()).orElse("USD");
-            String destination = safe(destinationField.getText());
-            String network = safe(networkField.getText());
-
-            if (provider.isBlank()) {
-                statusLabel.setText("Select a provider that supports funding operations.");
-                return;
-            }
-
-            Exchange providerExchange = resolveFundingExchange(provider);
-            if (providerExchange == null) {
-                statusLabel.setText("Selected provider is not connected.");
-                return;
-            }
-
-            BigDecimal amount;
-            try {
-                amount = new BigDecimal(safe(amountField.getText()));
-            } catch (Exception exception) {
-                statusLabel.setText("Invalid amount.");
-                return;
-            }
-
-            if (amount.signum() <= 0) {
-                statusLabel.setText("Amount must be greater than zero.");
-                return;
-            }
-
-            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-            String pendingReference = "PENDING-"
-                    + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
-            String amountDisplay = money(amount.doubleValue());
-
-            TransferFundingRow pending = new TransferFundingRow(
-                    timestamp,
-                    provider,
-                    type,
-                    currency,
-                    amountDisplay,
-                    "Pending",
-                    pendingReference);
-            fundingRows.add(0, pending);
-            statusLabel.setText("Submitting " + type.toLowerCase(Locale.ROOT) + " request...");
-            journal("Funding request submitted: " + type + " " + amountDisplay + " " + currency + " via " + provider);
-
-            CompletableFuture<String> future = executeFundingRequest(
-                    providerExchange,
-                    type,
-                    currency,
-                    amount,
-                    destination,
-                    network);
-
-            future.whenComplete((response, throwable) -> runOnFx(() -> {
-                if (throwable != null) {
-                    String message = rootMessage(throwable);
-                    TransferFundingRow failed = new TransferFundingRow(
-                            timestamp,
-                            provider,
-                            type,
-                            currency,
-                            amountDisplay,
-                            "Failed",
-                            pendingReference);
-                    fundingRows.set(0, failed);
-                    statusLabel.setText("Failed: " + message);
-                    journal("Funding request failed: " + message);
-                    return;
-                }
-
-                String reference = extractFundingReference(response, pendingReference);
-                TransferFundingRow completed = new TransferFundingRow(
-                        timestamp,
-                        provider,
-                        type,
-                        currency,
-                        amountDisplay,
-                        "Submitted",
-                        reference);
-                fundingRows.set(0, completed);
-                statusLabel.setText("Request submitted successfully. Ref: " + reference);
-                journal("Funding request submitted successfully: " + reference);
-            }));
-        });
-
-        GridPane actionForm = new GridPane();
-        actionForm.setHgap(10);
-        actionForm.setVgap(8);
-        actionForm.addRow(0, new Label("Action"), actionType, new Label("Provider"), providerBox);
-        actionForm.addRow(1, new Label("Currency"), currencyBox, new Label("Amount"), amountField);
-        actionForm.addRow(2, new Label("Destination"), destinationField, new Label("Network"), networkField);
-        actionForm.add(submitButton, 3, 3);
-        actionForm.add(statusLabel, 0, 3, 3, 1);
-        GridPane.setHgrow(amountField, Priority.ALWAYS);
-        GridPane.setHgrow(destinationField, Priority.ALWAYS);
-        GridPane.setHgrow(networkField, Priority.ALWAYS);
-        actionForm.getStyleClass().add("pro-panel");
-
-        VBox content = new VBox(10, title, subtitle, actionForm, table);
-        content.setPadding(new Insets(16));
-        content.getStyleClass().add("pro-panel");
-        VBox.setVgrow(table, Priority.ALWAYS);
-
-        createIndependentWindow("Deposits & Withdrawals", content, 1050, 680);
+        openIndependentWindow(
+                "Deposits & Withdrawals",
+                fundingController.createDepositsWithdrawalsPanel(),
+                1120,
+                720);
         journal("Deposits & Withdrawals panel opened");
     }
 
     private void openTransferFundsWindow() {
-        TransferPanel transferPanel = new TransferPanel(exchange, this::journal);
-        createIndependentWindow("Transfer Funds", transferPanel, 1120, 780);
+        openIndependentWindow(
+                "Transfer Funds",
+                fundingController.createTransferFundsPanel(),
+                1120,
+                780);
         journal("Transfer Funds panel opened");
     }
 
-    private List<String> fundingCapableProviders() {
+    private List<Exchange> connectedFundingExchanges() {
         java.util.LinkedHashMap<String, Exchange> providers = new java.util.LinkedHashMap<>();
-
         if (supportsFundingOperations(exchange)) {
             providers.put(normalizeExchangeName(firstNonBlank(
                     exchange.getDisplayName(),
@@ -1111,182 +1007,23 @@ public class TradingDesk extends BorderPane {
         }
 
         for (BrokerSession session : brokerSessions.values()) {
-            if (session == null || !session.accessGranted() || session.exchange() == null) {
+            if (session == null || !session.accessGranted() || !supportsFundingOperations(session.exchange())) {
                 continue;
             }
             Exchange sessionExchange = session.exchange();
-            if (!supportsFundingOperations(sessionExchange)) {
-                continue;
-            }
-            String providerName = normalizeExchangeName(firstNonBlank(
+            providers.putIfAbsent(normalizeExchangeName(firstNonBlank(
                     sessionExchange.getDisplayName(),
                     sessionExchange.getName(),
                     sessionExchange.getExchangeId(),
-                    sessionExchange.getClass().getSimpleName()));
-            providers.putIfAbsent(providerName, sessionExchange);
+                    sessionExchange.getClass().getSimpleName())), sessionExchange);
         }
-
-        return providers.keySet().stream().sorted().toList();
-    }
-
-    private Exchange resolveFundingExchange(String providerName) {
-        String normalizedProvider = normalizeExchangeName(providerName);
-        if (exchange != null) {
-            String current = normalizeExchangeName(firstNonBlank(
-                    exchange.getDisplayName(),
-                    exchange.getName(),
-                    exchange.getExchangeId(),
-                    exchange.getClass().getSimpleName()));
-            if (normalizedProvider.equals(current)) {
-                return exchange;
-            }
-        }
-
-        BrokerSession session = findBrokerSession(normalizedProvider);
-        if (session != null && session.accessGranted() && session.exchange() != null) {
-            return session.exchange();
-        }
-
-        return null;
+        return List.copyOf(providers.values());
     }
 
     private boolean supportsFundingOperations(Exchange providerExchange) {
         return providerExchange instanceof Coinbase
                 || providerExchange instanceof Binance
                 || providerExchange instanceof Bitfinex;
-    }
-
-    private CompletableFuture<String> executeFundingRequest(
-            Exchange providerExchange,
-            String action,
-            String currency,
-            BigDecimal amount,
-            String destination,
-            String network) {
-        if (providerExchange instanceof Coinbase coinbase) {
-            return executeCoinbaseFundingRequest(coinbase, action, currency, amount, destination, network);
-        }
-
-        if (providerExchange instanceof Binance binance) {
-            if ("Deposit".equalsIgnoreCase(action)) {
-                return CompletableFuture.failedFuture(
-                        new UnsupportedOperationException("Binance adapter supports withdrawals only in this build."));
-            }
-            if (!isCryptoCurrencyCode(currency)) {
-                return CompletableFuture.failedFuture(
-                        new IllegalArgumentException("Binance withdrawals require a crypto currency."));
-            }
-            if (destination.isBlank()) {
-                return CompletableFuture.failedFuture(
-                        new IllegalArgumentException("Binance withdrawal requires a destination wallet address."));
-            }
-            return binance.requestWithdrawalToCryptoAddress(amount, currency, destination, network, null);
-        }
-
-        if (providerExchange instanceof Bitfinex bitfinex) {
-            if ("Deposit".equalsIgnoreCase(action)) {
-                return CompletableFuture.failedFuture(
-                        new UnsupportedOperationException("Bitfinex adapter supports withdrawals only in this build."));
-            }
-            if (!isCryptoCurrencyCode(currency)) {
-                return CompletableFuture.failedFuture(
-                        new IllegalArgumentException("Bitfinex withdrawals require a crypto currency."));
-            }
-            if (destination.isBlank()) {
-                return CompletableFuture.failedFuture(
-                        new IllegalArgumentException("Bitfinex withdrawal requires a destination wallet address."));
-            }
-            return bitfinex.requestWithdrawalToCryptoAddress(amount, currency, destination, network, null);
-        }
-
-        return CompletableFuture.failedFuture(new UnsupportedOperationException(
-                providerExchange.getDisplayName() + " does not expose live funding APIs in this adapter."));
-    }
-
-    private CompletableFuture<String> executeCoinbaseFundingRequest(
-            Coinbase coinbase,
-            String action,
-            String currency,
-            BigDecimal amount,
-            String destination,
-            String network) {
-        if (coinbase == null) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Coinbase exchange is unavailable."));
-        }
-
-        boolean isDeposit = "Deposit".equalsIgnoreCase(action);
-        boolean cryptoRoute = isCryptoCurrencyCode(currency) || (!destination.isBlank() && destination.length() >= 24);
-
-        if (isDeposit) {
-            String paymentMethodId = normalizePaymentMethodId(destination);
-            if (paymentMethodId.isBlank()) {
-                return CompletableFuture.failedFuture(new IllegalArgumentException(
-                        "Deposit requires payment_method_id, bank_account:<id>, or debit_card:<id> in Destination."));
-            }
-            return coinbase.requestDepositFromPaymentMethod(amount, currency, paymentMethodId);
-        }
-
-        if (destination.isBlank()) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "Withdrawal requires a payment method ID or crypto address in Destination."));
-        }
-
-        if (cryptoRoute) {
-            return coinbase.requestWithdrawalToCryptoAddress(amount, currency, destination, network, null);
-        }
-
-        String paymentMethodId = normalizePaymentMethodId(destination);
-        if (paymentMethodId.isBlank()) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "Fiat withdrawal requires payment_method_id in Destination."));
-        }
-        return coinbase.requestWithdrawalToPaymentMethod(amount, currency, paymentMethodId);
-    }
-
-    private String normalizePaymentMethodId(String destination) {
-        return org.investpro.transfer.FundingDestinationParser.parsePaymentMethodId(destination);
-    }
-
-    private boolean isCryptoCurrencyCode(String currency) {
-        if (currency == null) {
-            return false;
-        }
-        return switch (currency.toUpperCase(Locale.ROOT)) {
-            case "BTC", "ETH", "SOL", "USDC", "USDT", "XRP", "LTC", "ADA", "DOGE" -> true;
-            default -> false;
-        };
-    }
-
-    private String extractFundingReference(String responseBody, String fallback) {
-        if (responseBody == null || responseBody.isBlank()) {
-            return fallback;
-        }
-
-        for (String key : List.of("id", "transfer_id", "transaction_id", "withdrawal_id", "deposit_id")) {
-            String needle = "\"" + key + "\"";
-            int keyIndex = responseBody.indexOf(needle);
-            if (keyIndex < 0) {
-                continue;
-            }
-            int colonIndex = responseBody.indexOf(':', keyIndex + needle.length());
-            if (colonIndex < 0) {
-                continue;
-            }
-            int firstQuote = responseBody.indexOf('"', colonIndex + 1);
-            if (firstQuote < 0) {
-                continue;
-            }
-            int secondQuote = responseBody.indexOf('"', firstQuote + 1);
-            if (secondQuote < 0) {
-                continue;
-            }
-            String value = responseBody.substring(firstQuote + 1, secondQuote).trim();
-            if (!value.isBlank()) {
-                return value;
-            }
-        }
-
-        return fallback;
     }
 
     private void openAccountManagementWindow() {
@@ -1307,15 +1044,6 @@ public class TradingDesk extends BorderPane {
         }
 
         return languageMenu;
-    }
-
-    private record TransferFundingRow(String date,
-            String provider,
-            String type,
-            String currency,
-            String amount,
-            String status,
-            String reference) {
     }
 
     private MenuItem menuItem(String text, KeyCodeCombination accelerator, Runnable action) {
@@ -2562,7 +2290,7 @@ public class TradingDesk extends BorderPane {
 
         if (!(exchange instanceof IbkrExchange) || !Objects.equals(activeExchangeName(), normalizedExchange)) {
             exchange = createExchange(normalizedExchange, "", "", "", configuredTradingMode);
-            if (exchange != null && configuredTradingMode != null && !configuredTradingMode.isBlank()) {
+            if ( configuredTradingMode != null && !configuredTradingMode.isBlank()) {
                 exchange.setUserSelectedTradingMode(configuredTradingMode);
             }
         }
@@ -3241,13 +2969,11 @@ public class TradingDesk extends BorderPane {
                 createTerminalTab("Signals", createSignalTab().getContent()),
                 createTerminalTab("Risk Monitor", createPositionRiskMonitorTab().getContent()));
 
-        Node terminalTabStrip = createTerminalTabStrip(terminalTabPane);
-
         Label activeTabLabel = new Label();
         activeTabLabel.getStyleClass().add("panel-meta");
         activeTabLabel.setText("Active: " + terminalTabPane.getSelectionModel().getSelectedItem().getText());
 
-        Label scrollHintLabel = new Label("Each tab supports scrolling for long tables and logs.");
+        Label scrollHintLabel = new Label("Scrollable logs, account state, signals, and risk monitors.");
         scrollHintLabel.getStyleClass().add("panel-meta");
 
         terminalTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
@@ -3263,7 +2989,7 @@ public class TradingDesk extends BorderPane {
         tabMetaRow.setPadding(new Insets(4, 8, 6, 8));
         tabMetaRow.getStyleClass().add("console-tab-meta");
 
-        VBox terminalSurface = new VBox(0, header, terminalTabStrip, tabMetaRow, terminalTabPane);
+        VBox terminalSurface = new VBox(0, header, tabMetaRow, terminalTabPane);
         terminalSurface.getStyleClass().add("terminal-scroll-content");
         VBox.setVgrow(terminalTabPane, Priority.ALWAYS);
 
@@ -3499,7 +3225,7 @@ public class TradingDesk extends BorderPane {
         terminalTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
         terminalTabPane.getStyleClass().add("console-tab-pane");
         // DraggableTab.registerTabPane(terminalTabPane);
-        terminalTabPane.getTabs().addAll(
+        terminalTabPane.getTabs().setAll(
                 createDetachableTerminalTab(TabName.ACCOUNT_ACTIVITY, buildAccountActivityPane()),
                 createDetachableTerminalTab(TabName.PORTFOLIO, buildPortfolioPane()),
                 createDetachableTerminalTab(TabName.POSITIONS, createPositionsTab().getContent()),
@@ -3509,9 +3235,7 @@ public class TradingDesk extends BorderPane {
                 createDetachableTerminalTab(TabName.ALERTS, createAlertsTab().getContent()),
                 createDetachableTerminalTab(TabName.JOURNAL, createJournalTab().getContent()));
 
-        Node terminalTabStrip = createTerminalTabStrip(terminalTabPane);
-
-        VBox terminalSurface = new VBox(6, header, terminalTabStrip, terminalTabPane);
+        VBox terminalSurface = new VBox(6, header, terminalTabPane);
         terminalSurface.getStyleClass().add("terminal-scroll-content");
         VBox.setVgrow(terminalTabPane, Priority.ALWAYS);
 
@@ -3722,6 +3446,10 @@ public class TradingDesk extends BorderPane {
      * Windows are not confined to the terminal and can be moved/resized
      * independently.
      */
+    private void openIndependentWindow(String title, Node content, double width, double height) {
+        createIndependentWindow(title, content, width, height);
+    }
+
     private void createIndependentWindow(String title, Node content, double width, double height) {
         if (content == null) {
             showWarning(title, "Panel content is not available.");
@@ -4102,7 +3830,7 @@ public class TradingDesk extends BorderPane {
         TableColumn<TradePair, String> symbolCol = new TableColumn<>("Symbol");
         symbolCol.setCellValueFactory(cd -> {
             TradePair p = cd.getValue();
-            return new SimpleStringProperty(p == null ? "" : p.toString('/'));
+            return new SimpleStringProperty(displayMarketWatchSymbol(p));
         });
         symbolCol.setCellFactory(col -> new TableCell<>() {
             @Override
@@ -4115,7 +3843,7 @@ public class TradingDesk extends BorderPane {
                     return;
                 }
                 setText(s);
-                String baseCode = s.contains("/") ? s.substring(0, s.indexOf('/')) : s;
+                String baseCode = baseAssetFromDisplaySymbol(s);
                 Image icon = CurrencyIconLoader.loadCurrencyIcon(baseCode);
                 if (icon != null) {
                     ImageView imageView = new ImageView(icon);
@@ -4130,6 +3858,24 @@ public class TradingDesk extends BorderPane {
             }
         });
         symbolCol.setPrefWidth(88);
+
+        TableColumn<TradePair, String> marketTypeCol = new TableColumn<>("Market");
+        marketTypeCol.setCellValueFactory(cd -> {
+            TradePair pair = cd.getValue();
+            MarketInstrument instrument = pair == null ? null : marketInstrumentBySymbol.get(symbolKey(pair));
+            return new SimpleStringProperty(instrument == null ? "Spot" : instrument.marketBadge());
+        });
+        marketTypeCol.setPrefWidth(92);
+
+        TableColumn<TradePair, String> venueCol = new TableColumn<>("Route");
+        venueCol.setCellValueFactory(cd -> {
+            TradePair pair = cd.getValue();
+            MarketInstrument instrument = pair == null ? null : marketInstrumentBySymbol.get(symbolKey(pair));
+            return new SimpleStringProperty(instrument == null || instrument.routingExchange().isBlank()
+                    ? ""
+                    : instrument.routingExchange());
+        });
+        venueCol.setPrefWidth(120);
 
         // ── Bid ───────────────────────────────────────────────────────────────
         TableColumn<TradePair, String> bidCol = new TableColumn<>("Bid");
@@ -4243,7 +3989,7 @@ public class TradingDesk extends BorderPane {
         });
         tradabilityCol.setPrefWidth(120);
 
-        table.getColumns().addAll(symbolCol, bidCol, askCol, sessionCol, tradabilityCol);
+        table.getColumns().addAll(symbolCol, marketTypeCol, venueCol, bidCol, askCol, sessionCol, tradabilityCol);
 
         // ── Row factory: alternating rows + context menu + double-click ───────
         table.setRowFactory(view -> {
@@ -4290,6 +4036,21 @@ public class TradingDesk extends BorderPane {
         });
 
         table.setRowFactory(view -> createMarketWatchRow());
+    }
+
+    private String displayMarketWatchSymbol(TradePair pair) {
+        if (pair == null) {
+            return "";
+        }
+        MarketInstrument instrument = marketInstrumentBySymbol.get(symbolKey(pair));
+        if (instrument == null) {
+            return pair.toString('/');
+        }
+        return MarketWatchSymbolFormatter.displaySymbol(instrument, pair);
+    }
+
+    private String baseAssetFromDisplaySymbol(String symbol) {
+        return MarketWatchSymbolFormatter.baseAsset(symbol);
     }
 
     private @NotNull TableRow<TradePair> createMarketWatchRow() {
@@ -4563,8 +4324,8 @@ public class TradingDesk extends BorderPane {
         actionsCol.setPrefWidth(210);
         actionsCol.setResizable(false);
         actionsCol.setCellFactory(col -> new TableCell<>() {
-            private final Button reduceBtn = styledActionBtn("▼ Reduce", "#b45309");
-            private final Button increaseBtn = styledActionBtn("▲ Increase", "#1e40af");
+            private final Button reduceBtn = styledActionBtn("▼ -", "#b45309");
+            private final Button increaseBtn = styledActionBtn("▲ +", "#1e40af");
             private final Button closeBtn = styledActionBtn("✕ Close", "#991b1b");
             private final HBox box = new HBox(4, reduceBtn, increaseBtn, closeBtn);
 
@@ -5664,7 +5425,7 @@ public class TradingDesk extends BorderPane {
         orderTypes.add("LIMIT");
 
         if (exchange == null || exchange.supportsStopLossTakeProfit()) {
-            orderTypes.add("STOP");
+            orderTypes.add("STOP_LIMIT");
         }
         if (exchange == null || exchange.supportsBracketOrders()) {
             orderTypes.add("BRACKET");
@@ -7226,6 +6987,12 @@ public class TradingDesk extends BorderPane {
         for (TradePair pair : rawSymbols) {
             if (pair == null)
                 continue;
+            MarketInstrument instrument = marketInstrumentBySymbol.get(symbolKey(pair));
+            if (instrument != null && !isBotEligibleInstrument(instrument)) {
+                journal("Bot skipped %s: %s is not supported for live bot routing."
+                        .formatted(pair.toString('/'), instrument.marketBadge()));
+                continue;
+            }
             SymbolTradability cached = tradabilityBySymbol.get(symbolKey(pair));
             if (cached != null && cached.canBeUsedForBotTrading()) {
                 allowed.add(pair);
@@ -7620,18 +7387,52 @@ public class TradingDesk extends BorderPane {
             return null;
         }
 
+        SymbolTradability cached = cachedTradabilityForOrder(pair);
         try {
-            SymbolTradability status = universalTradabilityService
-                    .getTradability(pair, TradabilityScope.ORDER_SUBMISSION, true)
-                    .get(5, TimeUnit.SECONDS);
+            CompletableFuture<SymbolTradability> refresh = universalTradabilityService
+                    .getTradability(pair, TradabilityScope.ORDER_SUBMISSION, true);
+            refresh.thenAccept(status -> {
+                if (status != null) {
+                    tradabilityBySymbol.put(symbolKey(pair), status);
+                }
+            });
+
+            SymbolTradability status = refresh.get(
+                    ORDER_TRADABILITY_REFRESH_TIMEOUT.toMillis(),
+                    TimeUnit.MILLISECONDS);
             if (status != null) {
                 tradabilityBySymbol.put(symbolKey(pair), status);
             }
             return status;
+        } catch (TimeoutException timeout) {
+            if (cached != null) {
+                log.warn("Tradability refresh timed out for {}; using cached status checkedAt={} status={}",
+                        pair, cached.checkedAt(), cached.status());
+                return cached;
+            }
+            log.warn("Tradability refresh timed out for {}; no cached order status is available.", pair);
+            return null;
         } catch (Exception exception) {
-            log.warn("Unable to verify tradability before order submission for {}", pair, exception);
+            if (cached != null) {
+                log.warn("Tradability refresh failed for {}; using cached status checkedAt={} status={}. cause={}",
+                        pair, cached.checkedAt(), cached.status(), rootMessage(exception));
+                return cached;
+            }
+            log.warn("Unable to verify tradability before order submission for {}: {}", pair, rootMessage(exception));
             return null;
         }
+    }
+
+    private SymbolTradability cachedTradabilityForOrder(TradePair pair) {
+        if (pair == null) {
+            return null;
+        }
+        SymbolTradability cached = tradabilityBySymbol.get(symbolKey(pair));
+        if (cached == null || cached.checkedAt() == null) {
+            return null;
+        }
+        Duration age = Duration.between(cached.checkedAt(), Instant.now()).abs();
+        return age.compareTo(ORDER_TRADABILITY_FALLBACK_MAX_AGE) <= 0 ? cached : null;
     }
 
     private boolean canSubmitOrderByTradability(TradePair pair, OpenOrder.OrderType orderType, double amount) {
@@ -7645,6 +7446,7 @@ public class TradingDesk extends BorderPane {
             return false;
         }
 
+        status = reconcileTradabilityWithCurrentExchange(pair, status, orderType);
         boolean typeAllowed = isTradabilityAllowedForOrderType(status, orderType);
 
         if (!status.orderSubmissionAllowed() || !typeAllowed) {
@@ -7687,6 +7489,83 @@ public class TradingDesk extends BorderPane {
         }
 
         return true;
+    }
+
+    private SymbolTradability reconcileTradabilityWithCurrentExchange(
+            TradePair pair,
+            SymbolTradability status,
+            OpenOrder.OrderType orderType) {
+        if (status == null
+                || status.orderSubmissionAllowed()
+                || exchange == null
+                || status.status() != org.investpro.trading.tradability.TradabilityStatus.FULLY_TRADABLE
+                || !exchange.canSubmitOrders()) {
+            return status;
+        }
+
+        String reason = safe(status.reason()).toLowerCase(Locale.ROOT);
+        Object sessionReason = metadataValue(status, "session.reason", "");
+        boolean staleDisconnectedSession = reason.contains("provider is disconnected")
+                || safe(String.valueOf(sessionReason)).toLowerCase(Locale.ROOT).contains("provider is disconnected");
+        if (!staleDisconnectedSession) {
+            return status;
+        }
+
+        boolean marketAllowed = orderType == null
+                || orderType == OpenOrder.OrderType.MARKET
+                || status.marketOrderAllowed();
+        boolean limitAllowed = orderType == null
+                || orderType == OpenOrder.OrderType.LIMIT
+                || status.limitOrderAllowed();
+        boolean stopAllowed = status.stopOrderAllowed();
+        boolean requestedTypeAllowed;
+        if (orderType == null) {
+            requestedTypeAllowed = true;
+        } else {
+            requestedTypeAllowed = switch (orderType) {
+                case MARKET -> marketAllowed;
+                case LIMIT -> limitAllowed;
+                case STOP_LOSS, TAKE_PROFIT, TRAILING_STOP -> stopAllowed;
+                default -> true;
+            };
+        }
+        if (!requestedTypeAllowed) {
+            return status;
+        }
+
+        Map<String, Object> metadata = new LinkedHashMap<>(status.rawMetadata());
+        metadata.put("accountPermission", true);
+        metadata.put("connected", true);
+        metadata.put("session.orderSubmissionOpen", true);
+        metadata.put("session.openNewPositionsAllowed", true);
+        metadata.put("session.reason", "Order submission allowed by current connected exchange session.");
+        metadata.put("orderSubmissionAllowed", true);
+        metadata.put("marketOrderAllowed", true);
+        metadata.put("limitOrderAllowed", true);
+
+        SymbolTradability reconciled = new SymbolTradability(
+                status.exchangeId(),
+                pair == null ? status.tradePair() : pair,
+                status.nativeSymbol(),
+                status.status(),
+                status.marketDataAllowed(),
+                status.watchlistAllowed(),
+                status.backtestingAllowed(),
+                status.paperTradingAllowed(),
+                status.liveTradingAllowed(),
+                status.botTradingAllowed(),
+                true,
+                true,
+                true,
+                status.stopOrderAllowed(),
+                status.shortingAllowed(),
+                status.marginAllowed(),
+                status.leverageAllowed(),
+                "Order submission allowed by current connected exchange session.",
+                Instant.now(),
+                metadata);
+        tradabilityBySymbol.put(symbolKey(reconciled.tradePair()), reconciled);
+        return reconciled;
     }
 
     private String buildTradabilityDiagnostics(TradePair pair, SymbolTradability status,
@@ -7799,6 +7678,17 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
+        MarketInstrument instrument = marketInstrumentBySymbol.get(symbolKey(selected));
+        if (instrument != null && (instrument.marketType() == MarketType.UNKNOWN || instrument.isDerivative())) {
+            buyButton.setDisable(true);
+            sellButton.setDisable(true);
+            String tip = "Cannot trade " + selected.toSlashSymbol() + ": "
+                    + instrument.marketBadge() + " routing is not implemented.";
+            Tooltip.install(buyButton, new Tooltip(tip));
+            Tooltip.install(sellButton, new Tooltip(tip));
+            return;
+        }
+
         SymbolTradability status = tradabilityBySymbol.get(symbolKey(selected));
         if (status == null) {
             buyButton.setDisable(true);
@@ -7847,9 +7737,19 @@ public class TradingDesk extends BorderPane {
 
         org.investpro.asset.AssetCatalogService assetCatalog = org.investpro.asset.AssetCatalogRuntime.service();
         org.investpro.asset.ExchangeId exchangeId = org.investpro.asset.AssetCatalogService.exchangeId(exchange);
-        List<TradePair> tradePairs = assetCatalog.loadMarketWatchPairs(exchangeId);
+        List<MarketInstrument> instruments = routeFilteredInstruments(refreshMarketInstrumentCacheForExchange(exchange));
+        List<TradePair> tradePairs = instruments.stream()
+                .filter(MarketInstrument::canShowInMarketWatch)
+                .map(MarketInstrument::tradePair)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
 
-        if (tradePairs == null || tradePairs.isEmpty()) {
+        if (tradePairs.isEmpty()) {
+            tradePairs = assetCatalog.loadMarketWatchPairs(exchangeId);
+        }
+
+        if (tradePairs.isEmpty()) {
             tradePairs = fallbackMarketWatchPairs();
             journal("Market Watch is using fallback symbols while the local %s asset catalog is refreshed."
                     .formatted(exchangeId.id()));
@@ -8362,7 +8262,9 @@ public class TradingDesk extends BorderPane {
 
         Stage stage = new Stage();
         stage.setTitle(title);
-        stage.setScene(new Scene(root, 1100, 720));
+        Scene scene = new Scene(root, 1100, 720);
+        addCoreStylesheets(scene);
+        stage.setScene(scene);
 
         DetachedChartWindow window = new DetachedChartWindow(title, tab, floatingTab, stage);
         detachedChartWindows.put(title, window);
@@ -8735,7 +8637,7 @@ public class TradingDesk extends BorderPane {
 
         return current.fetchOpenOrders(null).thenCompose(initialOrders -> {
             List<OpenOrder> openOrders = normalizeOpenOrdersTyped(initialOrders);
-            if (openOrders != null && !openOrders.isEmpty()) {
+            if ( !openOrders.isEmpty()) {
                 return CompletableFuture.completedFuture(openOrders);
             }
 
@@ -8750,7 +8652,7 @@ public class TradingDesk extends BorderPane {
             });
         }).exceptionally(ex -> {
             log.debug("Open orders workspace refresh failed", ex);
-            return List.<OpenOrder>of();
+            return List.of();
         });
     }
 
@@ -12903,6 +12805,15 @@ public class TradingDesk extends BorderPane {
             return List.of();
         }
 
+        List<MarketInstrument> instruments = loadBotMarketInstrumentsForExchange(targetExchange);
+        if (!instruments.isEmpty()) {
+            return instruments.stream()
+                    .map(MarketInstrument::tradePair)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+        }
+
         try {
             List<TradePair> symbols = targetExchange.getTradePairSymbol();
             if (symbols != null && !symbols.isEmpty()) {
@@ -12919,6 +12830,140 @@ public class TradingDesk extends BorderPane {
             log.debug("Unable to load tradable pairs for {}", targetExchange.getDisplayName(), exception);
             return List.of();
         }
+    }
+
+    private List<MarketInstrument> loadBotMarketInstrumentsForExchange(Exchange targetExchange) {
+        if (targetExchange == null) {
+            return List.of();
+        }
+        try {
+            List<MarketInstrument> instruments = marketInstrumentService.loadForExchange(targetExchange)
+                    .get(15, TimeUnit.SECONDS);
+            if (instruments == null || instruments.isEmpty()) {
+                return List.of();
+            }
+
+            String runtimeKey = botRuntimeKey(targetExchange);
+            for (MarketInstrument instrument : instruments) {
+                cacheMarketInstrument(runtimeKey, instrument);
+            }
+
+            List<MarketInstrument> eligible = instruments.stream()
+                    .filter(Objects::nonNull)
+                    .filter(instrument -> instrument.tradePair() != null)
+                    .filter(this::isBotEligibleInstrument)
+                    .toList();
+            logMarketWatchEligibility(instruments, eligible.size());
+            return eligible;
+        } catch (Exception exception) {
+            log.debug("Unable to load market instruments for {}", targetExchange.getDisplayName(), exception);
+            return List.of();
+        }
+    }
+
+    private void logMarketWatchEligibility(List<MarketInstrument> instruments, int botEligible) {
+        if (instruments == null || instruments.isEmpty()) {
+            log.info("MarketWatch marketWatchSymbols=0, botEligible=0, viewOnly=0, expired=0, unsupportedRoute=0");
+            return;
+        }
+        long viewOnly = instruments.stream()
+                .filter(Objects::nonNull)
+                .map(MarketInstrument::tradability)
+                .filter(Objects::nonNull)
+                .filter(status -> status.status() == org.investpro.trading.tradability.TradabilityStatus.VIEW_ONLY)
+                .count();
+        long expired = instruments.stream()
+                .filter(Objects::nonNull)
+                .filter(instrument -> instrument.contractExpiry() != null
+                        && instrument.contractExpiry().isBefore(java.time.Instant.now()))
+                .count();
+        long unsupportedRoute = instruments.stream()
+                .filter(Objects::nonNull)
+                .filter(instrument -> !matchesConfiguredMarketRoute(instrument)
+                        || instrument.marketType() == MarketType.UNKNOWN
+                        || instrument.isDerivative())
+                .count();
+        log.info("MarketWatch marketWatchSymbols={}, botEligible={}, viewOnly={}, expired={}, unsupportedRoute={}",
+                instruments.size(), botEligible, viewOnly, expired, unsupportedRoute);
+    }
+
+    private List<MarketInstrument> refreshMarketInstrumentCacheForExchange(Exchange targetExchange) {
+        if (targetExchange == null) {
+            return List.of();
+        }
+        try {
+            List<MarketInstrument> instruments = marketInstrumentService.loadForExchange(targetExchange)
+                    .get(15, TimeUnit.SECONDS);
+            if (instruments == null) {
+                return List.of();
+            }
+            String runtimeKey = botRuntimeKey(targetExchange);
+            for (MarketInstrument instrument : instruments) {
+                cacheMarketInstrument(runtimeKey, instrument);
+            }
+            return instruments;
+        } catch (Exception exception) {
+            log.debug("Unable to refresh market instrument cache for {}: {}",
+                    targetExchange.getDisplayName(), rootMessage(exception));
+            return List.of();
+        }
+    }
+
+    private List<MarketInstrument> routeFilteredInstruments(List<MarketInstrument> instruments) {
+        if (instruments == null || instruments.isEmpty()) {
+            return List.of();
+        }
+        return instruments.stream()
+                .filter(Objects::nonNull)
+                .filter(this::matchesConfiguredMarketRoute)
+                .toList();
+    }
+
+    private boolean matchesConfiguredMarketRoute(MarketInstrument instrument) {
+        if (instrument == null) {
+            return false;
+        }
+        if (configuredInstrumentType == InstrumentType.SPOT || configuredContractType == ContractType.CASH) {
+            return instrument.isSpot();
+        }
+        if (configuredInstrumentType == InstrumentType.PERPETUAL || configuredContractType == ContractType.PERPETUAL) {
+            return instrument.isPerpetual();
+        }
+        if (configuredInstrumentType == InstrumentType.FUTURE || configuredContractType == ContractType.FUTURE) {
+            return instrument.isFuture() && !instrument.isPerpetual();
+        }
+        return true;
+    }
+
+    private void cacheMarketInstrument(String runtimeKey, MarketInstrument instrument) {
+        if (instrument == null) {
+            return;
+        }
+        String prefix = safe(runtimeKey).toUpperCase(Locale.ROOT);
+        if (!instrument.nativeSymbol().isBlank()) {
+            marketInstrumentBySymbol.put(prefix + ":" + instrument.nativeSymbol().toUpperCase(Locale.ROOT), instrument);
+        }
+        if (instrument.tradePair() != null) {
+            marketInstrumentBySymbol.put(prefix + ":" + symbolKey(instrument.tradePair()), instrument);
+            marketInstrumentBySymbol.put(symbolKey(instrument.tradePair()), instrument);
+        }
+    }
+
+    private boolean isBotEligibleInstrument(MarketInstrument instrument) {
+        if (instrument == null || instrument.tradePair() == null) {
+            return false;
+        }
+        if (instrument.marketType() == MarketType.UNKNOWN) {
+            return false;
+        }
+        if (instrument.isDerivative()) {
+            // Market-data/backtesting can display these, but live bot execution must not
+            // route them through spot order code until derivatives routing is implemented.
+            return false;
+        }
+        return instrument.tradability() == null
+                || instrument.tradability().canBeUsedForBotTrading()
+                || isSoftBotTradable(instrument.tradability());
     }
 
     private List<TradePair> filterBotTradableSymbolsForExchange(Exchange targetExchange, List<TradePair> rawSymbols) {
@@ -12941,6 +12986,10 @@ public class TradingDesk extends BorderPane {
             }
 
             String cacheKey = botRuntimeKey(targetExchange) + ":" + symbolKey(pair);
+            MarketInstrument instrument = marketInstrumentBySymbol.get(cacheKey);
+            if (instrument != null && !isBotEligibleInstrument(instrument)) {
+                continue;
+            }
             SymbolTradability cached = localCache.get(cacheKey);
             if (cached != null) {
                 if (cached.canBeUsedForBotTrading() || isSoftBotTradable(cached)) {

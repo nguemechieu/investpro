@@ -163,6 +163,6 @@ public class StrategyAssignmentRepository {
      * Make composite key for symbol/timeframe.
      */
     private String makeKey(String symbol, Timeframe timeframe) {
-        return symbol + "/" + (timeframe != null ? timeframe.getCode() : "UNKNOWN");
+        return StrategyAssignment.key(symbol, timeframe);
     }
 }

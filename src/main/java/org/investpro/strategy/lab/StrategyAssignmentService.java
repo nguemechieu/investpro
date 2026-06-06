@@ -11,7 +11,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.Optional;
 
 /**
@@ -265,17 +264,4 @@ public class StrategyAssignmentService {
         }
     }
 
-    public String strategyId;
-
-    public StrategyAssignment getMode() {
-        return null;
-    }
-
-    public double getScoreAtAssignment() {
-        return 0.0;
-    }
-
-    public LocalDateTime getAssignedAt() {
-        return null;
-    }
 }

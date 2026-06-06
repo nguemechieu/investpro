@@ -13,18 +13,6 @@ import java.time.Instant;
  * the current {@link ExchangeRuntimeState}. Produced by
  * {@link ExchangeRuntimeManager} and consumed by monitoring dashboards,
  * the health engine, and telemetry sinks.
- *
- * @param exchangeName      canonical exchange identifier
- * @param state             current runtime state
- * @param lastHeartbeat     timestamp of the last successful heartbeat (null if never received)
- * @param websocketConnected whether the WebSocket stream is currently established
- * @param staleDuration     time since the last fresh data point (null if data is current)
- * @param latencyMs         most recently measured round-trip latency in milliseconds
- * @param reconnectCount    total number of reconnect attempts since runtime start
- * @param lastStateChange   timestamp of the most recent state transition
- * @param lastAuthCheckTime timestamp of the most recent authentication check
- * @param authSuccessful    result of the most recent authentication check
- * @param capturedAt        timestamp when this snapshot was created
  */
 public record ExchangeRuntimeMetadata(
         @NotNull String exchangeName,

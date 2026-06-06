@@ -15,7 +15,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.SystemCore;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.core.agents.symbol.SymbolAgentState;
+import org.investpro.models.market.MarketInstrument;
 import org.investpro.models.trading.TradePair;
+import org.investpro.trading.market.MarketInstrumentService;
 import org.investpro.trading.tradability.ExchangeTradabilityProvider;
 import org.investpro.trading.tradability.MarketWatchTradabilityFilter;
 import org.investpro.trading.tradability.ProductTradabilityStatus;
@@ -23,6 +25,7 @@ import org.investpro.trading.tradability.TradabilityProvider;
 import org.investpro.trading.tradability.TradabilityProviderRegistry;
 import org.investpro.trading.tradability.TradabilityRefreshScheduler;
 import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.ui.market.MarketWatchProductFilter;
 import org.investpro.ui.models.MarketWatchRow;
 import org.investpro.ui.utils.CurrencyIconLoader;
 import org.jetbrains.annotations.NotNull;
@@ -59,10 +62,15 @@ public class MarketWatchPanel extends StackPane {
     private final Map<String, SymbolTradability> exchangeTradabilityCache = new ConcurrentHashMap<>();
     private final Set<String> favoriteSymbols = ConcurrentHashMap.newKeySet();
     private final ComboBox<MarketWatchTradabilityFilter> filterSelector = new ComboBox<>();
+    private final ComboBox<MarketWatchProductFilter> productFilterSelector = new ComboBox<>();
     private final ComboBox<String> sortSelector = new ComboBox<>();
     private final TradabilityRefreshScheduler refreshScheduler;
+    private final MarketInstrumentService marketInstrumentService = new MarketInstrumentService();
+    private final Map<String, MarketInstrument> instrumentsBySymbol = new ConcurrentHashMap<>();
     private final AtomicReference<MarketWatchTradabilityFilter> activeFilter = new AtomicReference<>(
             MarketWatchTradabilityFilter.SHOW_ALL);
+    private final AtomicReference<MarketWatchProductFilter> activeProductFilter = new AtomicReference<>(
+            MarketWatchProductFilter.ALL);
 
     private Timeline refreshTimer;
     private static final long REFRESH_INTERVAL_MS = 3000; // Refresh every 3 seconds
@@ -92,6 +100,7 @@ public class MarketWatchPanel extends StackPane {
 
         initializeUI();
         startAutoRefresh();
+        refreshMarketInstrumentsAsync();
         refreshMarketWatchData();
         refreshScheduler.start(5);
     }
@@ -164,7 +173,7 @@ public class MarketWatchPanel extends StackPane {
         // Currency Icon column
         TableColumn<MarketWatchRow, String> iconCol = new TableColumn<>("");
         iconCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-                cellData.getValue().getSymbol().toString()));
+                cellData.getValue().getDisplaySymbol()));
         iconCol.setCellFactory(col -> new TableCell<>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -194,8 +203,20 @@ public class MarketWatchPanel extends StackPane {
         // Symbol column
         TableColumn<MarketWatchRow, String> symbolCol = new TableColumn<>("Symbol");
         symbolCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-                cellData.getValue().getSymbol().toString()));
-        symbolCol.setPrefWidth(100);
+                cellData.getValue().getDisplaySymbol()));
+        symbolCol.setPrefWidth(120);
+
+        TableColumn<MarketWatchRow, String> marketTypeCol = new TableColumn<>("Market");
+        marketTypeCol.setCellValueFactory(cellData -> cellData.getValue().marketBadgeProperty());
+        marketTypeCol.setPrefWidth(110);
+
+        TableColumn<MarketWatchRow, String> venueCol = new TableColumn<>("Venue");
+        venueCol.setCellValueFactory(cellData -> cellData.getValue().venueProperty());
+        venueCol.setPrefWidth(130);
+
+        TableColumn<MarketWatchRow, String> tradabilityCol = new TableColumn<>("Tradability");
+        tradabilityCol.setCellValueFactory(cellData -> cellData.getValue().tradabilityStatusProperty());
+        tradabilityCol.setPrefWidth(110);
 
         // Bid column
         TableColumn<MarketWatchRow, Double> bidCol = new TableColumn<>("Bid");
@@ -378,9 +399,25 @@ public class MarketWatchPanel extends StackPane {
         });
 
         // Add columns to table
-        table.getColumns().addAll(
-                iconCol, symbolCol, bidCol, askCol, spreadCol, sessionCol, modeCol,
-                strategyCol, tfCol, signalCol, scoreCol, liveReadyCol, assignedStrategyCol);
+        table.getColumns().add(iconCol);
+        table.getColumns().add(symbolCol);
+        table.getColumns().add(marketTypeCol);
+        table.getColumns().add(venueCol);
+        table.getColumns().add(bidCol);
+        table.getColumns().add(askCol);
+        table.getColumns().add(spreadCol);
+        table.getColumns().add(sessionCol);
+        table.getColumns().add(tradabilityCol);
+        table.getColumns().add(modeCol);
+        table.getColumns().add(strategyCol);
+        table.getColumns().add(tfCol);
+        table.getColumns().add(signalCol);
+        table.getColumns().add(scoreCol);
+        table.getColumns().add(liveReadyCol);
+        table.getColumns().add(assignedStrategyCol);
+
+
+
     }
 
     private HBox createControlsBar() {
@@ -394,6 +431,15 @@ public class MarketWatchPanel extends StackPane {
         Label statusLabel = new Label("Status: ");
         Label symbolCountLabel = new Label("Symbols: 0");
         symbolCountLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 11px;");
+
+        productFilterSelector.getItems().setAll(MarketWatchProductFilter.values());
+        productFilterSelector.setValue(MarketWatchProductFilter.ALL);
+        productFilterSelector.setOnAction(event -> {
+            MarketWatchProductFilter selected = productFilterSelector.getValue();
+            activeProductFilter.set(selected == null ? MarketWatchProductFilter.ALL : selected);
+            applyProductFilterToTable();
+            symbolCountLabel.setText("Symbols: " + table.getItems().size());
+        });
 
         Button refreshButton = new Button("⟳");
         refreshButton.setStyle(
@@ -448,7 +494,7 @@ public class MarketWatchPanel extends StackPane {
         Region spacer = new Region();
         HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
 
-        HBox controls = new HBox(12, titleLabel, statusLabel, symbolCountLabel, spacer,
+        HBox controls = new HBox(12, titleLabel, statusLabel, symbolCountLabel, productFilterSelector, spacer,
                 refreshButton, pauseButton, exportButton);
         controls.setPadding(new Insets(8, 12, 8, 12));
         controls.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
@@ -497,9 +543,7 @@ public class MarketWatchPanel extends StackPane {
 
                 Set<String> currentSymbolKeys = allStates.stream()
                         .filter(Objects::nonNull)
-                        .map(SymbolAgentState::getSymbol)
-
-                        .map(MarketWatchPanel::symbolKey)
+                        .map(MarketWatchPanel::stateKey)
                         .collect(Collectors.toCollection(LinkedHashSet::new));
 
                 // Remove rows for symbols no longer in the manager.
@@ -512,12 +556,13 @@ public class MarketWatchPanel extends StackPane {
                 for (SymbolAgentState state : allStates) {
                     if (state != null) {
                         TradePair symbol = state.getSymbol();
-                        String symbolKey = symbolKey(symbol);
+                        String symbolKey = stateKey(state);
                         MarketWatchRow row = rowCache.computeIfAbsent(
                                 symbolKey,
                                 key -> MarketWatchRow.builder()
                                         .symbol(symbol)
                                         .build());
+                        row.setMarketInstrument(resolveInstrument(state));
                         row.updateSymbolState(state);
                     }
                 }
@@ -525,7 +570,7 @@ public class MarketWatchPanel extends StackPane {
                 // Re-populate table items when the symbol set changes. Row properties update
                 // cells in-place between set changes.
                 if (!currentSymbolKeys.equals(lastSymbolKeys)) {
-                    table.getItems().setAll(new java.util.ArrayList<>(rowCache.values()));
+                    applyProductFilterToTable();
                     lastSymbolKeys = Set.copyOf(currentSymbolKeys);
                     log.debug("Refreshed MarketWatch with {} symbols", rowCache.size());
                 }
@@ -533,6 +578,72 @@ public class MarketWatchPanel extends StackPane {
                 log.error("Error refreshing market watch data", e);
             }
         });
+    }
+
+    private void refreshMarketInstrumentsAsync() {
+        if (systemCore == null || systemCore.getExchange() == null) {
+            return;
+        }
+        marketInstrumentService.loadForExchange(systemCore.getExchange())
+                .thenAccept(instruments -> {
+                    Map<String, MarketInstrument> refreshed = new LinkedHashMap<>();
+                    for (MarketInstrument instrument : instruments) {
+                        if (instrument == null) {
+                            continue;
+                        }
+                        refreshed.put(instrumentKey(instrument), instrument);
+                        if (instrument.tradePair() != null) {
+                            refreshed.putIfAbsent(symbolKey(instrument.tradePair()), instrument);
+                        }
+                        if (instrument.nativeSymbol() != null && !instrument.nativeSymbol().isBlank()) {
+                            refreshed.putIfAbsent(instrument.nativeSymbol().trim().toUpperCase(Locale.ROOT), instrument);
+                        }
+                    }
+                    instrumentsBySymbol.clear();
+                    instrumentsBySymbol.putAll(refreshed);
+                    Platform.runLater(() -> {
+                        rowCache.values().forEach(row -> row.setMarketInstrument(resolveInstrument(row.getSymbol())));
+                        applyProductFilterToTable();
+                    });
+                })
+                .exceptionally(exception -> {
+                    log.warn("Unable to refresh market instrument metadata: {}", exception.getMessage());
+                    return null;
+                });
+    }
+
+    private MarketInstrument resolveInstrument(TradePair pair) {
+        if (pair == null) {
+            return null;
+        }
+        MarketInstrument byPair = instrumentsBySymbol.get(symbolKey(pair));
+        if (byPair != null) {
+            return byPair;
+        }
+        String nativeSymbol = pair.getNativeSymbol();
+        return nativeSymbol == null || nativeSymbol.isBlank()
+                ? null
+                : instrumentsBySymbol.get(nativeSymbol.trim().toUpperCase(Locale.ROOT));
+    }
+
+    private MarketInstrument resolveInstrument(SymbolAgentState state) {
+        if (state == null) {
+            return null;
+        }
+        MarketInstrument stateInstrument = state.getMarketInstrument();
+        if (stateInstrument != null) {
+            MarketInstrument byIdentity = instrumentsBySymbol.get(instrumentKey(stateInstrument));
+            return byIdentity == null ? stateInstrument : byIdentity;
+        }
+        return resolveInstrument(state.getSymbol());
+    }
+
+    private void applyProductFilterToTable() {
+        MarketWatchProductFilter filter = activeProductFilter.get();
+        List<MarketWatchRow> rows = rowCache.values().stream()
+                .filter(row -> filter == null || filter.accepts(row.getMarketInstrument()))
+                .toList();
+        table.getItems().setAll(rows);
     }
 
     /**
@@ -557,7 +668,7 @@ public class MarketWatchPanel extends StackPane {
             // Add rows
             for (MarketWatchRow row : rowCache.values()) {
                 csv.append(String.format("%s,%.5f,%.5f,%.4f,%s,%s,%s,%s,%.2f,%s,%s\n",
-                        row.getSymbol(),
+                        row.getDisplaySymbol(),
                         row.getBid(),
                         row.getAsk(),
                         row.getSpreadPercent(),
@@ -585,5 +696,26 @@ public class MarketWatchPanel extends StackPane {
 
     private static @NotNull String symbolKey(@NotNull TradePair symbol) {
         return symbol.toString('/').trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static @NotNull String stateKey(@NotNull SymbolAgentState state) {
+        MarketInstrument instrument = state.getMarketInstrument();
+        if (instrument != null) {
+            return instrumentKey(instrument);
+        }
+        return symbolKey(state.getSymbol());
+    }
+
+    private static @NotNull String instrumentKey(@NotNull MarketInstrument instrument) {
+        String exchange = safeKey(instrument.exchangeId());
+        String routingExchange = safeKey(instrument.routingExchange());
+        String nativeSymbol = safeKey(instrument.nativeSymbol());
+        String pair = instrument.tradePair() == null ? "" : symbolKey(instrument.tradePair());
+        String symbol = nativeSymbol.isBlank() ? pair : nativeSymbol;
+        return String.join("|", exchange, routingExchange, symbol);
+    }
+
+    private static String safeKey(String value) {
+        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 }

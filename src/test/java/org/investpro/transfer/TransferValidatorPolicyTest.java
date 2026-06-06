@@ -55,6 +55,46 @@ class TransferValidatorPolicyTest {
         assertTrue(result.valid(), () -> "Expected valid transfer but got: " + result.errors());
     }
 
+    @Test
+    void allowsSpecificCryptoNetworkForCrossExchangeTransfers() {
+        TransferRequest request = new TransferRequest(
+                "Coinbase",
+                "Spot",
+                "Binance",
+                "Spot",
+                "USDC",
+                new BigDecimal("100"),
+                "",
+                "ERC20",
+                3,
+                Instant.now());
+
+        TransferValidator.ValidationOutcome result = validator.validate(request, providers(), feeCalculator, true);
+
+        assertTrue(result.valid(), () -> "Expected valid transfer but got: " + result.errors());
+    }
+
+    @Test
+    void blocksAutoNetworkForCrossExchangeTransfers() {
+        TransferRequest request = new TransferRequest(
+                "Coinbase",
+                "Spot",
+                "Binance",
+                "Spot",
+                "USDC",
+                new BigDecimal("100"),
+                "",
+                "AUTO",
+                3,
+                Instant.now());
+
+        TransferValidator.ValidationOutcome result = validator.validate(request, providers(), feeCalculator, true);
+
+        assertFalse(result.valid());
+        assertTrue(result.errors().stream()
+                .anyMatch(msg -> msg.contains("crypto network/rail")));
+    }
+
     private Map<String, TransferProvider> providers() {
         TransferProvider provider = new TransferProvider() {
             @Override

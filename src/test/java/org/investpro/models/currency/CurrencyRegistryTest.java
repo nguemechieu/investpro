@@ -119,6 +119,44 @@ class CurrencyRegistryTest {
         assertThat(first).isSameAs(second);
     }
 
+    @Test
+    @DisplayName("derivative expiry and CDE fragments are reserved and not registered")
+    void derivativeFragmentsAreNotRegisteredAsCurrencies() {
+        CurrencyRegistry registry = CurrencyRegistry.loadDefault();
+
+        Currency expiry = registry.findOrUnknown("26JUN26");
+        Currency cdeSynthetic = registry.findOrUnknown("CDE-USD");
+        Currency cde = registry.findOrUnknown("CDE");
+        Currency perp = registry.findOrUnknown("PERP");
+
+        assertThat(expiry.getCode()).isEqualTo("26JUN26");
+        assertThat(cdeSynthetic.getCode()).isEqualTo("CDE-USD");
+        assertThat(cde.getCode()).isEqualTo("CDE");
+        assertThat(perp.getCode()).isEqualTo("PERP");
+        assertThat(registry.findByCode("26JUN26")).isNotPresent();
+        assertThat(registry.findByCode("CDE-USD")).isNotPresent();
+        assertThat(registry.findByCode("CDE")).isNotPresent();
+        assertThat(registry.findByCode("PERP")).isNotPresent();
+    }
+
+    @Test
+    @DisplayName("TradePair preserves Coinbase derivative product ids as native symbols")
+    void tradePairPreservesCoinbaseDerivativeProductIds() throws Exception {
+        TradePair future = TradePair.fromSymbol("DOG-26JUN26-CDE");
+        TradePair perp = TradePair.fromSymbol("BTC-PERP");
+
+        assertThat(future.getNativeSymbol()).isEqualTo("DOG-26JUN26-CDE");
+        assertThat(future.toSlashSymbol()).isEqualTo("DOG-26JUN26-CDE");
+        assertThat(future.toExchangeSymbol("coinbase")).isEqualTo("DOG-26JUN26-CDE");
+        assertThat(future.getExpiryCode()).isEqualTo("26JUN26");
+        assertThat(future.isDerivativeContract()).isTrue();
+
+        assertThat(perp.getNativeSymbol()).isEqualTo("BTC-PERP");
+        assertThat(perp.toSlashSymbol()).isEqualTo("BTC-PERP");
+        assertThat(perp.toExchangeSymbol("coinbase")).isEqualTo("BTC-PERP");
+        assertThat(perp.isPerpetual()).isTrue();
+    }
+
     private static final class DuplicateUsdProvider implements CurrencyProvider {
 
         @Override

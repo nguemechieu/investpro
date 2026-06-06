@@ -18,13 +18,18 @@ import org.investpro.models.trading.*;
 import org.investpro.models.Account;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.service.AuthResult;
+import org.investpro.enums.AssetClass;
+import org.investpro.enums.ContractType;
 import org.investpro.enums.timeframe.Timeframe;
+import org.investpro.models.market.MarketInstrument;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.exchange.coinbase.CoinbaseJwtSigner;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.investpro.exchange.coinbase.CoinbaseCandleDataSupplier;
+import org.investpro.exchange.coinbase.CoinbaseMarketInstrumentMapper;
 import org.investpro.exchange.coinbase.CoinbaseMarketDataService;
+import org.investpro.exchange.coinbase.CoinbaseProductSymbolParser;
 import org.investpro.exchange.coinbase.CoinbaseRestRateLimiter;
 
 import org.investpro.exchange.websocket.ExchangeWebSocketClient;
@@ -74,20 +79,24 @@ public class Coinbase extends Exchange {
 
     private static final String REST_BASE_URL = "https://api.coinbase.com/api/v3/brokerage";
     private static final String PUBLIC_PRODUCTS_URL = "%s/market/products".formatted(REST_BASE_URL);
+    private static final String PRODUCTS_URL = "%s/products".formatted(REST_BASE_URL);
     private static final String PUBLIC_PRODUCT_BOOK_URL = "%s/market/product_book".formatted(REST_BASE_URL);
     private static final String PUBLIC_SERVER_TIME_URL = "%s/time".formatted(REST_BASE_URL);
     private static final String ORDERS_URL = "%s/orders".formatted(REST_BASE_URL);
     private static final String CANCEL_ORDERS_URL = "%s/orders/batch_cancel".formatted(REST_BASE_URL);
     private static final String ACCOUNTS_URL = "%s/accounts".formatted(REST_BASE_URL);
+    private static final String CFM_POSITIONS_URL = "%s/cfm/positions".formatted(REST_BASE_URL);
     private static final String DEPOSIT_PAYMENT_METHOD_URL = "%s/deposits/payment-method".formatted(REST_BASE_URL);
     private static final String WITHDRAW_PAYMENT_METHOD_URL = "%s/withdrawals/payment-method".formatted(REST_BASE_URL);
     private static final String WITHDRAW_CRYPTO_URL = "%s/withdrawals/crypto".formatted(REST_BASE_URL);
+    private static final String CDP_PLATFORM_TRANSFERS_URL = "https://api.cdp.coinbase.com/platform/v2/transfers";
     private static final String MARKET_DATA_WS_URL = "wss://advanced-trade-ws.coinbase.com";
     private static final String PEM_EC_BEGIN = "-----BEGIN EC PRIVATE " + "KEY-----";
     private static final String PEM_EC_END = "-----END EC PRIVATE " + "KEY-----";
     private static final String PEM_PKCS8_BEGIN = "-----BEGIN PRIVATE " + "KEY-----";
     private static final String PEM_PKCS8_END = "-----END PRIVATE " + "KEY-----";
     private static final String PEM_KEY_MARKER = "PRIVATE " + "KEY";
+    private static final String COINBASE_PERMISSION_DENIED = "PERMISSION_DENIED";
 
     protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -115,6 +124,16 @@ public class Coinbase extends Exchange {
     private final CoinbaseRestRateLimiter marketRestLimiter = new CoinbaseRestRateLimiter();
     private final MarketDataCache marketDataCache = new MarketDataCache();
     private final CoinbaseMarketDataService marketDataService = new CoinbaseMarketDataService(marketDataCache);
+    private volatile ExchangeCapabilityStatus spotProductsAccess = ExchangeCapabilityStatus.UNKNOWN;
+    private volatile ExchangeCapabilityStatus expiringFuturesAccess = ExchangeCapabilityStatus.UNKNOWN;
+    private volatile ExchangeCapabilityStatus perpetualsAccess = ExchangeCapabilityStatus.UNKNOWN;
+    private volatile String perpetualsUnavailableReason = "";
+    private volatile String expiringFuturesUnavailableReason = "";
+    private final ExecutorService tradabilityExecutor = Executors.newFixedThreadPool(2, runnable -> {
+        Thread thread = new Thread(runnable, "coinbase-tradability");
+        thread.setDaemon(true);
+        return thread;
+    });
     /** Products for which a level2 WebSocket subscription is already active. */
     private final Set<String> level2Subscribed = ConcurrentHashMap.newKeySet();
     private volatile long lastOpenOrdersAuthWarningMs = 0L;
@@ -677,6 +696,15 @@ public class Coinbase extends Exchange {
         return start + "..." + end;
     }
 
+    private String redact(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.length() <= 8
+                ? "****"
+                : value.substring(0, 4) + "****" + value.substring(value.length() - 4);
+    }
+
     private CoinbaseJwtSigner createJwtSigner(String keyName, String privateKey) {
         if (keyName == null || keyName.isBlank() || !looksLikePrivateKey(privateKey)) {
             return null;
@@ -748,7 +776,7 @@ public class Coinbase extends Exchange {
         }
 
         if (!keyFormatOk) {
-            return "Coinbase API Key has invalid format: " + apiKey +
+            return "Coinbase API Key has invalid format: " + redact(apiKey) +
                     "\n\nExpected format: organizations/{org_id}/apiKeys/{key_id}" +
                     "\n\nGet this from: Coinbase → Developer → API Keys";
         }
@@ -810,6 +838,27 @@ public class Coinbase extends Exchange {
         }
     }
 
+    public ExchangeCapabilityStatus getSpotProductsAccess() {
+        return spotProductsAccess;
+    }
+
+    public ExchangeCapabilityStatus getExpiringFuturesAccess() {
+        return expiringFuturesAccess;
+    }
+
+    public ExchangeCapabilityStatus getPerpetualsAccess() {
+        return perpetualsAccess;
+    }
+
+    public boolean hasDerivativesAccess() {
+        return expiringFuturesAccess == ExchangeCapabilityStatus.AVAILABLE
+                || perpetualsAccess == ExchangeCapabilityStatus.AVAILABLE;
+    }
+
+    public boolean hasPerpetualsAccess() {
+        return perpetualsAccess == ExchangeCapabilityStatus.AVAILABLE;
+    }
+
     private @NotNull String sendWithRetry(HttpRequest request, int attempt, int maxAttempts) {
         String route = request.uri().getPath();
         String productId = CoinbaseRestRateLimiter.extractProductId(request.uri());
@@ -860,7 +909,9 @@ public class Coinbase extends Exchange {
                 String errorMsg = "Coinbase HTTP %d for %s: %s"
                         .formatted(httpResponse.statusCode(), request.uri(), body);
 
-                if (httpResponse.statusCode() == 401) {
+                if (isCoinbasePermissionDeniedProductDiscovery(request, httpResponse.statusCode(), body)) {
+                    log.info("Coinbase product discovery permission required for {}.", request.uri());
+                } else if (httpResponse.statusCode() == 401) {
                     log.error(errorMsg);
                     String uriPath = request.uri().getPath();
                     logAuthenticationDiagnostics(uriPath);
@@ -975,9 +1026,12 @@ public class Coinbase extends Exchange {
                                 if (marketRequest && httpResponse.statusCode() != 429) {
                                     marketRestLimiter.onNonRateLimitFailure();
                                 }
-                                throw new RuntimeException(
-                                        "Coinbase HTTP %d for %s: %s"
-                                                .formatted(httpResponse.statusCode(), request.uri(), body));
+                                String errorMsg = "Coinbase HTTP %d for %s: %s"
+                                        .formatted(httpResponse.statusCode(), request.uri(), body);
+                                if (isCoinbasePermissionDeniedProductDiscovery(request, httpResponse.statusCode(), body)) {
+                                    log.info("Coinbase product discovery permission required for {}.", request.uri());
+                                }
+                                throw new RuntimeException(errorMsg);
                             }
 
                             return CompletableFuture.completedFuture(body);
@@ -1024,6 +1078,19 @@ public class Coinbase extends Exchange {
                 || path.contains("/market/product_book")
                 || path.contains("/market/products/")
                 || path.contains("/candles");
+    }
+
+    private boolean isCoinbasePermissionDeniedProductDiscovery(
+            HttpRequest request,
+            int statusCode,
+            String body) {
+        return statusCode == 403
+                && request != null
+                && request.uri() != null
+                && productDiscoverySegment(request.uri().toString()) != CoinbaseProductDiscoverySegment.SPOT
+                && isCoinbaseDerivativesProductsUrl(request.uri().toString())
+                && body != null
+                && body.toUpperCase(Locale.ROOT).contains(COINBASE_PERMISSION_DENIED);
     }
 
     public CoinbaseMarketDataService.MarketDataSnapshot getLatestSnapshot(TradePair pair) {
@@ -1128,7 +1195,57 @@ public class Coinbase extends Exchange {
 
     private @NotNull String productId(TradePair tradePair) {
         Objects.requireNonNull(tradePair, "tradePair must not be null");
-        return tradePair.toString('-').toUpperCase(Locale.ROOT);
+        return normalizeCoinbaseProductId(tradePair.toExchangeSymbol("coinbase"));
+    }
+
+    private static @NotNull String normalizeCoinbaseProductId(String productId) {
+        if (productId == null || productId.isBlank()) {
+            return "";
+        }
+
+        String normalized = productId.trim().toUpperCase(Locale.ROOT);
+        if (normalized.contains("/")) {
+            normalized = normalized.replace("/", "-");
+        }
+
+        return normalized;
+    }
+
+    private static boolean isCoinbaseDerivativeProductId(String productId) {
+        String normalized = normalizeCoinbaseProductId(productId);
+        return normalized.endsWith("-PERP")
+                || normalized.contains("-PERP-")
+                || normalized.contains("-CDE")
+                || normalized.contains("-FUT")
+                || normalized.contains("-OPT")
+                || normalized.matches("[A-Z0-9]{2,}-\\d{1,2}[A-Z]{3}\\d{2,4}-[A-Z0-9]+");
+    }
+
+    private static boolean isDerivativePair(TradePair tradePair) {
+        if (tradePair == null) {
+            return false;
+        }
+        return tradePair.getContractType() == ContractType.FUTURE
+                || tradePair.getContractType() == ContractType.PERPETUAL
+                || tradePair.getContractType() == ContractType.OPTION
+                || isCoinbaseDerivativeProductId(tradePair.getNativeSymbol());
+    }
+
+    private static ContractType contractTypeForCoinbaseProduct(String productId, String productType) {
+        String product = normalizeCoinbaseProductId(productId);
+        String type = productType == null ? "" : productType.toUpperCase(Locale.ROOT);
+
+        if (product.endsWith("-PERP") || type.contains("PERPETUAL")) {
+            return ContractType.PERPETUAL;
+        }
+        if (type.contains("OPTION") || product.contains("-OPT")) {
+            return ContractType.OPTION;
+        }
+        if (type.contains("FUTURE") || type.contains("DERIVATIVE") || isCoinbaseDerivativeProductId(product)) {
+            return ContractType.FUTURE;
+        }
+
+        return ContractType.SPOT;
     }
 
     private static String firstText(JsonNode node, String... names) {
@@ -1240,13 +1357,7 @@ public class Coinbase extends Exchange {
 
     @Override
     public List<TradePair> getTradePairSymbol() {
-        HttpRequest request = authenticatedRequest("GET", PUBLIC_PRODUCTS_URL)
-                .GET()
-                .build();
-
-        @NotNull
-        String httpResponse = send(request);
-        JsonNode root = readJson(httpResponse);
+        JsonNode root = fetchCoinbaseProductsRoot(true);
 
         ArrayList<TradePair> tradePairs = new ArrayList<>();
 
@@ -1256,6 +1367,7 @@ public class Coinbase extends Exchange {
         }
 
         JsonNode products = root.has("products") ? root.get("products") : root;
+        CoinbaseProductSymbolParser symbolParser = new CoinbaseProductSymbolParser();
 
         if (products == null || !products.isArray()) {
             log.warn("Coinbase products API returned unexpected payload: {}", root);
@@ -1274,30 +1386,18 @@ public class Coinbase extends Exchange {
                 continue;
             }
 
-            String baseCode = firstText(
-                    product,
-                    "base_currency_id",
-                    "base_currency",
-                    "base_currency_code");
-
-            String quoteCode = firstText(
-                    product,
-                    "quote_currency_id",
-                    "quote_currency",
-                    "quote_currency_code");
-
-            if (baseCode.isBlank() || quoteCode.isBlank()) {
-                continue;
-            }
+            String nativeProductId = firstText(product, "product_id", "id", "symbol");
+            String productType = product.path("product_type").asText("").toUpperCase(Locale.ROOT);
 
             try {
-                String nativeProductId = firstText(product, "product_id", "id", "symbol");
-                String normalizedSymbol = nativeProductId.isBlank()
-                        ? baseCode + "-" + quoteCode
-                        : nativeProductId.replace('/', '-');
+                if (nativeProductId.isBlank()) {
+                    continue;
+                }
 
-                TradePair pair = TradePair.fromSymbol(normalizedSymbol);
-                pair.setNativeSymbol(nativeProductId.isBlank() ? normalizedSymbol : nativeProductId);
+                TradePair pair = symbolParser.parseProduct(nativeProductId, product);
+                ContractType contractType = contractTypeForCoinbaseProduct(pair.getNativeSymbol(), productType);
+                pair.setContractType(contractType);
+                pair.setAssetClass(contractType == ContractType.SPOT ? AssetClass.CRYPTO_ASSET : AssetClass.DERIVATIVE);
                 tradePairs.add(pair);
             } catch (SQLException | ClassNotFoundException exception) {
                 throw new RuntimeException(exception);
@@ -1314,6 +1414,18 @@ public class Coinbase extends Exchange {
     }
 
     @Override
+    public CompletableFuture<List<MarketInstrument>> fetchMarketInstruments() {
+        return CompletableFuture.supplyAsync(() -> {
+            JsonNode root = fetchCoinbaseProductsRoot(true);
+            CoinbaseMarketInstrumentMapper mapper = new CoinbaseMarketInstrumentMapper(getExchangeId(), null);
+            Map<String, JsonNode> productsById = productsById(root);
+            return mapper.mapAll(root).stream()
+                    .map(instrument -> enrichInstrumentTradability(instrument, productsById))
+                    .toList();
+        }, tradabilityExecutor);
+    }
+
+    @Override
     public CompletableFuture<List<SymbolTradability>> fetchTradabilityStatus(List<TradePair> pairs) {
         if (pairs == null || pairs.isEmpty()) {
             return CompletableFuture.completedFuture(List.of());
@@ -1325,7 +1437,7 @@ public class Coinbase extends Exchange {
                     .filter(Objects::nonNull)
                     .map(pair -> mapCoinbaseTradability(pair, products.get(productId(pair))))
                     .toList();
-        });
+        }, tradabilityExecutor);
     }
 
     @Override
@@ -1338,20 +1450,322 @@ public class Coinbase extends Exchange {
         return CompletableFuture.supplyAsync(() -> {
             JsonNode product = fetchCoinbaseProduct(productId(pair));
             return mapCoinbaseTradability(pair, product);
+        }, tradabilityExecutor);
+    }
+
+    private JsonNode fetchCoinbaseProductsRoot(boolean includeTradability) {
+        List<String> urls = coinbaseProductDiscoveryUrls(includeTradability);
+        var merged = OBJECT_MAPPER.createObjectNode();
+        var products = OBJECT_MAPPER.createArrayNode();
+        Set<String> seenProductIds = new LinkedHashSet<>();
+        int numProducts = 0;
+
+        for (String url : urls) {
+            CoinbaseProductDiscoverySegment segment = productDiscoverySegment(url);
+            JsonNode root;
+            try {
+                root = fetchCoinbaseProductsPageSet(url);
+            } catch (Exception exception) {
+                if (isCoinbasePermissionDenied(exception) && isCoinbaseDerivativesProductsUrl(url)) {
+                    markProductDiscoveryPermissionRequired(segment, rootMessage(exception));
+                    log.info("Coinbase {} product discovery unavailable for this account: {}",
+                            segment.displayName(), userFacingCapabilityReason(segment));
+                } else {
+                    markProductDiscoveryUnknown(segment, rootMessage(exception));
+                    log.warn("Coinbase product discovery segment failed for {}: {}", url, rootMessage(exception));
+                }
+                continue;
+            }
+            JsonNode productArray = root == null ? null : root.has("products") ? root.get("products") : root;
+            if (productArray == null || !productArray.isArray()) {
+                continue;
+            }
+            for (JsonNode product : productArray) {
+                if (product == null || !product.isObject()) {
+                    continue;
+                }
+                String productId = normalizeCoinbaseProductId(firstText(product, "product_id", "id", "symbol"));
+                String key = productId.isBlank() ? product.toString() : productId;
+                if (seenProductIds.add(key)) {
+                    products.add(product);
+                    numProducts++;
+                }
+            }
+            markProductDiscoveryAvailable(segment);
+        }
+
+        if (products.isEmpty()) {
+            JsonNode fallbackRoot;
+            try {
+                fallbackRoot = fetchLegacyCoinbaseProductsRoot(includeTradability);
+            } catch (Exception exception) {
+                log.warn("Coinbase legacy product discovery fallback failed: {}", rootMessage(exception));
+                fallbackRoot = null;
+            }
+            JsonNode productArray = fallbackRoot == null ? null
+                    : fallbackRoot.has("products") ? fallbackRoot.get("products") : fallbackRoot;
+            if (productArray != null && productArray.isArray()) {
+                for (JsonNode product : productArray) {
+                    products.add(product);
+                    numProducts++;
+                }
+            }
+        }
+
+        merged.set("products", products);
+        merged.put("num_products", numProducts);
+        return merged;
+    }
+
+    private boolean isCoinbaseDerivativesProductsUrl(String url) {
+        return url != null
+                && url.contains("product_type=FUTURE")
+                && (url.contains("contract_expiry_type=PERPETUAL")
+                || url.contains("contract_expiry_type=EXPIRING"));
+    }
+
+    private CoinbaseProductDiscoverySegment productDiscoverySegment(String url) {
+        if (url == null || url.isBlank()) {
+            return CoinbaseProductDiscoverySegment.UNKNOWN;
+        }
+        if (url.contains("product_type=SPOT")) {
+            return CoinbaseProductDiscoverySegment.SPOT;
+        }
+        if (url.contains("product_type=FUTURE") && url.contains("contract_expiry_type=PERPETUAL")) {
+            return CoinbaseProductDiscoverySegment.PERPETUAL;
+        }
+        if (url.contains("product_type=FUTURE") && url.contains("contract_expiry_type=EXPIRING")) {
+            return CoinbaseProductDiscoverySegment.EXPIRING_FUTURES;
+        }
+        return CoinbaseProductDiscoverySegment.UNKNOWN;
+    }
+
+    private void markProductDiscoveryAvailable(CoinbaseProductDiscoverySegment segment) {
+        switch (segment) {
+            case SPOT -> spotProductsAccess = ExchangeCapabilityStatus.AVAILABLE;
+            case PERPETUAL -> {
+                perpetualsAccess = ExchangeCapabilityStatus.AVAILABLE;
+                perpetualsUnavailableReason = "";
+            }
+            case EXPIRING_FUTURES -> {
+                expiringFuturesAccess = ExchangeCapabilityStatus.AVAILABLE;
+                expiringFuturesUnavailableReason = "";
+            }
+            case UNKNOWN -> {
+                // No scoped capability to update.
+            }
+        }
+    }
+
+    private void markProductDiscoveryPermissionRequired(CoinbaseProductDiscoverySegment segment, String reason) {
+        String safeReason = reason == null || reason.isBlank()
+                ? "Coinbase returned " + COINBASE_PERMISSION_DENIED
+                : reason;
+        switch (segment) {
+            case PERPETUAL -> {
+                perpetualsAccess = ExchangeCapabilityStatus.PERMISSION_REQUIRED;
+                perpetualsUnavailableReason = safeReason;
+            }
+            case EXPIRING_FUTURES -> {
+                expiringFuturesAccess = ExchangeCapabilityStatus.PERMISSION_REQUIRED;
+                expiringFuturesUnavailableReason = safeReason;
+            }
+            case SPOT -> spotProductsAccess = ExchangeCapabilityStatus.PERMISSION_REQUIRED;
+            case UNKNOWN -> {
+                // No scoped capability to update.
+            }
+        }
+    }
+
+    private void markProductDiscoveryUnknown(CoinbaseProductDiscoverySegment segment, String reason) {
+        switch (segment) {
+            case SPOT -> spotProductsAccess = ExchangeCapabilityStatus.UNKNOWN;
+            case PERPETUAL -> {
+                perpetualsAccess = ExchangeCapabilityStatus.UNKNOWN;
+                perpetualsUnavailableReason = reason == null ? "" : reason;
+            }
+            case EXPIRING_FUTURES -> {
+                expiringFuturesAccess = ExchangeCapabilityStatus.UNKNOWN;
+                expiringFuturesUnavailableReason = reason == null ? "" : reason;
+            }
+            case UNKNOWN -> {
+                // No scoped capability to update.
+            }
+        }
+    }
+
+    private String userFacingCapabilityReason(CoinbaseProductDiscoverySegment segment) {
+        return switch (segment) {
+            case PERPETUAL ->
+                    "Coinbase account or API key does not currently have permission to access perpetual futures products.";
+            case EXPIRING_FUTURES ->
+                    "Coinbase account or API key does not currently have permission to access futures products.";
+            case SPOT -> "Coinbase account or API key does not currently have permission to access spot products.";
+            case UNKNOWN -> "Coinbase product discovery permission is unavailable.";
+        };
+    }
+
+    private boolean isCoinbasePermissionDenied(Throwable throwable) {
+        String message = rootMessage(throwable).toUpperCase(Locale.ROOT);
+        return message.contains("COINBASE HTTP 403")
+                || message.contains("PERMISSION_DENIED")
+                || message.contains("CORRECT PERMISSIONS");
+    }
+
+    private static String rootMessage(Throwable throwable) {
+        Throwable cursor = throwable;
+        while (cursor != null && cursor.getCause() != null) {
+            cursor = cursor.getCause();
+        }
+        if (cursor == null) {
+            return "unknown";
+        }
+        String message = cursor.getMessage();
+        if (message == null || message.isBlank()) {
+            return cursor.getClass().getSimpleName();
+        }
+        return message;
+    }
+
+    private List<String> coinbaseProductDiscoveryUrls(boolean includeTradability) {
+        List<String> urls = new ArrayList<>();
+        urls.add(productsUrl(Map.of(
+                "product_type", "SPOT",
+                "get_tradability_status", Boolean.toString(includeTradability))));
+        urls.add(productsUrl(Map.of(
+                "product_type", "FUTURE",
+                "contract_expiry_type", "PERPETUAL",
+                "get_tradability_status", Boolean.toString(includeTradability))));
+        urls.add(productsUrl(Map.of(
+                "product_type", "FUTURE",
+                "contract_expiry_type", "EXPIRING",
+                "expiring_contract_status", "STATUS_UNEXPIRED",
+                "get_tradability_status", Boolean.toString(includeTradability))));
+        return urls;
+    }
+
+    private JsonNode fetchCoinbaseProductsPageSet(String firstUrl) {
+        var merged = OBJECT_MAPPER.createObjectNode();
+        var products = OBJECT_MAPPER.createArrayNode();
+        String url = firstUrl;
+        int guard = 0;
+
+        while (url != null && !url.isBlank() && guard++ < 20) {
+            JsonNode root = fetchCoinbaseProductsPage(url);
+            JsonNode productArray = root == null ? null : root.has("products") ? root.get("products") : root;
+            if (productArray != null && productArray.isArray()) {
+                productArray.forEach(products::add);
+            }
+
+            String nextCursor = root == null ? "" : root.path("pagination").path("next_cursor").asText("");
+            boolean hasNext = root != null && root.path("pagination").path("has_next").asBoolean(false);
+            url = hasNext && !nextCursor.isBlank() ? appendQuery(firstUrl, "cursor", nextCursor) : "";
+        }
+
+        merged.set("products", products);
+        merged.put("num_products", products.size());
+        return merged;
+    }
+
+    private JsonNode fetchCoinbaseProductsPage(String url) {
+        HttpRequest request = authenticatedRequest("GET", url)
+                .GET()
+                .build();
+        return readJson(send(request));
+    }
+
+    private JsonNode fetchLegacyCoinbaseProductsRoot(boolean includeTradability) {
+        String url = includeTradability ? PUBLIC_PRODUCTS_URL + "?get_tradability_status=true" : PUBLIC_PRODUCTS_URL;
+        HttpRequest request = authenticatedRequest("GET", url)
+                .GET()
+                .build();
+        return readJson(send(request));
+    }
+
+    private String productsUrl(Map<String, String> query) {
+        String url = PRODUCTS_URL;
+        if (query == null || query.isEmpty()) {
+            return url;
+        }
+        StringJoiner joiner = new StringJoiner("&");
+        query.forEach((key, value) -> {
+            if (key != null && !key.isBlank() && value != null && !value.isBlank()) {
+                joiner.add(encode(key) + "=" + encode(value));
+            }
         });
+        String queryText = joiner.toString();
+        return queryText.isBlank() ? url : url + "?" + queryText;
+    }
+
+    private String appendQuery(String url, String key, String value) {
+        if (url == null || url.isBlank() || key == null || key.isBlank() || value == null || value.isBlank()) {
+            return url;
+        }
+        return url + (url.contains("?") ? "&" : "?") + encode(key) + "=" + encode(value);
+    }
+
+    private Map<String, JsonNode> productsById(JsonNode root) {
+        JsonNode products = root == null ? null : root.has("products") ? root.get("products") : root;
+        if (products == null || !products.isArray()) {
+            return Map.of();
+        }
+        return StreamSupport.stream(products.spliterator(), false)
+                .filter(Objects::nonNull)
+                .filter(JsonNode::isObject)
+                .filter(node -> node.hasNonNull("product_id"))
+                .filter(node -> !node.path("product_id").asText("").isBlank())
+                .collect(java.util.stream.Collectors.toMap(
+                        node -> normalizeCoinbaseProductId(node.path("product_id").asText()),
+                        node -> node,
+                        (left, right) -> left,
+                        LinkedHashMap::new));
+    }
+
+    private MarketInstrument enrichInstrumentTradability(
+            MarketInstrument instrument,
+            Map<String, JsonNode> productsById) {
+        if (instrument == null || instrument.tradePair() == null) {
+            return instrument;
+        }
+
+        JsonNode product = productsById.get(normalizeCoinbaseProductId(instrument.nativeSymbol()));
+        SymbolTradability tradability = product == null
+                ? unavailableProductFamilyTradability(instrument.tradePair())
+                : instrument.tradePair() == null
+                ? mapCoinbaseInstrumentTradability(instrument, product)
+                : mapCoinbaseTradability(instrument.tradePair(), product);
+
+        return new MarketInstrument(
+                instrument.exchangeId(),
+                instrument.nativeSymbol(),
+                instrument.displaySymbol(),
+                instrument.tradePair(),
+                instrument.assetClass(),
+                instrument.marketType(),
+                instrument.contractType(),
+                instrument.productType(),
+                instrument.contractExpiryType(),
+                instrument.underlyingType(),
+                instrument.environment(),
+                instrument.routingExchange(),
+                instrument.baseAsset(),
+                instrument.quoteAsset(),
+                instrument.marginAsset(),
+                instrument.underlyingAsset(),
+                instrument.contractCode(),
+                instrument.contractSize(),
+                instrument.contractExpiry(),
+                instrument.leveraged(),
+                instrument.expiring(),
+                instrument.physicallySettled(),
+                instrument.cashSettled(),
+                tradability,
+                instrument.rawMetadata());
     }
 
     private Map<String, JsonNode> fetchCoinbaseProductsById() {
-        String url = PUBLIC_PRODUCTS_URL + "?get_tradability_status=true";
-
         try {
-            HttpRequest request = authenticatedRequest("GET", url)
-                    .GET()
-                    .build();
-
-            String response = send(request);
-            JsonNode root = readJson(response);
-
+            JsonNode root = fetchCoinbaseProductsRoot(true);
             JsonNode products = root.has("products") ? root.get("products") : root;
 
             if (products == null || !products.isArray()) {
@@ -1365,7 +1779,7 @@ public class Coinbase extends Exchange {
                     .filter(node -> node.hasNonNull("product_id"))
                     .filter(node -> !node.path("product_id").asText("").isBlank())
                     .collect(java.util.stream.Collectors.toMap(
-                            node -> node.path("product_id").asText(),
+                            node -> normalizeCoinbaseProductId(node.path("product_id").asText()),
                             node -> node,
                             (left, right) -> left,
                             LinkedHashMap::new));
@@ -1385,14 +1799,226 @@ public class Coinbase extends Exchange {
         return products.get(productId);
     }
 
+    private SymbolTradability unavailableProductFamilyTradability(TradePair pair) {
+        CoinbaseProductDiscoverySegment segment = productDiscoverySegment(pair);
+        ExchangeCapabilityStatus capabilityStatus = capabilityStatus(segment);
+        TradabilityStatus tradabilityStatus = capabilityStatus == ExchangeCapabilityStatus.PERMISSION_REQUIRED
+                ? TradabilityStatus.PERMISSION_DENIED
+                : TradabilityStatus.UNKNOWN;
+        String reason = switch (segment) {
+            case PERPETUAL -> "Coinbase Perpetuals unavailable. Your Coinbase account or API key does not currently have permission to access perpetual futures products. Spot products are still available.";
+            case EXPIRING_FUTURES -> "Coinbase Futures unavailable. Your Coinbase account or API key does not currently have permission to access futures products. Spot products are still available.";
+            case SPOT -> "Coinbase Spot products are unavailable for this account or API key.";
+            case UNKNOWN -> "Product is not available to this Coinbase account.";
+        };
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("source", "coinbase-product-discovery");
+        metadata.put("productStatus", tradabilityStatus.name());
+        metadata.put("coinbase.spotAccess", spotProductsAccess.name());
+        metadata.put("coinbase.futuresAccess", expiringFuturesAccess.name());
+        metadata.put("coinbase.perpetualsAccess", perpetualsAccess.name());
+        metadata.put("coinbase.capabilityStatus", capabilityStatus.name());
+        metadata.put("coinbase.capabilityLabel", capabilityLabel(segment, capabilityStatus));
+        metadata.put("coinbase.permissionReason", permissionReason(segment));
+
+        return new SymbolTradability(
+                getExchangeId(),
+                pair,
+                pair == null ? "" : productId(pair),
+                tradabilityStatus,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                reason,
+                Instant.now(),
+                metadata);
+    }
+
+    private SymbolTradability mapCoinbaseInstrumentTradability(MarketInstrument instrument, JsonNode product) {
+        if (instrument == null) {
+            return defaultTradability(null, TradabilityStatus.UNKNOWN, "Market instrument is null");
+        }
+
+        boolean isDisabled = product.path("is_disabled").asBoolean(false);
+        boolean tradingDisabled = product.path("trading_disabled").asBoolean(false);
+        boolean viewOnly = product.path("view_only").asBoolean(false);
+        boolean cancelOnly = product.path("cancel_only").asBoolean(false);
+        boolean limitOnly = product.path("limit_only").asBoolean(false);
+        boolean postOnly = product.path("post_only").asBoolean(false);
+        boolean auctionOnly = product.path("auction_mode").asBoolean(false);
+        String productType = product.path("product_type").asText(instrument.productType()).toUpperCase(Locale.ROOT);
+        String nativeProductId = normalizeCoinbaseProductId(product.path("product_id").asText(instrument.nativeSymbol()));
+        CoinbaseProductDiscoverySegment segment = productDiscoverySegment(productType, product);
+        ExchangeCapabilityStatus capabilityStatus = capabilityStatus(segment);
+
+        TradabilityStatus status;
+        String reason;
+        if (isDisabled) {
+            status = TradabilityStatus.DISABLED;
+            reason = "Coinbase product is disabled";
+        } else if (tradingDisabled) {
+            status = TradabilityStatus.HALTED;
+            reason = "Coinbase trading is disabled for this product";
+        } else if (viewOnly) {
+            status = TradabilityStatus.VIEW_ONLY;
+            reason = "Coinbase product is view-only for this account";
+        } else if (cancelOnly) {
+            status = TradabilityStatus.CANCEL_ONLY;
+            reason = "Coinbase product is cancel-only";
+        } else if (auctionOnly) {
+            status = TradabilityStatus.AUCTION_ONLY;
+            reason = "Coinbase product is currently in auction mode";
+        } else if (postOnly) {
+            status = TradabilityStatus.POST_ONLY;
+            reason = "Coinbase product is post-only";
+        } else if (limitOnly) {
+            status = TradabilityStatus.LIMIT_ONLY;
+            reason = "Coinbase product supports limit-only trading";
+        } else {
+            status = TradabilityStatus.FULLY_TRADABLE;
+            reason = "Coinbase product is tradable";
+        }
+
+        Map<String, Object> metadata = new LinkedHashMap<>(instrument.rawMetadata());
+        metadata.put("is_disabled", isDisabled);
+        metadata.put("trading_disabled", tradingDisabled);
+        metadata.put("view_only", viewOnly);
+        metadata.put("cancel_only", cancelOnly);
+        metadata.put("limit_only", limitOnly);
+        metadata.put("post_only", postOnly);
+        metadata.put("auction_mode", auctionOnly);
+        metadata.put("product_type", productType);
+        metadata.put("contract_type", instrument.contractType().name());
+        metadata.put("native_product_id", nativeProductId);
+        metadata.put("productStatus", status.name());
+        metadata.put("coinbase.spotAccess", spotProductsAccess.name());
+        metadata.put("coinbase.futuresAccess", expiringFuturesAccess.name());
+        metadata.put("coinbase.perpetualsAccess", perpetualsAccess.name());
+        metadata.put("coinbase.capabilityStatus", capabilityStatus.name());
+        metadata.put("coinbase.capabilityLabel", capabilityLabel(segment, capabilityStatus));
+
+        boolean marketDataAllowed = !isDisabled;
+        boolean orderSubmissionAllowed = false;
+        boolean marketOrderAllowed = false;
+        boolean limitOrderAllowed = false;
+
+        return new SymbolTradability(
+                getExchangeId(),
+                null,
+                nativeProductId,
+                status,
+                marketDataAllowed,
+                true,
+                marketDataAllowed,
+                false,
+                false,
+                false,
+                false,
+                marketOrderAllowed,
+                limitOrderAllowed,
+                false,
+                false,
+                instrument.leveraged(),
+                instrument.leveraged(),
+                reason,
+                Instant.now(),
+                sessionMetadata(metadata,
+                        new SessionState(marketDataAllowed, false, false, false, false, false, reason),
+                        orderSubmissionAllowed,
+                        marketOrderAllowed,
+                        limitOrderAllowed));
+    }
+
+    private CoinbaseProductDiscoverySegment productDiscoverySegment(TradePair pair) {
+        if (pair == null || pair.getContractType() == null) {
+            return CoinbaseProductDiscoverySegment.UNKNOWN;
+        }
+        return switch (pair.getContractType()) {
+            case PERPETUAL -> CoinbaseProductDiscoverySegment.PERPETUAL;
+            case FUTURE -> CoinbaseProductDiscoverySegment.EXPIRING_FUTURES;
+            case SPOT -> CoinbaseProductDiscoverySegment.SPOT;
+            default -> CoinbaseProductDiscoverySegment.UNKNOWN;
+        };
+    }
+
+    private CoinbaseProductDiscoverySegment productDiscoverySegment(String productType, JsonNode product) {
+        String normalizedProductType = productType == null ? "" : productType.toUpperCase(Locale.ROOT);
+        if (normalizedProductType.contains("SPOT")) {
+            return CoinbaseProductDiscoverySegment.SPOT;
+        }
+        if (!normalizedProductType.contains("FUTURE")) {
+            return CoinbaseProductDiscoverySegment.UNKNOWN;
+        }
+        String expiryType = firstText(product, "contract_expiry_type");
+        if (expiryType.isBlank()) {
+            expiryType = firstText(product.path("future_product_details"), "contract_expiry_type");
+        }
+        return "PERPETUAL".equalsIgnoreCase(expiryType)
+                ? CoinbaseProductDiscoverySegment.PERPETUAL
+                : CoinbaseProductDiscoverySegment.EXPIRING_FUTURES;
+    }
+
+    private ExchangeCapabilityStatus capabilityStatus(CoinbaseProductDiscoverySegment segment) {
+        return switch (segment) {
+            case SPOT -> spotProductsAccess;
+            case PERPETUAL -> perpetualsAccess;
+            case EXPIRING_FUTURES -> expiringFuturesAccess;
+            case UNKNOWN -> ExchangeCapabilityStatus.UNKNOWN;
+        };
+    }
+
+    private String capabilityLabel(CoinbaseProductDiscoverySegment segment, ExchangeCapabilityStatus status) {
+        return switch (segment) {
+            case SPOT -> status == ExchangeCapabilityStatus.AVAILABLE
+                    ? "Coinbase Spot: Connected"
+                    : "Coinbase Spot: " + displayStatus(status);
+            case PERPETUAL -> status == ExchangeCapabilityStatus.AVAILABLE
+                    ? "Coinbase Perpetuals: Connected"
+                    : "Coinbase Perpetuals: Not enabled for this account";
+            case EXPIRING_FUTURES -> status == ExchangeCapabilityStatus.AVAILABLE
+                    ? "Coinbase Futures: Connected"
+                    : "Coinbase Futures: View-only / permission required";
+            case UNKNOWN -> "Coinbase capability: " + displayStatus(status);
+        };
+    }
+
+    private String displayStatus(ExchangeCapabilityStatus status) {
+        return status == null ? "Unknown" : switch (status) {
+            case AVAILABLE -> "Connected";
+            case VIEW_ONLY -> "View-only";
+            case PERMISSION_REQUIRED -> "Permission required";
+            case REGION_RESTRICTED -> "Region restricted";
+            case NOT_SUPPORTED -> "Not supported";
+            case UNKNOWN -> "Unknown";
+        };
+    }
+
+    private String permissionReason(CoinbaseProductDiscoverySegment segment) {
+        return switch (segment) {
+            case PERPETUAL -> perpetualsUnavailableReason;
+            case EXPIRING_FUTURES -> expiringFuturesUnavailableReason;
+            default -> "";
+        };
+    }
+
     private SymbolTradability mapCoinbaseTradability(TradePair pair, JsonNode product) {
         if (pair == null) {
             return defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null");
         }
 
         if (product == null || product.isMissingNode()) {
-            return defaultTradability(pair, TradabilityStatus.PERMISSION_DENIED,
-                    "Product is not available to this Coinbase account");
+            return unavailableProductFamilyTradability(pair);
         }
 
         boolean isDisabled = product.path("is_disabled").asBoolean(false);
@@ -1403,13 +2029,22 @@ public class Coinbase extends Exchange {
         boolean postOnly = product.path("post_only").asBoolean(false);
         boolean auctionOnly = product.path("auction_mode").asBoolean(false);
 
+        String nativeProductId = normalizeCoinbaseProductId(product.path("product_id").asText(productId(pair)));
         String productType = product.path("product_type").asText("SPOT").toUpperCase(Locale.ROOT);
+        ContractType contractType = contractTypeForCoinbaseProduct(nativeProductId, productType);
+        CoinbaseProductDiscoverySegment segment = productDiscoverySegment(productType, product);
+        ExchangeCapabilityStatus capabilityStatus = capabilityStatus(segment);
+        pair.setNativeSymbol(nativeProductId);
+        pair.setContractType(contractType);
+        pair.setAssetClass(contractType == ContractType.SPOT ? AssetClass.CRYPTO_ASSET : AssetClass.DERIVATIVE);
+
+        boolean derivativeProduct = contractType != ContractType.SPOT;
         boolean productTypeSupported = productType.contains("SPOT") || productType.contains("FUTURE")
                 || productType.contains("PERPETUAL") || productType.contains("DERIVATIVE");
 
         BigDecimal baseMinSize = safeDecimal(product.path("base_min_size").asText("0"));
         BigDecimal quoteMinSize = safeDecimal(product.path("quote_min_size").asText("0"));
-        boolean minSizeValid = baseMinSize.signum() > 0 && quoteMinSize.signum() > 0;
+        boolean minSizeValid = derivativeProduct || (baseMinSize.signum() > 0 && quoteMinSize.signum() > 0);
 
         TradabilityStatus status;
         String reason;
@@ -1455,7 +2090,14 @@ public class Coinbase extends Exchange {
         metadata.put("post_only", postOnly);
         metadata.put("auction_mode", auctionOnly);
         metadata.put("product_type", productType);
+        metadata.put("contract_type", contractType.name());
+        metadata.put("native_product_id", nativeProductId);
         metadata.put("productStatus", status.name());
+        metadata.put("coinbase.spotAccess", spotProductsAccess.name());
+        metadata.put("coinbase.futuresAccess", expiringFuturesAccess.name());
+        metadata.put("coinbase.perpetualsAccess", perpetualsAccess.name());
+        metadata.put("coinbase.capabilityStatus", capabilityStatus.name());
+        metadata.put("coinbase.capabilityLabel", capabilityLabel(segment, capabilityStatus));
         metadata.put("base_min_size", baseMinSize.toPlainString());
         metadata.put("quote_min_size", quoteMinSize.toPlainString());
 
@@ -1484,7 +2126,7 @@ public class Coinbase extends Exchange {
         return new SymbolTradability(
                 getExchangeId(),
                 pair,
-                product.path("product_id").asText(pair.toString('/')),
+                nativeProductId,
                 status,
                 true,
                 true,
@@ -1925,7 +2567,7 @@ public class Coinbase extends Exchange {
             case 1800 -> "THIRTY_MINUTE";
             case 3600 -> "ONE_HOUR";
             case 7200 -> "TWO_HOUR";
-            case 14400 -> "TWO_HOUR"; // Coinbase does not support FOUR_HOUR
+            case 14400 -> "SIX_HOUR"; // Coinbase does not support FOUR_HOUR
             case 21600 -> "SIX_HOUR";
             case 86400 -> "ONE_DAY";
             default -> "ONE_MINUTE";
@@ -2876,6 +3518,19 @@ public class Coinbase extends Exchange {
 
         requirePrivateEndpointAuth("Coinbase positions");
 
+        if (isDerivativePair(tradePair)) {
+            String product = productId(tradePair);
+            String url = "%s/%s".formatted(CFM_POSITIONS_URL, encode(product));
+
+            HttpRequest request = authenticatedRequest("GET", url)
+                    .GET()
+                    .build();
+
+            return sendAsync(request)
+                    .thenApply(response -> parseCfmPosition(response, tradePair))
+                    .thenApply(optional -> optional.map(List::of).orElseGet(List::of));
+        }
+
         HttpRequest request = authenticatedRequest("GET", ACCOUNTS_URL)
                 .GET()
                 .build();
@@ -3274,6 +3929,108 @@ public class Coinbase extends Exchange {
         return sendAsync(request).thenApply(this::requireSuccessfulFundingResponse);
     }
 
+    public CompletableFuture<String> requestPlatformTransfer(
+            @NotNull JsonNode source,
+            @NotNull JsonNode target,
+            @NotNull BigDecimal amount,
+            @NotNull String asset,
+            boolean execute,
+            boolean validateOnly,
+            @Nullable String amountType,
+            @Nullable String idempotencyKey,
+            @Nullable Map<String, String> metadata) {
+        if (isPaperTrading()) {
+            return failedFuture(
+                    new UnsupportedOperationException("Coinbase paper mode does not support live CDP transfers."));
+        }
+        if (validateOnly && execute) {
+            return failedFuture(new IllegalArgumentException("CDP Transfers validateOnly and execute cannot both be true."));
+        }
+
+        requirePrivateEndpointAuth("Coinbase CDP Platform transfer");
+
+        if (source == null || source.isNull() || !source.isObject()) {
+            return failedFuture(new IllegalArgumentException("CDP transfer source is required."));
+        }
+        if (target == null || target.isNull() || !target.isObject()) {
+            return failedFuture(new IllegalArgumentException("CDP transfer target is required."));
+        }
+        if (amount == null || amount.signum() <= 0) {
+            return failedFuture(new IllegalArgumentException("Amount must be greater than zero."));
+        }
+        if (asset == null || asset.isBlank()) {
+            return failedFuture(new IllegalArgumentException("CDP transfer asset is required."));
+        }
+
+        var payload = OBJECT_MAPPER.createObjectNode();
+        payload.set("source", source);
+        payload.set("target", target);
+        payload.put("amount", amount.stripTrailingZeros().toPlainString());
+        payload.put("asset", asset.trim().toLowerCase(Locale.ROOT));
+        payload.put("execute", execute);
+        payload.put("validateOnly", validateOnly);
+        if (amountType != null && !amountType.isBlank()) {
+            payload.put("amountType", amountType.trim().toLowerCase(Locale.ROOT));
+        }
+        if (metadata != null && !metadata.isEmpty()) {
+            var metadataNode = OBJECT_MAPPER.createObjectNode();
+            metadata.entrySet().stream()
+                    .filter(entry -> entry.getKey() != null && !entry.getKey().isBlank())
+                    .filter(entry -> entry.getValue() != null && !entry.getValue().isBlank())
+                    .limit(10)
+                    .forEach(entry -> metadataNode.put(entry.getKey().trim(), entry.getValue().trim()));
+            if (!metadataNode.isEmpty()) {
+                payload.set("metadata", metadataNode);
+            }
+        }
+
+        HttpRequest.Builder builder = authenticatedRequest("POST", CDP_PLATFORM_TRANSFERS_URL)
+                .header("Content-Type", "application/json");
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            builder.header("X-Idempotency-Key", idempotencyKey.trim());
+        }
+
+        HttpRequest request = builder
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
+
+        return sendAsync(request).thenApply(this::requireSuccessfulFundingResponse);
+    }
+
+    public CompletableFuture<String> executePlatformTransfer(@NotNull String transferId, @Nullable String idempotencyKey) {
+        if (isPaperTrading()) {
+            return failedFuture(
+                    new UnsupportedOperationException("Coinbase paper mode does not support live CDP transfers."));
+        }
+        requirePrivateEndpointAuth("Coinbase CDP Platform transfer execute");
+        if (transferId == null || transferId.isBlank()) {
+            return failedFuture(new IllegalArgumentException("CDP transfer id is required."));
+        }
+
+        String url = "%s/%s/execute".formatted(CDP_PLATFORM_TRANSFERS_URL, encode(transferId.trim()));
+        HttpRequest.Builder builder = authenticatedRequest("POST", url);
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            builder.header("X-Idempotency-Key", idempotencyKey.trim());
+        }
+        return sendAsync(builder.POST(HttpRequest.BodyPublishers.noBody()).build())
+                .thenApply(this::requireSuccessfulFundingResponse);
+    }
+
+    public CompletableFuture<String> getPlatformTransfer(@NotNull String transferId) {
+        if (isPaperTrading()) {
+            return failedFuture(
+                    new UnsupportedOperationException("Coinbase paper mode does not support live CDP transfers."));
+        }
+        requirePrivateEndpointAuth("Coinbase CDP Platform transfer status");
+        if (transferId == null || transferId.isBlank()) {
+            return failedFuture(new IllegalArgumentException("CDP transfer id is required."));
+        }
+
+        String url = "%s/%s".formatted(CDP_PLATFORM_TRANSFERS_URL, encode(transferId.trim()));
+        return sendAsync(authenticatedRequest("GET", url).GET().build())
+                .thenApply(this::requireSuccessfulFundingResponse);
+    }
+
     private String requireSuccessfulFundingResponse(String responseBody) {
         JsonNode root = readJson(responseBody);
 
@@ -3291,6 +4048,16 @@ public class Coinbase extends Exchange {
 
         if (root.has("error") && !root.path("error").asText("").isBlank()) {
             throw new IllegalStateException(root.path("error").asText());
+        }
+
+        if (root.has("errorType") && !root.path("errorType").asText("").isBlank()) {
+            String message = root.path("message").asText(root.path("errorType").asText("Coinbase funding request failed."));
+            throw new IllegalStateException(message);
+        }
+
+        if ("failed".equalsIgnoreCase(root.path("status").asText(""))) {
+            String message = root.path("failureReason").asText("Coinbase transfer failed.");
+            throw new IllegalStateException(message);
         }
 
         return responseBody;
@@ -3718,8 +4485,8 @@ public class Coinbase extends Exchange {
             case 3600 -> "ONE_HOUR";
             case 7200 -> "TWO_HOUR";
             case 14400 -> {
-                log.warn("Coinbase does not support 4h candles directly. Falling back to TWO_HOUR.");
-                yield "TWO_HOUR";
+                log.warn("Coinbase does not support 4h candles directly. Falling back to SIX_HOUR.");
+                yield "SIX_HOUR";
             }
             case 21600 -> "SIX_HOUR";
             case 86400 -> "ONE_DAY";
@@ -3739,7 +4506,7 @@ public class Coinbase extends Exchange {
                 Timeframe.M15,
                 Timeframe.M30,
                 Timeframe.H1,
-                Timeframe.H4,
+                Timeframe.H6,
                 Timeframe.D1);
     }
 
@@ -3943,6 +4710,85 @@ public class Coinbase extends Exchange {
         }
 
         return positions;
+    }
+
+    private Optional<Position> parseCfmPosition(String jsonResponse, TradePair requestedPair) {
+        try {
+            JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
+            JsonNode node = root.has("position") ? root.get("position") : root;
+
+            if (node == null || node.isMissingNode() || node.isNull()) {
+                return Optional.empty();
+            }
+
+            String product = normalizeCoinbaseProductId(firstText(node, "product_id", "productId", "symbol"));
+            if (product.isBlank()) {
+                product = productId(requestedPair);
+            }
+
+            String sideText = firstText(node, "side").toUpperCase(Locale.ROOT);
+            double contracts = parseDouble(firstText(node, "number_of_contracts", "contracts", "size"), 0.0);
+            double currentPrice = parseDouble(firstText(node, "current_price", "mark_price", "price"), 0.0);
+            double entryPrice = parseDouble(firstText(node, "avg_entry_price", "average_entry_price", "entry_price"), 0.0);
+            double unrealizedPnl = parseDouble(firstText(node, "unrealized_pnl"), 0.0);
+            double realizedPnl = parseDouble(firstText(node, "daily_realized_pnl", "realized_pnl"), 0.0);
+
+            if (contracts == 0.0 || sideText.isBlank() || "UNKNOWN".equals(sideText)) {
+                return Optional.empty();
+            }
+
+            TradePair positionPair = requestedPair;
+            if (positionPair == null || !product.equalsIgnoreCase(productId(positionPair))) {
+                positionPair = parseTradePairFromProductId(product);
+            }
+            positionPair.setNativeSymbol(product);
+            positionPair.setContractType(contractTypeForCoinbaseProduct(product, "DERIVATIVE"));
+            positionPair.setAssetClass(AssetClass.DERIVATIVE);
+
+            Position position = new Position(positionPair);
+            position.setPositionId(product);
+            position.setTradePair(positionPair);
+            position.setQuantity(Math.abs(contracts));
+            position.setSide("SHORT".equals(sideText) ? Side.SELL : Side.BUY);
+            position.setEntryPrice(Math.max(0.0, entryPrice));
+            position.setCurrentPrice(Math.max(0.0, currentPrice));
+            position.setUnrealizedPnl(unrealizedPnl);
+            position.setRealizedPnl(realizedPnl);
+            position.setOpen(Math.abs(contracts) > 0.0 && !"UNKNOWN".equals(sideText));
+            position.setOpenTime(Instant.now());
+            position.setTimestamp(Instant.now());
+
+            return Optional.of(position);
+        } catch (Exception exception) {
+            log.error("Failed to parse Coinbase CFM position response", exception);
+            return Optional.empty();
+        }
+    }
+
+    public enum ExchangeCapabilityStatus {
+        AVAILABLE,
+        VIEW_ONLY,
+        PERMISSION_REQUIRED,
+        REGION_RESTRICTED,
+        NOT_SUPPORTED,
+        UNKNOWN
+    }
+
+    private enum CoinbaseProductDiscoverySegment {
+        SPOT("spot"),
+        EXPIRING_FUTURES("expiring futures"),
+        PERPETUAL("perpetuals"),
+        UNKNOWN("unknown");
+
+        private final String displayName;
+
+        CoinbaseProductDiscoverySegment(String displayName) {
+            this.displayName = displayName;
+        }
+
+        String displayName() {
+            return displayName;
+        }
     }
 
     private @NotNull List<Position> parseAllPositionsFromAccounts(String jsonResponse) {

@@ -10,10 +10,15 @@ import org.investpro.enums.TradingSessionStatus;
 import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.core.agents.symbol.SymbolTradingMode;
 import org.investpro.models.currency.CurrencyRegistry;
+import org.investpro.models.market.MarketInstrument;
+import org.investpro.models.market.MarketType;
 import org.investpro.models.trading.TradePair;
 import org.investpro.trading.tradability.ProductTradabilityStatus;
 import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.ui.market.MarketWatchSymbolFormatter;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Map;
 
 /**
  * Model for a single row in the MarketWatch table.
@@ -63,6 +68,10 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
     private final StringProperty exchangeCapability = new SimpleStringProperty("Unknown");
     private final BooleanProperty favorite = new SimpleBooleanProperty(false);
     private final StringProperty lastUpdatedText = new SimpleStringProperty("");
+    private final ObjectProperty<MarketInstrument> marketInstrument = new SimpleObjectProperty<>();
+    private final StringProperty marketType = new SimpleStringProperty("Unknown");
+    private final StringProperty venue = new SimpleStringProperty("Unknown");
+    private final StringProperty marketBadge = new SimpleStringProperty("Unknown");
 
     // Metadata
     private long lastUpdated;
@@ -93,6 +102,10 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
 
     public TradePair getSymbol() {
         return symbol.get();
+    }
+
+    public String getDisplaySymbol() {
+        return MarketWatchSymbolFormatter.displaySymbol(getMarketInstrument(), getSymbol());
     }
 
     public DoubleProperty bidProperty() {
@@ -275,6 +288,38 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
         return lastUpdatedText.get();
     }
 
+    public ObjectProperty<MarketInstrument> marketInstrumentProperty() {
+        return marketInstrument;
+    }
+
+    public MarketInstrument getMarketInstrument() {
+        return marketInstrument.get();
+    }
+
+    public StringProperty marketTypeProperty() {
+        return marketType;
+    }
+
+    public String getMarketType() {
+        return marketType.get();
+    }
+
+    public StringProperty venueProperty() {
+        return venue;
+    }
+
+    public String getVenue() {
+        return venue.get();
+    }
+
+    public StringProperty marketBadgeProperty() {
+        return marketBadge;
+    }
+
+    public String getMarketBadge() {
+        return marketBadge.get();
+    }
+
     public String getBaseCodeBadge() {
         TradePair pair = getSymbol();
         return pair == null ? "" : pair.getBaseCode();
@@ -337,6 +382,37 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
 
     public void setExchangeCapability(String value) {
         exchangeCapability.set(value == null || value.isBlank() ? "Unknown" : value);
+    }
+
+    public void setMarketInstrument(@Nullable MarketInstrument instrument) {
+        marketInstrument.set(instrument);
+        if (instrument == null) {
+            TradePair pair = getSymbol();
+            MarketType type = pair == null ? MarketType.UNKNOWN : MarketType.SPOT;
+            marketType.set(type.name());
+            venue.set("");
+            marketBadge.set(type == MarketType.SPOT ? "Spot" : "Unknown");
+            return;
+        }
+
+        marketType.set(instrument.marketType().name());
+        venue.set(instrument.routingExchange());
+        marketBadge.set(instrument.marketBadge());
+        if (instrument.tradability() != null) {
+            updateTradability(null, instrument.tradability(), exchangeCapabilityLabel(instrument));
+        }
+    }
+
+    private String exchangeCapabilityLabel(MarketInstrument instrument) {
+        if (instrument == null || instrument.tradability() == null) {
+            return instrument == null ? "" : instrument.routingExchange();
+        }
+        Map<String, Object> metadata = instrument.tradability().rawMetadata();
+        Object label = metadata.get("coinbase.capabilityLabel");
+        if (label != null && !label.toString().isBlank()) {
+            return label.toString();
+        }
+        return instrument.routingExchange();
     }
 
     // ===== Update from SymbolAgentState =====

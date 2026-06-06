@@ -176,9 +176,9 @@ public class OnboardingDesk extends StackPane {
         rememberMeCheckBox.setMaxWidth(Region.USE_PREF_SIZE);
 
         Hyperlink forgotPasswordButton = new Hyperlink("Forgot Password?");
-        forgotPasswordButton.setOnAction(event -> showForgotPasswordDialog(statusLabelForInline()));
 
         Label validation = inlineValidationLabel();
+        forgotPasswordButton.setOnAction(event -> showForgotPasswordDialog(validation));
 
         Button loginButton = createPrimaryButton(t("onboarding.logIn"));
         Button createAccountButton = createSuccessButton(t("onboarding.createAccount"));
@@ -224,9 +224,9 @@ public class OnboardingDesk extends StackPane {
 
         form.add(spacer(), 0, row++);
         form.add(buttonBox, 0, row++);
-        form.add(validation, 0, row);
+        form.add(validation, 0, row++);
         form.add(spacer(), 0, row++);
-        form.add(forgotPasswordButton, 1, row + 1);
+        form.add(forgotPasswordButton, 0, row);
 
         VBox card = new VBox(20, badge("SECURE TERMINAL ACCESS"), title, prompt, form);
         card.setAlignment(Pos.TOP_LEFT);
@@ -357,17 +357,20 @@ public class OnboardingDesk extends StackPane {
         field.setStyle(INPUT_STYLE);
         field.setPrefHeight(44);
         field.setMinHeight(44);
+        field.setMaxWidth(Double.MAX_VALUE);
         field.setEditable(true);
         field.setFocusTraversable(true);
     }
 
     private void styleChoiceBox(ChoiceBox<?> choiceBox) {
         choiceBox.setPrefHeight(42);
+        choiceBox.setMaxWidth(Double.MAX_VALUE);
         choiceBox.setStyle(COMBO_STYLE);
     }
 
     private void styleComboBox(ComboBox<?> comboBox) {
         comboBox.setPrefHeight(44);
+        comboBox.setMaxWidth(Double.MAX_VALUE);
         comboBox.setStyle(COMBO_STYLE);
     }
 
@@ -525,8 +528,26 @@ public class OnboardingDesk extends StackPane {
     }
 
     private void showConfigurationStep() {
-        marketTypeBox.getItems().setAll("Crypto", "Forex", "Stocks", "Futures", "Options", "ETFs", "Bonds");
-        venueBox.getItems().setAll("US", "Global", "Spot", "Derivatives", "Paper Trading");
+        marketTypeBox.getItems().setAll(
+                "Crypto Spot",
+                "Spot",
+                "Perpetuals",
+                "Futures",
+                "Options",
+                "Forex",
+                "Stocks",
+                "Indices",
+                "Commodities",
+                "ETFs",
+                "Bonds");
+        venueBox.getItems().setAll(
+                "US",
+                "Global",
+                "Spot",
+                "Derivatives",
+                "US Derivatives",
+                "International",
+                "Paper Trading");
 
         exchangeBox.getItems().clear();
         Arrays.stream(SupportedExchange.values())
@@ -542,13 +563,13 @@ public class OnboardingDesk extends StackPane {
         Label title = new Label("Market Configuration");
         title.setStyle(titleStyle(30));
 
-        Label subtitle = new Label("Choose the market, venue, and exchange that InvestPro should connect to.");
+        Label subtitle = new Label("Choose the instrument family, routing market, and exchange that InvestPro should connect to.");
         subtitle.setStyle(subtitleStyle());
         subtitle.setWrapText(true);
 
         GridPane grid = formGrid();
-        grid.addRow(0, createLabel("Market Type"), marketTypeBox);
-        grid.addRow(1, createLabel("Venue"), venueBox);
+        grid.addRow(0, createLabel("Instrument"), marketTypeBox);
+        grid.addRow(1, createLabel("Route"), venueBox);
         grid.addRow(2, createLabel("Exchange"), exchangeBox);
 
         Label validation = inlineValidationLabel();
@@ -556,7 +577,7 @@ public class OnboardingDesk extends StackPane {
         loadMarketButton.setPrefWidth(180);
         loadMarketButton.setOnAction(event -> {
             if (marketTypeBox.getValue() == null || venueBox.getValue() == null || exchangeBox.getValue() == null) {
-                validation.setText("Select a market type, venue, and exchange.");
+                validation.setText("Select an instrument, route, and exchange.");
                 return;
             }
             showExchangeCredentialsStep();
@@ -578,6 +599,19 @@ public class OnboardingDesk extends StackPane {
         grid.setHgap(16);
         grid.setVgap(14);
         grid.setAlignment(Pos.CENTER);
+        grid.setMaxWidth(Double.MAX_VALUE);
+
+        ColumnConstraints labelColumn = new ColumnConstraints();
+        labelColumn.setMinWidth(120);
+        labelColumn.setPrefWidth(138);
+        labelColumn.setHgrow(Priority.NEVER);
+
+        ColumnConstraints inputColumn = new ColumnConstraints();
+        inputColumn.setMinWidth(220);
+        inputColumn.setHgrow(Priority.ALWAYS);
+        inputColumn.setFillWidth(true);
+
+        grid.getColumnConstraints().setAll(labelColumn, inputColumn);
         return grid;
     }
 
@@ -592,7 +626,7 @@ public class OnboardingDesk extends StackPane {
         SupportedExchange selectedExchange = SupportedExchange.fromDisplayName(selectedExchangeName);
 
         selectedTradingModeChoiceBox.getItems().setAll("PAPER TRADING", "LIVE");
-        selectedTradingModeChoiceBox.setValue(loadSavedTradingMode());
+        selectedTradingModeChoiceBox.setValue(toTradingModeDisplay(loadSavedTradingMode()));
         styleChoiceBox(selectedTradingModeChoiceBox);
         boolean isIbkr = selectedExchange == SupportedExchange.INTERACTIVE_BROKERS;
         if (isIbkr) {
@@ -871,7 +905,7 @@ public class OnboardingDesk extends StackPane {
         String apiSecret = apiSecretField.getText().trim();
         String accountId = accountIdField.getText().trim();
         String ibkrTwoFactorCode = ibkrTwoFactorCodeField.getText().trim();
-        String tradingMode = selectedTradingModeChoiceBox.getValue();
+        String tradingMode = normalizeTradingMode(selectedTradingModeChoiceBox.getValue());
 
         if (tradingMode == null || tradingMode.isBlank()) {
             tradingMode = "PAPER";
@@ -890,8 +924,7 @@ public class OnboardingDesk extends StackPane {
             }
 
             String normalizedTradingMode = safe(tradingMode).toUpperCase(Locale.ROOT);
-            if (("LIVE".equals(normalizedTradingMode) || "LIVE TRADING".equals(normalizedTradingMode))
-                    && accountId.isBlank()) {
+            if ("LIVE".equals(normalizedTradingMode) && accountId.isBlank()) {
                 validation.setText("IBKR Account ID is required for live trading mode.");
                 return;
             }
@@ -967,15 +1000,14 @@ public class OnboardingDesk extends StackPane {
             TextField livePortField,
             TextField clientIdField,
             Label validation) {
-        String tradingMode = selectedTradingModeChoiceBox.getValue();
+        String tradingMode = normalizeTradingMode(selectedTradingModeChoiceBox.getValue());
         if (tradingMode == null || tradingMode.isBlank()) {
-            tradingMode = "PAPER TRADING";
+            tradingMode = "PAPER";
         }
 
         String normalizedTradingMode = safe(tradingMode).toUpperCase(Locale.ROOT);
         String accountId = accountIdField.getText().trim();
-        if (("LIVE".equals(normalizedTradingMode) || "LIVE TRADING".equals(normalizedTradingMode))
-                && accountId.isBlank()) {
+        if ("LIVE".equals(normalizedTradingMode) && accountId.isBlank()) {
             validation.setText("IBKR Account ID is required for live trading mode.");
             return;
         }
@@ -1332,7 +1364,11 @@ public class OnboardingDesk extends StackPane {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
         preferences.put("username", safe(configuration.username()));
         preferences.put("marketType", safe(configuration.marketType()));
+        preferences.put("instrumentType", configuration.normalizedInstrumentType().name());
+        preferences.put("leverageMode", configuration.normalizedLeverageMode().name());
+        preferences.put("normalizedMarketType", configuration.normalizedMarketType().name());
         preferences.put("venue", safe(configuration.venue()));
+        preferences.put("routingExchange", safe(configuration.venue()));
         preferences.put("exchange", safe(configuration.exchange()));
         preferences.put("apiKey", safe(configuration.apiKey()));
         preferences.put("apiSecret", safe(configuration.apiSecret()));
@@ -1371,12 +1407,12 @@ public class OnboardingDesk extends StackPane {
     private void applySavedConfigurationSelection() {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
 
-        String savedMarketType = preferences.get("marketType", "Crypto");
+        String savedMarketType = preferences.get("marketType", "Crypto Spot");
         String savedVenue = preferences.get("venue", "US");
         String savedExchange = preferences.get("exchange", SupportedExchange.COINBASE.getFactoryKey());
 
         marketTypeBox.getSelectionModel().select(
-                marketTypeBox.getItems().contains(savedMarketType) ? savedMarketType : "Crypto");
+                marketTypeBox.getItems().contains(savedMarketType) ? savedMarketType : "Crypto Spot");
         venueBox.getSelectionModel().select(
                 venueBox.getItems().contains(savedVenue) ? savedVenue : "US");
 
@@ -1405,11 +1441,19 @@ public class OnboardingDesk extends StackPane {
 
     private @NonNull String loadSavedTradingMode() {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
-        String savedTradingMode = preferences.get("tradingMode", "PAPER TRADING");
-        if ("LIVE".equalsIgnoreCase(savedTradingMode)) {
+        return normalizeTradingMode(preferences.get("tradingMode", "PAPER"));
+    }
+
+    private @NonNull String normalizeTradingMode(String value) {
+        String normalized = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+        if (normalized.startsWith("LIVE")) {
             return "LIVE";
         }
-        return "PAPER TRADING";
+        return "PAPER";
+    }
+
+    private @NonNull String toTradingModeDisplay(String value) {
+        return "LIVE".equalsIgnoreCase(normalizeTradingMode(value)) ? "LIVE" : "PAPER TRADING";
     }
 
     private void loadSavedOptionalTokens() {

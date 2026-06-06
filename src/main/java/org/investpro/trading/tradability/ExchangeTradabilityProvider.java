@@ -3,6 +3,8 @@ package org.investpro.trading.tradability;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
 import java.util.List;
@@ -43,8 +45,9 @@ public final class ExchangeTradabilityProvider implements TradabilityProvider {
                 });
     }
 
+    @Contract(" -> new")
     @Override
-    public CompletableFuture<List<ProductTradabilityStatus>> getAllTradableProducts() {
+    public @NonNull CompletableFuture<List<ProductTradabilityStatus>> getAllTradableProducts() {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 List<TradePair> pairs = exchange.getTradePairSymbol();
@@ -61,21 +64,21 @@ public final class ExchangeTradabilityProvider implements TradabilityProvider {
     }
 
     @Override
-    public CompletableFuture<Boolean> isTradeable(String productId) {
+    public @NonNull CompletableFuture<Boolean> isTradeable(String productId) {
         return getTradabilityStatus(productId).thenApply(ProductTradabilityStatus::isTradeable);
     }
 
     @Override
-    public CompletableFuture<Boolean> canPlaceMarketOrder(String productId) {
+    public @NonNull CompletableFuture<Boolean> canPlaceMarketOrder(String productId) {
         return getTradabilityStatus(productId).thenApply(ProductTradabilityStatus::canPlaceMarketOrder);
     }
 
     @Override
-    public CompletableFuture<Boolean> canPlaceLimitOrder(String productId) {
+    public @NonNull CompletableFuture<Boolean> canPlaceLimitOrder(String productId) {
         return getTradabilityStatus(productId).thenApply(ProductTradabilityStatus::canPlaceLimitOrder);
     }
 
-    private ProductTradabilityStatus toProductStatus(SymbolTradability status) {
+    private @NonNull ProductTradabilityStatus toProductStatus(SymbolTradability status) {
         if (status == null) {
             return unknown("", "No tradability data");
         }
@@ -105,7 +108,8 @@ public final class ExchangeTradabilityProvider implements TradabilityProvider {
                 status.checkedAt() == null ? Instant.now() : status.checkedAt());
     }
 
-    private ProductTradabilityStatus unknown(String productId, String message) {
+    @Contract("_, _ -> new")
+    private @NonNull ProductTradabilityStatus unknown(String productId, String message) {
         return new ProductTradabilityStatus(productId, false, false, false, false, false, false, false, false,
                 "UNKNOWN", message, Instant.now());
     }

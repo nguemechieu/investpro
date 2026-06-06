@@ -7,6 +7,7 @@ import org.investpro.data.CandleData;
 import org.investpro.enums.MarketBehavior;
 import org.investpro.enums.TradingSessionStatus;
 import org.investpro.market.InstrumentTradingSession;
+import org.investpro.models.market.MarketInstrument;
 import org.investpro.models.trading.TradePair;
 import org.investpro.enums.timeframe.Timeframe;
 
@@ -22,6 +23,7 @@ import java.util.List;
 @Setter
 public class StrategyContext {
     private  TradePair symbol;
+    private MarketInstrument marketInstrument;
 
     private  Timeframe timeframe;
     

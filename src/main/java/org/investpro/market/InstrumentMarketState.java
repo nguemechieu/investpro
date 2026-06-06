@@ -91,7 +91,7 @@ public class InstrumentMarketState implements Serializable {
             this.candlesByTimeframe.putAll(candlesByTimeframe);
         }
         this.tradingSessionStatus = tradingSessionStatus;
-        this.updatedAt = updatedAt != null ? updatedAt : Instant.now();
+        this.updatedAt = updatedAt;
     }
 
     /**

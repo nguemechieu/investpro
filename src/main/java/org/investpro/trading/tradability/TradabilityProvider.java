@@ -37,6 +37,6 @@ public interface TradabilityProvider {
     }
 
     default String productId(TradePair pair) {
-        return pair == null ? "" : pair.toString('-').toUpperCase();
+        return pair == null ? "" : pair.toExchangeSymbol("").toUpperCase();
     }
 }

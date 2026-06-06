@@ -21,6 +21,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import org.investpro.exchange.Exchange;
 
+import java.util.Collection;
 import java.util.function.Consumer;
 
 public class TransferPanel extends BorderPane {
@@ -28,11 +29,24 @@ public class TransferPanel extends BorderPane {
     private final TransferController controller;
 
     public TransferPanel(Consumer<String> notifier) {
-        this(null, notifier);
+        this((Exchange) null, notifier);
     }
 
     public TransferPanel(Exchange activeExchange, Consumer<String> notifier) {
         TransferService transferService = new TransferService(activeExchange);
+        this.controller = createController(transferService, notifier);
+        setCenter(buildUi());
+        getStyleClass().addAll("transfer-funds-panel", "pro-panel");
+    }
+
+    public TransferPanel(Collection<? extends Exchange> connectedExchanges, Consumer<String> notifier) {
+        TransferService transferService = new TransferService(connectedExchanges);
+        this.controller = createController(transferService, notifier);
+        setCenter(buildUi());
+        getStyleClass().addAll("transfer-funds-panel", "pro-panel");
+    }
+
+    private TransferController createController(TransferService transferService, Consumer<String> notifier) {
         TransferValidator transferValidator = new TransferValidator();
         TransferFeeCalculator feeCalculator = new TransferFeeCalculator();
         TransferHistoryService historyService = new TransferHistoryService();
@@ -45,9 +59,7 @@ public class TransferPanel extends BorderPane {
                 historyService,
                 statusMonitor);
 
-        this.controller = new TransferController(transferManager, notifier);
-        setCenter(buildUi());
-        getStyleClass().addAll("transfer-funds-panel", "pro-panel");
+        return new TransferController(transferManager, notifier);
     }
 
     private VBox buildUi() {
@@ -119,7 +131,7 @@ public class TransferPanel extends BorderPane {
         cancelButton.setOnAction(event -> {
             amount.clear();
             notes.clear();
-            transferMessage.setText("Transfer input reset.");
+            controller.resetTransferInputMessage();
         });
 
         HBox actions = new HBox(10, previewButton, executeButton, cancelButton, progressIndicator);

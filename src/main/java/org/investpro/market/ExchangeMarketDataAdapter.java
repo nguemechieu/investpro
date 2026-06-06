@@ -43,7 +43,7 @@ public record ExchangeMarketDataAdapter(MarketDataEngine engine, String brokerNa
      * Called when exchange adapter fetches live price for a pair.
      */
     public void consumeTicker(@NotNull Ticker ticker) {
-        if (ticker == null || ticker.getTradePair() == null) {
+        if (ticker.getTradePair() == null) {
             log.warn("[{}] Received null ticker", brokerName);
             return;
         }

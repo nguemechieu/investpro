@@ -8,7 +8,10 @@ import org.investpro.data.CandleData;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategyContext;
+import org.investpro.strategy.StrategyDefinition;
+import org.investpro.strategy.StrategyInstrumentCompatibilityService;
 import org.investpro.strategy.StrategySelectionService;
+import org.investpro.models.market.MarketInstrument;
 import org.investpro.models.trading.TradePair;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.persistence.repository.HistoricalDataRepository;
@@ -53,6 +56,7 @@ public class StrategyLabService {
     private final HistoricalDataRepository historicalDataRepository;
     private final BacktestScheduler backtestScheduler;
     private final LocalAiRuntimeService localAiRuntimeService;
+    private final StrategyInstrumentCompatibilityService instrumentCompatibilityService;
 
     private final ExecutorService executorService;
 
@@ -73,6 +77,7 @@ public class StrategyLabService {
         this.historicalDataRepository = HistoricalDataRepositoryImpl.getInstance();
         this.backtestScheduler = BacktestScheduler.getInstance();
         this.localAiRuntimeService = LocalAiRuntimeService.fromConfiguration();
+        this.instrumentCompatibilityService = new StrategyInstrumentCompatibilityService();
 
         // Create dedicated thread pool for strategy backtests
         this.executorService = Executors.newFixedThreadPool(
@@ -137,6 +142,26 @@ public class StrategyLabService {
             @NotNull List<CandleData> candles) {
         List<String> allStrategyNames = new ArrayList<>(StrategyCatalog.availableStrategyNames());
         return evaluateAndAssignBest(symbol, timeframe, candles, allStrategyNames);
+    }
+
+    public CompletableFuture<StrategyAssignment> evaluateAndAssignBest(
+            @NotNull MarketInstrument instrument,
+            @NotNull Timeframe timeframe,
+            @NotNull List<CandleData> candles) {
+        if (instrument.marketType() == org.investpro.models.market.MarketType.UNKNOWN) {
+            log.warn("Skipping strategy assignment for {}: unknown market type", instrument.nativeSymbol());
+            return CompletableFuture.completedFuture(null);
+        }
+        if (instrument.tradePair() == null) {
+            log.warn("Skipping strategy assignment for {}: no safe TradePair mapping", instrument.nativeSymbol());
+            return CompletableFuture.completedFuture(null);
+        }
+        List<String> strategyNames = compatibleStrategyNames(instrument);
+        if (strategyNames.isEmpty()) {
+            log.warn("No compatible strategies for {} marketType={}", instrument.nativeSymbol(), instrument.marketType());
+            return CompletableFuture.completedFuture(null);
+        }
+        return evaluateAndAssignBest(instrument.tradePair().toString('/'), timeframe, candles, strategyNames);
     }
 
     public CompletableFuture<StrategyAssignment> evaluateAndAssignBestAcrossTimeframes(
@@ -257,6 +282,27 @@ public class StrategyLabService {
             @NotNull Timeframe timeframe,
             @NotNull List<String> strategyNames) {
         return testStrategiesAsync(symbol, List.of(timeframe), strategyNames);
+    }
+
+    public CompletableFuture<List<StrategyPerformanceReport>> testStrategies(
+            @NotNull MarketInstrument instrument,
+            @NotNull Timeframe timeframe) {
+        if (instrument.tradePair() == null) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return testStrategiesAsync(
+                instrument.tradePair().toString('/'),
+                List.of(timeframe),
+                compatibleStrategyNames(instrument));
+    }
+
+    private List<String> compatibleStrategyNames(@NotNull MarketInstrument instrument) {
+        return StrategyCatalog.availableStrategyNames().stream()
+                .filter(name -> {
+                    StrategyDefinition definition = StrategyCatalog.definition(name);
+                    return instrumentCompatibilityService.supports(definition, instrument);
+                })
+                .toList();
     }
 
     /**

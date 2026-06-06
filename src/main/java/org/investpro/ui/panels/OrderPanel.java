@@ -22,6 +22,8 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import static org.investpro.i18n.LocalizationService.t;
 
@@ -99,16 +101,15 @@ public class OrderPanel extends VBox {
         setPrefWidth(360);
         setMaxWidth(400);
 
-        List<TradePair> symbols = loadSymbols();
-
         TradePair initial = selectedTradePair != null
                 ? selectedTradePair
                 : systemCore.getSelectedTradePair();
+        List<TradePair> symbols = loadSymbols(initial);
         if (initial == null && !symbols.isEmpty()) initial = symbols.getFirst();
 
         if (initial != null) {
             try {
-                updatePricesFromOrderBook(systemCore.getExchange().fetchOrderBook(initial).get());
+                updatePricesFromOrderBook(systemCore.getExchange().fetchOrderBook(initial).get(3, TimeUnit.SECONDS));
             } catch (Exception e) {
                 log.warn("OrderPanel: could not fetch initial order book", e);
             }
@@ -122,22 +123,30 @@ public class OrderPanel extends VBox {
 
     // ── Data loading ──────────────────────────────────────────────────────
 
-    private @NonNull List<TradePair> loadSymbols() {
+    private @NonNull List<TradePair> loadSymbols(TradePair preferredSymbol) {
         try {
 
             List<TradePair> all = new ArrayList<>(systemCore.getExchange().getTradePairSymbol());
             try {
                 UniversalTradabilityService svc =
                         new UniversalTradabilityService(systemCore.getExchange(), systemCore.getExchange().getMarketDataEngine());
-                List<SymbolTradability> statuses = svc.getTradability(all).get();
-                List<TradePair> filtered = statuses.stream()
+                List<SymbolTradability> statuses = svc.getTradability(all).get(4, TimeUnit.SECONDS);
+                List<TradePair> orderable = statuses.stream()
                         .filter(java.util.Objects::nonNull)
-                        .filter(SymbolTradability::marketDataAllowed)
+                        .filter(this::canOpenManualOrder)
                         .map(SymbolTradability::tradePair)
                         .filter(java.util.Objects::nonNull)
                         .distinct()
-                        .toList();
-                if (!filtered.isEmpty()) return filtered;
+                        .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+
+                if (preferredSymbol != null && statuses.stream()
+                        .filter(Objects::nonNull)
+                        .anyMatch(status -> sameSymbol(preferredSymbol, status.tradePair()) && canOpenManualOrder(status))
+                        && orderable.stream().noneMatch(pair -> sameSymbol(pair, preferredSymbol))) {
+                    orderable.addFirst(preferredSymbol);
+                }
+
+                if (!orderable.isEmpty()) return orderable;
             } catch (Exception e) {
                 log.warn("Tradability filter unavailable in OrderPanel", e);
             }
@@ -146,6 +155,21 @@ public class OrderPanel extends VBox {
             log.error("OrderPanel: failed to load symbols", e);
             return List.of();
         }
+    }
+
+    private boolean canOpenManualOrder(SymbolTradability status) {
+        return status != null
+                && status.tradePair() != null
+                && status.orderSubmissionAllowed()
+                && (status.marketOrderAllowed()
+                        || status.limitOrderAllowed()
+                        || status.stopOrderAllowed());
+    }
+
+    private boolean sameSymbol(TradePair left, TradePair right) {
+        return left != null
+                && right != null
+                && displaySymbol(left).equalsIgnoreCase(displaySymbol(right));
     }
 
     // ── UI construction ───────────────────────────────────────────────────

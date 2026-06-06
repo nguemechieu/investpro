@@ -30,10 +30,12 @@ public final class CoinbaseSessionPolicy implements ProviderSessionPolicy {
             Map<String, Object> productMetadata,
             Instant now
     ) {
+        boolean connected = exchange != null
+                && (Boolean.TRUE.equals(exchange.isConnected()) || exchange.canSubmitOrders());
         ProviderSessionContext provider = new ProviderSessionContext(
                 exchange == null ? "" : exchange.getExchangeId(),
                 exchange == null ? "" : exchange.getName(),
-                exchange != null && Boolean.TRUE.equals(exchange.isConnected()),
+                connected,
                 exchange != null && exchange.canSubmitOrders());
         return sessionState(provider, instrument, productStatus, productMetadata, now);
     }

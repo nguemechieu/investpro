@@ -52,12 +52,12 @@ public class TransferController {
         } : notifier;
 
         walletByNetwork.put("AUTO", List.of());
-        walletByNetwork.put("BTC", List.of("bc1qexamplewallet0001", "1BitcoinExampleWallet0001"));
-        walletByNetwork.put("ERC20", List.of("0xAbCDef0123456789aBCdef0123456789AbCdEf01"));
-        walletByNetwork.put("TRC20", List.of("TRXExampleWalletAddress0001"));
-        walletByNetwork.put("BEP20", List.of("0xBep20ExampleAddress0001"));
-        walletByNetwork.put("SOL", List.of("SoL4wLLeTExAmPlEAddReSs11111111111111"));
-        walletByNetwork.put("XLM", List.of("GBZXN7PIRZGNMHGA4D5CGQWJ6NIPWG5GS2AHTVLF4L3E5QGWQ6XTY7RF"));
+        walletByNetwork.put("BTC", List.of());
+        walletByNetwork.put("ERC20", List.of());
+        walletByNetwork.put("TRC20", List.of());
+        walletByNetwork.put("BEP20", List.of());
+        walletByNetwork.put("SOL", List.of());
+        walletByNetwork.put("XLM", List.of());
     }
 
     public void initialize(ComboBox<String> fromAccountBox,
@@ -100,6 +100,9 @@ public class TransferController {
 
         fromAccounts.setAll(buildAccounts());
         toAccounts.setAll(buildAccounts());
+        if (fromAccounts.isEmpty()) {
+            transferMessage.set("Connect Coinbase, Binance, or Bitfinex in live mode to enable real transfers.");
+        }
         if (!fromAccounts.isEmpty()) {
             fromAccountBox.getSelectionModel().select(0);
         }
@@ -249,6 +252,11 @@ public class TransferController {
         return format.format(value == null ? BigDecimal.ZERO : value);
     }
 
+    public void resetTransferInputMessage() {
+        transferMessage.set("Transfer input reset.");
+        lastPreview.set(null);
+    }
+
     private boolean canPreview(ComboBox<String> fromAccountBox,
             ComboBox<String> toAccountBox,
             ComboBox<String> currencyBox,
@@ -345,8 +353,6 @@ public class TransferController {
         ObservableList<String> values = FXCollections.observableArrayList();
         for (String provider : manager.providers()) {
             values.add(provider + " Spot");
-            values.add(provider + " Margin");
-            values.add(provider + " Cash");
             values.add(provider + " Wallet");
         }
         return values;
@@ -365,7 +371,8 @@ public class TransferController {
             return "FIAT";
         }
         if (isCryptoCurrency(currency)) {
-            return "CRYPTO";
+            String selected = selectedNetwork == null ? "" : selectedNetwork.trim();
+            return selected.isBlank() || "AUTO".equalsIgnoreCase(selected) ? "CRYPTO" : selected.toUpperCase(Locale.ROOT);
         }
         return "FIAT";
     }
@@ -399,6 +406,9 @@ public class TransferController {
         destinationWalletBox.getItems().setAll(presets);
         if (!presets.isEmpty()) {
             destinationWalletBox.getSelectionModel().selectFirst();
+        } else {
+            destinationWalletBox.getSelectionModel().clearSelection();
+            destinationWalletBox.getEditor().clear();
         }
     }
 
@@ -438,11 +448,23 @@ public class TransferController {
         if (value == null || value.isBlank()) {
             return new AccountRef("", "");
         }
+        String trimmed = value.trim();
+        String provider = manager.providers().stream()
+                .filter(name -> trimmed.equalsIgnoreCase(name)
+                        || trimmed.toLowerCase(Locale.ROOT).startsWith(name.toLowerCase(Locale.ROOT) + " "))
+                .max((left, right) -> Integer.compare(left.length(), right.length()))
+                .orElse("");
+        if (!provider.isBlank()) {
+            String account = trimmed.length() == provider.length()
+                    ? "Spot"
+                    : trimmed.substring(provider.length()).trim();
+            return new AccountRef(provider, account.isBlank() ? "Spot" : account);
+        }
         int index = value.indexOf(' ');
         if (index <= 0) {
-            return new AccountRef(value.trim(), "Spot");
+            return new AccountRef(trimmed, "Spot");
         }
-        return new AccountRef(value.substring(0, index).trim(), value.substring(index + 1).trim());
+        return new AccountRef(trimmed.substring(0, index).trim(), trimmed.substring(index + 1).trim());
     }
 
     private record AccountRef(String provider, String account) {

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -75,6 +76,7 @@ class CoinbaseWebSocketClientTest {
         client.setTradePair(btcUsd);
 
         assertDoesNotThrow(client::stopAllStreamLiveTrades);
+        waitForPayloads(client, 2);
 
         assertTrue(client.liveTradeConsumers.isEmpty());
         assertNull(client.getTradePair());
@@ -82,9 +84,30 @@ class CoinbaseWebSocketClientTest {
         assertTrue(client.sentPayloads.stream().allMatch(payload -> payload.contains("\"type\":\"unsubscribe\"")));
     }
 
+    @Test
+    void subscriptionUsesNativeCoinbaseProductIdExactly() throws Exception {
+        TestableCoinbaseWebSocketClient client = new TestableCoinbaseWebSocketClient();
+        TradePair fallbackPair = TradePair.fromSymbol("DOG-26JUN26-CDE");
+
+        client.streamLiveTrades(fallbackPair, new NoopExchangeStreamConsumer());
+
+        waitForPayloads(client, 1);
+        assertEquals(1, client.sentPayloads.size());
+        assertTrue(client.sentPayloads.getFirst().contains("\"DOG-26JUN26-CDE\""));
+        assertTrue(client.sentPayloads.stream().noneMatch(payload -> payload.contains("26JUN26-CDE-USD")));
+    }
+
+    private static void waitForPayloads(TestableCoinbaseWebSocketClient client, int expectedCount)
+            throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 2_000L;
+        while (System.currentTimeMillis() < deadline && client.sentPayloads.size() < expectedCount) {
+            Thread.sleep(10L);
+        }
+    }
+
     private static final class TestableCoinbaseWebSocketClient extends CoinbaseWebSocketClient {
 
-        private final List<String> sentPayloads = new ArrayList<>();
+        private final List<String> sentPayloads = Collections.synchronizedList(new ArrayList<>());
 
         private TestableCoinbaseWebSocketClient() {
             super(URI.create("wss://example.com"), new Draft_6455(), "");

@@ -168,14 +168,23 @@ public class StrategyAssignmentDashboard extends BorderPane {
             private final Button promoteBtn = new Button("Promote");
             private final Button demoteBtn = new Button("Demote");
             private final Button pauseBtn = new Button("Pause");
+            private final Button resumeBtn = new Button("Resume");
+            private final Button archiveBtn = new Button("Archive");
+            private final HBox box = new HBox(4, promoteBtn, demoteBtn, pauseBtn, resumeBtn, archiveBtn);
 
             {
                 promoteBtn.setStyle(BTN_PROMOTE);
                 demoteBtn.setStyle(BTN_DEMOTE);
                 pauseBtn.setStyle(BTN_PAUSE);
+                resumeBtn.setStyle(BTN_PROMOTE);
+                archiveBtn.setStyle("-fx-background-color: #30363d; -fx-text-fill: white;");
+                box.setAlignment(Pos.CENTER_LEFT);
 
                 promoteBtn.setOnAction(e -> {
-                    StrategyLifecycleRecord rec = getTableView().getItems().get(getIndex());
+                    StrategyLifecycleRecord rec = currentRecord();
+                    if (rec == null) {
+                        return;
+                    }
                     StrategyLifecycleRecord promoted = manager.promoteToLive(
                             rec.getAssignmentId(),
                             "Manual promotion via dashboard");
@@ -186,13 +195,35 @@ public class StrategyAssignmentDashboard extends BorderPane {
                     refreshData();
                 });
                 demoteBtn.setOnAction(e -> {
-                    StrategyLifecycleRecord rec = getTableView().getItems().get(getIndex());
+                    StrategyLifecycleRecord rec = currentRecord();
+                    if (rec == null) {
+                        return;
+                    }
                     manager.demote(rec.getAssignmentId(), "Manual demotion via dashboard");
                     refreshData();
                 });
                 pauseBtn.setOnAction(e -> {
-                    StrategyLifecycleRecord rec = getTableView().getItems().get(getIndex());
+                    StrategyLifecycleRecord rec = currentRecord();
+                    if (rec == null) {
+                        return;
+                    }
                     manager.pause(rec.getAssignmentId(), "Manual pause via dashboard");
+                    refreshData();
+                });
+                resumeBtn.setOnAction(e -> {
+                    StrategyLifecycleRecord rec = currentRecord();
+                    if (rec == null) {
+                        return;
+                    }
+                    manager.resumeAssignment(rec.getAssignmentId(), "Manual resume via dashboard");
+                    refreshData();
+                });
+                archiveBtn.setOnAction(e -> {
+                    StrategyLifecycleRecord rec = currentRecord();
+                    if (rec == null) {
+                        return;
+                    }
+                    manager.archive(rec.getAssignmentId(), "Archived via dashboard");
                     refreshData();
                 });
             }
@@ -200,13 +231,29 @@ public class StrategyAssignmentDashboard extends BorderPane {
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty) {
+                StrategyLifecycleRecord rec = empty ? null : currentRecord();
+                if (rec == null) {
                     setGraphic(null);
                 } else {
-                    HBox box = new HBox(4, promoteBtn, demoteBtn, pauseBtn);
-                    box.setAlignment(Pos.CENTER_LEFT);
+                    StrategyLifecycleStatus status = rec.getLifecycleStatus();
+                    boolean archived = status == StrategyLifecycleStatus.ARCHIVED
+                            || status == StrategyLifecycleStatus.REPLACED;
+                    promoteBtn.setDisable(archived || status == StrategyLifecycleStatus.LIVE_ACTIVE);
+                    demoteBtn.setDisable(archived || status == StrategyLifecycleStatus.PAPER_TRADING
+                            || status == StrategyLifecycleStatus.DEMOTED);
+                    pauseBtn.setDisable(archived || status == StrategyLifecycleStatus.PAUSED);
+                    resumeBtn.setDisable(archived || status != StrategyLifecycleStatus.PAUSED);
+                    archiveBtn.setDisable(archived);
                     setGraphic(box);
                 }
+            }
+
+            private StrategyLifecycleRecord currentRecord() {
+                int row = getIndex();
+                if (row < 0 || getTableView() == null || row >= getTableView().getItems().size()) {
+                    return null;
+                }
+                return getTableView().getItems().get(row);
             }
         };
     }

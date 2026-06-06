@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +37,10 @@ public class TransferManager {
         boolean kycVerified = kycByProvider.getOrDefault(request.fromProvider(), Boolean.FALSE);
         TransferValidator.ValidationOutcome validation = validator.validate(request, transferService.providers(),
                 feeCalculator, kycVerified);
+        TransferProvider sourceProvider = transferService.provider(request.fromProvider());
+        if (sourceProvider != null) {
+            validation = merge(validation, sourceProvider.validateTransfer(request));
+        }
         BigDecimal fee = feeCalculator.calculate(request,
                 request.fromProvider().equals(request.toProvider()),
                 "USDT".equalsIgnoreCase(request.currency()) || "USDC".equalsIgnoreCase(request.currency()));
@@ -46,6 +51,23 @@ public class TransferManager {
                 : "CRYPTO".equalsIgnoreCase(request.network()) ? "5-20 min" : "T+0 to T+1";
 
         return new Preview(validation, fee, net, eta);
+    }
+
+    private TransferValidator.ValidationOutcome merge(
+            TransferValidator.ValidationOutcome first,
+            TransferValidator.ValidationOutcome second) {
+        if (second == null) {
+            return first;
+        }
+        List<String> errors = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+        if (first != null) {
+            errors.addAll(first.errors());
+            warnings.addAll(first.warnings());
+        }
+        errors.addAll(second.errors());
+        warnings.addAll(second.warnings());
+        return new TransferValidator.ValidationOutcome(errors.isEmpty(), List.copyOf(errors), List.copyOf(warnings));
     }
 
     public TransferResult execute(TransferRequest request) {

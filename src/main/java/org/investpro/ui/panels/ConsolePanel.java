@@ -38,13 +38,32 @@ public class ConsolePanel extends BorderPane {
         setStyle("-fx-background-color: linear-gradient(to bottom, #0f172a, #111827);");
 
         Label title = new Label("System Console");
-        title.setStyle("-fx-text-fill: #e5edf7; -fx-font-size: 16px; -fx-font-weight: bold;");
+        title.setStyle("-fx-text-fill: #e5edf7; -fx-font-size: 17px; -fx-font-weight: bold;");
 
         Label subtitle = new Label("Detached runtime log and operator messages");
         subtitle.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 11px;");
 
-        VBox header = new VBox(3, title, subtitle, new Separator());
-        header.setPadding(new Insets(0, 0, 10, 0));
+        VBox titleBlock = new VBox(2, title, subtitle);
+
+        Button clearButton = consoleButton("Clear");
+        clearButton.setOnAction(event -> outputArea.clear());
+
+        Button copyButton = consoleButton("Copy");
+        copyButton.setOnAction(event -> {
+            outputArea.selectAll();
+            outputArea.copy();
+            outputArea.deselect();
+        });
+
+        HBox actions = new HBox(8, copyButton, clearButton);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+
+        HBox headerRow = new HBox(12, titleBlock, actions);
+        HBox.setHgrow(titleBlock, Priority.ALWAYS);
+        headerRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox header = new VBox(8, headerRow, new Separator());
+        header.setPadding(new Insets(0, 0, 12, 0));
         setTop(header);
 
         outputArea.setEditable(false);
@@ -53,25 +72,19 @@ public class ConsolePanel extends BorderPane {
                 "-fx-control-inner-background: #0b1220;"
                         + "-fx-font-family: 'Consolas', 'Monaco', monospace;"
                         + "-fx-font-size: 12px;"
-                        + "-fx-text-fill: #dbeafe;");
+                        + "-fx-text-fill: #dbeafe;"
+                        + "-fx-highlight-fill: #2563eb;"
+                        + "-fx-highlight-text-fill: white;");
         setCenter(outputArea);
+    }
 
-        Button clearButton = new Button("Clear");
-        clearButton.setOnAction(event -> outputArea.clear());
-
-        Button copyButton = new Button("Copy All");
-        copyButton.setOnAction(event -> {
-            outputArea.selectAll();
-            outputArea.copy();
-            outputArea.deselect();
-        });
-
-        HBox footer = new HBox(8, clearButton, copyButton);
-        footer.setAlignment(Pos.CENTER_RIGHT);
-        footer.setPadding(new Insets(10, 0, 0, 0));
-        HBox.setHgrow(clearButton, Priority.NEVER);
-        HBox.setHgrow(copyButton, Priority.NEVER);
-        setBottom(footer);
+    private Button consoleButton(String text) {
+        Button button = new Button(text);
+        button.setFocusTraversable(false);
+        button.setStyle("-fx-background-color: #1f2937; -fx-text-fill: #dbeafe;"
+                + " -fx-background-radius: 4; -fx-padding: 5 12;"
+                + " -fx-border-color: #334155; -fx-border-radius: 4;");
+        return button;
     }
 
     public void info(String message) {

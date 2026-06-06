@@ -21,10 +21,17 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import org.investpro.models.market.MarketType;
+import org.investpro.models.market.TradingEnvironment;
 import org.investpro.market.InstrumentTradingSession;
 import org.investpro.enums.TradingSessionStatus;
 
@@ -61,6 +68,20 @@ public class TradePair extends Pair<Currency, Currency> {
 
     private Instant updatedAt;
     private String nativeSymbol;
+    private String displaySymbol;
+    private String underlyingCode;
+    private String expiryCode;
+    private LocalDate contractExpiryDate;
+    private TradeSymbolKind symbolKind = TradeSymbolKind.PAIR;
+    private MarketType marketType = MarketType.SPOT;
+    private TradingEnvironment tradingEnvironment = TradingEnvironment.UNKNOWN;
+    private String productVenue;
+    private String exchangeId;
+
+    private static final DateTimeFormatter CDE_EXPIRY_FORMATTER = new DateTimeFormatterBuilder()
+            .parseCaseInsensitive()
+            .appendPattern("ddMMMyy")
+            .toFormatter(Locale.US);
 
     public TradePair(
             @NotNull Currency baseCurrency,
@@ -154,6 +175,9 @@ public class TradePair extends Pair<Currency, Currency> {
     public static @NotNull TradePair fromSymbol(String symbol) throws SQLException, ClassNotFoundException {
         Objects.requireNonNull(symbol, "symbol must not be null");
         String normalized = symbol.trim().toUpperCase(Locale.ROOT);
+        if (isDerivativeProductSymbol(normalized)) {
+            return fromNativeProductSymbol(normalized);
+        }
 
         String[] parts = splitAnyPair(normalized);
         String baseCode = normalizeCode(parts[0]);
@@ -164,6 +188,87 @@ public class TradePair extends Pair<Currency, Currency> {
         TradePair pair = new TradePair(base, counter);
         pair.setNativeSymbol(symbol);
         return pair;
+    }
+
+    public static @NotNull TradePair fromNativeProductSymbol(String symbol) throws SQLException, ClassNotFoundException {
+        Objects.requireNonNull(symbol, "symbol must not be null");
+        String normalized = symbol.trim().toUpperCase(Locale.ROOT).replace('/', '-').replace('_', '-');
+        if (normalized.isBlank()) {
+            throw new IllegalArgumentException("symbol must not be blank");
+        }
+
+        String[] segments = normalized.split("-");
+        String underlying = normalizeCode(segments.length == 0 ? normalized : segments[0]);
+        String safeQuote = "USD";
+
+        Currency base = CurrencyRegistry.global().findOrUnknown(underlying);
+        Currency counter = CurrencyRegistry.global().findOrUnknown(safeQuote);
+        TradePair pair = new TradePair(base, counter);
+        pair.setNativeSymbol(normalized);
+        pair.setDisplaySymbol(normalized);
+        pair.setUnderlyingCode(underlying);
+        pair.setExchangeId("coinbase");
+
+        if (isPerpetualProductSymbol(normalized)) {
+            pair.setSymbolKind(TradeSymbolKind.PERPETUAL_CONTRACT);
+            pair.setContractType(ContractType.PERPETUAL);
+            pair.setAssetClass(AssetClass.DERIVATIVE);
+            pair.setMarketType(MarketType.PERPETUAL);
+            pair.setProductVenue("COINBASE_DERIVATIVES");
+            return pair;
+        }
+
+        pair.setSymbolKind(TradeSymbolKind.DERIVATIVE_CONTRACT);
+        pair.setContractType(ContractType.FUTURE);
+        pair.setAssetClass(AssetClass.DERIVATIVE);
+        pair.setMarketType(MarketType.FUTURE);
+        pair.setProductVenue("COINBASE_DERIVATIVES");
+
+        String expiry = expirySegment(normalized);
+        pair.setExpiryCode(expiry);
+        pair.setContractExpiryDate(parseExpiryDate(expiry));
+        return pair;
+    }
+
+    public static boolean isDerivativeProductSymbol(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return false;
+        }
+        String normalized = symbol.trim().toUpperCase(Locale.ROOT).replace('/', '-').replace('_', '-');
+        return normalized.endsWith("-CDE")
+                || normalized.contains("-PERP")
+                || normalized.matches(".*(?:^|-)\\d{2}[A-Z]{3}\\d{2}(?:-|$).*");
+    }
+
+    public static boolean isPerpetualProductSymbol(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return false;
+        }
+        String normalized = symbol.trim().toUpperCase(Locale.ROOT).replace('/', '-').replace('_', '-');
+        return normalized.endsWith("-PERP") || normalized.contains("-PERP-");
+    }
+
+    private static String expirySegment(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return "";
+        }
+        for (String part : symbol.trim().toUpperCase(Locale.ROOT).replace('/', '-').replace('_', '-').split("-")) {
+            if (part.matches("\\d{2}[A-Z]{3}\\d{2}")) {
+                return part;
+            }
+        }
+        return "";
+    }
+
+    private static LocalDate parseExpiryDate(String expiry) {
+        if (expiry == null || expiry.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(expiry, CDE_EXPIRY_FORMATTER);
+        } catch (DateTimeParseException exception) {
+            return null;
+        }
     }
 
     private static String[] splitAnyPair(String symbol) {
@@ -303,6 +408,10 @@ public class TradePair extends Pair<Currency, Currency> {
     }
 
     public String toString(@NotNull Character separator) {
+        if (isNativeProductSymbol()) {
+            return displaySymbol();
+        }
+
         String baseCode = codeOf(baseCurrency);
         String counterCode = codeOf(counterCurrency);
 
@@ -315,6 +424,9 @@ public class TradePair extends Pair<Currency, Currency> {
     }
 
     public String toCompactSymbol() {
+        if (isNativeProductSymbol()) {
+            return displaySymbol();
+        }
         return "%s%s".formatted(codeOf(baseCurrency), codeOf(counterCurrency));
     }
 
@@ -332,6 +444,96 @@ public class TradePair extends Pair<Currency, Currency> {
 
     public String getSymbol() {
         return toSlashSymbol();
+    }
+
+    public boolean isNativeProductSymbol() {
+        return symbolKind == TradeSymbolKind.NATIVE_PRODUCT
+                || symbolKind == TradeSymbolKind.DERIVATIVE_CONTRACT
+                || symbolKind == TradeSymbolKind.PERPETUAL_CONTRACT
+                || isDerivativeProductSymbol(nativeSymbol);
+    }
+
+    public boolean isDerivativeContract() {
+        return symbolKind == TradeSymbolKind.DERIVATIVE_CONTRACT
+                || contractType == ContractType.FUTURE
+                || isExpiringContract();
+    }
+
+    public boolean isPerpetual() {
+        return symbolKind == TradeSymbolKind.PERPETUAL_CONTRACT
+                || contractType == ContractType.PERPETUAL
+                || isPerpetualProductSymbol(nativeSymbol);
+    }
+
+    public boolean isExpiringContract() {
+        return expiryCode != null && !expiryCode.isBlank();
+    }
+
+    public boolean hasExpired() {
+        return contractExpiryDate != null && contractExpiryDate.isBefore(LocalDate.now(ZoneOffset.UTC));
+    }
+
+    public boolean isActiveContract() {
+        return !hasExpired();
+    }
+
+    public String nativeSymbol() {
+        if (nativeSymbol != null && !nativeSymbol.isBlank()) {
+            return nativeSymbol.trim().toUpperCase(Locale.ROOT).replace('/', '-').replace('_', '-');
+        }
+        return toDashSymbol();
+    }
+
+    public String displaySymbol() {
+        if (displaySymbol != null && !displaySymbol.isBlank()) {
+            return displaySymbol.trim().toUpperCase(Locale.ROOT);
+        }
+        if (nativeSymbol != null && !nativeSymbol.isBlank()) {
+            return nativeSymbol.trim().toUpperCase(Locale.ROOT);
+        }
+        return toString('/');
+    }
+
+    public String underlyingCode() {
+        if (underlyingCode != null && !underlyingCode.isBlank()) {
+            return underlyingCode.trim().toUpperCase(Locale.ROOT);
+        }
+        return getBaseCode();
+    }
+
+    public String expiryCode() {
+        return expiryCode == null ? "" : expiryCode.trim().toUpperCase(Locale.ROOT);
+    }
+
+    public String toExchangeSymbol(String exchangeId) {
+        if (isNativeProductSymbol()) {
+            return nativeSymbol();
+        }
+        String normalizedExchange = exchangeId == null ? "" : exchangeId.trim().toLowerCase(Locale.ROOT);
+        if ("coinbase".equals(normalizedExchange) || "coinbase_derivatives".equals(normalizedExchange)) {
+            return nativeSymbol();
+        }
+        return toDashSymbol();
+    }
+
+    public String toDisplayString() {
+        return displaySymbol();
+    }
+
+    public LocalDate contractExpiryDate() {
+        return contractExpiryDate;
+    }
+
+    public boolean canDisplayMarketData() {
+        return true;
+    }
+
+    public boolean canSubmitOrders() {
+        return !isNativeProductSymbol();
+    }
+
+    public boolean canBotTrade() {
+        return canSubmitOrders();
     }
 
     public String getBaseCode() {

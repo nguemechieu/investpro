@@ -2,6 +2,7 @@ package org.investpro.asset;
 
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -122,11 +123,15 @@ public final class AssetRefreshScheduler {
                 });
     }
 
-    private static String rootMessage(Throwable throwable) {
+    private static @NonNull String rootMessage(Throwable throwable) {
         Throwable cursor = throwable;
         while (cursor != null && cursor.getCause() != null) {
             cursor = cursor.getCause();
         }
-        return cursor == null || cursor.getMessage() == null ? "unknown" : cursor.getMessage();
+        if (cursor == null) {
+            return "unknown";
+        }
+        String message = cursor.getMessage();
+        return message == null || message.isBlank() ? cursor.getClass().getSimpleName() : message;
     }
 }

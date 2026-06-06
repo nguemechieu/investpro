@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -467,7 +468,9 @@ public class StrategyAssignment {
      * Stable map key helper.
      */
     public static String key(@NotNull String symbol, @NotNull Timeframe timeframe) {
-        return normalizeRequired(symbol, "symbol") + "::" + requireTimeframe(timeframe).getCode();
+        return normalizeRequired(symbol, "symbol").toUpperCase(Locale.ROOT)
+                + "::"
+                + requireTimeframe(timeframe).getCode().toUpperCase(Locale.ROOT);
     }
 
     public static @NotNull String generateId() {

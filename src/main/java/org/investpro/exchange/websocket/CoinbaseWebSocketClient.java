@@ -370,7 +370,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             sendSubscribeAsync(tradePair, MARKET_TRADES_CHANNEL,
                     () -> {
                         pendingSubscriptions.remove(tradePair);
-                        log.info("Subscribed Coinbase market trades for {}", tradePair);
+                        log.info("Subscribed Coinbase market trades for {}", tradePair.toString('/'));
                     },
                     exception -> {
                         pendingSubscriptions.add(tradePair);
@@ -456,13 +456,12 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             return;
         }
 
-        CoinbaseStream requestedStream = stream;
-        sendSubscribeAsync(requestedStream.tradePair(), requestedStream.channel(),
-                () -> log.info("Subscribed Coinbase raw stream {}", requestedStream.key()),
+        sendSubscribeAsync(stream.tradePair(), stream.channel(),
+                () -> log.info("Subscribed Coinbase raw stream {}", stream.key()),
                 exception -> {
-                    rawStreamHandlers.remove(requestedStream.key());
-                    removeHandler(requestedStream.key());
-                    log.error("Failed to subscribe Coinbase raw stream {}", requestedStream.key(), exception);
+                    rawStreamHandlers.remove(stream.key());
+                    removeHandler(stream.key());
+                    log.error("Failed to subscribe Coinbase raw stream {}", stream.key(), exception);
                 });
     }
 
@@ -482,10 +481,9 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             return;
         }
 
-        CoinbaseStream requestedStream = stream;
-        sendUnsubscribeAsync(requestedStream.tradePair(), requestedStream.channel(),
-                () -> log.info("Unsubscribed Coinbase raw stream {}", requestedStream.key()),
-                exception -> log.warn("Failed to unsubscribe Coinbase raw stream {}", requestedStream.key(), exception));
+        sendUnsubscribeAsync(stream.tradePair(), stream.channel(),
+                () -> log.info("Unsubscribed Coinbase raw stream {}", stream.key()),
+                exception -> log.warn("Failed to unsubscribe Coinbase raw stream {}", stream.key(), exception));
     }
 
     protected void sendSubscribe( TradePair tradePair, @NotNull String channel) {
@@ -836,7 +834,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     }
 
     private @NotNull String toCoinbaseProductId(@NotNull TradePair tradePair) {
-        return tradePair.toString('-').trim().toUpperCase(Locale.ROOT);
+        return normalizeCoinbaseProductId(tradePair.toExchangeSymbol("coinbase"));
     }
 
     private TradePair findAnyRegisteredPair() {

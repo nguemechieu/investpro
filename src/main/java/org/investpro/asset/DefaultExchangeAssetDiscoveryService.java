@@ -2,6 +2,7 @@ package org.investpro.asset;
 
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
+import org.investpro.models.market.MarketInstrument;
 import org.investpro.models.trading.TradePair;
 import org.investpro.trading.tradability.ExchangeInstrumentService;
 
@@ -27,11 +28,25 @@ public final class DefaultExchangeAssetDiscoveryService implements ExchangeAsset
             log.info("asset.catalog.discovery.skipped exchange={} reason=search-based-cache-only", exchangeId.id());
             return CompletableFuture.completedFuture(List.of());
         }
-        return CompletableFuture.supplyAsync(() -> fetchPairs(exchange), executor)
-                .thenApply(pairs -> pairs.stream()
-                        .filter(pair -> pair != null)
-                        .map(pair -> AssetCatalogEntry.fromTradePair(exchangeId, pair, Instant.now()))
+        return CompletableFuture.supplyAsync(() -> fetchInstruments(exchange), executor)
+                .thenApply(instruments -> instruments.stream()
+                        .filter(instrument -> instrument != null)
+                        .map(instrument -> AssetCatalogEntry.fromMarketInstrument(exchangeId, instrument, Instant.now()))
                         .toList());
+    }
+
+    private List<MarketInstrument> fetchInstruments(Exchange exchange) {
+        try {
+            List<MarketInstrument> instruments = exchange.fetchMarketInstruments().join();
+            if (instruments != null && !instruments.isEmpty()) {
+                return instruments;
+            }
+            return org.investpro.trading.market.MarketInstrumentService
+                    .legacyTradePairsToInstruments(exchange, fetchPairs(exchange));
+        } catch (Exception exception) {
+            throw new IllegalStateException("Unable to discover market instruments for "
+                    + exchange.getDisplayName(), exception);
+        }
     }
 
     private List<TradePair> fetchPairs(Exchange exchange) {

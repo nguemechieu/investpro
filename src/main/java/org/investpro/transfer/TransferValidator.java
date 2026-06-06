@@ -54,8 +54,8 @@ public class TransferValidator {
                 errors.add("Only crypto transfers are allowed between different exchanges or wallets.");
             }
 
-            if (crossProvider && !"CRYPTO".equalsIgnoreCase(request.network())) {
-                errors.add("Cross-exchange transfers must use CRYPTO network.");
+            if (crossProvider && !usesCryptoRail(request)) {
+                errors.add("Cross-exchange transfers must use a crypto network/rail.");
             }
 
             BigDecimal availableBalance = fromProvider.getBalances().getOrDefault(request.currency(), BigDecimal.ZERO);
@@ -98,10 +98,17 @@ public class TransferValidator {
         if (request.network().isBlank()) {
             return true;
         }
-        if ("CRYPTO".equalsIgnoreCase(request.network())) {
+        if (usesCryptoRail(request)) {
             return isStablecoin(request.currency()) || isCrypto(request.currency());
         }
         return true;
+    }
+
+    private boolean usesCryptoRail(TransferRequest request) {
+        String network = request.network() == null ? "" : request.network().trim();
+        return !network.isBlank()
+                && !"AUTO".equalsIgnoreCase(network)
+                && !"FIAT".equalsIgnoreCase(network);
     }
 
     private boolean isStablecoin(String currency) {

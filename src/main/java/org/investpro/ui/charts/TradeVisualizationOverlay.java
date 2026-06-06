@@ -262,7 +262,7 @@ public class TradeVisualizationOverlay {
             gc.setFont(Font.font(10));
             gc.setTextAlign(TextAlignment.LEFT);
 
-            String priceText = String.format("%.5f", level.price());
+            String priceText = formatPrice(level.price());
             String displayLabel = level.label() == null || level.label().isBlank()
                     ? level.type().label
                     : level.label();
@@ -307,7 +307,7 @@ public class TradeVisualizationOverlay {
             gc.fillText(infoText, x, labelY);
 
             double priceY = y > chartHeight / 2.0 ? labelY - 15 : labelY + 15;
-            gc.fillText(String.format("%.5f", marker.price()), x, priceY);
+            gc.fillText(formatPrice(marker.price()), x, priceY);
         }
     }
 
@@ -422,15 +422,38 @@ public class TradeVisualizationOverlay {
      */
     public String getTradeInfoAtPrice(double price) {
         StringBuilder info = new StringBuilder();
-        info.append(String.format("Price: %.5f%n", price));
+        info.append("Price: ").append(formatPrice(price)).append(System.lineSeparator());
 
         for (TradeMarker marker : tradeMarkers) {
             if (Math.abs(marker.price() - price) < priceRange * 0.02) {
-                info.append(String.format("%s @ %.5f%n", marker.type().label, marker.price()));
+                info.append(marker.type().label)
+                        .append(" @ ")
+                        .append(formatPrice(marker.price()))
+                        .append(System.lineSeparator());
             }
         }
 
         return info.toString();
+    }
+
+    private static String formatPrice(double value) {
+        if (!Double.isFinite(value)) {
+            return "-";
+        }
+
+        double abs = Math.abs(value);
+        if (abs == 0.0) {
+            return "0";
+        }
+        if (abs >= 1_000.0) {
+            return String.format("%.2f", value);
+        }
+        if (abs >= 1.0) {
+            return String.format("%.4f", value);
+        }
+
+        int precision = Math.min(12, Math.max(2, (int) Math.ceil(-Math.log10(abs)) + 2));
+        return String.format("%." + precision + "f", value);
     }
 
     private void recalculateCandleWidth() {

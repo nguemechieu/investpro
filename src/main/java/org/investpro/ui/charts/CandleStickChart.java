@@ -1269,10 +1269,15 @@ public class CandleStickChart extends Region {
         }
         double delta = max - min;
         if (!Double.isFinite(delta) || delta <= 0.0)
-            delta = Math.max(Math.abs(max) * 0.01, 0.0001);
+            delta = minPriceRangeFor(max);
         double padding = delta * PRICE_PADDING_RATIO;
-        visibleMinPrice = Math.max(0.0, min - padding);
+        visibleMinPrice = min > 0.0 ? Math.max(minPriceFloor(min), min - padding) : min - padding;
         visibleMaxPrice = max + padding;
+        if (visibleMaxPrice <= visibleMinPrice) {
+            double expansion = minPriceRangeFor(max);
+            visibleMinPrice = min > 0.0 ? Math.max(minPriceFloor(min), min - expansion) : min - expansion;
+            visibleMaxPrice = max + expansion;
+        }
         visibleMaxVolume = Math.max(1.0, maxVolume);
         yAxis.setLowerBound(visibleMinPrice);
         yAxis.setUpperBound(visibleMaxPrice);
@@ -3023,7 +3028,40 @@ public class CandleStickChart extends Region {
     }
 
     private String formatPrice(double value) {
-        return String.valueOf(value);
+        if (!Double.isFinite(value)) {
+            return "-";
+        }
+        double abs = Math.abs(value);
+        if (abs == 0.0) {
+            return "0";
+        }
+        if (abs >= 1_000_000_000.0)
+            return "%.2fB".formatted(value / 1_000_000_000.0);
+        if (abs >= 1_000_000.0)
+            return "%.2fM".formatted(value / 1_000_000.0);
+        if (abs >= 1_000.0)
+            return "%.2fK".formatted(value / 1_000.0);
+        if (abs >= 1.0)
+            return "%.4f".formatted(value);
+
+        int precision = Math.min(12, Math.max(2, (int) Math.ceil(-Math.log10(abs)) + 2));
+        return ("%." + precision + "f").formatted(value);
+    }
+
+    private double minPriceRangeFor(double referencePrice) {
+        double abs = Math.abs(referencePrice);
+        if (!Double.isFinite(abs) || abs <= 0.0) {
+            return 1.0;
+        }
+        return Math.max(abs * 0.01, Math.pow(10.0, Math.floor(Math.log10(abs)) - 2.0));
+    }
+
+    private double minPriceFloor(double referencePrice) {
+        double abs = Math.abs(referencePrice);
+        if (!Double.isFinite(abs) || abs <= 0.0) {
+            return 0.0;
+        }
+        return Math.pow(10.0, Math.floor(Math.log10(abs)) - 4.0);
     }
 
     private String compactNumber(double value) {

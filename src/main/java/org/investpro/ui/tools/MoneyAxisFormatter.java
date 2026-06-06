@@ -43,17 +43,16 @@ public final class MoneyAxisFormatter extends StringConverter<Number> {
         if (number == null) {
             return "";
         }
-
         double rawValue = number.doubleValue();
-
         if (!Double.isFinite(rawValue)) {
             return "";
         }
 
+        int effectivePrecision = precisionForValue(rawValue);
         BigDecimal value = toBigDecimal(number)
-                .setScale(precision, RoundingMode.HALF_UP);
+                .setScale(effectivePrecision, RoundingMode.HALF_UP);
 
-        return formatter.format(DefaultMoney.of(value, currency));
+        return formatter.format(DefaultMoney.of(value,currency));
     }
 
     @Override
@@ -61,7 +60,6 @@ public final class MoneyAxisFormatter extends StringConverter<Number> {
         if (string == null || string.isBlank()) {
             return BigDecimal.ZERO;
         }
-
         try {
             return formatter.parse(string.trim()).getNumber();
         } catch (Exception ignored) {
@@ -71,6 +69,16 @@ public final class MoneyAxisFormatter extends StringConverter<Number> {
 
     private static int clampPrecision(int precision) {
         return Math.max(MIN_PRECISION, Math.min(MAX_PRECISION, precision));
+    }
+
+    private int precisionForValue(double value) {
+        double abs = Math.abs(value);
+        if (abs == 0.0 || abs >= 1.0) {
+            return precision;
+        }
+
+        int leadingZeroPrecision = (int) Math.ceil(-Math.log10(abs)) + 2;
+        return clampPrecision(Math.max(precision, leadingZeroPrecision));
     }
 
     private static BigDecimal toBigDecimal(Number number) {

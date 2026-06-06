@@ -225,7 +225,10 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
 
         private static CoinbaseGranularity nearestSupported(int requestedSeconds) {
             CoinbaseGranularity nearest = SUPPORTED.stream()
-                    .min(Comparator.comparingInt(granularity -> Math.abs(granularity.seconds() - requestedSeconds)))
+                    .min(Comparator
+                            .comparingInt((CoinbaseGranularity granularity) ->
+                                    Math.abs(granularity.seconds() - requestedSeconds))
+                            .thenComparing(Comparator.comparingInt(CoinbaseGranularity::seconds).reversed()))
                     .orElse(SUPPORTED.get(0));
 
             logger.warn(

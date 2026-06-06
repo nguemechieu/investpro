@@ -8,9 +8,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.contracts.*;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.models.Account;
+import org.investpro.models.market.MarketInstrument;
 import org.investpro.models.trading.*;
 import org.investpro.market.MarketDataEngine;
 import org.investpro.market.ExchangeMarketDataAdapter;
+import org.investpro.trading.market.MarketInstrumentService;
 import org.investpro.trading.tradability.ExchangeInstrumentService;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.TradabilityStatus;
@@ -237,6 +239,17 @@ public abstract class Exchange implements
                 metadata);
 
         return CompletableFuture.completedFuture(tradability);
+    }
+
+    public CompletableFuture<List<MarketInstrument>> fetchMarketInstruments() {
+        try {
+            return CompletableFuture.completedFuture(
+                    MarketInstrumentService.legacyTradePairsToInstruments(this, getTradePairSymbol()));
+        } catch (Exception exception) {
+            CompletableFuture<List<MarketInstrument>> future = new CompletableFuture<>();
+            future.completeExceptionally(exception);
+            return future;
+        }
     }
 
     protected SymbolTradability defaultTradability(TradePair pair, TradabilityStatus status, String reason) {

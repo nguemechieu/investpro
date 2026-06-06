@@ -211,6 +211,7 @@ public final class DockableChartPanel implements DockablePane {
 
     private Button toolbarButton(String text, Runnable action, String tooltipText) {
         Button button = new Button(text);
+        button.getStyleClass().addAll("terminal-button", "mt5-toolbar-button");
         button.setTooltip(new javafx.scene.control.Tooltip(tooltipText));
         button.setFocusTraversable(false);
         button.setOnAction(event -> {

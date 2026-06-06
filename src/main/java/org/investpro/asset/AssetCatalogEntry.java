@@ -1,10 +1,17 @@
 package org.investpro.asset;
 
 import org.investpro.models.trading.TradePair;
+import org.investpro.models.market.AssetClass;
+import org.investpro.models.market.ContractType;
+import org.investpro.models.market.InstrumentType;
+import org.investpro.models.market.MarketInstrument;
+import org.investpro.models.market.MarketType;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 public record AssetCatalogEntry(
@@ -102,6 +109,65 @@ public record AssetCatalogEntry(
                 "{}");
     }
 
+    public static AssetCatalogEntry fromMarketInstrument(
+            ExchangeId exchangeId,
+            MarketInstrument instrument,
+            Instant refreshedAt) {
+        Objects.requireNonNull(instrument, "instrument must not be null");
+        TradePair pair = instrument.tradePair();
+        String base = !instrument.baseAsset().isBlank()
+                ? normalizeCode(instrument.baseAsset())
+                : pair == null ? "" : normalizeCode(pair.getBaseCode());
+        String quote = !instrument.quoteAsset().isBlank()
+                ? normalizeCode(instrument.quoteAsset())
+                : pair == null ? "" : normalizeCode(pair.getCounterCode());
+        String symbol = !instrument.displaySymbol().isBlank()
+                ? instrument.displaySymbol()
+                : pair == null ? instrument.nativeSymbol() : pair.toString('/');
+        String nativeSymbol = instrument.nativeSymbol().isBlank() ? symbol : instrument.nativeSymbol();
+
+        return new AssetCatalogEntry(
+                null,
+                exchangeId,
+                symbol,
+                nativeSymbol,
+                base,
+                quote,
+                inferType(
+                        instrument.assetClass(),
+                        instrument.instrumentType(),
+                        instrument.contractType(),
+                        instrument.marketType(),
+                        exchangeId,
+                        base,
+                        quote),
+                AssetStatus.ACTIVE,
+                mapTradability(instrument),
+                instrument.tradability() != null && instrument.tradability().orderSubmissionAllowed(),
+                instrument.tradability() == null || instrument.tradability().marketOrderAllowed(),
+                instrument.tradability() == null || instrument.tradability().limitOrderAllowed(),
+                instrument.tradability() != null && instrument.tradability().stopOrderAllowed(),
+                instrument.tradability() == null || instrument.tradability().liveTradingAllowed(),
+                instrument.tradability() == null || instrument.tradability().paperTradingAllowed(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "",
+                "",
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                refreshedAt,
+                refreshedAt,
+                metadataJson(instrument));
+    }
+
     public TradePair toTradePair() {
         try {
             TradePair pair = TradePair.of(baseAsset, quoteAsset);
@@ -180,5 +246,108 @@ public record AssetCatalogEntry(
             return AssetType.FOREX;
         }
         return AssetType.UNKNOWN;
+    }
+
+    private static AssetType inferType(
+            AssetClass assetClass,
+            InstrumentType instrumentType,
+            ContractType contractType,
+            MarketType marketType,
+            ExchangeId exchangeId,
+            String base,
+            String quote) {
+        if (instrumentType != null && instrumentType.isDerivative()) {
+            return instrumentType == InstrumentType.CFD ? AssetType.CFD : AssetType.FUTURE;
+        }
+        if (instrumentType != null) {
+            switch (instrumentType) {
+                case FOREX:
+                    return AssetType.FOREX;
+                case STOCK, ETF, INDEX, FUND, WARRANT:
+                    return AssetType.EQUITY;
+                case COMMODITY:
+                    return AssetType.FUTURE;
+                default:
+                    break;
+            }
+        }
+        if (contractType != null && contractType.isDerivative()) {
+            return AssetType.FUTURE;
+        }
+        if (marketType != null && marketType.isFx()) {
+            return AssetType.FOREX;
+        }
+        if (marketType == MarketType.FUTURE
+                || marketType == MarketType.PERPETUAL
+                || marketType == MarketType.OPTION
+                || marketType == MarketType.CRYPTO_SWAP) {
+            return AssetType.FUTURE;
+        }
+        if (marketType == MarketType.CFD) {
+            return AssetType.CFD;
+        }
+        if (marketType == MarketType.STOCK
+                || marketType == MarketType.ETF
+                || marketType == MarketType.INDEX
+                || marketType == MarketType.FUND
+                || marketType == MarketType.WARRANT) {
+            return AssetType.EQUITY;
+        }
+        if (assetClass == null || assetClass == AssetClass.UNKNOWN) {
+            return inferType(exchangeId, base, quote);
+        }
+        return switch (assetClass) {
+            case CRYPTO -> AssetType.CRYPTO;
+            case FIAT -> AssetType.FOREX;
+            case EQUITY, INDEX, ETF, FUND -> AssetType.EQUITY;
+            case COMMODITY, METAL -> AssetType.FUTURE;
+            case BOND, SYNTHETIC, UNKNOWN -> AssetType.UNKNOWN;
+        };
+    }
+
+    private static TradabilityStatus mapTradability(MarketInstrument instrument) {
+        if (instrument.tradability() == null || instrument.tradability().status() == null) {
+            return TradabilityStatus.UNKNOWN;
+        }
+        try {
+            return TradabilityStatus.valueOf(instrument.tradability().status().name());
+        } catch (Exception exception) {
+            return TradabilityStatus.UNKNOWN;
+        }
+    }
+
+    private static String metadataJson(MarketInstrument instrument) {
+        Map<String, Object> metadata = new LinkedHashMap<>(instrument.rawMetadata());
+        metadata.put("asset_class", instrument.assetClass().name());
+        metadata.put("market_type", instrument.marketType().name());
+        metadata.put("instrument_type", instrument.instrumentType().name());
+        metadata.put("leverage_mode", instrument.leverageMode().name());
+        metadata.put("contract_type", instrument.contractType().name());
+        metadata.put("product_type", instrument.productType());
+        metadata.put("contract_expiry_type", instrument.contractExpiryType().name());
+        metadata.put("underlying_type", instrument.underlyingType().name());
+        metadata.put("routing_exchange", instrument.routingExchange());
+        metadata.put("contract_code", instrument.contractCode());
+        metadata.put("contract_size", instrument.contractSize());
+        metadata.put("contract_expiry", instrument.contractExpiry() == null ? "" : instrument.contractExpiry().toString());
+        metadata.put("leveraged", Boolean.toString(instrument.leveraged()));
+        metadata.put("expiring", Boolean.toString(instrument.expiring()));
+        StringBuilder json = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<String, Object> entry : metadata.entrySet()) {
+            if (!first) {
+                json.append(',');
+            }
+            first = false;
+            json.append('"').append(escapeJson(entry.getKey())).append('"')
+                    .append(':')
+                    .append('"').append(escapeJson(String.valueOf(entry.getValue()))).append('"');
+        }
+        json.append('}');
+        return json.toString();
+    }
+
+    private static String escapeJson(String value) {
+        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

@@ -20,34 +20,34 @@ public record MarketStructureProfile(
         /*Importance score for the base currency (0–100 scale, USD = 100). */
         double baseCurrencyImportanceScore,
 
-        /** Importance score for the quote currency (0–100 scale, USD = 100). */
+        /* Importance score for the quote currency (0–100 scale, USD = 100). */
         double quoteCurrencyImportanceScore,
 
-        /** Combined pair liquidity score (0–100). */
+        /* Combined pair liquidity score (0–100). */
         double pairLiquidityScore,
 
-        /** Estimated relative spread risk (higher = wider typical spreads). */
+        /* Estimated relative spread risk (higher = wider typical spreads). */
         double expectedSpreadRisk,
 
-        /** Session activity score for the current market session (0–1). */
+        /* Session activity score for the current market session (0–1). */
         double sessionActivityScore,
 
-        /** Primary trading session: London, New York, Tokyo, Sydney, Overlap. */
+        /* Primary trading session: London, New York, Tokyo, Sydney, Overlap. */
         String primarySession,
 
-        /** Recommended strategy style based on liquidity tier. */
+        /* Recommended strategy style based on liquidity tier. */
         String recommendedStrategyStyle,
 
-        /** Whether automated trading is recommended for this pair. */
+        /* Whether automated trading is recommended for this pair. */
         boolean autoTradingRecommended,
 
-        /** Warning message, or empty string if no warning. */
+        /* Warning message, or empty string if no warning. */
         String warning,
 
-        /** Name of the data source used for classification. */
+        /* Name of the data source used for classification. */
         String source,
 
-        /** Year of the source dataset. */
+        /* Year of the source dataset. */
         int sourceYear
 
 ) {

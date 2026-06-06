@@ -178,13 +178,13 @@ public class StrategyLabPanel extends BorderPane {
         symbolCombo.setPrefWidth(170);
         styleCombo(symbolCombo);
 
-        if (systemCore.getExchange() != null) {
-            List<TradePair> symbols = systemCore.getExchange().getTradePairSymbol();
-            if (symbols != null) {
-                symbolCombo.getItems().setAll(symbols);
-                loadTradableSymbolsAsync(symbols);
-            }
+        TradePair initialPair = systemCore.getSelectedTradePair();
+        if (initialPair != null) {
+            symbolCombo.getItems().setAll(initialPair);
+            symbolCombo.getSelectionModel().select(initialPair);
+            selectedSymbol = initialPair.toString('/');
         }
+        loadSymbolsAsync();
 
         if (!symbolCombo.getItems().isEmpty()) {
             symbolCombo.getSelectionModel().selectFirst();
@@ -293,6 +293,54 @@ public class StrategyLabPanel extends BorderPane {
 
         box.getChildren().setAll(row1, row2, row3);
         return box;
+    }
+
+    private void loadSymbolsAsync() {
+        if (systemCore.getExchange() == null) {
+            return;
+        }
+
+        setStatusText("Loading symbols...");
+        CompletableFuture
+                .supplyAsync(() -> {
+                    try {
+                        List<TradePair> symbols = systemCore.getExchange().getTradePairSymbol();
+                        return symbols == null ? List.<TradePair>of() : symbols;
+                    } catch (Exception exception) {
+                        log.warn("Strategy Lab symbol load delayed: {}", rootMessage(exception));
+                        return List.<TradePair>of();
+                    }
+                })
+                .orTimeout(8, TimeUnit.SECONDS)
+                .exceptionally(exception -> {
+                    log.warn("Strategy Lab symbol load unavailable: {}", rootMessage(exception));
+                    return List.of();
+                })
+                .thenAccept(symbols -> runOnFx(() -> {
+                    if (symbols == null || symbols.isEmpty()) {
+                        setStatusText("Symbols unavailable; using current selection.");
+                        appendLog("Symbol load delayed by exchange limiter. Try Refresh after Coinbase REST traffic settles.");
+                        return;
+                    }
+
+                    TradePair previous = symbolCombo.getValue();
+                    symbolCombo.getItems().setAll(symbols);
+                    if (previous != null && symbols.stream().anyMatch(pair -> sameSymbol(pair, previous))) {
+                        symbolCombo.getSelectionModel().select(symbols.stream()
+                                .filter(pair -> sameSymbol(pair, previous))
+                                .findFirst()
+                                .orElse(previous));
+                    } else {
+                        symbolCombo.getSelectionModel().selectFirst();
+                    }
+
+                    TradePair selected = symbolCombo.getValue();
+                    if (selected != null) {
+                        selectedSymbol = selected.toString('/');
+                    }
+                    setStatusText("Ready");
+                    loadTradableSymbolsAsync(symbols);
+                }));
     }
 
     private Button button(String text, Runnable action) {
@@ -1376,6 +1424,20 @@ public class StrategyLabPanel extends BorderPane {
             String timestamp = java.time.LocalDateTime.now().format(LOG_TIME_FORMAT);
             logsArea.appendText("[" + timestamp + "] " + safe(message) + "\n");
         });
+    }
+
+    private void setStatusText(String status) {
+        runOnFx(() -> {
+            if (statusLabel != null) {
+                statusLabel.setText(status == null || status.isBlank() ? "Ready" : status);
+            }
+        });
+    }
+
+    private boolean sameSymbol(TradePair left, TradePair right) {
+        return left != null
+                && right != null
+                && safe(left.toString('/')).equalsIgnoreCase(safe(right.toString('/')));
     }
 
     private void setRunning(boolean running, String status) {

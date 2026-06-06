@@ -3,6 +3,7 @@ package org.investpro.core.agents.symbol;
 import lombok.Builder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.models.market.MarketInstrument;
 import org.investpro.models.trading.TradePair;
 import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
@@ -23,6 +24,9 @@ public class SymbolAgentState {
 
     @NotNull
     private TradePair symbol;
+
+    @Nullable
+    private MarketInstrument marketInstrument;
 
     @Nullable
     private SymbolEvaluationState state;
