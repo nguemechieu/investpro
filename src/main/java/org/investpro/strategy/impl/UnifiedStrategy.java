@@ -2,10 +2,14 @@ package org.investpro.strategy.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
+import org.investpro.decision.MarketRegime;
 import org.investpro.enums.StrategyCategory;
 import org.investpro.enums.AssetClass;
 import org.investpro.enums.ContractType;
 import org.investpro.strategy.*;
+import org.investpro.strategy.ai.AISignalReviewEngine;
+import org.investpro.strategy.lifecycle.AISignalDecision;
+import org.investpro.strategy.lifecycle.AISignalReview;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
@@ -104,6 +108,11 @@ public class UnifiedStrategy extends BaseStrategy {
         return strategyName;
     }
 
+    @Override
+    public String getName() {
+        return strategyName;
+    }
+
     // =========================================================================
     // Signal Generation
     // =========================================================================
@@ -144,7 +153,8 @@ public class UnifiedStrategy extends BaseStrategy {
             case "RSI Failure Swing" -> rsiFailureSwing(context, features);
             case "Volume Spike Reversal" -> volumeSpikeReversal(context, features);
             case "Adaptive Momentum Pullback" -> adaptiveMomentumPullback(context, features);
-            case "AI Hybrid", "ML Model" -> noSignal(context, baseName + " requires AI service (not attached)");
+            case "AI Hybrid" -> aiHybrid(context, features);
+            case "ML Model" -> mlModel(context, features);
             default -> noSignal(context, "Unknown base strategy: " + baseName);
         };
 
@@ -170,7 +180,7 @@ public class UnifiedStrategy extends BaseStrategy {
 
     @Override
     public @NotNull Object getId() {
-        return STRATEGY_ID;
+        return strategyName;
     }
 
     // =========================================================================
@@ -418,6 +428,102 @@ public class UnifiedStrategy extends BaseStrategy {
         }
     }
 
+    private @NotNull StrategySignal aiHybrid(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        List<StrategySignal> candidates = List.of(
+                trendFollowing(context, features),
+                momentumContinuation(context, features),
+                pullbackTrend(context, features),
+                breakout(context, features),
+                meanReversion(context, features),
+                volatilityBreakout(context, features),
+                rangeFade(context, features));
+
+        StrategySignal candidate = candidates.stream()
+                .filter(StrategySignal::isActionable)
+                .max(Comparator.comparingDouble(StrategySignal::getConfidence))
+                .orElseGet(() -> mlModel(context, features));
+
+        if (!candidate.isActionable()) {
+            return noSignal(context, "AI Hybrid found no actionable technical candidate");
+        }
+
+        AISignalReview review = AISignalReviewEngine.getInstance()
+                .reviewSignal(candidate.toBuilder()
+                        .strategyName(strategyName)
+                        .metadata("aiHybridCandidate", candidate.getStrategyName())
+                        .build(), toMarketRegime(features));
+
+        AISignalDecision decision = review.getDecision();
+        if (decision == AISignalDecision.REJECT
+                || decision == AISignalDecision.WAIT
+                || decision == AISignalDecision.LOW_CONFIDENCE) {
+            return noSignal(context, "AI Hybrid held signal: " + review.getReasoningSummary());
+        }
+
+        double sizeMultiplier = review.getSuggestedSizeMultiplier() <= 0
+                ? 1.0
+                : Math.min(1.0, review.getSuggestedSizeMultiplier());
+        double adjustedConfidence = Math.min(0.95,
+                candidate.getConfidence() * (0.70 + (review.getAiConfidence() * 0.30)));
+
+        if (decision == AISignalDecision.REDUCE_SIZE) {
+            adjustedConfidence = Math.min(adjustedConfidence, 0.62);
+        }
+
+        return candidate.toBuilder()
+                .strategyId(STRATEGY_ID)
+                .strategyName(strategyName)
+                .confidence(adjustedConfidence)
+                .amount(parameters.getSignalAmount() * sizeMultiplier)
+                .reason("AI Hybrid approved: " + review.getReasoningSummary())
+                .warning(String.join("; ", review.getWarningFlags()))
+                .metadata("selectedBaseStrategy", "AI Hybrid")
+                .metadata("aiDecision", decision.name())
+                .metadata("aiConfidence", review.getAiConfidence())
+                .metadata("aiSizeMultiplier", sizeMultiplier)
+                .metadata("marketConditionScore", review.getMarketConditionScore())
+                .metadata("regimeCompatibility", review.getRegimeCompatibility())
+                .build();
+    }
+
+    private @NotNull StrategySignal mlModel(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        double trendScore = clamp((features.getEmaFast() - features.getEmaSlow()) / Math.max(features.getClose(), 0.0001) * 20.0,
+                -1.0, 1.0);
+        double momentumScore = clamp(features.getMomentum() * 8.0, -1.0, 1.0);
+        double rsiScore = clamp((50.0 - features.getRsi()) / 50.0, -1.0, 1.0);
+        double breakoutScore = breakoutScore(features);
+        double volumeScore = clamp((features.getVolumeRatio() - 1.0) / 2.0, -0.5, 0.75);
+        double regimeScore = features.isTrending()
+                ? Math.signum(trendScore) * 0.20
+                : features.isRanging() ? rsiScore * 0.20 : 0.0;
+
+        double score = trendScore * 0.30
+                + momentumScore * 0.25
+                + rsiScore * 0.15
+                + breakoutScore * 0.15
+                + volumeScore * 0.10
+                + regimeScore;
+
+        double confidence = clamp(0.52 + Math.abs(score) * 0.32, 0.0, 0.88);
+        if (confidence < parameters.getMinConfidence() || Math.abs(score) < 0.18) {
+            return noSignal(context, "ML Model confidence below threshold");
+        }
+
+        Side side = score > 0 ? BUY : SELL;
+        return signal(context, side, confidence,
+                "ML ensemble score=" + String.format(Locale.ROOT, "%.2f", score),
+                features).toBuilder()
+                .strategyName(strategyName)
+                .metadata("selectedBaseStrategy", "ML Model")
+                .metadata("mlScore", score)
+                .metadata("trendScore", trendScore)
+                .metadata("momentumScore", momentumScore)
+                .metadata("rsiScore", rsiScore)
+                .metadata("breakoutScore", breakoutScore)
+                .metadata("volumeScore", volumeScore)
+                .build();
+    }
+
     // =========================================================================
     // Signal Creation Helper
     // =========================================================================
@@ -500,6 +606,51 @@ public class UnifiedStrategy extends BaseStrategy {
         }
 
         return ema;
+    }
+
+    private double breakoutScore(@NotNull FeatureRow features) {
+        double close = features.getClose();
+        if (close <= 0) {
+            return 0.0;
+        }
+        if (features.getBreakoutHigh() > 0 && close > features.getBreakoutHigh()) {
+            return 1.0;
+        }
+        if (features.getBreakoutLow() > 0 && close < features.getBreakoutLow()) {
+            return -1.0;
+        }
+        double highDistance = features.getBreakoutHigh() <= 0 ? 0.0 : (features.getBreakoutHigh() - close) / close;
+        double lowDistance = features.getBreakoutLow() <= 0 ? 0.0 : (close - features.getBreakoutLow()) / close;
+        if (highDistance > 0 && highDistance < 0.01) {
+            return 0.35;
+        }
+        if (lowDistance > 0 && lowDistance < 0.01) {
+            return -0.35;
+        }
+        return 0.0;
+    }
+
+    private MarketRegime toMarketRegime(@NotNull FeatureRow features) {
+        if (features.isHighVolatility()) {
+            return MarketRegime.HIGH_VOLATILITY;
+        }
+        if (features.trendUp() && features.emasAlignedBullish()) {
+            return features.getTrendStrength() > 0.50 ? MarketRegime.STRONG_UPTREND : MarketRegime.WEAK_UPTREND;
+        }
+        if (features.trendDown() && features.emasAlignedBearish()) {
+            return features.getTrendStrength() > 0.50 ? MarketRegime.STRONG_DOWNTREND : MarketRegime.WEAK_DOWNTREND;
+        }
+        if (features.isRanging()) {
+            return MarketRegime.RANGE_BOUND;
+        }
+        return MarketRegime.UNKNOWN;
+    }
+
+    private double clamp(double value, double min, double max) {
+        if (!Double.isFinite(value)) {
+            return min;
+        }
+        return Math.max(min, Math.min(max, value));
     }
 
     @Override

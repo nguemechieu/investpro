@@ -1,6 +1,8 @@
 package org.investpro.trading;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -640,7 +642,8 @@ public class PreTradeValidationEngine {
             }
         }
 
-        public static TradeRequest marketBuy(String symbol, double quantity) {
+        @Contract(value = "_, _ -> new", pure = true)
+        public static @NonNull TradeRequest marketBuy(String symbol, double quantity) {
             return new TradeRequest(
                     symbol,
                     OrderSide.BUY,
@@ -653,7 +656,8 @@ public class PreTradeValidationEngine {
             );
         }
 
-        public static TradeRequest marketSell(String symbol, double quantity) {
+        @Contract(value = "_, _ -> new", pure = true)
+        public static @NonNull TradeRequest marketSell(String symbol, double quantity) {
             return new TradeRequest(
                     symbol,
                     OrderSide.SELL,
@@ -688,7 +692,7 @@ public class PreTradeValidationEngine {
             return warnings != null && !warnings.isEmpty();
         }
 
-        public String humanReadableSummary() {
+        public @NonNull String humanReadableSummary() {
             StringBuilder builder = new StringBuilder();
 
             builder.append(summary)
@@ -760,7 +764,8 @@ public class PreTradeValidationEngine {
             return new GateResult(gateNumber, gateName, GateStatus.BLOCKED, message, 1.0, null);
         }
 
-        public GateResult withGateInfo(int gateNumber, String gateName) {
+        @Contract("_, _ -> new")
+        public @NonNull GateResult withGateInfo(int gateNumber, String gateName) {
             return new GateResult(gateNumber, gateName, status, message, sizeReduction, recommendation);
         }
 

@@ -508,7 +508,6 @@ public final class StrategyCatalog {
     public static @NotNull List<String> providerStrategyNames() {
         try {
             return PluginRegistry.loadDefault().strategyProviders().stream()
-                    .filter(StrategyProvider::enabledByDefault)
                     .map(StrategyProvider::displayName)
                     .filter(name -> name != null && !name.isBlank())
                     .toList();

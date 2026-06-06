@@ -1,6 +1,7 @@
 package org.investpro.trading.tradability;
 
-import org.investpro.models.trading.TradePair;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -54,7 +55,7 @@ public record InstrumentTradabilityReport(
     }
 
     /** Returns a user-friendly message suitable for UI display. */
-    public String uiMessage() {
+    public @NonNull String uiMessage() {
         return switch (status) {
             case TRADEABLE -> "Ready to trade.";
             case SUPPORTED_BUT_MARKET_CLOSED -> "Market is currently closed for " + displayName + ".";
@@ -73,7 +74,8 @@ public record InstrumentTradabilityReport(
     }
 
     /** Converts back to a {@link SymbolTradability} record for interoperability. */
-    public SymbolTradability toSymbolTradability() {
+    @Contract(" -> new")
+    public @NonNull SymbolTradability toSymbolTradability() {
         TradabilityStatus ts = status.toTradabilityStatus();
         return new SymbolTradability(
                 exchangeId,

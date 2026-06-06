@@ -255,10 +255,7 @@ public final class StrategyRegistry {
     }
 
     public Collection<TradingStrategy> getEnabledStrategies() {
-        // Instantiate only the active strategy by default if nothing is loaded yet.
-        if (strategies.isEmpty() && activeName != null) {
-            getStrategy(activeName);
-        }
+        instantiateCoreStrategyFamilies();
 
         return strategies.values()
                 .stream()
@@ -383,6 +380,7 @@ public final class StrategyRegistry {
      * @return List of all TradingStrategy instances
      */
     public List<TradingStrategy> getAllStrategies() {
+        instantiateCoreStrategyFamilies();
         return strategies.values()
                 .stream()
                 .filter(Objects::nonNull)
@@ -465,9 +463,10 @@ public final class StrategyRegistry {
 
         for (String name : definitionNames) {
             try {
+                boolean alreadyInstantiated = strategies.containsKey(name);
                 TradingStrategy strategy = getStrategy(name);
 
-                if (strategy != null && !strategies.containsKey(name)) {
+                if (strategy != null && !alreadyInstantiated) {
                     strategies.put(name, strategy);
                     instantiatedCount++;
 
@@ -480,6 +479,27 @@ public final class StrategyRegistry {
 
         log.info("Instantiated {} strategies for multi-strategy consensus", instantiatedCount);
         return instantiatedCount;
+    }
+
+    private synchronized void instantiateCoreStrategyFamilies() {
+        for (String name : StrategyCatalog.CORE_STRATEGY_NAMES) {
+            try {
+                getStrategy(name);
+            } catch (Exception exception) {
+                log.warn("Failed to instantiate core strategy '{}': {}", name, exception.getMessage());
+            }
+        }
+        for (StrategyProvider provider : pluginProviders.values()) {
+            if (provider == null) {
+                continue;
+            }
+            try {
+                getStrategy(provider.displayName());
+            } catch (Exception exception) {
+                log.warn("Failed to instantiate provider strategy '{}': {}",
+                        provider.displayName(), exception.getMessage());
+            }
+        }
     }
 
 

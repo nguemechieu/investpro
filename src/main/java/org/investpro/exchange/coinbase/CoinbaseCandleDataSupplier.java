@@ -13,6 +13,7 @@ import org.investpro.models.trading.TradePair;
 import org.investpro.utils.CandleDataSupplier;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,7 +123,7 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                     }
 
                     String trimmed = body.trim();
-                    if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) {
+                    if (!(trimmed.startsWith("{")||trimmed.startsWith("["))) {
                         logger.warn("Coinbase candles request returned non-JSON data for {} {}: {}",
                                 tradePair,
                                 granularity.apiName(),
@@ -182,7 +183,7 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                 });
     }
 
-    private String abbreviate(String value) {
+    private @NonNull String abbreviate(String value) {
         if (value == null) {
             return "";
         }
@@ -211,7 +212,7 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                 new CoinbaseGranularity("FIFTEEN_MINUTE", 900),
                 new CoinbaseGranularity("THIRTY_MINUTE", 1800),
                 new CoinbaseGranularity("ONE_HOUR", 3600),
-                new CoinbaseGranularity("TWO_HOUR", 7200),
+                new CoinbaseGranularity("FOUR_HOUR", 3600*4),
                 new CoinbaseGranularity("SIX_HOUR", 21600),
                 new CoinbaseGranularity("ONE_DAY", 86400)
         );
@@ -223,7 +224,7 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                     .orElseGet(() -> nearestSupported(requestedSeconds));
         }
 
-        private static CoinbaseGranularity nearestSupported(int requestedSeconds) {
+        private static @NonNull CoinbaseGranularity nearestSupported(int requestedSeconds) {
             CoinbaseGranularity nearest = SUPPORTED.stream()
                     .min(Comparator
                             .comparingInt((CoinbaseGranularity granularity) ->

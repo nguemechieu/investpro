@@ -7737,7 +7737,11 @@ private static final class DetachedChartWindow {
 
         org.investpro.asset.AssetCatalogService assetCatalog = org.investpro.asset.AssetCatalogRuntime.service();
         org.investpro.asset.ExchangeId exchangeId = org.investpro.asset.AssetCatalogService.exchangeId(exchange);
-        List<MarketInstrument> instruments = routeFilteredInstruments(refreshMarketInstrumentCacheForExchange(exchange));
+        List<MarketInstrument> cachedInstruments = cachedMarketInstrumentsForExchange(exchange);
+        List<MarketInstrument> instruments = routeFilteredInstruments(cachedInstruments);
+        if (cachedInstruments.isEmpty()) {
+            refreshMarketInstrumentCacheForExchangeAsync(exchange);
+        }
         List<TradePair> tradePairs = instruments.stream()
                 .filter(MarketInstrument::canShowInMarketWatch)
                 .map(MarketInstrument::tradePair)
@@ -12907,6 +12911,46 @@ private static final class DetachedChartWindow {
                     targetExchange.getDisplayName(), rootMessage(exception));
             return List.of();
         }
+    }
+
+    private List<MarketInstrument> cachedMarketInstrumentsForExchange(Exchange targetExchange) {
+        if (targetExchange == null) {
+            return List.of();
+        }
+        try {
+            return marketInstrumentService.cachedForExchange(targetExchange);
+        } catch (Exception exception) {
+            log.debug("Unable to read cached market instruments for {}: {}",
+                    targetExchange.getDisplayName(), rootMessage(exception));
+            return List.of();
+        }
+    }
+
+    private void refreshMarketInstrumentCacheForExchangeAsync(Exchange targetExchange) {
+        if (targetExchange == null) {
+            return;
+        }
+        marketInstrumentService.loadForExchange(targetExchange)
+                .orTimeout(15, TimeUnit.SECONDS)
+                .whenComplete((instruments, exception) -> {
+                    if (exception != null) {
+                        log.debug("Unable to refresh market instrument cache for {}: {}",
+                                targetExchange.getDisplayName(), rootMessage(exception));
+                        return;
+                    }
+                    if (instruments == null || instruments.isEmpty()) {
+                        return;
+                    }
+                    String runtimeKey = botRuntimeKey(targetExchange);
+                    for (MarketInstrument instrument : instruments) {
+                        cacheMarketInstrument(runtimeKey, instrument);
+                    }
+                    Platform.runLater(() -> {
+                        if (Objects.equals(targetExchange, exchange)) {
+                            loadSymbolsForSelectedExchange();
+                        }
+                    });
+                });
     }
 
     private List<MarketInstrument> routeFilteredInstruments(List<MarketInstrument> instruments) {

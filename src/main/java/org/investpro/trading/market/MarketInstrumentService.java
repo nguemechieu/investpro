@@ -58,6 +58,17 @@ public class MarketInstrumentService {
                 });
     }
 
+    public List<MarketInstrument> cachedForExchange(Exchange exchange) {
+        if (exchange == null) {
+            return List.of();
+        }
+        CacheEntry cached = cacheByExchange.get(normalizeExchangeId(exchange.getExchangeId()));
+        if (cached == null || cached.expired()) {
+            return List.of();
+        }
+        return cached.instruments();
+    }
+
     public List<MarketInstrument> instruments() {
         return cacheByExchange.values().stream()
                 .filter(entry -> !entry.expired())
