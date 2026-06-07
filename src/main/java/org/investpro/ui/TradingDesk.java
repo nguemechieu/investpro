@@ -5430,6 +5430,9 @@ private static final class DetachedChartWindow {
         if (exchange == null || exchange.supportsBracketOrders()) {
             orderTypes.add("BRACKET");
         }
+        if (exchange == null || exchange.supportsTrailingStopOrders()) {
+            orderTypes.add("TRAILING_STOP");
+        }
 
         orderTypeSelector.getItems().setAll(orderTypes);
         orderTypeSelector.getSelectionModel().select(orderTypes.contains(selected[0]) ? selected[0] : "MARKET");
@@ -6180,7 +6183,8 @@ private static final class DetachedChartWindow {
             case "MARKET" -> OpenOrder.OrderType.MARKET;
             case "LIMIT" -> OpenOrder.OrderType.LIMIT;
             case "STOP", "BRACKET" -> OpenOrder.OrderType.STOP_LIMIT;
-            default -> OpenOrder.OrderType.TRAILING_STOP;
+            case "TRAILING_STOP", "TRAILING STOP", "TRAIL" -> OpenOrder.OrderType.TRAILING_STOP;
+            default -> OpenOrder.OrderType.MARKET;
         };
 
         if (!canSubmitOrderByTradability(tradePair, mappedOrderType, amount)) {
@@ -6203,6 +6207,13 @@ private static final class DetachedChartWindow {
                     return;
                 }
                 showBracketOrderDialog(tradePair, side, amount);
+            }
+            case "TRAILING_STOP", "TRAILING STOP", "TRAIL" -> {
+                if (exchange != null && !exchange.supportsTrailingStopOrders()) {
+                    showWarning("Order", "%s does not support trailing stop orders.".formatted(exchange.getDisplayName()));
+                    return;
+                }
+                showTrailingStopOrderDialog(tradePair, side, amount);
             }
             default -> showWarning("Order", "Unknown order type: " + orderType);
         }
@@ -6283,6 +6294,49 @@ private static final class DetachedChartWindow {
                                 "Order failed: %s".formatted(rootMessage(exception))));
                         return null;
                     });
+        });
+    }
+
+    private void showTrailingStopOrderDialog(TradePair tradePair, org.investpro.utils.Side side, double amount) {
+        ChoiceDialog<String> modeDialog = new ChoiceDialog<>("PRICE", List.of("PRICE", "PERCENT"));
+        modeDialog.setTitle("Trailing Stop Mode");
+        modeDialog.setHeaderText("Choose trailing stop mode for %s %s".formatted(side, tradePair.toString('/')));
+        modeDialog.setContentText("Mode:");
+
+        modeDialog.showAndWait().ifPresent(mode -> {
+            boolean trailingPercent = "PERCENT".equalsIgnoreCase(mode);
+            TextInputDialog distanceDialog = new TextInputDialog(trailingPercent ? "1.0" : "0.00");
+            distanceDialog.setTitle("Trailing Stop");
+            distanceDialog.setHeaderText("Enter trailing %s for %s %s".formatted(
+                    trailingPercent ? "percent" : "price distance", side, tradePair.toString('/')));
+            distanceDialog.setContentText(trailingPercent ? "Percent:" : "Distance:");
+
+            distanceDialog.showAndWait().ifPresent(distanceText -> {
+                double trailingAmount;
+                try {
+                    trailingAmount = Double.parseDouble(distanceText.trim());
+                } catch (NumberFormatException exception) {
+                    showWarning("Order", "Trailing stop value must be a number.");
+                    return;
+                }
+                if (trailingAmount <= 0 || !Double.isFinite(trailingAmount)) {
+                    showWarning("Order", "Trailing stop value must be greater than zero.");
+                    return;
+                }
+
+                exchange.createTrailingStopOrder(tradePair, side, amount, trailingAmount, trailingPercent)
+                        .thenAccept(orderId -> runOnFx(() -> {
+                            journal("%s trailing stop order submitted for %s amount=%.8f trail=%s%s: %s"
+                                    .formatted(side, tradePair.toString('/'), amount,
+                                            trailingPercent ? "" : "$", trailingAmount, orderId));
+                            refreshAccountWorkspace();
+                        }))
+                        .exceptionally(exception -> {
+                            runOnFx(() -> showWarning("Order Failed",
+                                    "Trailing stop failed: %s".formatted(rootMessage(exception))));
+                            return null;
+                        });
+            });
         });
     }
 
@@ -7482,6 +7536,16 @@ private static final class DetachedChartWindow {
                 status,
                 stellarTrustlineExists);
         if (!catalogDecision.allowed()) {
+            if (isOandaExchange(exchangeId, status)
+                    && status.status() == org.investpro.trading.tradability.TradabilityStatus.FULLY_TRADABLE
+                    && status.orderSubmissionAllowed()
+                    && typeAllowed) {
+                journal("OANDA live tradability accepted; local asset catalog warning ignored: "
+                        + catalogDecision.reason());
+                log.info("OANDA live tradability accepted over local catalog warning. symbol={} reason={}",
+                        pair == null ? "-" : pair.toString('/'), catalogDecision.reason());
+                return true;
+            }
             showWarning("Order Blocked", catalogDecision.reason());
             journal("Trade blocked by local asset catalog: " + catalogDecision.reason());
             log.warn("Order blocked by local asset catalog. {}", buildTradabilityDiagnostics(pair, status, orderType));
@@ -7489,6 +7553,20 @@ private static final class DetachedChartWindow {
         }
 
         return true;
+    }
+
+    private boolean isOandaExchange(org.investpro.asset.ExchangeId exchangeId, SymbolTradability status) {
+        if (exchangeId == org.investpro.asset.ExchangeId.OANDA) {
+            return true;
+        }
+        if (exchange != null) {
+            String exchangeText = (safe(exchange.getExchangeId()) + " " + safe(exchange.getName()) + " "
+                    + safe(exchange.getDisplayName())).toLowerCase(Locale.ROOT);
+            if (exchangeText.contains("oanda")) {
+                return true;
+            }
+        }
+        return status != null && safe(status.exchangeId()).toLowerCase(Locale.ROOT).contains("oanda");
     }
 
     private SymbolTradability reconcileTradabilityWithCurrentExchange(

@@ -9,17 +9,21 @@ export DISPLAY="${DISPLAY:-:0}"
 export GEOMETRY="${GEOMETRY:-1530x840}"
 export DEPTH="${DEPTH:-24}"
 export VNC_PASSWORD="${VNC_PASSWORD:-investpro}"
-export JAVA_OPTS="${JAVA_OPTS:--Xmx2g -Xms512m -Djava.awt.headless=false -Dprism.order=sw}"
+export JAVA_OPTS="${JAVA_OPTS:--Xmx2g -Xms512m -Djava.awt.headless=false -Dglass.platform=gtk -Dprism.order=sw}"
 
 echo "DISPLAY=$DISPLAY"
 echo "GEOMETRY=$GEOMETRY"
 echo "DEPTH=$DEPTH"
 
+mkdir -p /app/logs
+
 # Clean up stale X11 lock files from previous runs
 rm -f /tmp/.X*-lock 2>/dev/null || true
+rm -f /tmp/.X11-unix/X* 2>/dev/null || true
 
 echo "Starting Xvfb..."
-Xvfb "$DISPLAY" -screen 0 "${GEOMETRY}x${DEPTH}" -ac +extension GLX +render -noreset &
+Xvfb "$DISPLAY" -screen 0 "${GEOMETRY}x${DEPTH}" -ac +extension GLX +render -noreset \
+  >/app/logs/xvfb.log 2>/app/logs/xvfb.err.log &
 XVFB_PID=$!
 
 sleep 2
@@ -31,8 +35,14 @@ FLUXBOX_PID=$!
 sleep 1
 
 echo "Starting autocutsel (clipboard sync)..."
-autocutsel -s PRIMARY -i >/dev/null 2>&1 &
-AUTOCUTSEL_PID=$!
+
+# Standard clipboard used by Ctrl+C / Ctrl+V
+autocutsel -selection CLIPBOARD -fork \
+  >/app/logs/autocutsel-clipboard.log 2>/app/logs/autocutsel-clipboard.err.log || true
+
+# X11 primary selection
+autocutsel -selection PRIMARY -fork \
+  >/app/logs/autocutsel-primary.log 2>/app/logs/autocutsel-primary.err.log || true
 
 sleep 1
 
@@ -43,6 +53,9 @@ x11vnc \
   -shared \
   -rfbport 5900 \
   -passwd "$VNC_PASSWORD" \
+  -xkb \
+  -noxdamage \
+  -repeat \
   >/app/logs/x11vnc.log 2>/app/logs/x11vnc.err.log &
 X11VNC_PID=$!
 
@@ -79,6 +92,7 @@ APP_EXIT_CODE=${PIPESTATUS[0]}
 echo "InvestPro exited with code $APP_EXIT_CODE"
 
 echo "Stopping background services..."
-kill "$NOVNC_PID" "$X11VNC_PID" "$AUTOCUTSEL_PID" "$FLUXBOX_PID" "$XVFB_PID" 2>/dev/null || true
+kill "$NOVNC_PID" "$X11VNC_PID" "$FLUXBOX_PID" "$XVFB_PID" 2>/dev/null || true
+pkill autocutsel 2>/dev/null || true
 
 exit "$APP_EXIT_CODE"

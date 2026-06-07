@@ -306,6 +306,11 @@ public class Alpaca extends Exchange {
     }
 
     @Override
+    public boolean supportsTrailingStopOrders() {
+        return true;
+    }
+
+    @Override
     public boolean supportsLeverage() {
         return false;
     }
@@ -1303,6 +1308,50 @@ public class Alpaca extends Exchange {
                 return id == null ? responseBody.toString() : id.asText();
             } catch (Exception exception) {
                 throw new IllegalStateException("Alpaca order submission failed.", exception);
+            }
+        });
+    }
+
+    @Override
+    public CompletableFuture<String> createTrailingStopOrder(
+            TradePair tradePair,
+            Side side,
+            double amount,
+            double trailingAmount,
+            boolean trailingPercent) {
+        if (tradePair == null) {
+            return failedFuture(new IllegalArgumentException("tradePair must not be null"));
+        }
+        if (amount <= 0 || !Double.isFinite(amount)) {
+            return failedFuture(new IllegalArgumentException("Trailing stop amount must be greater than zero"));
+        }
+        if (trailingAmount <= 0 || !Double.isFinite(trailingAmount)) {
+            return failedFuture(new IllegalArgumentException("Trailing stop distance must be greater than zero"));
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Map<String, String> payload = new LinkedHashMap<>();
+                payload.put("symbol", alpacaSymbol(tradePair));
+                payload.put("qty", decimal(amount));
+                payload.put("side", side == Side.SELL ? "sell" : "buy");
+                payload.put("type", "trailing_stop");
+                payload.put("time_in_force", "day");
+                payload.put(trailingPercent ? "trail_percent" : "trail_price", decimal(trailingAmount));
+
+                String body = OBJECT_MAPPER.writeValueAsString(payload);
+                HttpResponse<String> response = HTTP_CLIENT.send(alpacaRequest("/v2/orders")
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body))
+                        .build(), HttpResponse.BodyHandlers.ofString());
+                JsonNode responseBody = OBJECT_MAPPER.readTree(response.body());
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    throw new IllegalStateException(
+                            "Alpaca trailing stop API returned HTTP %d: %s".formatted(response.statusCode(), responseBody));
+                }
+                JsonNode id = responseBody.get("id");
+                return id == null ? responseBody.toString() : id.asText();
+            } catch (Exception exception) {
+                throw new IllegalStateException("Alpaca trailing stop submission failed.", exception);
             }
         });
     }

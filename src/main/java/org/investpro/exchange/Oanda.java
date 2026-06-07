@@ -47,6 +47,7 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.ConnectException;
 import java.net.NoRouteToHostException;
 import java.net.SocketTimeoutException;
@@ -667,23 +668,19 @@ public class Oanda extends Exchange {
             log.debug("Could not fetch OANDA tradability ticker for {}", pair, exception);
         }
 
-        if (status == TradabilityStatus.FULLY_TRADABLE) {
-            boolean hasLiquidity = ticker != null
-                    && Double.isFinite(ticker.getBidPrice())
-                    && Double.isFinite(ticker.getAskPrice())
-                    && ticker.getBidPrice() > 0.0
-                    && ticker.getAskPrice() > 0.0;
-
-            if (!hasLiquidity) {
-                status = TradabilityStatus.LIQUIDITY_UNAVAILABLE;
-                reason = "No OANDA pricing liquidity is currently available";
-            }
-        }
-
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("instrument", instrument);
         metadata.put("session", String.valueOf(pair.getTradingSessionStatus()));
         metadata.put("productStatus", status.name());
+        boolean pricingAvailable = ticker != null
+                && Double.isFinite(ticker.getBidPrice())
+                && Double.isFinite(ticker.getAskPrice())
+                && ticker.getBidPrice() > 0.0
+                && ticker.getAskPrice() > 0.0;
+        metadata.put("pricingAvailable", pricingAvailable);
+        if (!pricingAvailable) {
+            metadata.put("pricingReason", "OANDA pricing was unavailable during tradability check; account/session status is authoritative for order gating.");
+        }
 
         SessionState sessionState = new ExchangeSessionService().sessionState(this, pair, status, metadata);
         boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE
@@ -1584,17 +1581,132 @@ public class Oanda extends Exchange {
     @Override
     public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
             double limitPrice) {
-        /*
-         * You can later convert this to OANDA LIMIT order payload.
-         * For now return unsupported explicitly instead of silently sending wrong order
-         * type.
-         */
-        return failedFuture(new UnsupportedOperationException("OANDA limit order adapter is not implemented yet"));
+        return createPendingOandaOrder(tradePair, side, amount, limitPrice, "LIMIT");
     }
 
     @Override
     public CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice) {
-        return failedFuture(new UnsupportedOperationException("OANDA stop order adapter is not implemented yet"));
+        return createPendingOandaOrder(tradePair, side, amount, stopPrice, "STOP");
+    }
+
+    private CompletableFuture<String> createPendingOandaOrder(
+            TradePair tradePair,
+            Side side,
+            double amount,
+            double price,
+            String orderType) {
+        if (tradePair == null) {
+            return failedFuture(new IllegalArgumentException("tradePair must not be null"));
+        }
+        if (amount <= 0 || !Double.isFinite(amount)) {
+            return failedFuture(new IllegalArgumentException("OANDA order amount must be greater than zero"));
+        }
+        if (price <= 0 || !Double.isFinite(price)) {
+            return failedFuture(new IllegalArgumentException("OANDA %s order price must be greater than zero"
+                    .formatted(orderType)));
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                String account = resolveAccountId();
+                if (account.isBlank()) {
+                    throw new IllegalStateException("OANDA account id is missing");
+                }
+
+                double normalizedUnits = normalizeAmount(tradePair, amount);
+                double signedUnits = side == Side.SELL ? -normalizedUnits : normalizedUnits;
+
+                Map<String, Object> payload = new LinkedHashMap<>();
+                Map<String, Object> orderNode = new LinkedHashMap<>();
+                orderNode.put("type", orderType);
+                orderNode.put("instrument", toInstrument(tradePair));
+                orderNode.put("units", String.valueOf((long) signedUnits));
+                orderNode.put("price", BigDecimal.valueOf(price).stripTrailingZeros().toPlainString());
+                orderNode.put("timeInForce", "GTC");
+                orderNode.put("positionFill", "DEFAULT");
+                payload.put("order", orderNode);
+
+                HttpRequest request = requestBuilder(oandaRoute(ACCOUNT_ORDERS_ROUTE, account))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(payload)))
+                        .build();
+                HttpResponse<String> response = send(request);
+
+                if (!isSuccess(response)) {
+                    throw new IllegalStateException("OANDA %s order failed HTTP %d: %s"
+                            .formatted(orderType, response.statusCode(), response.body()));
+                }
+
+                JsonNode root = OBJECT_MAPPER.readTree(response.body());
+                String createId = root.path("orderCreateTransaction").path("id").asText("");
+                String fillId = root.path("orderFillTransaction").path("id").asText("");
+                return !createId.isBlank() ? createId : fillId;
+            } catch (Exception exception) {
+                throw new IllegalStateException("Failed to create OANDA %s order".formatted(orderType), exception);
+            }
+        }, oandaExecutor);
+    }
+
+    @Override
+    public CompletableFuture<String> createTrailingStopOrder(
+            TradePair tradePair,
+            Side side,
+            double amount,
+            double trailingAmount,
+            boolean trailingPercent) {
+        if (trailingPercent) {
+            return failedFuture(new UnsupportedOperationException(
+                    "OANDA trailing stop orders require an absolute trailing distance, not a percent."));
+        }
+        if (tradePair == null) {
+            return failedFuture(new IllegalArgumentException("tradePair must not be null"));
+        }
+        if (amount <= 0 || !Double.isFinite(amount)) {
+            return failedFuture(new IllegalArgumentException("Trailing stop amount must be greater than zero"));
+        }
+        if (trailingAmount <= 0 || !Double.isFinite(trailingAmount)) {
+            return failedFuture(new IllegalArgumentException("Trailing stop distance must be greater than zero"));
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                String account = resolveAccountId();
+                if (account.isBlank()) {
+                    throw new IllegalStateException("OANDA account id is missing");
+                }
+
+                double normalizedUnits = normalizeAmount(tradePair, amount);
+                double signedUnits = side == Side.SELL ? -normalizedUnits : normalizedUnits;
+
+                Map<String, Object> payload = new LinkedHashMap<>();
+                Map<String, Object> orderNode = new LinkedHashMap<>();
+                orderNode.put("type", "TRAILING_STOP_LOSS");
+                orderNode.put("instrument", toInstrument(tradePair));
+                orderNode.put("units", String.valueOf((long) signedUnits));
+                orderNode.put("distance", BigDecimal.valueOf(trailingAmount).stripTrailingZeros().toPlainString());
+                orderNode.put("timeInForce", "GTC");
+                orderNode.put("positionFill", "DEFAULT");
+                payload.put("order", orderNode);
+
+                HttpRequest request = requestBuilder(oandaRoute(ACCOUNT_ORDERS_ROUTE, account))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(payload)))
+                        .build();
+                HttpResponse<String> response = send(request);
+
+                if (!isSuccess(response)) {
+                    throw new IllegalStateException(
+                            "OANDA trailing stop order failed HTTP %d: %s".formatted(response.statusCode(), response.body()));
+                }
+
+                JsonNode root = OBJECT_MAPPER.readTree(response.body());
+                String createId = root.path("orderCreateTransaction").path("id").asText("");
+                String fillId = root.path("orderFillTransaction").path("id").asText("");
+                return !createId.isBlank() ? createId : fillId;
+            } catch (Exception exception) {
+                throw new IllegalStateException("Failed to create OANDA trailing stop order", exception);
+            }
+        }, oandaExecutor);
     }
 
     @Override
@@ -2281,6 +2393,11 @@ public class Oanda extends Exchange {
 
     @Override
     public boolean supportsBracketOrders() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsTrailingStopOrders() {
         return true;
     }
 

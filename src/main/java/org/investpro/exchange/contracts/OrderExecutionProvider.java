@@ -38,6 +38,16 @@ public interface OrderExecutionProvider {
 
     CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice);
 
+    default CompletableFuture<String> createTrailingStopOrder(
+            TradePair tradePair,
+            Side side,
+            double amount,
+            double trailingAmount,
+            boolean trailingPercent) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException(
+                "%s does not support trailing stop orders".formatted(getClass().getSimpleName())));
+    }
+
     CompletableFuture<String> createBracketOrder(
             TradePair tradePair,
             Side side,

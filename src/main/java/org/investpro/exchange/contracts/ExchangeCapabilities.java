@@ -17,6 +17,10 @@ public interface ExchangeCapabilities {
 
     boolean supportsBracketOrders();
 
+    default boolean supportsTrailingStopOrders() {
+        return false;
+    }
+
     boolean supportsLeverage();
 
     boolean supportsDerivatives();

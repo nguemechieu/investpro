@@ -51,6 +51,12 @@ public class CoinbaseOrderPayloadFactory {
                 payload.put("limit_price", formatPrice(order.getLimitPrice()));
                 payload.put("size", formatQuantity(order.getQuantity()));
                 break;
+            case TRAILING_STOP:
+                payload.put("order_type", "trailing_stop");
+                payload.put("size", formatQuantity(order.getQuantity()));
+                payload.put(order.isTrailingPercent() ? "trail_percent" : "trail_price",
+                        formatPrice(order.getTrailingAmount()));
+                break;
         }
         
         // Advanced order options

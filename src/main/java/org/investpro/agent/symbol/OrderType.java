@@ -4,5 +4,6 @@ public enum OrderType {
     MARKET,
     LIMIT,
     STOP,
-    STOP_LIMIT
+    STOP_LIMIT,
+    TRAILING_STOP
 }

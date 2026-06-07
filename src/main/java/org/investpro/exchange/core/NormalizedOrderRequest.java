@@ -14,7 +14,7 @@ import java.util.Objects;
 @Setter
 public class NormalizedOrderRequest {
     public enum OrderType {
-        MARKET, LIMIT, STOP, STOP_LIMIT
+        MARKET, LIMIT, STOP, STOP_LIMIT, TRAILING_STOP
     }
     
     public enum Side {
@@ -36,19 +36,23 @@ public class NormalizedOrderRequest {
     private final BigDecimal stopPrice;      // For stop orders
     private final BigDecimal stopLossPrice;  // For bracket orders
     private final BigDecimal takeProfitPrice; // For bracket orders
+    private final BigDecimal trailingAmount;  // For trailing stop orders
+    private final boolean trailingPercent;    // true => percent, false => price distance
     private final TimeInForce timeInForce;
     private final boolean postOnly;
     private final BigDecimal leverage;       // For leveraged orders
     
     public NormalizedOrderRequest(String productId, Side side, OrderType orderType,
                                   BigDecimal quantity, BigDecimal limitPrice) {
-        this(productId, side, orderType, quantity, limitPrice, null, null, null, TimeInForce.GTC, false, BigDecimal.ONE);
+        this(productId, side, orderType, quantity, limitPrice, null, null, null, null, false,
+                TimeInForce.GTC, false, BigDecimal.ONE);
     }
     
     private NormalizedOrderRequest(String productId, Side side, OrderType orderType,
                                    BigDecimal quantity, BigDecimal limitPrice,
                                    BigDecimal stopPrice, BigDecimal stopLossPrice,
-                                   BigDecimal takeProfitPrice, TimeInForce timeInForce,
+                                   BigDecimal takeProfitPrice, BigDecimal trailingAmount,
+                                   boolean trailingPercent, TimeInForce timeInForce,
                                    boolean postOnly, BigDecimal leverage) {
         this.productId = Objects.requireNonNull(productId, "productId required");
         this.side = Objects.requireNonNull(side, "side required");
@@ -58,6 +62,8 @@ public class NormalizedOrderRequest {
         this.stopPrice = stopPrice;
         this.stopLossPrice = stopLossPrice;
         this.takeProfitPrice = takeProfitPrice;
+        this.trailingAmount = trailingAmount;
+        this.trailingPercent = trailingPercent;
         this.timeInForce = timeInForce != null ? timeInForce : TimeInForce.GTC;
         this.postOnly = postOnly;
         this.leverage = leverage != null ? leverage : BigDecimal.ONE;
@@ -77,6 +83,8 @@ public class NormalizedOrderRequest {
         private BigDecimal stopPrice;
         private BigDecimal stopLossPrice;
         private BigDecimal takeProfitPrice;
+        private BigDecimal trailingAmount;
+        private boolean trailingPercent = false;
         private TimeInForce timeInForce = TimeInForce.GTC;
         private boolean postOnly = false;
         private BigDecimal leverage = BigDecimal.ONE;
@@ -107,6 +115,16 @@ public class NormalizedOrderRequest {
             this.takeProfitPrice = takeProfitPrice;
             return this;
         }
+
+        public Builder trailingAmount(BigDecimal trailingAmount) {
+            this.trailingAmount = trailingAmount;
+            return this;
+        }
+
+        public Builder trailingPercent(boolean trailingPercent) {
+            this.trailingPercent = trailingPercent;
+            return this;
+        }
         
         public Builder timeInForce(TimeInForce timeInForce) {
             this.timeInForce = timeInForce;
@@ -125,7 +143,7 @@ public class NormalizedOrderRequest {
         
         public NormalizedOrderRequest build() {
             return new NormalizedOrderRequest(productId, side, orderType, quantity,
-                    limitPrice, stopPrice, stopLossPrice, takeProfitPrice,
+                    limitPrice, stopPrice, stopLossPrice, takeProfitPrice, trailingAmount, trailingPercent,
                     timeInForce, postOnly, leverage);
         }
     }
@@ -139,12 +157,15 @@ public class NormalizedOrderRequest {
     public BigDecimal getStopPrice() { return stopPrice; }
     public BigDecimal getStopLossPrice() { return stopLossPrice; }
     public BigDecimal getTakeProfitPrice() { return takeProfitPrice; }
+    public BigDecimal getTrailingAmount() { return trailingAmount; }
+    public boolean isTrailingPercent() { return trailingPercent; }
     public TimeInForce getTimeInForce() { return timeInForce; }
     public boolean isPostOnly() { return postOnly; }
     public BigDecimal getLeverage() { return leverage; }
     
     public boolean hasStopLoss() { return stopLossPrice != null && stopLossPrice.signum() > 0; }
     public boolean hasTakeProfit() { return takeProfitPrice != null && takeProfitPrice.signum() > 0; }
+    public boolean hasTrailingAmount() { return trailingAmount != null && trailingAmount.signum() > 0; }
     public boolean isBracketOrder() { return hasStopLoss() || hasTakeProfit(); }
     
     @Override
