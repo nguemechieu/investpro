@@ -37,6 +37,8 @@ import org.investpro.indicators.metadata.IndicatorDefinitionRegistry;
 import org.investpro.i18n.LocalizationService;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.models.trading.TradePair;
+import org.investpro.news.CryptoNewsIntelligence;
+import org.investpro.news.NewsContext;
 import org.investpro.persistence.repository.HistoricalDataRepository;
 import org.investpro.persistence.repository.HistoricalDataRepositoryImpl;
 import org.investpro.strategy.StrategyCatalog;
@@ -69,6 +71,7 @@ import org.investpro.utils.CandleDataSupplier;
 
 import java.net.URL;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -1334,13 +1337,16 @@ public class StrategyBuilderPanel extends VBox {
                 ? loadCandlesForAutoLab(pair.get(), timeframe)
                 : List.of();
         MarketRegime regime = candles.isEmpty() ? MarketRegime.UNKNOWN : marketRegimeDetector.detect(candles);
+        NewsContext newsContext = CryptoNewsIntelligence.contextService()
+                .getContextForSymbol(symbol.contains("/") ? symbol.substring(0, symbol.indexOf('/')) : symbol, Duration.ofHours(24));
         return new StrategyGenerationContext(
                 symbol,
                 timeframe,
                 candles,
                 regime,
                 RiskProfile.conservative(),
-                strategyDescriptionArea == null ? "" : strategyDescriptionArea.getText());
+                strategyDescriptionArea == null ? "" : strategyDescriptionArea.getText(),
+                newsContext);
     }
 
     private List<CandleData> loadCandlesForAutoLab(TradePair pair, Timeframe timeframe) {

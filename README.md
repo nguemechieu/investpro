@@ -5,7 +5,13 @@
 <h1 align="center">InvestPro</h1>
 
 <p align="center">
-  <strong>Institutional-style, multi-asset trading workstation built with Java 21 + JavaFX.</strong><br/>
+  <strong>
+**InvestPro** is a modern desktop trading and market intelligence platform built with JavaFX. It is designed to help traders, developers, and quantitative researchers build, test, compare, and monitor trading strategies across multiple markets and exchanges.
+
+The platform includes a strategy builder, technical indicator catalog, candlestick pattern support, backtesting workflow, symbol discovery, market data tools, trading agent architecture, and risk-controlled execution pipeline. InvestPro is designed to support both manual research and automated strategy evaluation while keeping risk management and broker activity as core parts of the system.
+
+InvestPro is not just a trading bot. It is a full trading platform architecture focused on strategy design, market analysis, automation, and disciplined execution.
+</strong><br/>
   Strategy engine · Agent runtime · Local gRPC AI advisory · Risk management · Backtesting · Paper trading · Multi-exchange execution
 </p>
 
