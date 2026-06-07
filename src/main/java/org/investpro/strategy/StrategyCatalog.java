@@ -5,6 +5,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 import org.investpro.spi.PluginRegistry;
 import org.investpro.spi.StrategyProvider;
+import org.investpro.strategy.persistence.UserStrategyDefinitionStore;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -39,6 +40,7 @@ public final class StrategyCatalog {
 
     public static final Map<String, StrategyDefinition> STRATEGY_DEFINITIONS = buildCatalog();
     private static final Map<String, StrategyDefinition> RUNTIME_DEFINITIONS = new ConcurrentHashMap<>();
+    private static volatile boolean persistedRuntimeDefinitionsLoaded = false;
 
     public static final Map<String, String> STRATEGY_VARIANT_BASE_MAP = buildVariantBaseMap();
 
@@ -453,6 +455,7 @@ public final class StrategyCatalog {
     }
 
     public static StrategyDefinition definition(String strategyName) {
+        ensurePersistedRuntimeDefinitionsLoaded();
         String normalized = normalizeStrategyName(strategyName);
 
         StrategyDefinition runtimeDefinition = RUNTIME_DEFINITIONS.get(normalized);
@@ -487,6 +490,7 @@ public final class StrategyCatalog {
 
     @Contract(" -> new")
     public static @NotNull List<String> availableStrategyNames() {
+        ensurePersistedRuntimeDefinitionsLoaded();
         LinkedHashSet<String> names = new LinkedHashSet<>(STRATEGY_DEFINITIONS.keySet());
         names.addAll(RUNTIME_DEFINITIONS.keySet());
         names.addAll(providerStrategyNames());
@@ -505,6 +509,21 @@ public final class StrategyCatalog {
         RUNTIME_DEFINITIONS.put(definition.getName(), definition);
     }
 
+    public static synchronized void ensurePersistedRuntimeDefinitionsLoaded() {
+        if (persistedRuntimeDefinitionsLoaded) {
+            return;
+        }
+        try {
+            for (StrategyDefinition definition : UserStrategyDefinitionStore.getDefault().loadAll()) {
+                registerRuntimeDefinition(definition);
+            }
+        } catch (Exception exception) {
+            // Keep the built-in catalog usable even if the user strategy file is corrupted.
+        } finally {
+            persistedRuntimeDefinitionsLoaded = true;
+        }
+    }
+
     public static @NotNull List<String> providerStrategyNames() {
         try {
             return PluginRegistry.loadDefault().strategyProviders().stream()
@@ -517,6 +536,7 @@ public final class StrategyCatalog {
     }
 
     public static int definitionCount() {
+        ensurePersistedRuntimeDefinitionsLoaded();
         return STRATEGY_DEFINITIONS.size() + RUNTIME_DEFINITIONS.size();
     }
 

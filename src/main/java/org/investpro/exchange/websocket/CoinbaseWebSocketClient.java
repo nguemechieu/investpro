@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
+import org.investpro.config.AppConfig;
 import org.investpro.utils.Side;
 import org.java_websocket.drafts.Draft;
 import org.jetbrains.annotations.NotNull;
@@ -51,6 +52,8 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
     public static final String MARKET_TRADES_CHANNEL = "market_trades";
     public static final String HEARTBEATS_CHANNEL = "heartbeats";
+    private static final String CFG_SUBSCRIPTION_DELAY_MS = "coinbase.ws.subscriptionDelayMs";
+    private static final int DEFAULT_SUBSCRIPTION_DELAY_MS = 125;
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -81,6 +84,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     private volatile String lastErrorMessage = "";
     private volatile long lastErrorLoggedAtMs = 0L;
     private volatile boolean authenticationFailed = false;
+    private volatile long lastSubscriptionSentAtMs = 0L;
     private final ExecutorService subscriptionExecutor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "Coinbase-WS-Subscription");
         thread.setDaemon(true);
@@ -521,12 +525,26 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     ) {
         subscriptionExecutor.execute(() -> {
             try {
+                throttleSubscriptionSend();
                 sendSubscriptionMessage(type, tradePair, channel);
                 onSuccess.run();
             } catch (Exception exception) {
                 onFailure.accept(exception);
             }
         });
+    }
+
+    private void throttleSubscriptionSend() throws InterruptedException {
+        int delayMs = Math.max(0, AppConfig.getInt(CFG_SUBSCRIPTION_DELAY_MS, DEFAULT_SUBSCRIPTION_DELAY_MS));
+        if (delayMs <= 0) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        long waitMs = delayMs - (now - lastSubscriptionSentAtMs);
+        if (waitMs > 0) {
+            Thread.sleep(waitMs);
+        }
+        lastSubscriptionSentAtMs = System.currentTimeMillis();
     }
 
     private void sendSubscriptionMessage(

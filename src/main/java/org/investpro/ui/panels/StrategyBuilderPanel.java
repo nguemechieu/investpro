@@ -18,6 +18,15 @@ import javafx.stage.Stage;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.ai.AiCostEstimator;
+import org.investpro.ai.AiCreditAccount;
+import org.investpro.ai.AiModelCatalog;
+import org.investpro.ai.AiModelDefinition;
+import org.investpro.ai.AiStrategyGenerationRequest;
+import org.investpro.ai.AiStrategyGenerationResult;
+import org.investpro.ai.AiTradingDisclaimer;
+import org.investpro.ai.SafeAiStrategyGenerator;
+import org.investpro.config.AppConfig;
 import org.investpro.core.SystemCore;
 import org.investpro.data.CandleData;
 import org.investpro.enums.StrategyCategory;
@@ -34,6 +43,16 @@ import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyDefinition;
 import org.investpro.strategy.StrategyRegistry;
 import org.investpro.strategy.StrategyParameters;
+import org.investpro.strategy.auto.AutoStrategyLab;
+import org.investpro.strategy.auto.AutoStrategyScheduler;
+import org.investpro.strategy.auto.MarketRegime;
+import org.investpro.strategy.auto.MarketRegimeDetector;
+import org.investpro.strategy.auto.RiskProfile;
+import org.investpro.strategy.auto.StrategyAssignmentDecision;
+import org.investpro.strategy.auto.StrategyCandidate;
+import org.investpro.strategy.auto.StrategyEvaluationResult;
+import org.investpro.strategy.auto.StrategyGenerationContext;
+import org.investpro.strategy.persistence.UserStrategyDefinitionStore;
 import org.investpro.strategy.rules.CandlePattern;
 import org.investpro.strategy.rules.SignalType;
 import org.investpro.strategy.rules.StrategyRuleDefinition;
@@ -49,6 +68,7 @@ import org.jspecify.annotations.NonNull;
 import org.investpro.utils.CandleDataSupplier;
 
 import java.net.URL;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -167,7 +187,14 @@ public class StrategyBuilderPanel extends VBox {
     private TextField minSellSignalsField;
     private Label minBuyOutOfLabel;
     private Label minSellOutOfLabel;
+    private Label autoStrategyStatusLabel;
     private SystemCore systemCore;
+    private final AutoStrategyLab autoStrategyLab = new AutoStrategyLab();
+    private final AutoStrategyScheduler autoStrategyScheduler = new AutoStrategyScheduler();
+    private final MarketRegimeDetector marketRegimeDetector = new MarketRegimeDetector();
+    private List<StrategyCandidate> lastAutoCandidates = List.of();
+    private List<StrategyEvaluationResult> lastAutoEvaluations = List.of();
+    private StrategyGenerationContext lastAutoContext;
 
     public StrategyBuilderPanel(SystemCore systemCore) {
         setPadding(new Insets(16));
@@ -310,7 +337,10 @@ public class StrategyBuilderPanel extends VBox {
                 createSignalThresholdCard("Minimum Sell Signals", false));
         thresholds.setAlignment(Pos.CENTER_LEFT);
 
-        card.getChildren().addAll(createWorkspaceToolbar(), rulesTable, addRuleButton, thresholds, createParamsPreviewSection());
+        autoStrategyStatusLabel = mutedLabel("Auto Strategy Lab: idle");
+        autoStrategyStatusLabel.getStyleClass().add("strategy-auto-status");
+
+        card.getChildren().addAll(createWorkspaceToolbar(), rulesTable, addRuleButton, thresholds, autoStrategyStatusLabel, createParamsPreviewSection());
         return card;
     }
 
@@ -327,11 +357,36 @@ public class StrategyBuilderPanel extends VBox {
         Button aiAssistantButton = secondaryButton("AI Assistant");
         aiAssistantButton.setOnAction(e -> showAiAssistantDialog());
 
+        Button createAiStrategyButton = secondaryButton("Create Strategy with AI BETA");
+        createAiStrategyButton.setOnAction(e -> showAiStrategyGenerationDialog());
+
         Button testButton = secondaryButton("Test Strategy");
         testButton.setOnAction(e -> testStrategy());
 
         Button codeButton = secondaryButton("Code");
         codeButton.setOnAction(e -> showAlert("Strategy Code", buildCodePreview()));
+
+        ToggleButton autoImproveToggle = new ToggleButton("Auto Improve");
+        autoImproveToggle.getStyleClass().add("strategy-secondary-button");
+        autoImproveToggle.setSelected(false);
+        autoImproveToggle.setDisable(!AppConfig.getBoolean("autoStrategy.enabled", true));
+        autoImproveToggle.setOnAction(e -> {
+            if (autoImproveToggle.isSelected()) {
+                startAutoImproveScheduler();
+            } else {
+                autoStrategyScheduler.stop();
+                setAutoStrategyStatus("Scheduled auto improvement stopped.");
+            }
+        });
+
+        Button generateCandidatesButton = secondaryButton("Generate Candidates");
+        generateCandidatesButton.setOnAction(e -> generateAutoStrategyCandidates());
+
+        Button evaluateCandidatesButton = secondaryButton("Evaluate Candidates");
+        evaluateCandidatesButton.setOnAction(e -> evaluateAutoStrategyCandidates());
+
+        Button assignBestButton = secondaryButton("Assign Best");
+        assignBestButton.setOnAction(e -> assignBestAutoStrategy());
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -339,7 +394,20 @@ public class StrategyBuilderPanel extends VBox {
         Button askAiButton = secondaryButton("Ask AI");
         askAiButton.setOnAction(e -> showAiAssistantDialog());
 
-        HBox toolbar = new HBox(8, saveButton, indicatorsButton, candlePatternsButton, aiAssistantButton, testButton, codeButton, spacer, askAiButton);
+        HBox toolbar = new HBox(8,
+                saveButton,
+                indicatorsButton,
+                candlePatternsButton,
+                aiAssistantButton,
+                createAiStrategyButton,
+                testButton,
+                codeButton,
+                autoImproveToggle,
+                generateCandidatesButton,
+                evaluateCandidatesButton,
+                assignBestButton,
+                spacer,
+                askAiButton);
         toolbar.getStyleClass().add("strategy-toolbar");
         toolbar.setAlignment(Pos.CENTER_LEFT);
         return toolbar;
@@ -1064,6 +1132,234 @@ public class StrategyBuilderPanel extends VBox {
         dialog.show();
     }
 
+    private void showAiStrategyGenerationDialog() {
+        Dialog<AiStrategyGenerationRequest> dialog = new Dialog<>();
+        dialog.setTitle("Create Strategy with AI BETA");
+        dialog.setHeaderText("AI drafts are for review, validation, and backtesting only");
+        ButtonType createButtonType = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(createButtonType, ButtonType.CANCEL);
+
+        boolean aiEnabled = AppConfig.getBoolean("ai.enabled", false);
+        AiCreditAccount creditAccount = new AiCreditAccount(BigDecimal.ZERO, new BigDecimal("25.0"));
+        ComboBox<AiModelDefinition> modelCombo = new ComboBox<>();
+        modelCombo.getItems().addAll(AiModelCatalog.modelsForFeature(org.investpro.ai.AiFeature.STRATEGY_DESIGNER));
+        modelCombo.setValue(AiModelCatalog.defaultModel());
+        modelCombo.setMaxWidth(Double.MAX_VALUE);
+        modelCombo.setCellFactory(list -> new ListCell<>() {
+            @Override protected void updateItem(AiModelDefinition item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.displayName() + (item.free() ? " (Free)" : ""));
+            }
+        });
+        modelCombo.setButtonCell(modelCombo.getCellFactory().call(null));
+
+        Label disabledLabel = mutedLabel(aiEnabled
+                ? "AI generation is enabled. Generated strategies must still be reviewed and tested."
+                : "AI strategy generation is disabled. InvestPro can still generate rule-based strategies.");
+        disabledLabel.setWrapText(true);
+
+        Label modelDescription = mutedLabel("");
+        modelDescription.setWrapText(true);
+        Label creditLabel = mutedLabel("");
+        Label costLabel = mutedLabel("");
+
+        TextArea prompt = new TextArea();
+        prompt.setPromptText("Describe the strategy idea, market, risk style, entries, exits, and indicators...");
+        prompt.setWrapText(true);
+        prompt.setPrefRowCount(8);
+        prompt.getStyleClass().add("strategy-text-area");
+
+        CheckBox disclaimer = new CheckBox(AiTradingDisclaimer.DISCLAIMER_TEXT);
+        disclaimer.setWrapText(true);
+
+        Button createButton = (Button) dialog.getDialogPane().lookupButton(createButtonType);
+        Runnable refresh = () -> {
+            AiModelDefinition model = modelCombo.getValue();
+            BigDecimal estimatedCost = AiCostEstimator.estimateTotalCredits(model, prompt.getText());
+            modelDescription.setText(model == null ? "No model selected." : model.description());
+            creditLabel.setText("Credits: free " + creditAccount.freeCredits() + " | paid " + creditAccount.paidCredits());
+            costLabel.setText("Estimated cost: " + estimatedCost + " credits");
+            createButton.setDisable(!aiEnabled
+                    || model == null
+                    || prompt.getText() == null
+                    || prompt.getText().trim().isBlank()
+                    || !disclaimer.isSelected()
+                    || !creditAccount.hasEnoughCredits(estimatedCost));
+        };
+        modelCombo.valueProperty().addListener((obs, oldValue, newValue) -> refresh.run());
+        prompt.textProperty().addListener((obs, oldValue, newValue) -> refresh.run());
+        disclaimer.selectedProperty().addListener((obs, oldValue, newValue) -> refresh.run());
+        refresh.run();
+
+        VBox content = new VBox(12,
+                disabledLabel,
+                createStackedInput("Model", modelCombo),
+                modelDescription,
+                new HBox(12, creditLabel, costLabel),
+                createStackedInput("Strategy Prompt", prompt),
+                disclaimer);
+        content.setPadding(new Insets(12));
+        dialog.getDialogPane().setContent(content);
+        dialog.setResultConverter(button -> {
+            if (button != createButtonType) {
+                return null;
+            }
+            return new AiStrategyGenerationRequest(
+                    modelCombo.getValue(),
+                    prompt.getText(),
+                    resolveTestPairPair(),
+                    Optional.ofNullable(timeframeCombo.getValue()),
+                    false,
+                    disclaimer.isSelected());
+        });
+
+        dialog.showAndWait().ifPresent(request -> {
+            setAutoStrategyStatus("AI strategy generation started...");
+            CompletableFuture
+                    .supplyAsync(() -> new SafeAiStrategyGenerator().generate(request))
+                    .whenComplete((result, throwable) -> Platform.runLater(() -> handleAiStrategyResult(result, throwable)));
+        });
+    }
+
+    private void handleAiStrategyResult(AiStrategyGenerationResult result, Throwable throwable) {
+        if (throwable != null) {
+            setAutoStrategyStatus("AI generation failed: " + throwable.getMessage());
+            showAlert("AI Strategy", throwable.getMessage());
+            return;
+        }
+        if (result == null || !result.success() || result.strategyDefinition() == null) {
+            String message = result == null ? "No AI result was produced." : String.join("\n", result.errors());
+            setAutoStrategyStatus("AI generation rejected.");
+            showAlert("AI Strategy", message);
+            return;
+        }
+        loadStrategyDefinitionIntoBuilder(result.strategyDefinition());
+        setAutoStrategyStatus("AI draft loaded for review: " + result.strategyDefinition().getName());
+    }
+
+    private void generateAutoStrategyCandidates() {
+        Timeframe timeframe = selectedOrDefaultTimeframe();
+        setAutoStrategyStatus("Generating Auto Strategy Lab candidates...");
+        CompletableFuture
+                .supplyAsync(() -> {
+                    StrategyGenerationContext context = createAutoStrategyContext(timeframe, false);
+                    return new AbstractMap.SimpleEntry<>(context, autoStrategyLab.generateCandidates(context).join());
+                })
+                .whenComplete((entry, throwable) -> Platform.runLater(() -> {
+                    if (throwable != null) {
+                        setAutoStrategyStatus("Candidate generation failed: " + throwable.getMessage());
+                        return;
+                    }
+                    lastAutoContext = entry.getKey();
+                    lastAutoCandidates = entry.getValue();
+                    lastAutoEvaluations = List.of();
+                    setAutoStrategyStatus("Generated " + lastAutoCandidates.size()
+                            + " candidate(s). Best template score="
+                            + lastAutoCandidates.stream().mapToDouble(StrategyCandidate::generationScore).max().orElse(0.0));
+                }));
+    }
+
+    private void evaluateAutoStrategyCandidates() {
+        if (lastAutoCandidates == null || lastAutoCandidates.isEmpty()) {
+            generateAutoStrategyCandidates();
+            setAutoStrategyStatus("Generate candidates first, then press Evaluate Candidates.");
+            return;
+        }
+        Timeframe timeframe = selectedOrDefaultTimeframe();
+        setAutoStrategyStatus("Fetching candles and evaluating candidates...");
+        CompletableFuture
+                .supplyAsync(() -> {
+                    StrategyGenerationContext context = createAutoStrategyContext(timeframe, true);
+                    return new AbstractMap.SimpleEntry<>(context, autoStrategyLab.evaluateCandidates(lastAutoCandidates, context).join());
+                })
+                .whenComplete((entry, throwable) -> Platform.runLater(() -> {
+                    if (throwable != null) {
+                        setAutoStrategyStatus("Evaluation failed: " + throwable.getMessage());
+                        return;
+                    }
+                    lastAutoContext = entry.getKey();
+                    lastAutoEvaluations = entry.getValue();
+                    Optional<StrategyEvaluationResult> best = lastAutoEvaluations.stream()
+                            .max(Comparator.comparingDouble(StrategyEvaluationResult::score));
+                    setAutoStrategyStatus("Evaluated " + lastAutoEvaluations.size()
+                            + " candidate(s). Best="
+                            + best.map(result -> result.candidate().strategyDefinition().getName()).orElse("none")
+                            + " score="
+                            + best.map(result -> String.format(Locale.ROOT, "%.2f", result.score())).orElse("0.00"));
+                }));
+    }
+
+    private void assignBestAutoStrategy() {
+        if (lastAutoEvaluations == null || lastAutoEvaluations.isEmpty()) {
+            setAutoStrategyStatus("No evaluated candidates to assign.");
+            return;
+        }
+        StrategyAssignmentDecision decision = autoStrategyLab.assignBest(
+                lastAutoEvaluations,
+                lastAutoContext == null ? null : org.investpro.strategy.StrategySelectionService.getInstance()
+                        .getCurrentAssignment(lastAutoContext.symbol(), lastAutoContext.timeframe()),
+                lastAutoContext,
+                true);
+        setAutoStrategyStatus("Decision: " + decision.reason());
+        if (decision.assigned()) {
+            showAlert("Auto Strategy Lab", "Assigned " + decision.strategyName() + "\n" + decision.reason());
+        } else {
+            showAlert("Auto Strategy Lab", decision.reason() + "\n" + String.join("\n", decision.warnings()));
+        }
+    }
+
+    private void startAutoImproveScheduler() {
+        setAutoStrategyStatus("Scheduled auto improvement enabled.");
+        autoStrategyScheduler.startAutoImprovement(
+                autoStrategyLab,
+                () -> List.of(createAutoStrategyContext(selectedOrDefaultTimeframe(), true)),
+                context -> org.investpro.strategy.StrategySelectionService.getInstance()
+                        .getCurrentAssignment(context.symbol(), context.timeframe()),
+                context -> {
+                    if (strategyNameField == null
+                            || strategyNameField.getText() == null
+                            || strategyNameField.getText().trim().isBlank()
+                            || ruleRows == null
+                            || ruleRows.isEmpty()) {
+                        return null;
+                    }
+                    return currentStrategyDefinition();
+                });
+    }
+
+    private StrategyGenerationContext createAutoStrategyContext(Timeframe timeframe, boolean includeCandles) {
+        Optional<TradePair> pair = resolveTestPairPair();
+        String symbol = pair.map(value -> value.toString('/')).orElse("UNKNOWN");
+        List<CandleData> candles = includeCandles && pair.isPresent()
+                ? loadCandlesForAutoLab(pair.get(), timeframe)
+                : List.of();
+        MarketRegime regime = candles.isEmpty() ? MarketRegime.UNKNOWN : marketRegimeDetector.detect(candles);
+        return new StrategyGenerationContext(
+                symbol,
+                timeframe,
+                candles,
+                regime,
+                RiskProfile.conservative(),
+                strategyDescriptionArea == null ? "" : strategyDescriptionArea.getText());
+    }
+
+    private List<CandleData> loadCandlesForAutoLab(TradePair pair, Timeframe timeframe) {
+        HistoricalDataRepository repository = systemCore != null && systemCore.getHistoricalDataRepository() != null
+                ? systemCore.getHistoricalDataRepository()
+                : HistoricalDataRepositoryImpl.getInstance();
+        LocalDateTime endTime = LocalDateTime.now();
+        LocalDateTime startTime = switch (timeframe) {
+            case D1, W1, MN -> endTime.minusYears(2);
+            case H4, H1 -> endTime.minusMonths(12);
+            default -> endTime.minusMonths(6);
+        };
+        List<CandleData> candles = fetchHistoricalCandles(repository, pair, startTime, endTime, timeframe.getCode());
+        if (candles.size() < 60 && systemCore != null && systemCore.getExchange() != null) {
+            candles = fetchCandlesFromExchange(pair, timeframe, startTime, endTime, repository);
+        }
+        return candles;
+    }
+
     private String buildAiWelcomeMessage() {
         String service = systemCore == null || systemCore.getAiReasoningService() == null
                 ? "local strategy assistant"
@@ -1290,6 +1586,9 @@ public class StrategyBuilderPanel extends VBox {
             String val = row.getValue().trim();
             if (val.isEmpty() || val.equals("(no parameters)")) continue;
             try { Double.parseDouble(val); } catch (NumberFormatException e) {
+                if (val.matches("[A-Za-z_\\- ]+")) {
+                    continue;
+                }
                 showAlert("Validation Error",
                         "Parameter '" + row.getParameterName() + "' of " + row.getIndicatorName() +
                         " has non-numeric value: " + val);
@@ -1411,6 +1710,45 @@ public class StrategyBuilderPanel extends VBox {
                 .build();
     }
 
+    private void loadStrategyDefinitionIntoBuilder(StrategyDefinition definition) {
+        if (definition == null) {
+            return;
+        }
+        if (strategyNameField != null) {
+            strategyNameField.setText(definition.getName() == null ? "" : definition.getName());
+        }
+        if (categoryCombo != null && categoryCombo.getValue() == null && !categoryCombo.getItems().isEmpty()) {
+            categoryCombo.getSelectionModel().selectFirst();
+        }
+        if (definition.getRules() != null && !definition.getRules().isEmpty()) {
+            Timeframe primaryTimeframe = definition.getRules().stream()
+                    .map(StrategyRuleDefinition::timeframe)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(selectedOrDefaultTimeframe());
+            if (timeframeCombo != null) {
+                timeframeCombo.setValue(primaryTimeframe);
+            }
+            ruleRows.clear();
+            for (StrategyRuleDefinition rule : definition.getRules()) {
+                StrategyRuleRow row = new StrategyRuleRow(
+                        rule.ruleSource(),
+                        rule.signalType(),
+                        rule.indicator(),
+                        rule.candlePattern(),
+                        rule.timeframe() == null ? primaryTimeframe : rule.timeframe());
+                row.getParameters().clear();
+                if (rule.parameters() != null) {
+                    row.getParameters().putAll(rule.parameters());
+                }
+                ruleRows.add(row);
+            }
+        }
+        syncParameterRowsFromRules();
+        updateSignalThresholdLabels();
+        updatePreview();
+    }
+
     private List<StrategyRuleDefinition> buildRuleDefinitions() {
         if (ruleRows == null || ruleRows.isEmpty()) {
             return List.of();
@@ -1434,6 +1772,7 @@ public class StrategyBuilderPanel extends VBox {
         USER_DEFINED_STRATEGIES.put(definition.getName().toLowerCase(Locale.ROOT), definition);
         StrategyCatalog.registerRuntimeDefinition(definition);
         StrategyRegistry.getInstance().registerDefinition(definition);
+        UserStrategyDefinitionStore.getDefault().save(definition);
     }
 
     private Optional<TradePair> resolveTestPairPair() {
@@ -1754,6 +2093,14 @@ public class StrategyBuilderPanel extends VBox {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    private void setAutoStrategyStatus(String message) {
+        String text = message == null || message.isBlank() ? "Auto Strategy Lab: idle" : "Auto Strategy Lab: " + message;
+        if (autoStrategyStatusLabel != null) {
+            autoStrategyStatusLabel.setText(text);
+        }
+        log.info(text);
     }
 
     // -----------------------------------------------------------------------

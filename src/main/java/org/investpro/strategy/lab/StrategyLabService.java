@@ -43,6 +43,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 public class StrategyLabService {
 
+    private static final String CFG_ASSIGNMENT_CANDIDATE_LIMIT = "strategy.lab.assignmentCandidateLimit";
+    private static final String CFG_BACKTEST_JOB_TIMEOUT_SECONDS = "strategy.lab.backtestJobTimeoutSeconds";
+    private static final int DEFAULT_ASSIGNMENT_CANDIDATE_LIMIT = 48;
+    private static final int DEFAULT_BACKTEST_JOB_TIMEOUT_SECONDS = 45;
+
     private static volatile StrategyLabService instance = null;
 
     private final StrategyRankingEngine rankingEngine;
@@ -140,8 +145,7 @@ public class StrategyLabService {
             @NotNull String symbol,
             @NotNull Timeframe timeframe,
             @NotNull List<CandleData> candles) {
-        List<String> allStrategyNames = new ArrayList<>(StrategyCatalog.availableStrategyNames());
-        return evaluateAndAssignBest(symbol, timeframe, candles, allStrategyNames);
+        return evaluateAndAssignBest(symbol, timeframe, candles, assignmentCandidateNames());
     }
 
     public CompletableFuture<StrategyAssignment> evaluateAndAssignBest(
@@ -171,9 +175,10 @@ public class StrategyLabService {
             return CompletableFuture.completedFuture(null);
         }
 
+        List<String> candidateNames = assignmentCandidateNames();
         List<CompletableFuture<StrategyAssignment>> evaluations = candlesByTimeframe.entrySet().stream()
                 .filter(entry -> entry.getKey() != null && entry.getValue() != null && !entry.getValue().isEmpty())
-                .map(entry -> evaluateAndAssignBest(symbol, entry.getKey(), entry.getValue())
+                .map(entry -> evaluateAndAssignBest(symbol, entry.getKey(), entry.getValue(), candidateNames)
                         .exceptionally(exception -> {
                             log.warn("Strategy evaluation failed for {}/{}: {}",
                                     symbol, entry.getKey().getCode(), exception.getMessage());
@@ -191,6 +196,23 @@ public class StrategyLabService {
                         .filter(Objects::nonNull)
                         .max(Comparator.comparingDouble(StrategyAssignment::getScoreAtAssignment))
                         .orElse(null));
+    }
+
+    private List<String> assignmentCandidateNames() {
+        int limit = Math.max(1, org.investpro.config.AppConfig.getInt(
+                CFG_ASSIGNMENT_CANDIDATE_LIMIT,
+                DEFAULT_ASSIGNMENT_CANDIDATE_LIMIT));
+        LinkedHashSet<String> candidates = new LinkedHashSet<>(StrategyCatalog.CORE_STRATEGY_NAMES);
+        for (String name : StrategyCatalog.availableStrategyNames()) {
+            if (candidates.size() >= limit) {
+                break;
+            }
+            candidates.add(name);
+        }
+        return candidates.stream()
+                .filter(name -> name != null && !name.isBlank())
+                .limit(limit)
+                .toList();
     }
 
     /**
@@ -575,12 +597,27 @@ public class StrategyLabService {
         }
 
         List<StrategyPerformanceReport> results = new ArrayList<>();
+        int timeoutSeconds = Math.max(5, org.investpro.config.AppConfig.getInt(
+                CFG_BACKTEST_JOB_TIMEOUT_SECONDS,
+                DEFAULT_BACKTEST_JOB_TIMEOUT_SECONDS));
         for (BacktestJob job : jobs) {
             try {
-                results.add(job.getFuture().join());
+                results.add(job.getFuture().get(timeoutSeconds, TimeUnit.SECONDS));
             } catch (CancellationException exception) {
                 log.warn("Backtest cancelled for {}/{} strategy={}",
                         symbol, timeframe.getCode(), job.getRequest().getStrategyName());
+            } catch (TimeoutException exception) {
+                backtestScheduler.cancel(job.getJobId());
+                log.warn("Backtest timed out after {}s for {}/{} strategy={}",
+                        timeoutSeconds, symbol, timeframe.getCode(), job.getRequest().getStrategyName());
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                backtestScheduler.cancel(job.getJobId());
+                break;
+            } catch (ExecutionException exception) {
+                log.warn("Backtest failed for {}/{} strategy={}: {}",
+                        symbol, timeframe.getCode(), job.getRequest().getStrategyName(),
+                        exception.getCause() == null ? exception.getMessage() : exception.getCause().getMessage());
             } catch (CompletionException exception) {
                 log.warn("Backtest failed for {}/{} strategy={}: {}",
                         symbol, timeframe.getCode(), job.getRequest().getStrategyName(),

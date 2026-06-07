@@ -1,0 +1,4829 @@
+{
+  "candidates" : [ {
+    "id" : "e446ec2a-004a-4ef6-bb66-035098d01780",
+    "name" : "RSI Mean Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 74.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "RSI Mean Reversion 00/USD 1h",
+      "baseName" : "RSI Mean Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "f716dbff-84c7-480b-9842-e1244b44cdea",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "892055c1-2f9f-4fa5-a5a4-e2b7c697b049",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "a13ff5a6-6ffc-445d-bdee-e1733c1967d0",
+    "name" : "MACD Trend Expansion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 72.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "MACD Trend Expansion 00/USD 1h",
+      "baseName" : "MACD Trend Expansion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ec413902-ad05-41af-be73-995aa9d2d224",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "4cf3fc61-0fe6-40fc-894e-39ab1f3b8d6f",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "e289782b-fc21-4d2f-b4e8-03f5a65405d7",
+    "name" : "Bollinger Range Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 69.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "Bollinger Range Reversion 00/USD 1h",
+      "baseName" : "Bollinger Range Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "920a0538-6239-435c-9605-0fdca8dfa01e",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "daa065d0-cbc4-4d2b-ac79-3caf10b6e1d7",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "c40c8621-6cd1-4a93-af3d-61149617a910",
+    "name" : "EMA Momentum Cross 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 67.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "EMA Momentum Cross 00/USD 1h",
+      "baseName" : "EMA Momentum Cross",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "b5a71939-424c-489d-8c2e-5bacb8bb60a2",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "866e8ffb-f471-4416-9ed4-000046ab6eee",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "ca7f1a3b-f896-4f81-b79b-941350d22db0",
+    "name" : "Stochastic Reversal 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 65.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "Stochastic Reversal 00/USD 1h",
+      "baseName" : "Stochastic Reversal",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "fa159a59-552c-475d-97ae-0034d3ffe952",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "62dddf18-13d3-4173-bd73-9dbe98698bef",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "3d69497a-0d14-451e-ab97-137355fd98a5",
+    "name" : "ATR Volatility Breakout 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 63.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "ATR Volatility Breakout 00/USD 1h",
+      "baseName" : "ATR Volatility Breakout",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "a00c3bf8-e9ae-42db-a293-d0da4d03244c",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "ddd13116-1f69-4006-8458-c030314da80e",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "9c2a5f2c-3f6d-481c-958b-d8531f314a8a",
+    "name" : "Candle Confirmation Swing 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 61.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "Candle Confirmation Swing 00/USD 1h",
+      "baseName" : "Candle Confirmation Swing",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "560352ee-f2fa-49ba-b5fe-262c52396e23",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "2820004a-8d35-43e0-acae-ad903d404039",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "ENGULFING_BEARISH",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "e5fa9046-5409-47cf-9476-9130d9e3ad14",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "512935a7-40e6-42f9-b443-68ebf663613e",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "3a895939-4bb1-477a-94a9-9bbb79bf177a",
+    "name" : "RSI Mean Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 74.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "RSI Mean Reversion 00/USD 1h",
+      "baseName" : "RSI Mean Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "414e4802-5a6d-42e2-b29c-65b519b40957",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "ea60a323-29e6-4706-9a76-161a8360fcc3",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "45bbb449-edf7-42ec-92dd-ea11583a569a",
+    "name" : "MACD Trend Expansion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 72.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "MACD Trend Expansion 00/USD 1h",
+      "baseName" : "MACD Trend Expansion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "376787d7-d499-4523-ad5f-ad57aeccd271",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "f3d6b73d-9efa-4df7-8021-dae8a34fa8d0",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "5763b59f-79e5-4a1d-af1b-987cf3b49753",
+    "name" : "Bollinger Range Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 69.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "Bollinger Range Reversion 00/USD 1h",
+      "baseName" : "Bollinger Range Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "c8e185dd-037a-43c6-84fa-2245e853d1b0",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "cb58177b-84fc-4e92-b018-da47a6d3b64d",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "ef195278-aed5-44e9-8189-74aba536dd79",
+    "name" : "EMA Momentum Cross 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 67.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "EMA Momentum Cross 00/USD 1h",
+      "baseName" : "EMA Momentum Cross",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "1d80f870-e0ca-44bb-b686-0893364579df",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "83a218a5-3a10-43bc-b05f-feb5d40730e1",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "8079660b-6930-4e97-a985-4d79d1523906",
+    "name" : "Stochastic Reversal 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 65.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "Stochastic Reversal 00/USD 1h",
+      "baseName" : "Stochastic Reversal",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "b8dd20bf-d088-4444-9081-9dad9e68015b",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "b1b25475-ca51-402c-861d-940d083a9cea",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "41df3774-01a2-4855-852b-df7a4f139727",
+    "name" : "ATR Volatility Breakout 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 63.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "ATR Volatility Breakout 00/USD 1h",
+      "baseName" : "ATR Volatility Breakout",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "b9e876c3-aa57-432a-b129-aaa4872f599f",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "576fef40-1084-42fc-bd41-a2c04a86400a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "146d93e8-22dd-45bf-beef-1c960da4343b",
+    "name" : "Candle Confirmation Swing 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 61.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "Candle Confirmation Swing 00/USD 1h",
+      "baseName" : "Candle Confirmation Swing",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "f05212fd-7a1a-4290-bbab-d2e613fb190c",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "102697a4-d1ed-4960-a875-2a319ce5fe05",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "ENGULFING_BEARISH",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "2573a7c1-4a92-43e9-84fa-50b18c0ae8fe",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "761e85f4-c910-4588-a0b6-238d3088e63a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "8398a5ae-d792-43f9-b630-697572cbbaef",
+    "name" : "RSI Mean Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 74.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828141.627356000,
+    "strategyDefinition" : {
+      "name" : "RSI Mean Reversion 00/USD 1h",
+      "baseName" : "RSI Mean Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "40f544cf-2731-477b-aa85-b66ff2b255f2",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "84565f72-df99-4fbd-83c5-df52331be3f1",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "b422e729-6221-4e09-a8cb-33fdbad72d4c",
+    "name" : "MACD Trend Expansion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 72.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828141.627356000,
+    "strategyDefinition" : {
+      "name" : "MACD Trend Expansion 00/USD 1h",
+      "baseName" : "MACD Trend Expansion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "86a353dd-824a-45d5-a5ae-9b3b74730f08",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "85dff335-827c-44e7-b0d7-cb358504f28d",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "0744e6cc-4503-48fe-bc31-17cc43a3e242",
+    "name" : "Bollinger Range Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 69.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828141.627356000,
+    "strategyDefinition" : {
+      "name" : "Bollinger Range Reversion 00/USD 1h",
+      "baseName" : "Bollinger Range Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "838ababf-7d60-4eba-aa18-b015bb411326",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "13be968b-13b9-4929-b735-19fc4a125357",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "19465672-68c2-4d15-bd82-47ed466c0531",
+    "name" : "EMA Momentum Cross 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 67.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828141.627356000,
+    "strategyDefinition" : {
+      "name" : "EMA Momentum Cross 00/USD 1h",
+      "baseName" : "EMA Momentum Cross",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "0e9b85ef-e893-450e-a60b-ec529b9bc03f",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "b7298dbe-3cfe-41a5-a951-6fb1de26cefc",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "a9419a3e-69fe-4980-9e28-d51601d624be",
+    "name" : "Stochastic Reversal 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 65.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828141.627356000,
+    "strategyDefinition" : {
+      "name" : "Stochastic Reversal 00/USD 1h",
+      "baseName" : "Stochastic Reversal",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "f1d878ec-b1fd-4ea6-a55b-936938d943f9",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "25e6161a-c941-4ae9-ba7c-a659db93a536",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "561f3318-326c-4386-99c7-4c12025d21cc",
+    "name" : "ATR Volatility Breakout 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 63.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828141.627356000,
+    "strategyDefinition" : {
+      "name" : "ATR Volatility Breakout 00/USD 1h",
+      "baseName" : "ATR Volatility Breakout",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "2a4afa08-201b-491d-ac8e-4adfcd6371de",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "dca4652e-0454-4f47-805f-fcf451b32218",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "f47eb506-00b8-4eb3-9656-3efaf25f4759",
+    "name" : "Candle Confirmation Swing 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 61.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828141.627356000,
+    "strategyDefinition" : {
+      "name" : "Candle Confirmation Swing 00/USD 1h",
+      "baseName" : "Candle Confirmation Swing",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "b45eb36f-de11-438b-ba12-3da3a19e4f7c",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "2b0c48a9-298f-452b-a8f5-fb9f52e57001",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "ENGULFING_BEARISH",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "ee972c4b-e40b-4bc2-9f83-cead2e8437c2",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "5aafa2e4-c5b6-4ae0-adda-04af9a5989e1",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "bcc6567e-29c7-44fc-8167-2a071873b324",
+    "name" : "RSI Mean Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 74.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "RSI Mean Reversion 00/USD 1h",
+      "baseName" : "RSI Mean Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "b37afe25-d1ee-4a2e-b795-abe7b0b0f22a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "abe639d1-ce55-4318-a8ab-e354c6467b54",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "20754f1d-ce53-4225-b8a5-fd243369c3b2",
+    "name" : "MACD Trend Expansion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 72.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "MACD Trend Expansion 00/USD 1h",
+      "baseName" : "MACD Trend Expansion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "20f289d3-2754-46cb-964f-64493934cbe3",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "f8402859-7576-4555-87de-79545db59da7",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "a0e2a115-7fd5-483a-9b1d-dac62d8521a5",
+    "name" : "Bollinger Range Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 69.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "Bollinger Range Reversion 00/USD 1h",
+      "baseName" : "Bollinger Range Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "1d89313d-2181-4ff9-82db-6ca07a2f8024",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "1468ce37-2fac-4d8c-aab0-dfbb3ac78130",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "274058a1-e6fb-4e56-b6e9-a2e79f3b5a58",
+    "name" : "EMA Momentum Cross 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 67.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "EMA Momentum Cross 00/USD 1h",
+      "baseName" : "EMA Momentum Cross",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "3b45e998-5416-487b-a66f-9ba5ed07a2ee",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "a0b11489-09f6-48ce-9e8d-5ce62b492c27",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "0d224a90-5229-47ee-b370-6721e02e18d0",
+    "name" : "Stochastic Reversal 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 65.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "Stochastic Reversal 00/USD 1h",
+      "baseName" : "Stochastic Reversal",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "77787a7f-0abd-4c31-a0a0-48a1dc9b1100",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "34861a61-edd8-4abd-8104-e1d28bf2527e",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "94df532c-55fb-4e00-9fd2-d542ec27412b",
+    "name" : "ATR Volatility Breakout 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 63.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "ATR Volatility Breakout 00/USD 1h",
+      "baseName" : "ATR Volatility Breakout",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "80dd89ce-ac0d-4826-bafe-dccbfde81308",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "2da7c50d-a586-44e7-8484-2a442f6e8096",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "acdfb727-c4f1-470a-8033-c57bd416b5e5",
+    "name" : "Candle Confirmation Swing 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 61.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "Candle Confirmation Swing 00/USD 1h",
+      "baseName" : "Candle Confirmation Swing",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "7cf432ee-65df-412a-8cbb-18723f1560c9",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "c2631729-d75c-4a3e-afa2-a271d0f00194",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "ENGULFING_BEARISH",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "48b5ccac-aea9-4cec-a020-086b58508f4e",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "532f8c20-68bc-4f5b-9442-109e6940cb43",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  } ],
+  "evaluations" : [ {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "e446ec2a-004a-4ef6-bb66-035098d01780",
+      "name" : "RSI Mean Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "TRENDING_DOWN",
+      "generationScore" : 74.0,
+      "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+      "generatedAt" : 1780828020.318848000,
+      "strategyDefinition" : {
+        "name" : "RSI Mean Reversion 00/USD 1h",
+        "baseName" : "RSI Mean Reversion",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "f716dbff-84c7-480b-9842-e1244b44cdea",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "RSI_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "crossoverMode" : "REGION_EXIT",
+            "period" : "14",
+            "oversold" : "30",
+            "overbought" : "70"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "892055c1-2f9f-4fa5-a5a4-e2b7c697b049",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "RSI_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "crossoverMode" : "REGION_EXIT",
+            "period" : "14",
+            "oversold" : "30",
+            "overbought" : "70"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "RSI Mean Reversion 00/USD 1h",
+      "baseStrategyName" : "RSI Mean Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 206,
+      "winRate" : 0.3592233009708738,
+      "totalReturn" : -3.654045716757537E-4,
+      "netProfit" : -0.03654045716757537,
+      "maxDrawdown" : 3.6958255627020277E-6,
+      "profitFactor" : 0.42285553711692225,
+      "sharpeApproximation" : -978.4068902832024,
+      "score" : 48.02960522265576,
+      "warnings" : [ ],
+      "generatedAt" : 1780828023.847581600
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "RSI Mean Reversion 00/USD 1h",
+      "baseStrategyName" : "RSI Mean Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 70,
+      "winRate" : 0.32857142857142857,
+      "totalReturn" : -6.0781989814131516E-5,
+      "netProfit" : -0.006078198981413152,
+      "maxDrawdown" : 7.934397496045961E-7,
+      "profitFactor" : 0.5602555967961973,
+      "sharpeApproximation" : -200.29537723638754,
+      "score" : 48.597212175418065,
+      "warnings" : [ ],
+      "generatedAt" : 1780828024.484951800
+    },
+    "score" : 48.34170970270007,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828024.485954100
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "a13ff5a6-6ffc-445d-bdee-e1733c1967d0",
+      "name" : "MACD Trend Expansion 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "TRENDING_DOWN",
+      "generationScore" : 72.0,
+      "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+      "generatedAt" : 1780828020.318848000,
+      "strategyDefinition" : {
+        "name" : "MACD Trend Expansion 00/USD 1h",
+        "baseName" : "MACD Trend Expansion",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "ec413902-ad05-41af-be73-995aa9d2d224",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "MACD_SIGNAL",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "signalPeriod" : "9",
+            "slowPeriod" : "26",
+            "fastPeriod" : "12"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "4cf3fc61-0fe6-40fc-894e-39ab1f3b8d6f",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "MACD_SIGNAL",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "signalPeriod" : "9",
+            "slowPeriod" : "26",
+            "fastPeriod" : "12"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "MACD Trend Expansion 00/USD 1h",
+      "baseStrategyName" : "MACD Trend Expansion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 355,
+      "winRate" : 0.36619718309859156,
+      "totalReturn" : -4.0912161968662984E-4,
+      "netProfit" : -0.040912161968662986,
+      "maxDrawdown" : 4.192711771793256E-6,
+      "profitFactor" : 0.5685679521032565,
+      "sharpeApproximation" : -1173.1065010536015,
+      "score" : 50.90118437453415,
+      "warnings" : [ ],
+      "generatedAt" : 1780828027.329566800
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "MACD Trend Expansion 00/USD 1h",
+      "baseStrategyName" : "MACD Trend Expansion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 147,
+      "winRate" : 0.25170068027210885,
+      "totalReturn" : -1.5210629146167776E-4,
+      "netProfit" : -0.015210629146167776,
+      "maxDrawdown" : 1.5929507994683033E-6,
+      "profitFactor" : 0.3636642632755838,
+      "sharpeApproximation" : -820.7876678788796,
+      "score" : 45.5690775816526,
+      "warnings" : [ ],
+      "generatedAt" : 1780828027.751769900
+    },
+    "score" : 47.968366343369354,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828027.754770300
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "e289782b-fc21-4d2f-b4e8-03f5a65405d7",
+      "name" : "Bollinger Range Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "TRENDING_DOWN",
+      "generationScore" : 69.0,
+      "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+      "generatedAt" : 1780828020.318848000,
+      "strategyDefinition" : {
+        "name" : "Bollinger Range Reversion 00/USD 1h",
+        "baseName" : "Bollinger Range Reversion",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "920a0538-6239-435c-9605-0fdca8dfa01e",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "BOLLINGER_BANDS",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "stdDevMult" : "2.0",
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "daa065d0-cbc4-4d2b-ac79-3caf10b6e1d7",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "BOLLINGER_BANDS",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "stdDevMult" : "2.0",
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "Bollinger Range Reversion 00/USD 1h",
+      "baseStrategyName" : "Bollinger Range Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 181,
+      "winRate" : 0.3812154696132597,
+      "totalReturn" : -1.461299266520655E-4,
+      "netProfit" : -0.014612992665206548,
+      "maxDrawdown" : 1.5857630575322605E-6,
+      "profitFactor" : 0.6863180207742391,
+      "sharpeApproximation" : -384.17032075838773,
+      "score" : 53.161291796755094,
+      "warnings" : [ ],
+      "generatedAt" : 1780828033.809960600
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "Bollinger Range Reversion 00/USD 1h",
+      "baseStrategyName" : "Bollinger Range Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 84,
+      "winRate" : 0.25,
+      "totalReturn" : -6.2930383355706E-5,
+      "netProfit" : -0.0062930383355706,
+      "maxDrawdown" : 8.308956776360711E-7,
+      "profitFactor" : 0.4608541886291476,
+      "sharpeApproximation" : -382.54912297652254,
+      "score" : 48.480255117229746,
+      "warnings" : [ ],
+      "generatedAt" : 1780828034.766410100
+    },
+    "score" : 50.586638533448394,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828034.769075400
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "c40c8621-6cd1-4a93-af3d-61149617a910",
+      "name" : "EMA Momentum Cross 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "TRENDING_DOWN",
+      "generationScore" : 67.0,
+      "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+      "generatedAt" : 1780828020.318848000,
+      "strategyDefinition" : {
+        "name" : "EMA Momentum Cross 00/USD 1h",
+        "baseName" : "EMA Momentum Cross",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "b5a71939-424c-489d-8c2e-5bacb8bb60a2",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "866e8ffb-f471-4416-9ed4-000046ab6eee",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "EMA Momentum Cross 00/USD 1h",
+      "baseStrategyName" : "EMA Momentum Cross 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 363,
+      "winRate" : 0.3305785123966942,
+      "totalReturn" : -8.086072073274408E-4,
+      "netProfit" : -0.08086072073274408,
+      "maxDrawdown" : 8.185415215636793E-6,
+      "profitFactor" : 0.35936014597174354,
+      "sharpeApproximation" : -2100.9399705022856,
+      "score" : 44.246899111485675,
+      "warnings" : [ ],
+      "generatedAt" : 1780828036.629518900
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "EMA Momentum Cross 00/USD 1h",
+      "baseStrategyName" : "EMA Momentum Cross 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 146,
+      "winRate" : 0.2328767123287671,
+      "totalReturn" : -1.7411105593055255E-4,
+      "netProfit" : -0.017411105593055254,
+      "maxDrawdown" : 1.7698745083410587E-6,
+      "profitFactor" : 0.2988615265701924,
+      "sharpeApproximation" : -936.6366884659918,
+      "score" : 41.842509005619135,
+      "warnings" : [ ],
+      "generatedAt" : 1780828036.919566800
+    },
+    "score" : 42.92430756580824,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828036.921566200
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "ca7f1a3b-f896-4f81-b79b-941350d22db0",
+      "name" : "Stochastic Reversal 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "TRENDING_DOWN",
+      "generationScore" : 65.0,
+      "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+      "generatedAt" : 1780828020.318848000,
+      "strategyDefinition" : {
+        "name" : "Stochastic Reversal 00/USD 1h",
+        "baseName" : "Stochastic Reversal",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "fa159a59-552c-475d-97ae-0034d3ffe952",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "oversold" : "20",
+            "crossoverMode" : "REGION_EXIT",
+            "smooth" : "3",
+            "overbought" : "80",
+            "dPeriod" : "3",
+            "kPeriod" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "62dddf18-13d3-4173-bd73-9dbe98698bef",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "oversold" : "20",
+            "crossoverMode" : "REGION_EXIT",
+            "smooth" : "3",
+            "overbought" : "80",
+            "dPeriod" : "3",
+            "kPeriod" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "Stochastic Reversal 00/USD 1h",
+      "baseStrategyName" : "Stochastic Reversal 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 518,
+      "winRate" : 0.3861003861003861,
+      "totalReturn" : -5.786724377321662E-4,
+      "netProfit" : -0.057867243773216614,
+      "maxDrawdown" : 5.945375428469025E-6,
+      "profitFactor" : 0.6204077730618388,
+      "sharpeApproximation" : -1415.0023164909157,
+      "score" : 52.4141608410873,
+      "warnings" : [ ],
+      "generatedAt" : 1780828039.616232200
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "Stochastic Reversal 00/USD 1h",
+      "baseStrategyName" : "Stochastic Reversal 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 200,
+      "winRate" : 0.26,
+      "totalReturn" : -2.2997174817646738E-4,
+      "netProfit" : -0.022997174817646737,
+      "maxDrawdown" : 2.3888252633720653E-6,
+      "profitFactor" : 0.3415789008199863,
+      "sharpeApproximation" : -1083.8104352111397,
+      "score" : 44.40739913589353,
+      "warnings" : [ ],
+      "generatedAt" : 1780828040.000155900
+    },
+    "score" : 48.01020302070439,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828040.002154200
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "3a895939-4bb1-477a-94a9-9bbb79bf177a",
+      "name" : "RSI Mean Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 74.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828027.394745400,
+      "strategyDefinition" : {
+        "name" : "RSI Mean Reversion 00/USD 1h",
+        "baseName" : "RSI Mean Reversion",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "414e4802-5a6d-42e2-b29c-65b519b40957",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "RSI_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "crossoverMode" : "REGION_EXIT",
+            "period" : "14",
+            "oversold" : "30",
+            "overbought" : "70"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "ea60a323-29e6-4706-9a76-161a8360fcc3",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "RSI_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "crossoverMode" : "REGION_EXIT",
+            "period" : "14",
+            "oversold" : "30",
+            "overbought" : "70"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "RSI Mean Reversion 00/USD 1h",
+      "baseStrategyName" : "RSI Mean Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 206,
+      "winRate" : 0.3592233009708738,
+      "totalReturn" : -3.654045716757537E-4,
+      "netProfit" : -0.03654045716757537,
+      "maxDrawdown" : 3.6958255627020277E-6,
+      "profitFactor" : 0.42285553711692225,
+      "sharpeApproximation" : -978.4068902832024,
+      "score" : 48.02960522265576,
+      "warnings" : [ ],
+      "generatedAt" : 1780828040.428164800
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "RSI Mean Reversion 00/USD 1h",
+      "baseStrategyName" : "RSI Mean Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 70,
+      "winRate" : 0.32857142857142857,
+      "totalReturn" : -6.0781989814131516E-5,
+      "netProfit" : -0.006078198981413152,
+      "maxDrawdown" : 7.934397496045961E-7,
+      "profitFactor" : 0.5602555967961973,
+      "sharpeApproximation" : -200.29537723638754,
+      "score" : 48.597212175418065,
+      "warnings" : [ ],
+      "generatedAt" : 1780828040.967489000
+    },
+    "score" : 48.34170970270007,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828040.969529600
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "45bbb449-edf7-42ec-92dd-ea11583a569a",
+      "name" : "MACD Trend Expansion 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 72.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828027.394745400,
+      "strategyDefinition" : {
+        "name" : "MACD Trend Expansion 00/USD 1h",
+        "baseName" : "MACD Trend Expansion",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "376787d7-d499-4523-ad5f-ad57aeccd271",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "MACD_SIGNAL",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "signalPeriod" : "9",
+            "slowPeriod" : "26",
+            "fastPeriod" : "12"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "f3d6b73d-9efa-4df7-8021-dae8a34fa8d0",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "MACD_SIGNAL",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "signalPeriod" : "9",
+            "slowPeriod" : "26",
+            "fastPeriod" : "12"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "MACD Trend Expansion 00/USD 1h",
+      "baseStrategyName" : "MACD Trend Expansion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 355,
+      "winRate" : 0.36619718309859156,
+      "totalReturn" : -4.0912161968662984E-4,
+      "netProfit" : -0.040912161968662986,
+      "maxDrawdown" : 4.192711771793256E-6,
+      "profitFactor" : 0.5685679521032565,
+      "sharpeApproximation" : -1173.1065010536015,
+      "score" : 50.90118437453415,
+      "warnings" : [ ],
+      "generatedAt" : 1780828044.009887400
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "MACD Trend Expansion 00/USD 1h",
+      "baseStrategyName" : "MACD Trend Expansion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 147,
+      "winRate" : 0.25170068027210885,
+      "totalReturn" : -1.5210629146167776E-4,
+      "netProfit" : -0.015210629146167776,
+      "maxDrawdown" : 1.5929507994683033E-6,
+      "profitFactor" : 0.3636642632755838,
+      "sharpeApproximation" : -820.7876678788796,
+      "score" : 45.5690775816526,
+      "warnings" : [ ],
+      "generatedAt" : 1780828044.478729800
+    },
+    "score" : 47.968366343369354,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828044.480759100
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "3d69497a-0d14-451e-ab97-137355fd98a5",
+      "name" : "ATR Volatility Breakout 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "TRENDING_DOWN",
+      "generationScore" : 63.0,
+      "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+      "generatedAt" : 1780828020.318848000,
+      "strategyDefinition" : {
+        "name" : "ATR Volatility Breakout 00/USD 1h",
+        "baseName" : "ATR Volatility Breakout",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "a00c3bf8-e9ae-42db-a293-d0da4d03244c",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "ATR",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "ddd13116-1f69-4006-8458-c030314da80e",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "ATR",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "ATR Volatility Breakout 00/USD 1h",
+      "baseStrategyName" : "ATR Volatility Breakout 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 15.0,
+      "warnings" : [ "Insufficient trades (0) for meaningful statistics" ],
+      "generatedAt" : 1780828044.272791500
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "ATR Volatility Breakout 00/USD 1h",
+      "baseStrategyName" : "ATR Volatility Breakout 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 15.0,
+      "warnings" : [ "Insufficient trades (0) for meaningful statistics" ],
+      "generatedAt" : 1780828045.019254100
+    },
+    "score" : 15.0,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828045.021260600
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "9c2a5f2c-3f6d-481c-958b-d8531f314a8a",
+      "name" : "Candle Confirmation Swing 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "TRENDING_DOWN",
+      "generationScore" : 61.0,
+      "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+      "generatedAt" : 1780828020.318848000,
+      "strategyDefinition" : {
+        "name" : "Candle Confirmation Swing 00/USD 1h",
+        "baseName" : "Candle Confirmation Swing",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "560352ee-f2fa-49ba-b5fe-262c52396e23",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "HAMMER",
+          "timeframe" : "H1",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "2820004a-8d35-43e0-acae-ad903d404039",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "ENGULFING_BEARISH",
+          "timeframe" : "H1",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "e5fa9046-5409-47cf-9476-9130d9e3ad14",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "RSI",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "overbought" : "70",
+            "oversold" : "30",
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "512935a7-40e6-42f9-b443-68ebf663613e",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "RSI",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "overbought" : "70",
+            "oversold" : "30",
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "Candle Confirmation Swing 00/USD 1h",
+      "baseStrategyName" : "Candle Confirmation Swing 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 23,
+      "winRate" : 0.4782608695652174,
+      "totalReturn" : -2.305120193341281E-5,
+      "netProfit" : -0.0023051201933412813,
+      "maxDrawdown" : 5.005559092408729E-7,
+      "profitFactor" : 0.6863645653666288,
+      "sharpeApproximation" : -57.21739271844693,
+      "score" : 51.47879700936292,
+      "warnings" : [ ],
+      "generatedAt" : 1780828049.020499300
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "Candle Confirmation Swing 00/USD 1h",
+      "baseStrategyName" : "Candle Confirmation Swing 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 8,
+      "winRate" : 0.125,
+      "totalReturn" : -1.0902399608312408E-5,
+      "netProfit" : -0.0010902399608312408,
+      "maxDrawdown" : 1.0902399608312408E-7,
+      "profitFactor" : 0.14755739110373248,
+      "sharpeApproximation" : -94.35152141449362,
+      "score" : 13.520127643010536,
+      "warnings" : [ ],
+      "generatedAt" : 1780828049.696182200
+    },
+    "score" : 30.6015179554695,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828049.699263200
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "5763b59f-79e5-4a1d-af1b-987cf3b49753",
+      "name" : "Bollinger Range Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 69.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828027.394745400,
+      "strategyDefinition" : {
+        "name" : "Bollinger Range Reversion 00/USD 1h",
+        "baseName" : "Bollinger Range Reversion",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "c8e185dd-037a-43c6-84fa-2245e853d1b0",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "BOLLINGER_BANDS",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "stdDevMult" : "2.0",
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "cb58177b-84fc-4e92-b018-da47a6d3b64d",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "BOLLINGER_BANDS",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "stdDevMult" : "2.0",
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "Bollinger Range Reversion 00/USD 1h",
+      "baseStrategyName" : "Bollinger Range Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 181,
+      "winRate" : 0.3812154696132597,
+      "totalReturn" : -1.461299266520655E-4,
+      "netProfit" : -0.014612992665206548,
+      "maxDrawdown" : 1.5857630575322605E-6,
+      "profitFactor" : 0.6863180207742391,
+      "sharpeApproximation" : -384.17032075838773,
+      "score" : 53.161291796755094,
+      "warnings" : [ ],
+      "generatedAt" : 1780828050.905624600
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "Bollinger Range Reversion 00/USD 1h",
+      "baseStrategyName" : "Bollinger Range Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 84,
+      "winRate" : 0.25,
+      "totalReturn" : -6.2930383355706E-5,
+      "netProfit" : -0.0062930383355706,
+      "maxDrawdown" : 8.308956776360711E-7,
+      "profitFactor" : 0.4608541886291476,
+      "sharpeApproximation" : -382.54912297652254,
+      "score" : 48.480255117229746,
+      "warnings" : [ ],
+      "generatedAt" : 1780828051.854431700
+    },
+    "score" : 50.586638533448394,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828051.857395100
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "ef195278-aed5-44e9-8189-74aba536dd79",
+      "name" : "EMA Momentum Cross 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 67.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828027.394745400,
+      "strategyDefinition" : {
+        "name" : "EMA Momentum Cross 00/USD 1h",
+        "baseName" : "EMA Momentum Cross",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "1d80f870-e0ca-44bb-b686-0893364579df",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "83a218a5-3a10-43bc-b05f-feb5d40730e1",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "EMA Momentum Cross 00/USD 1h",
+      "baseStrategyName" : "EMA Momentum Cross 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 363,
+      "winRate" : 0.3305785123966942,
+      "totalReturn" : -8.086072073274408E-4,
+      "netProfit" : -0.08086072073274408,
+      "maxDrawdown" : 8.185415215636793E-6,
+      "profitFactor" : 0.35936014597174354,
+      "sharpeApproximation" : -2100.9399705022856,
+      "score" : 44.246899111485675,
+      "warnings" : [ ],
+      "generatedAt" : 1780828053.851568900
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "EMA Momentum Cross 00/USD 1h",
+      "baseStrategyName" : "EMA Momentum Cross 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 146,
+      "winRate" : 0.2328767123287671,
+      "totalReturn" : -1.7411105593055255E-4,
+      "netProfit" : -0.017411105593055254,
+      "maxDrawdown" : 1.7698745083410587E-6,
+      "profitFactor" : 0.2988615265701924,
+      "sharpeApproximation" : -936.6366884659918,
+      "score" : 41.842509005619135,
+      "warnings" : [ ],
+      "generatedAt" : 1780828054.109636000
+    },
+    "score" : 42.92430756580824,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828054.111631600
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "8079660b-6930-4e97-a985-4d79d1523906",
+      "name" : "Stochastic Reversal 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 65.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828027.394745400,
+      "strategyDefinition" : {
+        "name" : "Stochastic Reversal 00/USD 1h",
+        "baseName" : "Stochastic Reversal",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "b8dd20bf-d088-4444-9081-9dad9e68015b",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "oversold" : "20",
+            "crossoverMode" : "REGION_EXIT",
+            "smooth" : "3",
+            "overbought" : "80",
+            "dPeriod" : "3",
+            "kPeriod" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "b1b25475-ca51-402c-861d-940d083a9cea",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "oversold" : "20",
+            "crossoverMode" : "REGION_EXIT",
+            "smooth" : "3",
+            "overbought" : "80",
+            "dPeriod" : "3",
+            "kPeriod" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "Stochastic Reversal 00/USD 1h",
+      "baseStrategyName" : "Stochastic Reversal 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 518,
+      "winRate" : 0.3861003861003861,
+      "totalReturn" : -5.786724377321662E-4,
+      "netProfit" : -0.057867243773216614,
+      "maxDrawdown" : 5.945375428469025E-6,
+      "profitFactor" : 0.6204077730618388,
+      "sharpeApproximation" : -1415.0023164909157,
+      "score" : 52.4141608410873,
+      "warnings" : [ ],
+      "generatedAt" : 1780828056.425367100
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "Stochastic Reversal 00/USD 1h",
+      "baseStrategyName" : "Stochastic Reversal 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 200,
+      "winRate" : 0.26,
+      "totalReturn" : -2.2997174817646738E-4,
+      "netProfit" : -0.022997174817646737,
+      "maxDrawdown" : 2.3888252633720653E-6,
+      "profitFactor" : 0.3415789008199863,
+      "sharpeApproximation" : -1083.8104352111397,
+      "score" : 44.40739913589353,
+      "warnings" : [ ],
+      "generatedAt" : 1780828056.763240600
+    },
+    "score" : 48.01020302070439,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828056.765240200
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "41df3774-01a2-4855-852b-df7a4f139727",
+      "name" : "ATR Volatility Breakout 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 63.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828027.394745400,
+      "strategyDefinition" : {
+        "name" : "ATR Volatility Breakout 00/USD 1h",
+        "baseName" : "ATR Volatility Breakout",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "b9e876c3-aa57-432a-b129-aaa4872f599f",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "ATR",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "576fef40-1084-42fc-bd41-a2c04a86400a",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "ATR",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "ATR Volatility Breakout 00/USD 1h",
+      "baseStrategyName" : "ATR Volatility Breakout 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 15.0,
+      "warnings" : [ "Insufficient trades (0) for meaningful statistics" ],
+      "generatedAt" : 1780828060.460765300
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "ATR Volatility Breakout 00/USD 1h",
+      "baseStrategyName" : "ATR Volatility Breakout 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 15.0,
+      "warnings" : [ "Insufficient trades (0) for meaningful statistics" ],
+      "generatedAt" : 1780828061.088386400
+    },
+    "score" : 15.0,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828061.090414400
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "146d93e8-22dd-45bf-beef-1c960da4343b",
+      "name" : "Candle Confirmation Swing 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 61.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828027.394745400,
+      "strategyDefinition" : {
+        "name" : "Candle Confirmation Swing 00/USD 1h",
+        "baseName" : "Candle Confirmation Swing",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "f05212fd-7a1a-4290-bbab-d2e613fb190c",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "HAMMER",
+          "timeframe" : "H1",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "102697a4-d1ed-4960-a875-2a319ce5fe05",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "ENGULFING_BEARISH",
+          "timeframe" : "H1",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "2573a7c1-4a92-43e9-84fa-50b18c0ae8fe",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "RSI",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "overbought" : "70",
+            "oversold" : "30",
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "761e85f4-c910-4588-a0b6-238d3088e63a",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "RSI",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "overbought" : "70",
+            "oversold" : "30",
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "Candle Confirmation Swing 00/USD 1h",
+      "baseStrategyName" : "Candle Confirmation Swing 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 23,
+      "winRate" : 0.4782608695652174,
+      "totalReturn" : -2.305120193341281E-5,
+      "netProfit" : -0.0023051201933412813,
+      "maxDrawdown" : 5.005559092408729E-7,
+      "profitFactor" : 0.6863645653666288,
+      "sharpeApproximation" : -57.21739271844693,
+      "score" : 51.47879700936292,
+      "warnings" : [ ],
+      "generatedAt" : 1780828064.527566800
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "Candle Confirmation Swing 00/USD 1h",
+      "baseStrategyName" : "Candle Confirmation Swing 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 8,
+      "winRate" : 0.125,
+      "totalReturn" : -1.0902399608312408E-5,
+      "netProfit" : -0.0010902399608312408,
+      "maxDrawdown" : 1.0902399608312408E-7,
+      "profitFactor" : 0.14755739110373248,
+      "sharpeApproximation" : -94.35152141449362,
+      "score" : 13.520127643010536,
+      "warnings" : [ ],
+      "generatedAt" : 1780828065.128409500
+    },
+    "score" : 30.6015179554695,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828065.129410000
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "bcc6567e-29c7-44fc-8167-2a071873b324",
+      "name" : "RSI Mean Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 74.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828349.876500800,
+      "strategyDefinition" : {
+        "name" : "RSI Mean Reversion 00/USD 1h",
+        "baseName" : "RSI Mean Reversion",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "b37afe25-d1ee-4a2e-b795-abe7b0b0f22a",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "RSI_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "crossoverMode" : "REGION_EXIT",
+            "period" : "14",
+            "oversold" : "30",
+            "overbought" : "70"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "abe639d1-ce55-4318-a8ab-e354c6467b54",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "RSI_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "crossoverMode" : "REGION_EXIT",
+            "period" : "14",
+            "oversold" : "30",
+            "overbought" : "70"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "RSI Mean Reversion 00/USD 1h",
+      "baseStrategyName" : "RSI Mean Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 64,
+      "winRate" : 0.5,
+      "totalReturn" : -4.484720569962519E-5,
+      "netProfit" : -0.004484720569962519,
+      "maxDrawdown" : 6.403359438943572E-7,
+      "profitFactor" : 0.7812817361338548,
+      "sharpeApproximation" : -101.38927064302091,
+      "score" : 56.3736187227176,
+      "warnings" : [ ],
+      "generatedAt" : 1780828357.999737300
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "RSI Mean Reversion 00/USD 1h",
+      "baseStrategyName" : "RSI Mean Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 19,
+      "winRate" : 0.5263157894736842,
+      "totalReturn" : -1.2028001492581097E-5,
+      "netProfit" : -0.0012028001492581097,
+      "maxDrawdown" : 2.0309199821137532E-7,
+      "profitFactor" : 0.6829897912726087,
+      "sharpeApproximation" : -38.82407301708607,
+      "score" : 40.91854948725967,
+      "warnings" : [ ],
+      "generatedAt" : 1780828358.158493200
+    },
+    "score" : 47.87331033401592,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828358.160500800
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "20754f1d-ce53-4225-b8a5-fd243369c3b2",
+      "name" : "MACD Trend Expansion 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 72.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828349.876500800,
+      "strategyDefinition" : {
+        "name" : "MACD Trend Expansion 00/USD 1h",
+        "baseName" : "MACD Trend Expansion",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "20f289d3-2754-46cb-964f-64493934cbe3",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "MACD_SIGNAL",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "signalPeriod" : "9",
+            "slowPeriod" : "26",
+            "fastPeriod" : "12"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "f8402859-7576-4555-87de-79545db59da7",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "MACD_SIGNAL",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "signalPeriod" : "9",
+            "slowPeriod" : "26",
+            "fastPeriod" : "12"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "MACD Trend Expansion 00/USD 1h",
+      "baseStrategyName" : "MACD Trend Expansion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 203,
+      "winRate" : 0.4187192118226601,
+      "totalReturn" : -2.533185364154633E-4,
+      "netProfit" : -0.02533185364154633,
+      "maxDrawdown" : 2.599665085650189E-6,
+      "profitFactor" : 0.6502294484110586,
+      "sharpeApproximation" : -541.052469773508,
+      "score" : 51.13134184579783,
+      "warnings" : [ ],
+      "generatedAt" : 1780828358.930321200
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "MACD Trend Expansion 00/USD 1h",
+      "baseStrategyName" : "MACD Trend Expansion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 73,
+      "winRate" : 0.3013698630136986,
+      "totalReturn" : -5.887798646654119E-5,
+      "netProfit" : -0.005887798646654119,
+      "maxDrawdown" : 8.710476426715914E-7,
+      "profitFactor" : 0.5070826445494008,
+      "sharpeApproximation" : -298.77315686603515,
+      "score" : 48.0559732199151,
+      "warnings" : [ ],
+      "generatedAt" : 1780828359.049411500
+    },
+    "score" : 49.43980199679806,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828359.050918800
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "a0e2a115-7fd5-483a-9b1d-dac62d8521a5",
+      "name" : "Bollinger Range Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 69.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828349.876500800,
+      "strategyDefinition" : {
+        "name" : "Bollinger Range Reversion 00/USD 1h",
+        "baseName" : "Bollinger Range Reversion",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "1d89313d-2181-4ff9-82db-6ca07a2f8024",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "BOLLINGER_BANDS",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "stdDevMult" : "2.0",
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "1468ce37-2fac-4d8c-aab0-dfbb3ac78130",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "BOLLINGER_BANDS",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "stdDevMult" : "2.0",
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "Bollinger Range Reversion 00/USD 1h",
+      "baseStrategyName" : "Bollinger Range Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 108,
+      "winRate" : 0.4351851851851852,
+      "totalReturn" : -7.822438938092091E-5,
+      "netProfit" : -0.007822438938092091,
+      "maxDrawdown" : 1.1038475524889308E-6,
+      "profitFactor" : 0.7463359536956247,
+      "sharpeApproximation" : -204.52977412846337,
+      "score" : 54.135106964685,
+      "warnings" : [ ],
+      "generatedAt" : 1780828360.624634900
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "Bollinger Range Reversion 00/USD 1h",
+      "baseStrategyName" : "Bollinger Range Reversion 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 50,
+      "winRate" : 0.24,
+      "totalReturn" : -4.623079204975511E-5,
+      "netProfit" : -0.004623079204975511,
+      "maxDrawdown" : 6.082158357689199E-7,
+      "profitFactor" : 0.480466455310083,
+      "sharpeApproximation" : -228.91243601642054,
+      "score" : 45.242695166223925,
+      "warnings" : [ ],
+      "generatedAt" : 1780828360.856239200
+    },
+    "score" : 49.24421965394784,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828360.858363100
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "274058a1-e6fb-4e56-b6e9-a2e79f3b5a58",
+      "name" : "EMA Momentum Cross 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 67.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828349.876500800,
+      "strategyDefinition" : {
+        "name" : "EMA Momentum Cross 00/USD 1h",
+        "baseName" : "EMA Momentum Cross",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "3b45e998-5416-487b-a66f-9ba5ed07a2ee",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "a0b11489-09f6-48ce-9e8d-5ce62b492c27",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "EMA Momentum Cross 00/USD 1h",
+      "baseStrategyName" : "EMA Momentum Cross 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 226,
+      "winRate" : 0.36283185840707965,
+      "totalReturn" : -2.1878701914829438E-4,
+      "netProfit" : -0.021878701914829435,
+      "maxDrawdown" : 3.0294918906655637E-6,
+      "profitFactor" : 0.7046833522519556,
+      "sharpeApproximation" : -486.3315813261661,
+      "score" : 50.91884862540374,
+      "warnings" : [ ],
+      "generatedAt" : 1780828361.356150400
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "EMA Momentum Cross 00/USD 1h",
+      "baseStrategyName" : "EMA Momentum Cross 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 74,
+      "winRate" : 0.32432432432432434,
+      "totalReturn" : -2.7007601438526763E-5,
+      "netProfit" : -0.0027007601438526763,
+      "maxDrawdown" : 4.371719393757537E-7,
+      "profitFactor" : 0.7552834678489093,
+      "sharpeApproximation" : -114.53820401519893,
+      "score" : 54.29672024101114,
+      "warnings" : [ ],
+      "generatedAt" : 1780828361.426214400
+    },
+    "score" : 52.776634296793866,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828361.427451200
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "0d224a90-5229-47ee-b370-6721e02e18d0",
+      "name" : "Stochastic Reversal 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 65.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828349.876500800,
+      "strategyDefinition" : {
+        "name" : "Stochastic Reversal 00/USD 1h",
+        "baseName" : "Stochastic Reversal",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "77787a7f-0abd-4c31-a0a0-48a1dc9b1100",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "oversold" : "20",
+            "crossoverMode" : "REGION_EXIT",
+            "smooth" : "3",
+            "overbought" : "80",
+            "dPeriod" : "3",
+            "kPeriod" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "34861a61-edd8-4abd-8104-e1d28bf2527e",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "oversold" : "20",
+            "crossoverMode" : "REGION_EXIT",
+            "smooth" : "3",
+            "overbought" : "80",
+            "dPeriod" : "3",
+            "kPeriod" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "Stochastic Reversal 00/USD 1h",
+      "baseStrategyName" : "Stochastic Reversal 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 316,
+      "winRate" : 0.46835443037974683,
+      "totalReturn" : 3.761152214792674E-5,
+      "netProfit" : 0.0037611522147926735,
+      "maxDrawdown" : 1.6483869733481414E-6,
+      "profitFactor" : 1.0429390352792423,
+      "sharpeApproximation" : 81.36884869944652,
+      "score" : 60.20257170275601,
+      "warnings" : [ ],
+      "generatedAt" : 1780828362.139525900
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "Stochastic Reversal 00/USD 1h",
+      "baseStrategyName" : "Stochastic Reversal 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 115,
+      "winRate" : 0.34782608695652173,
+      "totalReturn" : -1.0339715427107875E-4,
+      "netProfit" : -0.010339715427107876,
+      "maxDrawdown" : 1.1772473739327363E-6,
+      "profitFactor" : 0.49592530607275537,
+      "sharpeApproximation" : -461.4005508113653,
+      "score" : 47.44821004688799,
+      "warnings" : [ ],
+      "generatedAt" : 1780828362.232538200
+    },
+    "score" : 53.187555067291214,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828362.234502800
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "94df532c-55fb-4e00-9fd2-d542ec27412b",
+      "name" : "ATR Volatility Breakout 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 63.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828349.876500800,
+      "strategyDefinition" : {
+        "name" : "ATR Volatility Breakout 00/USD 1h",
+        "baseName" : "ATR Volatility Breakout",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "80dd89ce-ac0d-4826-bafe-dccbfde81308",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "ATR",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "2da7c50d-a586-44e7-8484-2a442f6e8096",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "ATR",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "ATR Volatility Breakout 00/USD 1h",
+      "baseStrategyName" : "ATR Volatility Breakout 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 15.0,
+      "warnings" : [ "Insufficient trades (0) for meaningful statistics" ],
+      "generatedAt" : 1780828363.144727900
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "ATR Volatility Breakout 00/USD 1h",
+      "baseStrategyName" : "ATR Volatility Breakout 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 15.0,
+      "warnings" : [ "Insufficient trades (0) for meaningful statistics" ],
+      "generatedAt" : 1780828363.331417500
+    },
+    "score" : 15.0,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828363.333382200
+  }, {
+    "symbol" : "00/USD",
+    "candidate" : {
+      "id" : "acdfb727-c4f1-470a-8033-c57bd416b5e5",
+      "name" : "Candle Confirmation Swing 00/USD 1h",
+      "symbol" : "00/USD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "UNKNOWN",
+      "generationScore" : 61.0,
+      "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+      "generatedAt" : 1780828349.876500800,
+      "strategyDefinition" : {
+        "name" : "Candle Confirmation Swing 00/USD 1h",
+        "baseName" : "Candle Confirmation Swing",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "7cf432ee-65df-412a-8cbb-18723f1560c9",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "HAMMER",
+          "timeframe" : "H1",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "c2631729-d75c-4a3e-afa2-a271d0f00194",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "ENGULFING_BEARISH",
+          "timeframe" : "H1",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "48b5ccac-aea9-4cec-a020-086b58508f4e",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "RSI",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "overbought" : "70",
+            "oversold" : "30",
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "532f8c20-68bc-4f5b-9442-109e6940cb43",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "RSI",
+          "candlePattern" : null,
+          "timeframe" : "H1",
+          "parameters" : {
+            "overbought" : "70",
+            "oversold" : "30",
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "Candle Confirmation Swing 00/USD 1h",
+      "baseStrategyName" : "Candle Confirmation Swing 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 8,
+      "winRate" : 0.625,
+      "totalReturn" : 1.7309599043073833E-5,
+      "netProfit" : 0.0017309599043073831,
+      "maxDrawdown" : 1.676559929610736E-7,
+      "profitFactor" : 1.8284006069479852,
+      "sharpeApproximation" : 34.1935363090479,
+      "score" : 53.721286429120994,
+      "warnings" : [ ],
+      "generatedAt" : 1780828364.287800200
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "Candle Confirmation Swing 00/USD 1h",
+      "baseStrategyName" : "Candle Confirmation Swing 00/USD 1h",
+      "symbol" : "00/USD",
+      "timeframe" : "H1",
+      "totalTrades" : 1,
+      "winRate" : 0.0,
+      "totalReturn" : -3.118799995718291E-6,
+      "netProfit" : -3.118799995718291E-4,
+      "maxDrawdown" : 3.118799995718291E-8,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : -1.1562983056968536E10,
+      "score" : 0.0,
+      "warnings" : [ "Insufficient trades (1) for meaningful statistics" ],
+      "generatedAt" : 1780828364.465113900
+    },
+    "score" : 24.174575774304454,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1780828364.467629700
+  } ],
+  "decisions" : [ {
+    "symbol" : "00/USD",
+    "currentStrategyName" : "",
+    "selectedStrategyName" : "Bollinger Range Reversion 00/USD 1h",
+    "assigned" : false,
+    "liveAssignmentAllowed" : false,
+    "currentScore" : 0.0,
+    "selectedScore" : 50.586638533448394,
+    "reason" : "Best candidate did not pass evaluation thresholds.",
+    "warnings" : [ ],
+    "decidedAt" : 1780828049.706271300
+  }, {
+    "symbol" : "00/USD",
+    "currentStrategyName" : "",
+    "selectedStrategyName" : "Bollinger Range Reversion 00/USD 1h",
+    "assigned" : false,
+    "liveAssignmentAllowed" : false,
+    "currentScore" : 0.0,
+    "selectedScore" : 50.586638533448394,
+    "reason" : "Best candidate did not pass evaluation thresholds.",
+    "warnings" : [ ],
+    "decidedAt" : 1780828131.598510400
+  } ],
+  "rejectedCandidates" : [ {
+    "id" : "e446ec2a-004a-4ef6-bb66-035098d01780",
+    "name" : "RSI Mean Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 74.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "RSI Mean Reversion 00/USD 1h",
+      "baseName" : "RSI Mean Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "f716dbff-84c7-480b-9842-e1244b44cdea",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "892055c1-2f9f-4fa5-a5a4-e2b7c697b049",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "a13ff5a6-6ffc-445d-bdee-e1733c1967d0",
+    "name" : "MACD Trend Expansion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 72.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "MACD Trend Expansion 00/USD 1h",
+      "baseName" : "MACD Trend Expansion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ec413902-ad05-41af-be73-995aa9d2d224",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "4cf3fc61-0fe6-40fc-894e-39ab1f3b8d6f",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "e289782b-fc21-4d2f-b4e8-03f5a65405d7",
+    "name" : "Bollinger Range Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 69.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "Bollinger Range Reversion 00/USD 1h",
+      "baseName" : "Bollinger Range Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "920a0538-6239-435c-9605-0fdca8dfa01e",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "daa065d0-cbc4-4d2b-ac79-3caf10b6e1d7",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "c40c8621-6cd1-4a93-af3d-61149617a910",
+    "name" : "EMA Momentum Cross 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 67.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "EMA Momentum Cross 00/USD 1h",
+      "baseName" : "EMA Momentum Cross",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "b5a71939-424c-489d-8c2e-5bacb8bb60a2",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "866e8ffb-f471-4416-9ed4-000046ab6eee",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "ca7f1a3b-f896-4f81-b79b-941350d22db0",
+    "name" : "Stochastic Reversal 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 65.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "Stochastic Reversal 00/USD 1h",
+      "baseName" : "Stochastic Reversal",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "fa159a59-552c-475d-97ae-0034d3ffe952",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "62dddf18-13d3-4173-bd73-9dbe98698bef",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "3a895939-4bb1-477a-94a9-9bbb79bf177a",
+    "name" : "RSI Mean Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 74.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "RSI Mean Reversion 00/USD 1h",
+      "baseName" : "RSI Mean Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "414e4802-5a6d-42e2-b29c-65b519b40957",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "ea60a323-29e6-4706-9a76-161a8360fcc3",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "45bbb449-edf7-42ec-92dd-ea11583a569a",
+    "name" : "MACD Trend Expansion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 72.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "MACD Trend Expansion 00/USD 1h",
+      "baseName" : "MACD Trend Expansion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "376787d7-d499-4523-ad5f-ad57aeccd271",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "f3d6b73d-9efa-4df7-8021-dae8a34fa8d0",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "3d69497a-0d14-451e-ab97-137355fd98a5",
+    "name" : "ATR Volatility Breakout 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 63.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "ATR Volatility Breakout 00/USD 1h",
+      "baseName" : "ATR Volatility Breakout",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "a00c3bf8-e9ae-42db-a293-d0da4d03244c",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "ddd13116-1f69-4006-8458-c030314da80e",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "9c2a5f2c-3f6d-481c-958b-d8531f314a8a",
+    "name" : "Candle Confirmation Swing 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "TRENDING_DOWN",
+    "generationScore" : 61.0,
+    "rationale" : [ "Generated from InvestPro rule templates for TRENDING_DOWN" ],
+    "generatedAt" : 1780828020.318848000,
+    "strategyDefinition" : {
+      "name" : "Candle Confirmation Swing 00/USD 1h",
+      "baseName" : "Candle Confirmation Swing",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "560352ee-f2fa-49ba-b5fe-262c52396e23",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "2820004a-8d35-43e0-acae-ad903d404039",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "ENGULFING_BEARISH",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "e5fa9046-5409-47cf-9476-9130d9e3ad14",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "512935a7-40e6-42f9-b443-68ebf663613e",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "5763b59f-79e5-4a1d-af1b-987cf3b49753",
+    "name" : "Bollinger Range Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 69.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "Bollinger Range Reversion 00/USD 1h",
+      "baseName" : "Bollinger Range Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "c8e185dd-037a-43c6-84fa-2245e853d1b0",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "cb58177b-84fc-4e92-b018-da47a6d3b64d",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "ef195278-aed5-44e9-8189-74aba536dd79",
+    "name" : "EMA Momentum Cross 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 67.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "EMA Momentum Cross 00/USD 1h",
+      "baseName" : "EMA Momentum Cross",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "1d80f870-e0ca-44bb-b686-0893364579df",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "83a218a5-3a10-43bc-b05f-feb5d40730e1",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "8079660b-6930-4e97-a985-4d79d1523906",
+    "name" : "Stochastic Reversal 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 65.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "Stochastic Reversal 00/USD 1h",
+      "baseName" : "Stochastic Reversal",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "b8dd20bf-d088-4444-9081-9dad9e68015b",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "b1b25475-ca51-402c-861d-940d083a9cea",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "41df3774-01a2-4855-852b-df7a4f139727",
+    "name" : "ATR Volatility Breakout 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 63.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "ATR Volatility Breakout 00/USD 1h",
+      "baseName" : "ATR Volatility Breakout",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "b9e876c3-aa57-432a-b129-aaa4872f599f",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "576fef40-1084-42fc-bd41-a2c04a86400a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "146d93e8-22dd-45bf-beef-1c960da4343b",
+    "name" : "Candle Confirmation Swing 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 61.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828027.394745400,
+    "strategyDefinition" : {
+      "name" : "Candle Confirmation Swing 00/USD 1h",
+      "baseName" : "Candle Confirmation Swing",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "f05212fd-7a1a-4290-bbab-d2e613fb190c",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "102697a4-d1ed-4960-a875-2a319ce5fe05",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "ENGULFING_BEARISH",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "2573a7c1-4a92-43e9-84fa-50b18c0ae8fe",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "761e85f4-c910-4588-a0b6-238d3088e63a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "bcc6567e-29c7-44fc-8167-2a071873b324",
+    "name" : "RSI Mean Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 74.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "RSI Mean Reversion 00/USD 1h",
+      "baseName" : "RSI Mean Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "b37afe25-d1ee-4a2e-b795-abe7b0b0f22a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "abe639d1-ce55-4318-a8ab-e354c6467b54",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "20754f1d-ce53-4225-b8a5-fd243369c3b2",
+    "name" : "MACD Trend Expansion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 72.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "MACD Trend Expansion 00/USD 1h",
+      "baseName" : "MACD Trend Expansion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "20f289d3-2754-46cb-964f-64493934cbe3",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "f8402859-7576-4555-87de-79545db59da7",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9",
+          "slowPeriod" : "26",
+          "fastPeriod" : "12"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "a0e2a115-7fd5-483a-9b1d-dac62d8521a5",
+    "name" : "Bollinger Range Reversion 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 69.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "Bollinger Range Reversion 00/USD 1h",
+      "baseName" : "Bollinger Range Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "1d89313d-2181-4ff9-82db-6ca07a2f8024",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "1468ce37-2fac-4d8c-aab0-dfbb3ac78130",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "stdDevMult" : "2.0",
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "274058a1-e6fb-4e56-b6e9-a2e79f3b5a58",
+    "name" : "EMA Momentum Cross 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 67.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "EMA Momentum Cross 00/USD 1h",
+      "baseName" : "EMA Momentum Cross",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "3b45e998-5416-487b-a66f-9ba5ed07a2ee",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "a0b11489-09f6-48ce-9e8d-5ce62b492c27",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "0d224a90-5229-47ee-b370-6721e02e18d0",
+    "name" : "Stochastic Reversal 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 65.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "Stochastic Reversal 00/USD 1h",
+      "baseName" : "Stochastic Reversal",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "77787a7f-0abd-4c31-a0a0-48a1dc9b1100",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "34861a61-edd8-4abd-8104-e1d28bf2527e",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "94df532c-55fb-4e00-9fd2-d542ec27412b",
+    "name" : "ATR Volatility Breakout 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 63.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "ATR Volatility Breakout 00/USD 1h",
+      "baseName" : "ATR Volatility Breakout",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "80dd89ce-ac0d-4826-bafe-dccbfde81308",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "2da7c50d-a586-44e7-8484-2a442f6e8096",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "acdfb727-c4f1-470a-8033-c57bd416b5e5",
+    "name" : "Candle Confirmation Swing 00/USD 1h",
+    "symbol" : "00/USD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 61.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1780828349.876500800,
+    "strategyDefinition" : {
+      "name" : "Candle Confirmation Swing 00/USD 1h",
+      "baseName" : "Candle Confirmation Swing",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "7cf432ee-65df-412a-8cbb-18723f1560c9",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "c2631729-d75c-4a3e-afa2-a271d0f00194",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "ENGULFING_BEARISH",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "48b5ccac-aea9-4cec-a020-086b58508f4e",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "532f8c20-68bc-4f5b-9442-109e6940cb43",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "overbought" : "70",
+          "oversold" : "30",
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  } ],
+  "winningStrategies" : [ ]
+}

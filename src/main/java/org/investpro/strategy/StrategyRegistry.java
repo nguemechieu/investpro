@@ -82,6 +82,7 @@ public final class StrategyRegistry {
 
     private void registerBuiltInStrategies() {
         registerPluginProviders();
+        StrategyCatalog.ensurePersistedRuntimeDefinitionsLoaded();
 
         for (StrategyDefinition definition : StrategyCatalog.STRATEGY_DEFINITIONS.values()) {
             if (definition == null || isBlank(definition.getName())) {
@@ -95,6 +96,14 @@ public final class StrategyRegistry {
             if (activeName == null) {
                 activeName = normalized;
             }
+        }
+
+        for (String strategyName : StrategyCatalog.availableStrategyNames()) {
+            StrategyDefinition definition = StrategyCatalog.definition(strategyName);
+            if (definition == null || isBlank(definition.getName())) {
+                continue;
+            }
+            definitions.putIfAbsent(StrategyCatalog.normalizeStrategyName(definition.getName()), definition);
         }
 
         log.info("StrategyRegistry initialized with {} strategy definitions", definitions.size());

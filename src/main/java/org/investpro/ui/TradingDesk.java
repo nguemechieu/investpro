@@ -8992,11 +8992,7 @@ private static final class DetachedChartWindow {
                     }
 
                     if (!cachedUpdates.isEmpty()) {
-                        runOnFx(() -> {
-                            for (Map.Entry<TradePair, Ticker> entry : cachedUpdates) {
-                                updateTickerFromStream(entry.getKey(), entry.getValue());
-                            }
-                        });
+                        runOnFx(() -> applyTickerBatch(cachedUpdates));
                     }
 
                     if (pollFallbackPairs.isEmpty()) {
@@ -9009,12 +9005,16 @@ private static final class DetachedChartWindow {
                                 if (tickers == null) {
                                     return;
                                 }
+                                List<Map.Entry<TradePair, Ticker>> updates = new ArrayList<>();
                                 for (int i = 0; i < tickers.size() && i < pollFallbackPairs.size(); i++) {
                                     Ticker ticker = tickers.get(i);
                                     TradePair pair = pollFallbackPairs.get(i);
                                     if (ticker != null && pair != null) {
-                                        runOnFx(() -> updateTickerFromStream(pair, ticker));
+                                        updates.add(Map.entry(pair, ticker));
                                     }
+                                }
+                                if (!updates.isEmpty()) {
+                                    runOnFx(() -> applyTickerBatch(updates));
                                 }
                             })
                             .exceptionally(exception -> {
@@ -12099,6 +12099,33 @@ private static final class DetachedChartWindow {
         symbolCountLabel.setText(t("label.symbols", marketWatchItems.size()));
     }
 
+    private void applyTickerBatch(List<Map.Entry<TradePair, Ticker>> updates) {
+        if (updates == null || updates.isEmpty()) {
+            return;
+        }
+        boolean changed = false;
+        for (Map.Entry<TradePair, Ticker> entry : updates) {
+            TradePair tradePair = entry.getKey();
+            Ticker ticker = entry.getValue();
+            if (tradePair == null || ticker == null) {
+                continue;
+            }
+            tradePair.setBid(ticker.getBidPrice());
+            tradePair.setAsk(ticker.getAskPrice());
+            tradePair.setLast(ticker.getLastPrice());
+            tradePair.setVolume(ticker.getVolume());
+            tradePair.setHigh24h(ticker.getHighPrice());
+            tradePair.setLow24h(ticker.getLowPrice());
+            tradePair.setChangePercent(ticker.getChangePercent());
+            tradePair.setUpdatedAt(Instant.now());
+            changed = true;
+        }
+        if (changed && marketWatchTable != null) {
+            marketWatchTable.refresh();
+            symbolCountLabel.setText(t("label.symbols", marketWatchItems.size()));
+        }
+    }
+
     public void updateTradeFromStream(Trade trade) {
         if (trade != null) {
             accountTradeItems.addFirst(trade);
@@ -12563,9 +12590,12 @@ private static final class DetachedChartWindow {
 
         CompletableFuture.runAsync(() -> {
             try {
+                int timeoutSeconds = Math.max(15, AppConfig.getInt(
+                        "strategy.lab.backgroundSelectionTimeoutSeconds",
+                        60));
                 StrategyAssignment selectedAssignment = strategyLab
                         .evaluateAndAssignBestAcrossTimeframes(symbolText, candlesByTimeframe)
-                        .get(10, TimeUnit.MINUTES);
+                        .get(timeoutSeconds, TimeUnit.SECONDS);
 
                 if (selectedAssignment == null || selectedAssignment.getStrategyId() == null) {
                     log.info("Background strategy selection kept fallback for {} on {}",
@@ -12583,7 +12613,7 @@ private static final class DetachedChartWindow {
                         + selectedAssignment.getStrategyId() + " on "
                         + selectedAssignment.getTimeframe().getCode() + ".");
             } catch (TimeoutException timeout) {
-                log.warn("Background strategy selection timed out for {} after 10 minutes", symbolText);
+                log.warn("Background strategy selection timed out for {} after configured timeout", symbolText);
             } catch (Exception exception) {
                 log.warn("Background strategy selection failed for {}: {}", symbolText,
                         rootMessage(exception), exception);

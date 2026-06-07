@@ -71,6 +71,7 @@ public final class BacktestScheduler {
     private static final String CFG_MAX_QUEUE = "strategy.lab.maxQueueSize";
     private static final String CFG_RESOURCE_GUARD = "strategy.lab.enableResourceProtection";
     private static final String CFG_LOG_EACH = "strategy.lab.logEachBacktest";
+    private static final String CFG_STALE_JOB_SECONDS = "strategy.lab.staleJobSeconds";
 
     // ─── Singleton ───────────────────────────────────────────────────────────
 
@@ -108,6 +109,7 @@ public final class BacktestScheduler {
     private final int maxQueueSize;
     private final boolean resourceProtection;
     private final boolean logEachBacktest;
+    private final int staleJobSeconds;
 
     /** Priority queue: lower priority level → dequeued first. */
     private final PriorityBlockingQueue<BacktestJob> workQueue;
@@ -171,6 +173,7 @@ public final class BacktestScheduler {
         this.maxQueueSize = AppConfig.getInt(CFG_MAX_QUEUE, 1000);
         this.resourceProtection = AppConfig.getBoolean(CFG_RESOURCE_GUARD, true);
         this.logEachBacktest = AppConfig.getBoolean(CFG_LOG_EACH, false);
+        this.staleJobSeconds = Math.max(30, AppConfig.getInt(CFG_STALE_JOB_SECONDS, 120));
 
         this.workQueue = new PriorityBlockingQueue<>(256);
         this.queueCapacity = new Semaphore(maxQueueSize, true);
@@ -723,6 +726,7 @@ public final class BacktestScheduler {
 
     /** Periodic aggregate status log (replaces per-backtest INFO spam). */
     private void logStatus() {
+        cancelStaleRunningJobs();
         SchedulerStats s = getStats();
         if (s.queued() > 0 && s.activeWorkers() == 0 && !paused.get() && !shutdown.get()) {
             ensureDispatchLoopRunning();
@@ -742,6 +746,30 @@ public final class BacktestScheduler {
                     String.format("%.2f", s.throughputPerSec()),
                     String.format("%.0f", s.getHeapUsedMiB()),
                     String.format("%.0f", s.getHeapMaxMiB()));
+        }
+    }
+
+    private void cancelStaleRunningJobs() {
+        if (runningJobIds.isEmpty()) {
+            return;
+        }
+        Instant cutoff = Instant.now().minusSeconds(staleJobSeconds);
+        for (String jobId : List.copyOf(runningJobIds)) {
+            BacktestJob job = allJobs.get(jobId);
+            if (job == null || job.getStartedAt() == null || job.isTerminal()) {
+                continue;
+            }
+            if (job.getStartedAt().isBefore(cutoff)) {
+                log.warn("BacktestScheduler cancelling stale job {} strategy={} symbol={} runtime>{}s",
+                        job.getJobId().substring(0, 8),
+                        job.getRequest().getStrategyName(),
+                        job.getRequest().getSymbol(),
+                        staleJobSeconds);
+                if (job.cancel()) {
+                    runningJobIds.remove(jobId);
+                    cancelledCount.incrementAndGet();
+                }
+            }
         }
     }
 }

@@ -7,6 +7,7 @@ import org.investpro.ai.AiReasoningService;
 import org.investpro.ai.LocalAiReasoningService;
 import org.investpro.ai.OpenAiReasoningService;
 import org.investpro.ai.local.grpc.LocalAiRuntimeService;
+import org.investpro.config.AppConfig;
 import org.investpro.core.agents.*;
 import org.investpro.core.agents.execution.ExecutionEngine;
 import org.investpro.core.agents.execution.SymbolExecutionFilter;
@@ -82,6 +83,9 @@ import java.io.IOException;
 @Getter
 @Setter
 public class SystemCore {
+
+    private static final String CFG_SAFE_DEFAULT_MAX_STREAM_SYMBOLS = "streaming.safeDefault.maxSymbols";
+    private static final int DEFAULT_SAFE_DEFAULT_MAX_STREAM_SYMBOLS = 40;
 
     private HistoricalDataRepository historicalDataRepository;
     private SystemHealthSnapshot health;
@@ -680,6 +684,7 @@ public class SystemCore {
 
         StreamingMode safeMode = mode == null ? StreamingMode.EVERYTHING : mode;
         selectedPairs = filterSymbolsForStreaming(selectedPairs, safeMode);
+        selectedPairs = limitSymbolsForUiSafeStreaming(selectedPairs, safeMode);
         if (selectedPairs.isEmpty()) {
             log.warn("Cannot start streaming: selected symbols are not tradable for mode {}", safeMode);
             notifyAllChannels(
@@ -841,6 +846,32 @@ public class SystemCore {
             log.warn("Unable to filter symbols for streaming mode {}", mode, exception);
             return Set.of();
         }
+    }
+
+    private Set<TradePair> limitSymbolsForUiSafeStreaming(Set<TradePair> symbols, StreamingMode mode) {
+        if (symbols == null || symbols.isEmpty()) {
+            return Set.of();
+        }
+        if (mode != StreamingMode.SAFE_DEFAULT && mode != StreamingMode.TRADES_ONLY && mode != StreamingMode.MARKET_DATA) {
+            return symbols;
+        }
+
+        int limit = Math.max(1, AppConfig.getInt(
+                CFG_SAFE_DEFAULT_MAX_STREAM_SYMBOLS,
+                DEFAULT_SAFE_DEFAULT_MAX_STREAM_SYMBOLS));
+        if (symbols.size() <= limit) {
+            return symbols;
+        }
+
+        LinkedHashSet<TradePair> limited = symbols.stream()
+                .limit(limit)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        log.warn("Streaming symbol universe capped from {} to {} for {}. Configure {} to change this.",
+                symbols.size(), limited.size(), mode, CFG_SAFE_DEFAULT_MAX_STREAM_SYMBOLS);
+        publishSystemEvent(
+                "SYSTEM_CORE_STREAMING_CAPPED",
+                "Streaming capped from %d to %d symbols for %s".formatted(symbols.size(), limited.size(), mode));
+        return limited;
     }
 
     public void stopStreaming() {

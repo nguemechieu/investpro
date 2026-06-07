@@ -1,0 +1,77 @@
+[ {
+  "name" : "Hope",
+  "baseName" : "Hope",
+  "parameters" : {
+    "rsiPeriod" : 14,
+    "emaFast" : 20,
+    "emaSlow" : 50,
+    "atrPeriod" : 14,
+    "breakoutLookback" : 20,
+    "oversoldThreshold" : 35.0,
+    "overboughtThreshold" : 65.0,
+    "minConfidence" : 0.55,
+    "signalAmount" : 1.0
+  },
+  "rules" : [ {
+    "id" : "a2655191-c48d-4ac9-827e-671ca1be4e92",
+    "ruleSource" : "CANDLE_PATTERN",
+    "signalType" : "SELL",
+    "indicator" : null,
+    "candlePattern" : "COUNTERATTACK_BEARISH",
+    "timeframe" : "M5",
+    "parameters" : { },
+    "conditions" : [ ],
+    "enabled" : true
+  }, {
+    "id" : "2eb17b07-0b34-4342-b514-27821955d4bf",
+    "ruleSource" : "CANDLE_PATTERN",
+    "signalType" : "SELL",
+    "indicator" : null,
+    "candlePattern" : "DOWNSIDE_TASUKI_GAP",
+    "timeframe" : "M5",
+    "parameters" : { },
+    "conditions" : [ ],
+    "enabled" : true
+  }, {
+    "id" : "6ac98ada-84a6-4883-952b-383516e7235b",
+    "ruleSource" : "CANDLE_PATTERN",
+    "signalType" : "SELL",
+    "indicator" : null,
+    "candlePattern" : "DOJI_STAR_BEARISH",
+    "timeframe" : "H1",
+    "parameters" : { },
+    "conditions" : [ ],
+    "enabled" : true
+  }, {
+    "id" : "9550bc61-34b9-4655-88ab-9d8a05990684",
+    "ruleSource" : "CANDLE_PATTERN",
+    "signalType" : "BUY",
+    "indicator" : null,
+    "candlePattern" : "CLOSING_MARUBOZU_BULLISH",
+    "timeframe" : "H1",
+    "parameters" : { },
+    "conditions" : [ ],
+    "enabled" : true
+  }, {
+    "id" : "f1623c12-84ea-484b-8cc8-4cd938bbf9ba",
+    "ruleSource" : "CANDLE_PATTERN",
+    "signalType" : "BUY",
+    "indicator" : null,
+    "candlePattern" : "SHORT_LINE_BULLISH",
+    "timeframe" : "H1",
+    "parameters" : { },
+    "conditions" : [ ],
+    "enabled" : true
+  }, {
+    "id" : "8af7b58d-6f27-4228-b0cf-c66402301cda",
+    "ruleSource" : "CANDLE_PATTERN",
+    "signalType" : "BUY",
+    "indicator" : null,
+    "candlePattern" : "UNIQUE_3_RIVER",
+    "timeframe" : "H1",
+    "parameters" : { },
+    "conditions" : [ ],
+    "enabled" : true
+  } ],
+  "marketCompatibility" : [ "ALL" ]
+} ]
