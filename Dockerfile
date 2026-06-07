@@ -9,7 +9,7 @@ COPY pom.xml .
 RUN mvn -B -DskipTests dependency:go-offline || true
 
 COPY . .
-RUN mvn -B -DskipTests clean package
+RUN mvn -B -Dmaven.test.skip=true clean package
 
 
 # ============================================================

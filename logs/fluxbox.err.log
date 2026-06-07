@@ -216,13 +216,13 @@ Failed to read: session.screen0.slit.maxOver
 Setting default value
 Failed to read: session.screen0.slit.placement
 Setting default value
-Warning: Missing charsets in String to FontSet conversion
 Failed to read: session.screen0.slit.alpha
 Setting default value
 Failed to read: session.screen0.slit.onhead
 Setting default value
 Failed to read: session.screen0.slit.layer
 Setting default value
+Warning: Missing charsets in String to FontSet conversion
 Failed to read: session.screen0.toolbar.autoHide
 Setting default value
 Failed to read: session.screen0.toolbar.maxOver
@@ -253,3 +253,4 @@ Failed to read: session.screen0.titlebar.left
 Setting default value
 Failed to read: session.screen0.titlebar.right
 Setting default value
+Fluxbox: XIOError: lost connection to display.

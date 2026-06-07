@@ -65,9 +65,11 @@ echo "============================================================"
 
 echo "Starting InvestPro JavaFX application..."
 
+JAVAFX_MODULE_PATH="$(find /app/lib -maxdepth 1 -name 'javafx-*.jar' -printf '%p:' | sed 's/:$//')"
+
 java $JAVA_OPTS \
   -cp "/app/investpro.jar:/app/lib/*" \
-  --module-path "/app/lib" \
+  --module-path "$JAVAFX_MODULE_PATH" \
   --add-modules javafx.controls,javafx.fxml,javafx.swing,javafx.base,javafx.graphics \
   org.investpro.InvestPro \
   2>&1 | tee /app/logs/investpro.log

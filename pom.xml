@@ -441,6 +441,9 @@
                         </goals>
                         <configuration>
                             <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                            <!-- Okio's metadata artifact and JVM artifact expose the same Java module.
+                                 Ship only okio-jvm in the desktop runtime lib directory. -->
+                            <excludeArtifactIds>okio</excludeArtifactIds>
                         </configuration>
                     </execution>
                 </executions>
