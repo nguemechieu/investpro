@@ -5,8 +5,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.enums.MarketBehavior;
 import org.investpro.enums.TradingSessionStatus;
+import org.investpro.indicators.engine.IndicatorCalculatorRegistry;
+import org.investpro.indicators.engine.IndicatorResult;
 import org.investpro.models.trading.TradePair;
 import org.investpro.strategy.*;
+import org.investpro.strategy.rules.CandlePatternSignal;
+import org.investpro.strategy.rules.DefaultCandlePatternDetector;
+import org.investpro.strategy.rules.SignalType;
+import org.investpro.strategy.rules.StrategyRuleDefinition;
+import org.investpro.strategy.rules.StrategyRuleSource;
 import org.investpro.utils.HistoricalDataPrefetcher;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
@@ -32,6 +39,8 @@ import java.util.*;
 public class StrategyBacktestRunner {
 
     private static final int MIN_LOOKBACK_BARS = 50;
+    private final DefaultCandlePatternDetector candlePatternDetector = new DefaultCandlePatternDetector();
+    private final IndicatorCalculatorRegistry indicatorCalculatorRegistry = IndicatorCalculatorRegistry.getInstance();
     private double totalLoss;
 
     /**
@@ -162,7 +171,7 @@ public class StrategyBacktestRunner {
 
             // Generate signal if not in trade
             if (!inTrade) {
-                StrategySignal signal = generateSignal(strategy, request, window);
+            StrategySignal signal = generateSignal(strategy, request, window);
 
                 if (signal != null && signal.isActionable() && tradeCount < request.getMaxTrades()) {
                     // Check if we can trade this side
@@ -232,11 +241,404 @@ public class StrategyBacktestRunner {
                     .barsAvailable(window.size())
                     .build();
 
-            return strategy.generateSignal(context);
+            StrategySignal strategySignal = strategy.generateSignal(context);
+            StrategyDefinition definition = resolveDefinition(request);
+
+            if (definition == null || definition.getRules() == null || definition.getRules().isEmpty()) {
+                return strategySignal;
+            }
+
+            return generateRuleAwareSignal(strategySignal, request, definition, window);
         } catch (Exception e) {
             log.debug("Signal generation failed", e);
             return null;
         }
+    }
+
+    private StrategyDefinition resolveDefinition(StrategyBacktestRequest request) {
+        if (request.getStrategyDefinition() != null) {
+            return request.getStrategyDefinition();
+        }
+        return StrategyCatalog.definition(request.getStrategyName());
+    }
+
+    private StrategySignal generateRuleAwareSignal(
+            StrategySignal strategySignal,
+            StrategyBacktestRequest request,
+            StrategyDefinition definition,
+            List<CandleData> window) {
+        List<StrategyRuleDefinition> rules = definition.getRules();
+        List<StrategyRuleDefinition> candleRules = rules.stream()
+                .filter(StrategyRuleDefinition::enabled)
+                .filter(rule -> rule.ruleSource() == StrategyRuleSource.CANDLE_PATTERN)
+                .filter(rule -> rule.candlePattern() != null)
+                .toList();
+        boolean hasIndicatorRules = rules.stream()
+                .filter(StrategyRuleDefinition::enabled)
+                .anyMatch(rule -> rule.ruleSource() == StrategyRuleSource.INDICATOR);
+
+        IndicatorRuleMatch indicatorMatch = evaluateIndicatorRules(rules, window);
+
+        if (candleRules.isEmpty()) {
+            if (indicatorMatch != null) {
+                return signalFromIndicatorMatch(request, indicatorMatch, window.get(window.size() - 1));
+            }
+            return strategySignal != null
+                    ? strategySignal
+                    : StrategySignal.hold(
+                    request.getSymbol(),
+                    request.getTimeframe().getCode(),
+                    request.getStrategyName(),
+                    "No indicator rule fired on current bar.");
+        }
+
+        CandlePatternMatch candleMatch = evaluateCandlePatternRules(candleRules, request, window);
+        if (candleMatch == null) {
+            return StrategySignal.hold(
+                    request.getSymbol(),
+                    request.getTimeframe().getCode(),
+                    request.getStrategyName(),
+                    "No selected candle pattern rule fired on current bar.");
+        }
+
+        if (hasIndicatorRules && indicatorMatch == null && (strategySignal == null || !strategySignal.isActionable())) {
+            return StrategySignal.hold(
+                    request.getSymbol(),
+                    request.getTimeframe().getCode(),
+                    request.getStrategyName(),
+                    "Candle pattern fired, but indicator rules did not confirm.");
+        }
+
+        if (indicatorMatch != null && !sideMatches(indicatorMatch.side(), candleMatch.signalType())) {
+            return StrategySignal.hold(
+                    request.getSymbol(),
+                    request.getTimeframe().getCode(),
+                    request.getStrategyName(),
+                    "Candle pattern side did not confirm indicator signal.");
+        }
+
+        if (indicatorMatch == null && hasIndicatorRules && !sideMatches(strategySignal.getSide(), candleMatch.signalType())) {
+            return StrategySignal.hold(
+                    request.getSymbol(),
+                    request.getTimeframe().getCode(),
+                    request.getStrategyName(),
+                    "Candle pattern side did not confirm indicator signal.");
+        }
+
+        return signalFromCandleMatch(request, candleMatch, window.get(window.size() - 1));
+    }
+
+    private IndicatorRuleMatch evaluateIndicatorRules(List<StrategyRuleDefinition> rules, List<CandleData> window) {
+        if (rules == null || rules.isEmpty() || window == null || window.isEmpty()) {
+            return null;
+        }
+
+        IndicatorRuleMatch bestMatch = null;
+        List<StrategyRuleDefinition> indicatorRules = rules.stream()
+                .filter(StrategyRuleDefinition::enabled)
+                .filter(rule -> rule.ruleSource() == StrategyRuleSource.INDICATOR)
+                .filter(rule -> rule.indicator() != null)
+                .toList();
+
+        for (StrategyRuleDefinition rule : indicatorRules) {
+            try {
+                IndicatorResult result = indicatorCalculatorRegistry.calculate(
+                        rule.indicator(),
+                        window,
+                        rule.parameters());
+                IndicatorRuleMatch match = evaluateIndicatorRule(rule, result, window);
+                log.debug("Indicator rule evaluated. indicator={} outputs={} fired={}",
+                        rule.indicator(), result.outputs().keySet(), match != null);
+                if (match != null && (bestMatch == null || match.confidence() > bestMatch.confidence())) {
+                    bestMatch = match;
+                }
+            } catch (UnsupportedOperationException exception) {
+                log.warn(exception.getMessage());
+            } catch (Exception exception) {
+                log.warn("Indicator calculation failed for {}: {}", rule.indicator(), exception.getMessage());
+            }
+        }
+
+        return bestMatch;
+    }
+
+    private IndicatorRuleMatch evaluateIndicatorRule(
+            StrategyRuleDefinition rule,
+            IndicatorResult result,
+            List<CandleData> window) {
+        int last = window.size() - 1;
+        if (last < 1 || result == null || result.outputs() == null || result.outputs().isEmpty()) {
+            return null;
+        }
+
+        SignalType desired = rule.signalType() == null ? SignalType.NEUTRAL : rule.signalType();
+        Side side = switch (desired) {
+            case BUY -> Side.BUY;
+            case SELL -> Side.SELL;
+            case NEUTRAL -> null;
+        };
+
+        Double crossoverSignal = lastValue(result.outputs().get("crossoverSignal"));
+        if (crossoverSignal != null && crossoverSignal != 0.0) {
+            Side firedSide = crossoverSignal > 0 ? Side.BUY : Side.SELL;
+            if (side == null || side == firedSide) {
+                return new IndicatorRuleMatch(rule, firedSide, 0.70, rule.indicator().getDisplayName() + " region crossover");
+            }
+            return null;
+        }
+
+        if (isMacdFamily(rule.indicator())) {
+            List<Double> histogram = result.outputs().get("histogram");
+            if (crossedUp(histogram, last) && (side == null || side == Side.BUY)) {
+                return new IndicatorRuleMatch(rule, Side.BUY, 0.68, rule.indicator().getDisplayName() + " bullish cross");
+            }
+            if (crossedDown(histogram, last) && (side == null || side == Side.SELL)) {
+                return new IndicatorRuleMatch(rule, Side.SELL, 0.68, rule.indicator().getDisplayName() + " bearish cross");
+            }
+            return null;
+        }
+
+        if (result.outputs().containsKey("percentK") && result.outputs().containsKey("percentD")) {
+            List<Double> k = result.outputs().get("percentK");
+            List<Double> d = result.outputs().get("percentD");
+            if (crossedAbove(k, d, last) && (side == null || side == Side.BUY)) {
+                return new IndicatorRuleMatch(rule, Side.BUY, 0.64, rule.indicator().getDisplayName() + " bullish %K/%D cross");
+            }
+            if (crossedBelow(k, d, last) && (side == null || side == Side.SELL)) {
+                return new IndicatorRuleMatch(rule, Side.SELL, 0.64, rule.indicator().getDisplayName() + " bearish %K/%D cross");
+            }
+            return null;
+        }
+
+        if (result.outputs().containsKey("rsi")) {
+            double oversold = doubleParam(rule.parameters(), "oversold", 30.0);
+            double overbought = doubleParam(rule.parameters(), "overbought", 70.0);
+            List<Double> rsi = result.outputs().get("rsi");
+            if (crossedLevelUp(rsi, oversold, last) && (side == null || side == Side.BUY)) {
+                return new IndicatorRuleMatch(rule, Side.BUY, 0.62, rule.indicator().getDisplayName() + " left oversold region");
+            }
+            if (crossedLevelDown(rsi, overbought, last) && (side == null || side == Side.SELL)) {
+                return new IndicatorRuleMatch(rule, Side.SELL, 0.62, rule.indicator().getDisplayName() + " left overbought region");
+            }
+            return null;
+        }
+
+        List<Double> firstOutput = result.outputs().values().stream().findFirst().orElse(null);
+        List<Double> close = window.stream().map(CandleData::closePrice).toList();
+        if (crossedAbove(close, firstOutput, last) && (side == null || side == Side.BUY)) {
+            return new IndicatorRuleMatch(rule, Side.BUY, 0.60, "Price crossed above " + rule.indicator().getDisplayName());
+        }
+        if (crossedBelow(close, firstOutput, last) && (side == null || side == Side.SELL)) {
+            return new IndicatorRuleMatch(rule, Side.SELL, 0.60, "Price crossed below " + rule.indicator().getDisplayName());
+        }
+
+        return null;
+    }
+
+    private CandlePatternMatch evaluateCandlePatternRules(
+            List<StrategyRuleDefinition> candleRules,
+            StrategyBacktestRequest request,
+            List<CandleData> window) {
+        int currentIndex = window.size() - 1;
+        CandlePatternMatch bestMatch = null;
+
+        for (StrategyRuleDefinition rule : candleRules) {
+            if (rule.timeframe() != null && rule.timeframe() != request.getTimeframe()) {
+                continue;
+            }
+            List<CandlePatternSignal> signals = candlePatternDetector.detect(window, rule.candlePattern());
+            for (CandlePatternSignal signal : signals) {
+                if (signal.candleIndex() != currentIndex) {
+                    continue;
+                }
+                SignalType desiredSide = rule.signalType() == SignalType.NEUTRAL
+                        ? signal.signalType()
+                        : rule.signalType();
+                CandlePatternMatch match = new CandlePatternMatch(
+                        rule,
+                        desiredSide,
+                        signal.confidence(),
+                        signal.reason());
+                if (bestMatch == null || match.confidence() > bestMatch.confidence()) {
+                    bestMatch = match;
+                }
+            }
+        }
+
+        return bestMatch;
+    }
+
+    private StrategySignal signalFromCandleMatch(
+            StrategyBacktestRequest request,
+            CandlePatternMatch match,
+            CandleData candle) {
+        double entry = candle.closePrice();
+        double stopDistance = Math.max(entry * 0.02, Math.max(0.00000001, candle.highPrice() - candle.lowPrice()));
+        double targetDistance = stopDistance * 2.0;
+        String reason = match.rule().candlePattern().getDisplayName() + ": " + match.reason();
+
+        if (match.signalType() == SignalType.BUY) {
+            return StrategySignal.buy(
+                    request.getSymbol(),
+                    request.getTimeframe().getCode(),
+                    request.getStrategyName(),
+                    match.confidence(),
+                    entry,
+                    Math.max(0.00000001, entry - stopDistance),
+                    entry + targetDistance,
+                    reason);
+        }
+
+        if (match.signalType() == SignalType.SELL) {
+            return StrategySignal.sell(
+                    request.getSymbol(),
+                    request.getTimeframe().getCode(),
+                    request.getStrategyName(),
+                    match.confidence(),
+                    entry,
+                    entry + stopDistance,
+                    Math.max(0.00000001, entry - targetDistance),
+                    reason);
+        }
+
+        return StrategySignal.hold(
+                request.getSymbol(),
+                request.getTimeframe().getCode(),
+                request.getStrategyName(),
+                reason);
+    }
+
+    private StrategySignal signalFromIndicatorMatch(
+            StrategyBacktestRequest request,
+            IndicatorRuleMatch match,
+            CandleData candle) {
+        double entry = candle.closePrice();
+        double stopDistance = Math.max(entry * 0.02, Math.max(0.00000001, candle.highPrice() - candle.lowPrice()));
+        double targetDistance = stopDistance * 2.0;
+
+        if (match.side() == Side.BUY) {
+            return StrategySignal.buy(
+                    request.getSymbol(),
+                    request.getTimeframe().getCode(),
+                    request.getStrategyName(),
+                    match.confidence(),
+                    entry,
+                    Math.max(0.00000001, entry - stopDistance),
+                    entry + targetDistance,
+                    match.reason());
+        }
+
+        return StrategySignal.sell(
+                request.getSymbol(),
+                request.getTimeframe().getCode(),
+                request.getStrategyName(),
+                match.confidence(),
+                entry,
+                entry + stopDistance,
+                Math.max(0.00000001, entry - targetDistance),
+                match.reason());
+    }
+
+    private boolean isMacdFamily(org.investpro.indicators.INDICATORS indicator) {
+        return indicator == org.investpro.indicators.INDICATORS.MACD
+                || indicator == org.investpro.indicators.INDICATORS.MACD_LINE
+                || indicator == org.investpro.indicators.INDICATORS.MACD_SIGNAL
+                || indicator == org.investpro.indicators.INDICATORS.MACD_HISTOGRAM
+                || indicator == org.investpro.indicators.INDICATORS.PPO;
+    }
+
+    private static boolean crossedUp(List<Double> values, int last) {
+        return values != null
+                && last > 0
+                && valid(values, last)
+                && values.get(last - 1) <= 0.0
+                && values.get(last) > 0.0;
+    }
+
+    private static boolean crossedDown(List<Double> values, int last) {
+        return values != null
+                && last > 0
+                && valid(values, last)
+                && values.get(last - 1) >= 0.0
+                && values.get(last) < 0.0;
+    }
+
+    private static boolean crossedAbove(List<Double> left, List<Double> right, int last) {
+        return left != null
+                && right != null
+                && last > 0
+                && valid(left, last)
+                && valid(right, last)
+                && left.get(last - 1) <= right.get(last - 1)
+                && left.get(last) > right.get(last);
+    }
+
+    private static boolean crossedBelow(List<Double> left, List<Double> right, int last) {
+        return left != null
+                && right != null
+                && last > 0
+                && valid(left, last)
+                && valid(right, last)
+                && left.get(last - 1) >= right.get(last - 1)
+                && left.get(last) < right.get(last);
+    }
+
+    private static boolean crossedLevelUp(List<Double> values, double level, int last) {
+        return values != null
+                && last > 0
+                && valid(values, last)
+                && values.get(last - 1) < level
+                && values.get(last) >= level;
+    }
+
+    private static boolean crossedLevelDown(List<Double> values, double level, int last) {
+        return values != null
+                && last > 0
+                && valid(values, last)
+                && values.get(last - 1) > level
+                && values.get(last) <= level;
+    }
+
+    private static boolean valid(List<Double> values, int index) {
+        return values.size() > index
+                && values.size() > index - 1
+                && !Double.isNaN(values.get(index))
+                && !Double.isNaN(values.get(index - 1));
+    }
+
+    private static Double lastValue(List<Double> values) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        double value = values.get(values.size() - 1);
+        return Double.isNaN(value) ? null : value;
+    }
+
+    private static double doubleParam(Map<String, String> params, String key, double fallback) {
+        try {
+            return Double.parseDouble(params == null ? Double.toString(fallback) : params.getOrDefault(key, Double.toString(fallback)));
+        } catch (Exception exception) {
+            return fallback;
+        }
+    }
+
+    private boolean sideMatches(Side side, SignalType signalType) {
+        return (side == Side.BUY && signalType == SignalType.BUY)
+                || (side == Side.SELL && signalType == SignalType.SELL);
+    }
+
+    private record CandlePatternMatch(
+            StrategyRuleDefinition rule,
+            SignalType signalType,
+            double confidence,
+            String reason) {
+    }
+
+    private record IndicatorRuleMatch(
+            StrategyRuleDefinition rule,
+            Side side,
+            double confidence,
+            String reason) {
     }
 
     private TradePair parsePair(String symbol) {

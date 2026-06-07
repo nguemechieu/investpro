@@ -47,6 +47,39 @@ class CoinbaseOrderPayloadTest {
     }
 
     @Test
+    void normalizesDerivativeMarketOrderWithNativeProductIdAndBaseSizeOnly() throws Exception {
+        Order order = new Order();
+        order.setSymbol("DOG-26JUN26-CDE");
+        order.setType("MARKET");
+        order.setSide(Side.BUY);
+        order.setQuantity(2.0);
+        order.setCummulativeQuoteQty(50.0);
+
+        JsonNode payload = MAPPER.readTree(Coinbase.normalizeOrderPayload(MAPPER.valueToTree(order)));
+        JsonNode market = payload.path("order_configuration").path("market_market_ioc");
+
+        assertEquals("DOG-26JUN26-CDE", payload.path("product_id").asText());
+        assertEquals("2", market.path("base_size").asText());
+        assertFalse(market.has("quote_size"));
+    }
+
+    @Test
+    void normalizesPerpetualLimitOrderWithNativeProductId() throws Exception {
+        Order order = new Order();
+        order.setSymbol("BTC-PERP");
+        order.setType("LIMIT");
+        order.setSide(Side.SELL);
+        order.setQuantity(1.0);
+        order.setPrice(68000.0);
+
+        JsonNode payload = MAPPER.readTree(Coinbase.normalizeOrderPayload(MAPPER.valueToTree(order)));
+
+        assertEquals("BTC-PERP", payload.path("product_id").asText());
+        assertEquals("1", payload.path("order_configuration").path("limit_limit_gtc").path("base_size").asText());
+        assertEquals("68000", payload.path("order_configuration").path("limit_limit_gtc").path("limit_price").asText());
+    }
+
+    @Test
     void keepsAdvancedTradePayloadUnchangedWhenAlreadyNormalized() throws Exception {
         ObjectNode payload = MAPPER.createObjectNode();
         payload.put("client_order_id", "client-1");

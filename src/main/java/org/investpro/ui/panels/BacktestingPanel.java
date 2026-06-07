@@ -35,11 +35,16 @@ import org.investpro.persistence.repository.HistoricalDataRepositoryImpl;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyContext;
+import org.investpro.strategy.StrategyDefinition;
 import org.investpro.strategy.StrategyRegistry;
 import org.investpro.strategy.StrategySelectionService;
 import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.TradingStrategy;
 import org.investpro.strategy.impl.UnifiedStrategy;
+import org.investpro.strategy.lab.StrategyBacktestRequest;
+import org.investpro.strategy.lab.StrategyBacktestRunner;
+import org.investpro.strategy.lab.StrategyBacktestTrade;
+import org.investpro.strategy.lab.StrategyPerformanceReport;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.UniversalTradabilityService;
 import org.investpro.utils.HistoricalDataPrefetcher;
@@ -145,6 +150,34 @@ public class BacktestingPanel extends StackPane {
 
         setupUI();
         LocalizationService.applyTranslations(this);
+    }
+
+    public void configureAndRun(String strategyName, TradePair pair, Timeframe timeframe) {
+        Platform.runLater(() -> {
+            if (strategyName != null && !strategyName.isBlank()) {
+                if (!strategyCombo.getItems().contains(strategyName)) {
+                    strategyCombo.getItems().add(0, strategyName);
+                }
+                strategyCombo.setValue(strategyName);
+            }
+
+            if (pair != null) {
+                if (!symbolCombo.getItems().contains(pair)) {
+                    symbolCombo.getItems().add(0, pair);
+                }
+                symbolCombo.setDisable(false);
+                symbolCombo.setValue(pair);
+            }
+
+            if (timeframe != null) {
+                if (!timeframeCombo.getItems().contains(timeframe)) {
+                    timeframeCombo.getItems().add(timeframe);
+                }
+                timeframeCombo.setValue(timeframe);
+            }
+
+            runBacktestAsync();
+        });
     }
 
     private void setupUI() {
@@ -1152,6 +1185,10 @@ public class BacktestingPanel extends StackPane {
         }
 
         Timeframe timeframe = resolveTimeframe(timeframeCode);
+        StrategyDefinition definition = StrategyCatalog.definition(strategyName);
+        if (definition != null && definition.getRules() != null && !definition.getRules().isEmpty()) {
+            return executeRuleAwareBacktest(strategyName, selectedPair, timeframe, candles, initialBalance);
+        }
 
         boolean inPosition = false;
         Side positionSide = HOLD;
@@ -1244,6 +1281,52 @@ public class BacktestingPanel extends StackPane {
         }
 
         return trades;
+    }
+
+    private List<BacktestTrade> executeRuleAwareBacktest(
+            String strategyName,
+            TradePair selectedPair,
+            Timeframe timeframe,
+            List<CandleData> candles,
+            double initialBalance) {
+        StrategyDefinition definition = StrategyCatalog.definition(strategyName);
+        StrategyBacktestRequest request = StrategyBacktestRequest.builder()
+                .symbol(displayTradePair(selectedPair))
+                .timeframe(timeframe)
+                .strategyName(strategyName)
+                .strategyDefinition(definition)
+                .candles(candles)
+                .initialCapital(initialBalance)
+                .build();
+
+        StrategyPerformanceReport report = new StrategyBacktestRunner().run(request);
+        if (report == null || report.getTrades() == null) {
+            return List.of();
+        }
+
+        return report.getTrades().stream()
+                .map(trade -> toBacktestTrade(trade))
+                .toList();
+    }
+
+    private BacktestTrade toBacktestTrade(StrategyBacktestTrade trade) {
+        LocalDate entryDate = trade.getEntryTime() == null
+                ? LocalDate.now()
+                : LocalDateTime.ofInstant(trade.getEntryTime(), ZoneId.systemDefault()).toLocalDate();
+        return new BacktestTrade(
+                entryDate,
+                trade.getSide(),
+                ORDER_TYPES.MARKET,
+                cleanNumber(trade.getEntryPrice()),
+                cleanNumber(trade.getExitPrice()),
+                cleanNumber(trade.getQuantity()),
+                cleanNumber(trade.getProfitLoss()),
+                cleanNumber(trade.getProfitLossPercent()),
+                trade.getExitReason() == null || trade.getExitReason().isBlank()
+                        ? trade.getEntryReason()
+                        : trade.getExitReason(),
+                0,
+                Math.max(0, trade.getBarsHeld()));
     }
 
     private double resolveBacktestQuantity(double initialBalance, StrategySignal signal) {

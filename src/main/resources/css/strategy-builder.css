@@ -1,0 +1,239 @@
+.strategy-builder-panel {
+    -fx-background-color: #071014;
+    -fx-text-fill: #f8fafc;
+}
+
+.strategy-builder-header {
+    -fx-background-color: #071014;
+    -fx-padding: 4 4 10 4;
+}
+
+.strategy-builder-breadcrumb {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12px;
+}
+
+.strategy-builder-title {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 26px;
+    -fx-font-weight: 700;
+}
+
+.strategy-meta-card,
+.strategy-workspace-card,
+.strategy-preview-card,
+.strategy-signal-card {
+    -fx-background-color: #101923;
+    -fx-border-color: #22303c;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 16px;
+}
+
+.strategy-workspace-card {
+    -fx-background-color: #0b1118;
+}
+
+.strategy-toolbar {
+    -fx-background-color: #101923;
+    -fx-border-color: #22303c;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 0 0 12 0;
+}
+
+.strategy-primary-button {
+    -fx-background-color: #00c2d7;
+    -fx-text-fill: #071014;
+    -fx-font-weight: 700;
+    -fx-background-radius: 6px;
+    -fx-padding: 8px 14px;
+}
+
+.strategy-secondary-button,
+.strategy-rule-action-button {
+    -fx-background-color: #172331;
+    -fx-border-color: #22303c;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-text-fill: #f8fafc;
+    -fx-padding: 8px 12px;
+}
+
+.strategy-secondary-button:hover,
+.strategy-rule-action-button:hover,
+.strategy-stepper-button:hover {
+    -fx-border-color: #00c2d7;
+    -fx-text-fill: #00c2d7;
+}
+
+.strategy-input,
+.strategy-text-area,
+.strategy-signal-input,
+.text-field,
+.combo-box-base {
+    -fx-background-color: #0b1118;
+    -fx-border-color: #22303c;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-text-fill: #f8fafc;
+    -fx-prompt-text-fill: #64748b;
+}
+
+.strategy-text-area .content {
+    -fx-background-color: #0b1118;
+}
+
+.strategy-muted-label,
+.strategy-card-subtitle {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12px;
+}
+
+.strategy-rules-table {
+    -fx-background-color: #101923;
+    -fx-control-inner-background: #101923;
+    -fx-table-cell-border-color: #22303c;
+    -fx-border-color: #22303c;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+
+.strategy-rules-table .column-header-background,
+.strategy-rules-table .column-header {
+    -fx-background-color: #0b1118;
+}
+
+.strategy-rules-table .column-header .label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-weight: 700;
+}
+
+.strategy-rules-table .table-row-cell {
+    -fx-background-color: #101923;
+    -fx-text-fill: #f8fafc;
+}
+
+.strategy-rules-table .table-row-cell:selected {
+    -fx-background-color: #132838;
+}
+
+.strategy-rules-table .table-cell {
+    -fx-text-fill: #f8fafc;
+    -fx-alignment: CENTER_LEFT;
+    -fx-padding: 8px;
+}
+
+.strategy-rule-source {
+    -fx-background-color: #0b1118;
+    -fx-border-color: #22303c;
+    -fx-border-radius: 999px;
+    -fx-background-radius: 999px;
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 11px;
+    -fx-padding: 3px 9px;
+}
+
+.strategy-signal-card {
+    -fx-padding: 14px;
+}
+
+.strategy-signal-input {
+    -fx-pref-width: 48px;
+    -fx-alignment: CENTER;
+}
+
+.strategy-stepper-button {
+    -fx-background-color: #0b1118;
+    -fx-border-color: #22303c;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-text-fill: #f8fafc;
+    -fx-font-weight: 700;
+    -fx-min-width: 32px;
+}
+
+.buy-pill,
+.sell-pill,
+.neutral-pill {
+    -fx-background-radius: 999px;
+    -fx-padding: 3px 10px;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+}
+
+.buy-pill {
+    -fx-background-color: #10352f;
+    -fx-text-fill: #10b981;
+}
+
+.sell-pill {
+    -fx-background-color: #3b1d24;
+    -fx-text-fill: #ef4444;
+}
+
+.neutral-pill {
+    -fx-background-color: #172331;
+    -fx-text-fill: #94a3b8;
+}
+
+.candle-pattern-dialog {
+    -fx-background-color: #101923;
+}
+
+.candle-pattern-dialog .content,
+.candle-pattern-dialog .header-panel {
+    -fx-background-color: #101923;
+}
+
+.candle-pattern-dialog .label {
+    -fx-text-fill: #f8fafc;
+}
+
+.candle-pattern-list {
+    -fx-background-color: #0b1118;
+    -fx-control-inner-background: #0b1118;
+    -fx-border-color: #22303c;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+
+.candle-pattern-list .list-cell {
+    -fx-background-color: #0b1118;
+    -fx-text-fill: #f8fafc;
+    -fx-padding: 8px 10px;
+}
+
+.candle-pattern-list .list-cell:selected {
+    -fx-background-color: #132838;
+}
+
+.strategy-image-placeholder {
+    -fx-background-color: #0b1118;
+    -fx-border-color: #22303c;
+    -fx-border-style: dashed;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-min-height: 150px;
+    -fx-padding: 18px;
+}
+
+.strategy-image-mark {
+    -fx-background-color: #172331;
+    -fx-border-color: #00c2d7;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-pref-width: 64px;
+    -fx-pref-height: 44px;
+}
+
+.strategy-preview-label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-family: "Consolas";
+    -fx-font-size: 11px;
+}
+
+.label {
+    -fx-text-fill: #f8fafc;
+}

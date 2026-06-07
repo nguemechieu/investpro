@@ -8,7 +8,9 @@ import org.investpro.models.market.ContractType;
 import org.investpro.models.market.InstrumentType;
 import org.investpro.models.market.MarketInstrument;
 import org.investpro.models.market.MarketType;
+import org.investpro.strategy.rules.StrategyRuleDefinition;
 
+import java.util.List;
 import java.util.Set;
 
 @Getter
@@ -21,6 +23,9 @@ public class StrategyDefinition {
 
     @Builder.Default
     private final StrategyParameters parameters = StrategyParameters.builder().build();
+
+    @Builder.Default
+    private final List<StrategyRuleDefinition> rules = List.of();
 
     @Builder.Default
     private final Set<StrategyMarketCompatibility> marketCompatibility = Set.of(StrategyMarketCompatibility.ALL);

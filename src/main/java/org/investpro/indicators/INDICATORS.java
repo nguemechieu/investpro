@@ -30,9 +30,13 @@ public enum INDICATORS {
     HMA("Hull Moving Average", IndicatorCategory.TREND, "Hull moving average"),
     DEMA("Double EMA", IndicatorCategory.TREND, "Double exponential moving average"),
     TEMA("Triple EMA", IndicatorCategory.TREND, "Triple exponential moving average"),
+    TMA("Triangular Moving Average", IndicatorCategory.TREND, "Double-smoothed simple moving average"),
+    T3_TILLSON("T3 Tillson Moving Average", IndicatorCategory.TREND, "Tillson T3 smoothed moving average"),
     VWMA("Volume Weighted Moving Average", IndicatorCategory.TREND, "Volume-weighted moving average"),
     KAMA("Kaufman Adaptive Moving Average", IndicatorCategory.TREND, "Adaptive moving average"),
+    MESA_ADAPTIVE_MOVING_AVERAGE("MESA Adaptive Moving Average", IndicatorCategory.TREND, "MESA adaptive moving average with MAMA/FAMA outputs"),
     ZLEMA("Zero Lag EMA", IndicatorCategory.TREND, "Zero-lag exponential moving average"),
+    TIME_SERIES_FORECAST("Time Series Forecast", IndicatorCategory.TREND, "Linear regression time series forecast"),
 
     EMA_FAST("Fast EMA", IndicatorCategory.TREND, "Fast EMA used for trend crossover"),
     EMA_SLOW("Slow EMA", IndicatorCategory.TREND, "Slow EMA used for trend crossover"),
@@ -42,13 +46,20 @@ public enum INDICATORS {
     // Momentum Indicators
     // =========================================================
     RSI("Relative Strength Index", IndicatorCategory.MOMENTUM, "Measures overbought and oversold conditions"),
+    RSI_REGION_CROSSOVER("RSI with Region Crossovers", IndicatorCategory.MOMENTUM, "RSI signals when leaving overbought or oversold regions"),
     STOCHASTIC("Stochastic Oscillator", IndicatorCategory.MOMENTUM, "Compares close to high-low range"),
+    STOCHASTIC_REGION_CROSSOVER("Stochastic with Region Crossovers", IndicatorCategory.MOMENTUM, "Stochastic oscillator with region crossover signals"),
     STOCHASTIC_K("Stochastic %K", IndicatorCategory.MOMENTUM, "Fast stochastic line"),
     STOCHASTIC_D("Stochastic %D", IndicatorCategory.MOMENTUM, "Slow stochastic signal line"),
     STOCH_RSI("Stochastic RSI", IndicatorCategory.MOMENTUM, "Stochastic calculation applied to RSI"),
+    STOCHASTIC_RSI("Stochastic RSI", IndicatorCategory.MOMENTUM, "Alias for stochastic RSI"),
+    STOCH_RSI_REGION_CROSSOVER("Stoch RSI with Region Crossovers", IndicatorCategory.MOMENTUM, "Stochastic RSI with overbought/oversold region crossover signals"),
     CCI("Commodity Channel Index", IndicatorCategory.MOMENTUM, "Measures price deviation from average"),
     MOMENTUM("Momentum", IndicatorCategory.MOMENTUM, "Rate of price change"),
     ROC("Rate of Change", IndicatorCategory.MOMENTUM, "Percentage rate of price change"),
+    PERCENT_CHANGE("Percent Change", IndicatorCategory.MOMENTUM, "Percent change over a lookback period"),
+    APO("Absolute Price Oscillator", IndicatorCategory.MOMENTUM, "Difference between fast and slow moving averages"),
+    PPO("Percentage Price Oscillator", IndicatorCategory.MOMENTUM, "Percentage difference between fast and slow moving averages"),
     WILLIAMS_R("Williams %R", IndicatorCategory.MOMENTUM, "Momentum oscillator measuring overbought/oversold"),
     TRIX("TRIX", IndicatorCategory.MOMENTUM, "Triple-smoothed rate of change"),
     ULTIMATE_OSCILLATOR("Ultimate Oscillator", IndicatorCategory.MOMENTUM, "Multi-period momentum oscillator"),
@@ -89,6 +100,7 @@ public enum INDICATORS {
     VOLUME_SMA("Volume SMA", IndicatorCategory.VOLUME, "Average volume"),
     VOLUME_RATIO("Volume Ratio", IndicatorCategory.VOLUME, "Current volume relative to average volume"),
     OBV("On Balance Volume", IndicatorCategory.VOLUME, "Cumulative volume flow"),
+    CHAIKIN_AD_OSCILLATOR("Chaikin A/D Oscillator", IndicatorCategory.VOLUME, "Oscillator based on accumulation/distribution line"),
     VWAP("VWAP", IndicatorCategory.VOLUME, "Volume weighted average price"),
     MFI("Money Flow Index", IndicatorCategory.VOLUME, "Volume-weighted RSI-like oscillator"),
     CMF("Chaikin Money Flow", IndicatorCategory.VOLUME, "Accumulation/distribution pressure"),
@@ -103,10 +115,13 @@ public enum INDICATORS {
     ADX("Average Directional Index", IndicatorCategory.TREND_STRENGTH, "Measures trend strength"),
     PLUS_DI("+DI", IndicatorCategory.TREND_STRENGTH, "Positive directional indicator"),
     MINUS_DI("-DI", IndicatorCategory.TREND_STRENGTH, "Negative directional indicator"),
+    DMI("Directional Movement Index", IndicatorCategory.TREND_STRENGTH, "Directional movement index with +DI, -DI, and ADX outputs"),
     AROON("Aroon", IndicatorCategory.TREND_STRENGTH, "Measures trend direction and strength"),
     AROON_UP("Aroon Up", IndicatorCategory.TREND_STRENGTH, "Aroon bullish line"),
     AROON_DOWN("Aroon Down", IndicatorCategory.TREND_STRENGTH, "Aroon bearish line"),
+    AROON_OSCILLATOR("Aroon Oscillator", IndicatorCategory.TREND_STRENGTH, "Aroon Up minus Aroon Down"),
     PSAR("Parabolic SAR", IndicatorCategory.TREND, "Trend-following stop and reverse indicator"),
+    PARABOLIC_SAR("Parabolic SAR", IndicatorCategory.TREND, "Alias for Parabolic SAR"),
     SUPERTREND("Supertrend", IndicatorCategory.TREND, "ATR-based trend-following indicator"),
     ICHIMOKU("Ichimoku Cloud", IndicatorCategory.TREND, "Multi-line trend and support/resistance system"),
     ICHIMOKU_TENKAN("Ichimoku Tenkan-sen", IndicatorCategory.TREND, "Ichimoku conversion line"),
@@ -114,6 +129,7 @@ public enum INDICATORS {
     ICHIMOKU_SENKOU_A("Ichimoku Senkou Span A", IndicatorCategory.TREND, "Ichimoku leading span A"),
     ICHIMOKU_SENKOU_B("Ichimoku Senkou Span B", IndicatorCategory.TREND, "Ichimoku leading span B"),
     ICHIMOKU_CHIKOU("Ichimoku Chikou Span", IndicatorCategory.TREND, "Ichimoku lagging span"),
+    ELDER_RAY("Elder Ray", IndicatorCategory.TREND_STRENGTH, "Bull and bear power derived from EMA"),
 
     // =========================================================
     // Support / Resistance / Structure
@@ -309,6 +325,9 @@ public enum INDICATORS {
         MOMENTUM,
         VOLATILITY,
         VOLUME,
+        PRICE_ACTION,
+        OVERLAP,
+        OSCILLATOR,
         MARKET_STRUCTURE,
         FIBONACCI,
         REGIME,
@@ -317,6 +336,7 @@ public enum INDICATORS {
         PERFORMANCE,
         AI,
         TIME,
-        CUSTOM
+        CUSTOM,
+        UNKNOWN
     }
 }

@@ -1908,10 +1908,20 @@ public class Coinbase extends Exchange {
         metadata.put("coinbase.capabilityStatus", capabilityStatus.name());
         metadata.put("coinbase.capabilityLabel", capabilityLabel(segment, capabilityStatus));
 
+        SessionState sessionState = new ExchangeSessionService()
+                .sessionState(this, instrument.tradePair(), status, metadata);
         boolean marketDataAllowed = !isDisabled;
-        boolean orderSubmissionAllowed = false;
-        boolean marketOrderAllowed = false;
-        boolean limitOrderAllowed = false;
+        boolean orderSubmissionAllowed = (status == TradabilityStatus.FULLY_TRADABLE
+                || status == TradabilityStatus.LIMIT_ONLY)
+                && sessionState.orderSubmissionOpen()
+                && sessionState.openNewPositionsAllowed();
+        boolean marketOrderAllowed = orderSubmissionAllowed
+                && status != TradabilityStatus.LIMIT_ONLY
+                && status != TradabilityStatus.POST_ONLY;
+        boolean limitOrderAllowed = orderSubmissionAllowed
+                || (status == TradabilityStatus.LIMIT_ONLY
+                && sessionState.orderSubmissionOpen()
+                && sessionState.openNewPositionsAllowed());
 
         return new SymbolTradability(
                 getExchangeId(),
@@ -1921,10 +1931,10 @@ public class Coinbase extends Exchange {
                 marketDataAllowed,
                 true,
                 marketDataAllowed,
-                false,
-                false,
-                false,
-                false,
+                orderSubmissionAllowed,
+                orderSubmissionAllowed,
+                orderSubmissionAllowed,
+                orderSubmissionAllowed,
                 marketOrderAllowed,
                 limitOrderAllowed,
                 false,
@@ -1933,11 +1943,7 @@ public class Coinbase extends Exchange {
                 instrument.leveraged(),
                 reason,
                 Instant.now(),
-                sessionMetadata(metadata,
-                        new SessionState(marketDataAllowed, false, false, false, false, false, reason),
-                        orderSubmissionAllowed,
-                        marketOrderAllowed,
-                        limitOrderAllowed));
+                sessionMetadata(metadata, sessionState, orderSubmissionAllowed, marketOrderAllowed, limitOrderAllowed));
     }
 
     private CoinbaseProductDiscoverySegment productDiscoverySegment(TradePair pair) {
@@ -3115,11 +3121,7 @@ public class Coinbase extends Exchange {
             type = "";
         }
 
-        if (product.contains("/")) {
-            product = product.replace("/", "-");
-        }
-
-        product = product.toUpperCase(Locale.ROOT);
+        product = normalizeCoinbaseProductId(product);
         side = side.toUpperCase(Locale.ROOT);
 
         if (product.isBlank()) {
@@ -3157,7 +3159,7 @@ public class Coinbase extends Exchange {
         } else {
             Map<String, Object> market = new LinkedHashMap<>();
 
-            if (!quoteSize.isBlank()) {
+            if (!quoteSize.isBlank() && !isCoinbaseDerivativeProductId(product)) {
                 market.put("quote_size", quoteSize);
             }
 

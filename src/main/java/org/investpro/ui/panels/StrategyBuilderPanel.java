@@ -1,14 +1,20 @@
 package org.investpro.ui.panels;
 
 import javafx.application.Platform;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.*;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +23,8 @@ import org.investpro.data.CandleData;
 import org.investpro.enums.StrategyCategory;
 import org.investpro.indicators.INDICATORS;
 import org.investpro.indicators.INDICATORS.IndicatorCategory;
+import org.investpro.indicators.metadata.IndicatorDefinition;
+import org.investpro.indicators.metadata.IndicatorDefinitionRegistry;
 import org.investpro.i18n.LocalizationService;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.models.trading.TradePair;
@@ -26,6 +34,10 @@ import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyDefinition;
 import org.investpro.strategy.StrategyRegistry;
 import org.investpro.strategy.StrategyParameters;
+import org.investpro.strategy.rules.CandlePattern;
+import org.investpro.strategy.rules.SignalType;
+import org.investpro.strategy.rules.StrategyRuleDefinition;
+import org.investpro.strategy.rules.StrategyRuleSource;
 import org.investpro.strategy.lab.StrategyBacktestRequest;
 import org.investpro.strategy.lab.StrategyBacktestRunner;
 import org.investpro.strategy.lab.StrategyPerformanceReport;
@@ -36,6 +48,7 @@ import org.jspecify.annotations.NonNull;
 
 import org.investpro.utils.CandleDataSupplier;
 
+import java.net.URL;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -146,44 +159,317 @@ public class StrategyBuilderPanel extends VBox {
     private TextArea strategyDescriptionArea;
     private TableView<StrategyParameterRow> parametersTable;
     private ObservableList<StrategyParameterRow> parameterRows;
+    private TableView<StrategyRuleRow> rulesTable;
+    private ObservableList<StrategyRuleRow> ruleRows;
+    private Label descriptionCounterLabel;
     private Label paramsPreviewLabel;
+    private TextField minBuySignalsField;
+    private TextField minSellSignalsField;
+    private Label minBuyOutOfLabel;
+    private Label minSellOutOfLabel;
     private SystemCore systemCore;
 
     public StrategyBuilderPanel(SystemCore systemCore) {
         setPadding(new Insets(16));
         setSpacing(12);
-        setStyle("-fx-background-color: #1a1a2e; -fx-text-fill: #ffffff;");
         getStyleClass().add("strategy-builder-panel");
         this.systemCore = systemCore;
         parameterRows = FXCollections.observableArrayList();
+        ruleRows = FXCollections.observableArrayList();
+        loadStylesheet();
         setupUI();
         LocalizationService.applyTranslations(this);
+    }
+
+    private void loadStylesheet() {
+        URL stylesheet = StrategyBuilderPanel.class.getResource("/css/strategy-builder.css");
+        if (stylesheet != null) {
+            getStylesheets().add(stylesheet.toExternalForm());
+        } else {
+            log.warn("strategy-builder.css was not found on the classpath");
+        }
     }
 
     // -----------------------------------------------------------------------
     // UI setup
     // -----------------------------------------------------------------------
     private void setupUI() {
-        Label titleLabel = new Label("Strategy Builder");
-        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+        VBox header = createHeader();
+        HBox body = createBody();
 
-        VBox basicInfoBox    = createBasicInfoSection();
-        VBox indicatorsBox   = createIndicatorsSection();
-        VBox logicBox        = createStrategyLogicSection();
-        VBox previewBox      = createParamsPreviewSection();
-        HBox actionBox       = createActionButtons();
+        getChildren().setAll(header, body);
+        VBox.setVgrow(body, Priority.ALWAYS);
+    }
 
-        ScrollPane scrollPane = new ScrollPane();
-        scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background: #16213e; -fx-background-color: #16213e;");
-        VBox content = new VBox(12);
-        content.setPadding(new Insets(12));
-        content.setStyle("-fx-background-color: #16213e;");
-        content.getChildren().addAll(basicInfoBox, new Separator(), indicatorsBox, new Separator(), logicBox, new Separator(), previewBox);
-        scrollPane.setContent(content);
+    private @NonNull VBox createHeader() {
+        Label breadcrumb = new Label("Bots > Strategy Builder > New Strategy");
+        breadcrumb.getStyleClass().add("strategy-builder-breadcrumb");
 
-        getChildren().addAll(titleLabel, scrollPane, actionBox);
-        VBox.setVgrow(scrollPane, Priority.ALWAYS);
+        Label title = new Label("New Strategy");
+        title.getStyleClass().add("strategy-builder-title");
+
+        VBox header = new VBox(4, breadcrumb, title);
+        header.getStyleClass().add("strategy-builder-header");
+        return header;
+    }
+
+    private @NonNull HBox createBody() {
+        VBox metadataCard = createMetadataCard();
+        VBox workspaceCard = createWorkspaceCard();
+
+        HBox body = new HBox(16, metadataCard, workspaceCard);
+        body.setAlignment(Pos.TOP_LEFT);
+        HBox.setHgrow(workspaceCard, Priority.ALWAYS);
+        return body;
+    }
+
+    private VBox createMetadataCard() {
+        VBox card = new VBox(14);
+        card.getStyleClass().add("strategy-meta-card");
+        card.setPrefWidth(340);
+        card.setMinWidth(320);
+        card.setMaxWidth(360);
+
+        strategyNameField = new TextField();
+        strategyNameField.setPromptText("e.g., My Mean Reversion Bot");
+        styleInput(strategyNameField);
+
+        categoryCombo = new ComboBox<>();
+        categoryCombo.getItems().addAll(StrategyCategory.values());
+        categoryCombo.setMaxWidth(Double.MAX_VALUE);
+        categoryCombo.getStyleClass().add("strategy-input");
+        categoryCombo.setCellFactory(lv -> new ListCell<>() {
+            @Override protected void updateItem(StrategyCategory c, boolean empty) {
+                super.updateItem(c, empty);
+                setText(empty || c == null ? null : c.getDisplayName());
+            }
+        });
+        categoryCombo.setButtonCell(new ListCell<>() {
+            @Override protected void updateItem(StrategyCategory c, boolean empty) {
+                super.updateItem(c, empty);
+                setText(empty || c == null ? "Select category..." : c.getDisplayName());
+            }
+        });
+
+        timeframeCombo = new ComboBox<>();
+        timeframeCombo.getItems().addAll(Timeframe.values());
+        timeframeCombo.setMaxWidth(Double.MAX_VALUE);
+        timeframeCombo.getStyleClass().add("strategy-input");
+
+        strategyDescriptionArea = new TextArea();
+        strategyDescriptionArea.setPromptText("Describe entry, exit, and risk logic.");
+        strategyDescriptionArea.setWrapText(true);
+        strategyDescriptionArea.setPrefRowCount(7);
+        strategyDescriptionArea.getStyleClass().add("strategy-text-area");
+
+        descriptionCounterLabel = mutedLabel("0 / 500");
+        strategyDescriptionArea.textProperty().addListener((obs, oldValue, newValue) -> {
+            int length = newValue == null ? 0 : newValue.length();
+            descriptionCounterLabel.setText(length + " / 500");
+        });
+
+        card.getChildren().addAll(sectionHeader("Strategy Details"),
+                createStackedInput("Strategy Name *", strategyNameField),
+                createStackedInput("Category", categoryCombo),
+                createStackedInput("Primary Timeframe", timeframeCombo),
+                createStackedInput("Description", strategyDescriptionArea),
+                descriptionCounterLabel,
+                createStrategyImagePlaceholder());
+        return card;
+    }
+
+    private @NonNull VBox createStrategyImagePlaceholder() {
+        Region imageMark = new Region();
+        imageMark.getStyleClass().add("strategy-image-mark");
+
+        Label imageLabel = new Label("Strategy Image");
+        imageLabel.getStyleClass().add("strategy-card-subtitle");
+
+        Button editButton = secondaryButton("Edit");
+        editButton.setOnAction(e -> showAlert("Strategy Image", "Image selection is not connected yet."));
+
+        VBox placeholder = new VBox(10, imageMark, imageLabel, editButton);
+        placeholder.getStyleClass().add("strategy-image-placeholder");
+        placeholder.setAlignment(Pos.CENTER);
+        return placeholder;
+    }
+
+    private VBox createWorkspaceCard() {
+        VBox card = new VBox(14);
+        card.getStyleClass().add("strategy-workspace-card");
+
+        rulesTable = buildRulesTable();
+        rulesTable.setItems(ruleRows);
+        VBox.setVgrow(rulesTable, Priority.ALWAYS);
+
+        Button addRuleButton = secondaryButton("+ Add Rule");
+        addRuleButton.setOnAction(e -> showAddRuleDialog());
+
+        HBox thresholds = new HBox(14,
+                createSignalThresholdCard("Minimum Buy Signals", true),
+                createSignalThresholdCard("Minimum Sell Signals", false));
+        thresholds.setAlignment(Pos.CENTER_LEFT);
+
+        card.getChildren().addAll(createWorkspaceToolbar(), rulesTable, addRuleButton, thresholds, createParamsPreviewSection());
+        return card;
+    }
+
+    private @NonNull HBox createWorkspaceToolbar() {
+        Button saveButton = primaryButton("Save Strategy");
+        saveButton.setOnAction(e -> saveStrategy());
+
+        Button indicatorsButton = secondaryButton("Indicators");
+        indicatorsButton.setOnAction(e -> showAddRuleDialog());
+
+        Button candlePatternsButton = secondaryButton("Candle Patterns");
+        candlePatternsButton.setOnAction(e -> showCandlePatternDialog());
+
+        Button aiAssistantButton = secondaryButton("AI Assistant");
+        aiAssistantButton.setOnAction(e -> showAiAssistantDialog());
+
+        Button testButton = secondaryButton("Test Strategy");
+        testButton.setOnAction(e -> testStrategy());
+
+        Button codeButton = secondaryButton("Code");
+        codeButton.setOnAction(e -> showAlert("Strategy Code", buildCodePreview()));
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button askAiButton = secondaryButton("Ask AI");
+        askAiButton.setOnAction(e -> showAiAssistantDialog());
+
+        HBox toolbar = new HBox(8, saveButton, indicatorsButton, candlePatternsButton, aiAssistantButton, testButton, codeButton, spacer, askAiButton);
+        toolbar.getStyleClass().add("strategy-toolbar");
+        toolbar.setAlignment(Pos.CENTER_LEFT);
+        return toolbar;
+    }
+
+    private TableView<StrategyRuleRow> buildRulesTable() {
+        TableView<StrategyRuleRow> table = new TableView<>();
+        table.setEditable(true);
+        table.getStyleClass().add("strategy-rules-table");
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        table.setPlaceholder(new Label("Add an indicator rule to begin."));
+
+        TableColumn<StrategyRuleRow, Boolean> selectedCol = new TableColumn<>("");
+        selectedCol.setCellValueFactory(c -> c.getValue().selectedProperty());
+        selectedCol.setCellFactory(CheckBoxTableCell.forTableColumn(selectedCol));
+        selectedCol.setEditable(true);
+        selectedCol.setPrefWidth(52);
+        selectedCol.setResizable(false);
+
+        TableColumn<StrategyRuleRow, String> typeCol = new TableColumn<>("Type");
+        typeCol.setCellValueFactory(c -> c.getValue().signalTypeProperty());
+        typeCol.setPrefWidth(120);
+        typeCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    return;
+                }
+                Label pill = new Label(item);
+                if ("BUY".equalsIgnoreCase(item)) {
+                    pill.getStyleClass().add("buy-pill");
+                } else if ("SELL".equalsIgnoreCase(item)) {
+                    pill.getStyleClass().add("sell-pill");
+                } else {
+                    pill.getStyleClass().add("neutral-pill");
+                }
+                setGraphic(pill);
+            }
+        });
+
+        TableColumn<StrategyRuleRow, String> sourceCol = new TableColumn<>("Source");
+        sourceCol.setCellValueFactory(c -> c.getValue().sourceNameProperty());
+        sourceCol.setPrefWidth(150);
+        sourceCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    return;
+                }
+                Label source = new Label(item);
+                source.getStyleClass().add("strategy-rule-source");
+                setGraphic(source);
+            }
+        });
+
+        TableColumn<StrategyRuleRow, String> nameCol = new TableColumn<>("Indicator");
+        nameCol.setCellValueFactory(c -> c.getValue().displayNameProperty());
+        nameCol.setPrefWidth(280);
+
+        TableColumn<StrategyRuleRow, String> candleCol = new TableColumn<>("Candle Size");
+        candleCol.setCellValueFactory(c -> c.getValue().candleSizeProperty());
+        candleCol.setPrefWidth(150);
+
+        TableColumn<StrategyRuleRow, Void> actionCol = new TableColumn<>("Actions");
+        actionCol.setPrefWidth(150);
+        actionCol.setResizable(false);
+        actionCol.setCellFactory(col -> new TableCell<>() {
+            private final Button settingsBtn = new Button("Settings");
+            private final Button removeBtn = new Button("Remove");
+            private final HBox actions = new HBox(6, settingsBtn, removeBtn);
+            {
+                actions.setAlignment(Pos.CENTER_LEFT);
+                settingsBtn.getStyleClass().add("strategy-rule-action-button");
+                removeBtn.getStyleClass().add("strategy-rule-action-button");
+                settingsBtn.setTooltip(new Tooltip("Edit rule parameters"));
+                settingsBtn.setOnAction(e -> {
+                    StrategyRuleRow row = getTableView().getItems().get(getIndex());
+                    showParameterEditor(row);
+                });
+                removeBtn.setOnAction(e -> {
+                    StrategyRuleRow row = getTableView().getItems().get(getIndex());
+                    ruleRows.remove(row);
+                    syncParameterRowsFromRules();
+                    updateSignalThresholdLabels();
+                    updatePreview();
+                });
+            }
+            @Override protected void updateItem(Void v, boolean empty) {
+                super.updateItem(v, empty);
+                setGraphic(empty ? null : actions);
+            }
+        });
+
+        table.getColumns().addAll(selectedCol, typeCol, sourceCol, nameCol, candleCol, actionCol);
+        return table;
+    }
+
+    private VBox createSignalThresholdCard(String title, boolean buy) {
+        Label titleLabel = sectionHeader(title);
+        TextField valueField = new TextField("1");
+        valueField.getStyleClass().add("strategy-signal-input");
+        valueField.setPrefColumnCount(2);
+
+        Label outOfLabel = mutedLabel("out of 0");
+        Button minus = new Button("-");
+        Button plus = new Button("+");
+        minus.getStyleClass().add("strategy-stepper-button");
+        plus.getStyleClass().add("strategy-stepper-button");
+        minus.setOnAction(e -> adjustSignalThreshold(valueField, -1));
+        plus.setOnAction(e -> adjustSignalThreshold(valueField, 1));
+
+        HBox controls = new HBox(8, minus, valueField, plus, outOfLabel);
+        controls.setAlignment(Pos.CENTER_LEFT);
+
+        VBox card = new VBox(8, titleLabel, controls);
+        card.getStyleClass().add("strategy-signal-card");
+        HBox.setHgrow(card, Priority.ALWAYS);
+
+        if (buy) {
+            minBuySignalsField = valueField;
+            minBuyOutOfLabel = outOfLabel;
+        } else {
+            minSellSignalsField = valueField;
+            minSellOutOfLabel = outOfLabel;
+        }
+
+        valueField.textProperty().addListener((obs, oldValue, newValue) -> updateSignalThresholdLabels());
+        return card;
     }
 
     private VBox createBasicInfoSection() {
@@ -377,10 +663,11 @@ public class StrategyBuilderPanel extends VBox {
     }
 
     private VBox createParamsPreviewSection() {
-        VBox section = styledSection("#6366f1");
+        VBox section = new VBox(8);
+        section.getStyleClass().add("strategy-preview-card");
         section.getChildren().add(sectionHeader("Assembled StrategyParameters Preview"));
         paramsPreviewLabel = new Label("(no indicators added yet)");
-        paramsPreviewLabel.setStyle("-fx-text-fill: #c7d2fe; -fx-font-family: monospace; -fx-font-size: 11px;");
+        paramsPreviewLabel.getStyleClass().add("strategy-preview-label");
         paramsPreviewLabel.setWrapText(true);
         section.getChildren().add(paramsPreviewLabel);
         return section;
@@ -409,28 +696,492 @@ public class StrategyBuilderPanel extends VBox {
     // Business logic
     // -----------------------------------------------------------------------
     private void addIndicatorToTable() {
-        INDICATORS selected = indicatorCombo.getValue();
-        if (selected == null) {
-            showAlert("No indicator selected", "Please choose an indicator from the list.");
+        showAddRuleDialog();
+    }
+
+    private void showAddRuleDialog() {
+        Dialog<StrategyRuleRow> dialog = new Dialog<>();
+        dialog.setTitle("Add Strategy Rule");
+        dialog.setHeaderText("Choose an indicator signal rule");
+        ButtonType addButtonType = new ButtonType("Add", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(addButtonType, ButtonType.CANCEL);
+
+        TextField searchField = new TextField();
+        searchField.setPromptText("Search indicators...");
+        searchField.getStyleClass().add("strategy-input");
+
+        ComboBox<SignalType> signalCombo = new ComboBox<>(FXCollections.observableArrayList(
+                SignalType.BUY,
+                SignalType.SELL,
+                SignalType.NEUTRAL));
+        signalCombo.getSelectionModel().selectFirst();
+        signalCombo.setMaxWidth(Double.MAX_VALUE);
+        signalCombo.getStyleClass().add("strategy-input");
+
+        ComboBox<IndicatorCategory> ruleCategoryCombo = new ComboBox<>();
+        ruleCategoryCombo.getItems().add(null);
+        ruleCategoryCombo.getItems().addAll(IndicatorCategory.values());
+        ruleCategoryCombo.setMaxWidth(Double.MAX_VALUE);
+        ruleCategoryCombo.getStyleClass().add("strategy-input");
+        ruleCategoryCombo.setButtonCell(indicatorCategoryCell("All categories"));
+        ruleCategoryCombo.setCellFactory(lv -> indicatorCategoryCell("All categories"));
+
+        ObservableList<INDICATORS> indicators = FXCollections.observableArrayList(
+                IndicatorDefinitionRegistry.all().stream()
+                        .map(IndicatorDefinition::indicator)
+                        .toList());
+        FilteredList<INDICATORS> filteredIndicators = new FilteredList<>(indicators, indicator -> true);
+
+        Runnable applyFilter = () -> {
+            IndicatorCategory selectedCategory = ruleCategoryCombo.getValue();
+            String query = searchField.getText() == null
+                    ? ""
+                    : searchField.getText().trim().toLowerCase(Locale.ROOT);
+            filteredIndicators.setPredicate(indicator -> {
+                IndicatorDefinition definition = IndicatorDefinitionRegistry.get(indicator);
+                boolean categoryMatches = selectedCategory == null || definition.category() == selectedCategory;
+                boolean queryMatches = query.isBlank()
+                        || definition.displayName().toLowerCase(Locale.ROOT).contains(query)
+                        || indicator.name().toLowerCase(Locale.ROOT).contains(query)
+                        || definition.description().toLowerCase(Locale.ROOT).contains(query);
+                return categoryMatches && queryMatches;
+            });
+        };
+
+        ListView<INDICATORS> indicatorList = new ListView<>(filteredIndicators);
+        indicatorList.getStyleClass().add("candle-pattern-list");
+        indicatorList.setPrefHeight(300);
+        indicatorList.setCellFactory(list -> new ListCell<>() {
+            @Override protected void updateItem(INDICATORS indicator, boolean empty) {
+                super.updateItem(indicator, empty);
+                if (empty || indicator == null) {
+                    setGraphic(null);
+                    return;
+                }
+                IndicatorDefinition definition = IndicatorDefinitionRegistry.get(indicator);
+                Label name = new Label(definition.displayName());
+                HBox.setHgrow(name, Priority.ALWAYS);
+                Label category = new Label(definition.category().name());
+                category.getStyleClass().add("strategy-rule-source");
+                HBox row = new HBox(10, name, category);
+                row.setAlignment(Pos.CENTER_LEFT);
+                setGraphic(row);
+            }
+        });
+        if (!filteredIndicators.isEmpty()) {
+            indicatorList.getSelectionModel().selectFirst();
+        }
+
+        ComboBox<Timeframe> candleCombo = new ComboBox<>();
+        candleCombo.getItems().addAll(Timeframe.values());
+        candleCombo.setMaxWidth(Double.MAX_VALUE);
+        candleCombo.getStyleClass().add("strategy-input");
+        if (timeframeCombo != null && timeframeCombo.getValue() != null) {
+            candleCombo.setValue(timeframeCombo.getValue());
+        } else if (!candleCombo.getItems().isEmpty()) {
+            candleCombo.getSelectionModel().selectFirst();
+        }
+
+        VBox parameterBox = new VBox(8);
+        parameterBox.getStyleClass().add("strategy-preview-card");
+        Map<String, TextField> parameterEditors = new LinkedHashMap<>();
+
+        Runnable refreshParameters = () -> {
+            parameterBox.getChildren().clear();
+            parameterEditors.clear();
+            INDICATORS selectedIndicator = indicatorList.getSelectionModel().getSelectedItem();
+            if (selectedIndicator == null) {
+                parameterBox.getChildren().add(mutedLabel("Select an indicator to edit parameters."));
+                return;
+            }
+            IndicatorDefinition definition = IndicatorDefinitionRegistry.get(selectedIndicator);
+            Label description = mutedLabel(definition.description());
+            description.setWrapText(true);
+            parameterBox.getChildren().add(description);
+            if (definition.parameters().isEmpty()) {
+                parameterBox.getChildren().add(mutedLabel("No configurable parameters."));
+                return;
+            }
+            for (var parameter : definition.parameters()) {
+                TextField field = new TextField(parameter.defaultValue());
+                field.getStyleClass().add("strategy-input");
+                parameterEditors.put(parameter.name(), field);
+                parameterBox.getChildren().add(createStackedInput(parameter.displayName(), field));
+            }
+        };
+
+        searchField.textProperty().addListener((obs, oldValue, newValue) -> applyFilter.run());
+        ruleCategoryCombo.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> applyFilter.run());
+        indicatorList.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refreshParameters.run());
+        indicatorList.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2 && indicatorList.getSelectionModel().getSelectedItem() != null) {
+                Button addButton = (Button) dialog.getDialogPane().lookupButton(addButtonType);
+                addButton.fire();
+            }
+        });
+        applyFilter.run();
+        refreshParameters.run();
+
+        HBox chooserRow = new HBox(12,
+                createStackedInput("Signal", signalCombo),
+                createStackedInput("Category", ruleCategoryCombo),
+                createStackedInput("Candle Size", candleCombo));
+        chooserRow.setAlignment(Pos.CENTER_LEFT);
+        chooserRow.getChildren().forEach(child -> HBox.setHgrow(child, Priority.ALWAYS));
+
+        VBox content = new VBox(12,
+                searchField,
+                chooserRow,
+                indicatorList,
+                parameterBox);
+        content.setPadding(new Insets(12));
+        dialog.getDialogPane().setContent(content);
+
+        dialog.setResultConverter(button -> {
+            if (button != addButtonType) {
+                return null;
+            }
+            INDICATORS selectedIndicator = indicatorList.getSelectionModel().getSelectedItem();
+            Timeframe selectedTimeframe = candleCombo.getValue();
+            if (selectedIndicator == null || selectedTimeframe == null) {
+                return null;
+            }
+            StrategyRuleRow row = new StrategyRuleRow(
+                    StrategyRuleSource.INDICATOR,
+                    signalCombo.getValue(),
+                    selectedIndicator,
+                    null,
+                    selectedTimeframe);
+            row.getParameters().clear();
+            parameterEditors.forEach((name, field) -> row.getParameters().put(name, field.getText()));
+            return row;
+        });
+
+        dialog.showAndWait().ifPresent(row -> {
+            ruleRows.add(row);
+            syncParameterRowsFromRules();
+            updateSignalThresholdLabels();
+            updatePreview();
+            log.info("Added {} rule for {} on {}", row.getSignalType(), row.getIndicatorName(), row.getCandleSize());
+        });
+    }
+
+    private void showCandlePatternDialog() {
+        Dialog<StrategyRuleRow> dialog = new Dialog<>();
+        dialog.setTitle("Select a Candle Pattern");
+        dialog.setHeaderText("Select a Candle Pattern");
+        dialog.getDialogPane().getStyleClass().add("candle-pattern-dialog");
+        ButtonType addButtonType = new ButtonType("Add", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(addButtonType, ButtonType.CANCEL);
+
+        TextField searchField = new TextField();
+        searchField.setPromptText("Search for candle patterns...");
+        searchField.getStyleClass().add("strategy-input");
+
+        ObservableList<CandlePattern> patterns = FXCollections.observableArrayList(CandlePattern.values());
+        FilteredList<CandlePattern> filteredPatterns = new FilteredList<>(patterns, pattern -> true);
+        searchField.textProperty().addListener((obs, oldValue, newValue) -> {
+            String query = newValue == null ? "" : newValue.trim().toLowerCase(Locale.ROOT);
+            filteredPatterns.setPredicate(pattern ->
+                    query.isEmpty() || pattern.getDisplayName().toLowerCase(Locale.ROOT).contains(query));
+        });
+
+        ListView<CandlePattern> patternList = new ListView<>(filteredPatterns);
+        patternList.getStyleClass().add("candle-pattern-list");
+        patternList.setPrefHeight(420);
+        patternList.setCellFactory(list -> new ListCell<>() {
+            @Override protected void updateItem(CandlePattern pattern, boolean empty) {
+                super.updateItem(pattern, empty);
+                if (empty || pattern == null) {
+                    setGraphic(null);
+                    return;
+                }
+                Label name = new Label(pattern.getDisplayName());
+                HBox.setHgrow(name, Priority.ALWAYS);
+                Label signal = new Label(pattern.getDefaultSignal().name());
+                signal.getStyleClass().add(pattern.getDefaultSignal() == SignalType.BUY ? "buy-pill" : "sell-pill");
+                HBox row = new HBox(10, name, signal);
+                row.setAlignment(Pos.CENTER_LEFT);
+                setGraphic(row);
+            }
+        });
+        if (!filteredPatterns.isEmpty()) {
+            patternList.getSelectionModel().selectFirst();
+        }
+        patternList.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2 && patternList.getSelectionModel().getSelectedItem() != null) {
+                Button addButton = (Button) dialog.getDialogPane().lookupButton(addButtonType);
+                addButton.fire();
+            }
+        });
+
+        ComboBox<Timeframe> candleCombo = new ComboBox<>();
+        candleCombo.getItems().addAll(Timeframe.values());
+        candleCombo.setMaxWidth(Double.MAX_VALUE);
+        candleCombo.getStyleClass().add("strategy-input");
+        if (timeframeCombo != null && timeframeCombo.getValue() != null) {
+            candleCombo.setValue(timeframeCombo.getValue());
+        } else if (!candleCombo.getItems().isEmpty()) {
+            candleCombo.getSelectionModel().selectFirst();
+        }
+
+        VBox content = new VBox(12,
+                searchField,
+                patternList,
+                createStackedInput("Timeframe", candleCombo));
+        content.setPadding(new Insets(12));
+        dialog.getDialogPane().setContent(content);
+
+        dialog.setResultConverter(button -> {
+            if (button != addButtonType) {
+                return null;
+            }
+            CandlePattern selectedPattern = patternList.getSelectionModel().getSelectedItem();
+            Timeframe selectedTimeframe = candleCombo.getValue();
+            if (selectedPattern == null || selectedTimeframe == null) {
+                return null;
+            }
+            return new StrategyRuleRow(selectedPattern, selectedTimeframe);
+        });
+
+        dialog.showAndWait().ifPresent(row -> {
+            ruleRows.add(row);
+            syncParameterRowsFromRules();
+            updateSignalThresholdLabels();
+            updatePreview();
+            log.info("Added candle pattern rule {} on {}", row.getDisplayName(), row.getCandleSize());
+        });
+    }
+
+    private void showParameterEditor(StrategyRuleRow row) {
+        if (row == null) {
             return;
         }
-        List<String[]> defaults = INDICATOR_DEFAULTS.getOrDefault(selected, defaults(p("period", "14")));
-        if (defaults.isEmpty()) {
-            // Add a single no-param row so the indicator appears in the table
-            parameterRows.add(new StrategyParameterRow(selected.getDisplayName(), "(no parameters)", ""));
+
+        Dialog<Map<String, String>> dialog = new Dialog<>();
+        dialog.setTitle("Edit Parameters");
+        dialog.setHeaderText(row.getIndicatorName() + " | " + row.getSignalType() + " | " + row.getCandleSize());
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(12);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(12));
+        Map<String, TextField> editors = new LinkedHashMap<>();
+        int line = 0;
+        if (row.getParameters().isEmpty()) {
+            grid.add(new Label("This indicator has no editable default parameters."), 0, line);
         } else {
-            for (String[] kv : defaults) {
-                parameterRows.add(new StrategyParameterRow(selected.getDisplayName(), kv[0], kv[1]));
+            for (Map.Entry<String, String> entry : row.getParameters().entrySet()) {
+                TextField editor = new TextField(entry.getValue());
+                editor.getStyleClass().add("strategy-input");
+                editors.put(entry.getKey(), editor);
+                grid.add(new Label(entry.getKey()), 0, line);
+                grid.add(editor, 1, line);
+                GridPane.setHgrow(editor, Priority.ALWAYS);
+                line++;
             }
         }
-        log.info("Added indicator {} with {} parameter(s)", selected.getDisplayName(), defaults.size());
+        dialog.getDialogPane().setContent(grid);
+        dialog.setResultConverter(button -> {
+            if (button != ButtonType.OK) {
+                return null;
+            }
+            Map<String, String> updated = new LinkedHashMap<>();
+            editors.forEach((name, field) -> updated.put(name, field.getText() == null ? "" : field.getText().trim()));
+            return updated;
+        });
+
+        dialog.showAndWait().ifPresent(updated -> {
+            row.getParameters().clear();
+            row.getParameters().putAll(updated);
+            syncParameterRowsFromRules();
+            updatePreview();
+        });
+    }
+
+    private void showAiAssistantDialog() {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("InvestPro AI Assistant");
+        dialog.setHeaderText("Ask about this strategy or request a rule change");
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+
+        TextArea conversation = new TextArea();
+        conversation.setEditable(false);
+        conversation.setWrapText(true);
+        conversation.setPrefRowCount(14);
+        conversation.getStyleClass().add("strategy-text-area");
+        conversation.setText("AI: " + buildAiWelcomeMessage() + "\n");
+
+        TextArea prompt = new TextArea();
+        prompt.setPromptText("Ask AI to review, improve, explain, add RSI, add Hammer, balance signals, or test the strategy...");
+        prompt.setWrapText(true);
+        prompt.setPrefRowCount(3);
+        prompt.getStyleClass().add("strategy-text-area");
+
+        Button askButton = primaryButton("Ask");
+        Button addRsiButton = secondaryButton("Add RSI");
+        Button addHammerButton = secondaryButton("Add Hammer");
+        Button testButton = secondaryButton("Test Now");
+
+        askButton.setOnAction(event -> {
+            String question = prompt.getText() == null ? "" : prompt.getText().trim();
+            if (question.isBlank()) {
+                return;
+            }
+            conversation.appendText("\nUser: " + question + "\n");
+            prompt.clear();
+            askButton.setDisable(true);
+            CompletableFuture
+                    .supplyAsync(() -> answerAiAssistantQuestion(question))
+                    .whenComplete((answer, throwable) -> Platform.runLater(() -> {
+                        if (throwable != null) {
+                            conversation.appendText("AI: I could not process that request: "
+                                    + throwable.getMessage() + "\n");
+                        } else {
+                            conversation.appendText("AI: " + answer + "\n");
+                        }
+                        askButton.setDisable(false);
+                    }));
+        });
+
+        addRsiButton.setOnAction(event -> {
+            addIndicatorRule(SignalType.BUY, INDICATORS.RSI, selectedOrDefaultTimeframe());
+            conversation.appendText("\nAI: Added a BUY RSI rule using the current timeframe.\n");
+        });
+        addHammerButton.setOnAction(event -> {
+            addCandlePatternRule(CandlePattern.HAMMER, selectedOrDefaultTimeframe());
+            conversation.appendText("\nAI: Added a Hammer candle-pattern BUY rule using the current timeframe.\n");
+        });
+        testButton.setOnAction(event -> testStrategy());
+
+        HBox actions = new HBox(8, askButton, addRsiButton, addHammerButton, testButton);
+        actions.setAlignment(Pos.CENTER_LEFT);
+
+        VBox content = new VBox(10, conversation, prompt, actions);
+        content.setPadding(new Insets(12));
+        dialog.getDialogPane().setContent(content);
+        dialog.show();
+    }
+
+    private String buildAiWelcomeMessage() {
+        String service = systemCore == null || systemCore.getAiReasoningService() == null
+                ? "local strategy assistant"
+                : systemCore.getAiReasoningService().getServiceName();
+        return "Connected to " + service + ". Current strategy has "
+                + (ruleRows == null ? 0 : ruleRows.size())
+                + " rule(s). Ask for a review or a concrete rule change.";
+    }
+
+    private String answerAiAssistantQuestion(String question) {
+        String normalized = question.toLowerCase(Locale.ROOT);
+        StringBuilder response = new StringBuilder();
+
+        if (normalized.contains("add") && normalized.contains("rsi")) {
+            Platform.runLater(() -> addIndicatorRule(SignalType.BUY, INDICATORS.RSI, selectedOrDefaultTimeframe()));
+            return "I added a BUY RSI rule. Tune oversold/overbought from the row Settings button.";
+        }
+        if (normalized.contains("add") && normalized.contains("hammer")) {
+            Platform.runLater(() -> addCandlePatternRule(CandlePattern.HAMMER, selectedOrDefaultTimeframe()));
+            return "I added a Hammer candle-pattern rule. It will participate in backtests immediately.";
+        }
+        if (normalized.contains("test") || normalized.contains("backtest")) {
+            Platform.runLater(this::testStrategy);
+            return "I opened Backtesting and started the strategy test.";
+        }
+        if (normalized.contains("balance") || normalized.contains("minimum")) {
+            Platform.runLater(() -> {
+                if (minBuySignalsField != null) {
+                    minBuySignalsField.setText(Integer.toString(Math.max(1, Math.min(2, countRules("BUY")))));
+                }
+                if (minSellSignalsField != null) {
+                    minSellSignalsField.setText(Integer.toString(Math.max(1, Math.min(2, countRules("SELL")))));
+                }
+                updateSignalThresholdLabels();
+            });
+            return "I balanced the minimum signal thresholds against the current BUY/SELL rule counts.";
+        }
+
+        response.append("Review: ");
+        if (ruleRows == null || ruleRows.isEmpty()) {
+            response.append("No rules are configured yet. Start with one indicator rule and one confirmation rule.");
+        } else {
+            long indicatorCount = ruleRows.stream().filter(r -> r.getRuleSource() == StrategyRuleSource.INDICATOR).count();
+            long candleCount = ruleRows.stream().filter(r -> r.getRuleSource() == StrategyRuleSource.CANDLE_PATTERN).count();
+            response.append("You have ").append(indicatorCount).append(" indicator rule(s) and ")
+                    .append(candleCount).append(" candle-pattern rule(s). ");
+            if (indicatorCount == 0) {
+                response.append("Add an indicator filter for trend or momentum confirmation. ");
+            }
+            if (candleCount == 0) {
+                response.append("Add a candle pattern if you want price-action confirmation. ");
+            }
+            response.append("Run Backtesting after each change and compare trade count, return, drawdown, and profit factor.");
+        }
+        return response.toString();
+    }
+
+    private void syncParameterRowsFromRules() {
+        parameterRows.clear();
+        if (ruleRows == null) {
+            return;
+        }
+        for (StrategyRuleRow rule : ruleRows) {
+            if (rule.getParameters().isEmpty()) {
+                parameterRows.add(new StrategyParameterRow(rule.getIndicatorName(), "(no parameters)", ""));
+                continue;
+            }
+            rule.getParameters().forEach((name, value) ->
+                    parameterRows.add(new StrategyParameterRow(rule.getIndicatorName(), name, value)));
+        }
+    }
+
+    private void addIndicatorRule(SignalType signalType, INDICATORS indicator, Timeframe timeframe) {
+        if (indicator == null) {
+            return;
+        }
+        StrategyRuleRow row = new StrategyRuleRow(
+                StrategyRuleSource.INDICATOR,
+                signalType == null ? SignalType.BUY : signalType,
+                indicator,
+                null,
+                timeframe == null ? selectedOrDefaultTimeframe() : timeframe);
+        ruleRows.add(row);
+        syncParameterRowsFromRules();
+        updateSignalThresholdLabels();
         updatePreview();
+    }
+
+    private void addCandlePatternRule(CandlePattern pattern, Timeframe timeframe) {
+        if (pattern == null) {
+            return;
+        }
+        StrategyRuleRow row = new StrategyRuleRow(pattern, timeframe == null ? selectedOrDefaultTimeframe() : timeframe);
+        ruleRows.add(row);
+        syncParameterRowsFromRules();
+        updateSignalThresholdLabels();
+        updatePreview();
+    }
+
+    private Timeframe selectedOrDefaultTimeframe() {
+        if (timeframeCombo != null && timeframeCombo.getValue() != null) {
+            return timeframeCombo.getValue();
+        }
+        return Timeframe.H1;
     }
 
     /** Assembles StrategyParameters from the current table rows. */
     private StrategyParameters buildParameters() {
         StrategyParameters.StrategyParametersBuilder builder = StrategyParameters.builder();
-        for (StrategyParameterRow row : parameterRows) {
+        if (ruleRows != null && !ruleRows.isEmpty()) {
+            for (StrategyRuleRow rule : ruleRows) {
+                for (Map.Entry<String, String> entry : rule.getParameters().entrySet()) {
+                    applyParameter(builder, rule.getIndicatorName(), entry.getKey(), entry.getValue());
+                }
+            }
+            return builder.build();
+        }
+        for (StrategyParameterRow row : effectiveParameterRows()) {
             String param = row.getParameterName().toLowerCase(Locale.ROOT).replace(" ", "");
             String val   = row.getValue().trim();
             if (val.isEmpty() || val.equals("(no parameters)")) continue;
@@ -461,6 +1212,42 @@ public class StrategyBuilderPanel extends VBox {
             }
         }
         return builder.build();
+    }
+
+    private void applyParameter(
+            StrategyParameters.StrategyParametersBuilder builder,
+            String indicatorName,
+            String parameterName,
+            String value) {
+        String param = parameterName == null ? "" : parameterName.toLowerCase(Locale.ROOT).replace(" ", "");
+        String val = value == null ? "" : value.trim();
+        if (val.isEmpty() || val.equals("(no parameters)")) {
+            return;
+        }
+        try {
+            switch (param) {
+                case "period" -> {
+                    String ind = indicatorName == null ? "" : indicatorName.toLowerCase(Locale.ROOT);
+                    if (ind.contains("rsi"))        builder.rsiPeriod(Integer.parseInt(val));
+                    else if (ind.contains("atr"))   builder.atrPeriod(Integer.parseInt(val));
+                    else if (ind.contains("fast"))  builder.emaFast(Integer.parseInt(val));
+                    else if (ind.contains("slow"))  builder.emaSlow(Integer.parseInt(val));
+                    else if (ind.contains("breakout") || ind.contains("donchian")) builder.breakoutLookback(Integer.parseInt(val));
+                }
+                case "rsiperiod"        -> builder.rsiPeriod(Integer.parseInt(val));
+                case "fastperiod"       -> builder.emaFast(Integer.parseInt(val));
+                case "slowperiod"       -> builder.emaSlow(Integer.parseInt(val));
+                case "atrperiod"        -> builder.atrPeriod(Integer.parseInt(val));
+                case "breakoutlookback" -> builder.breakoutLookback(Integer.parseInt(val));
+                case "oversold"         -> builder.oversoldThreshold(Double.parseDouble(val));
+                case "overbought"       -> builder.overboughtThreshold(Double.parseDouble(val));
+                case "minconfidence"    -> builder.minConfidence(Double.parseDouble(val));
+                case "signalamount"     -> builder.signalAmount(Double.parseDouble(val));
+                default -> { /* indicator-specific param stored in rule metadata */ }
+            }
+        } catch (NumberFormatException ex) {
+            log.warn("Non-numeric value '{}' for param '{}' skipped", val, param);
+        }
     }
 
     private void updatePreview() {
@@ -494,12 +1281,12 @@ public class StrategyBuilderPanel extends VBox {
             showAlert("Validation Error", "Please select a primary timeframe.");
             return false;
         }
-        if (parameterRows.isEmpty()) {
-            showAlert("Validation Error", "Please add at least one indicator.");
+        if ((ruleRows == null || ruleRows.isEmpty()) && parameterRows.isEmpty()) {
+            showAlert("Validation Error", "Please add at least one rule.");
             return false;
         }
         // Check all editable values are numeric where applicable
-        for (StrategyParameterRow row : parameterRows) {
+        for (StrategyParameterRow row : effectiveParameterRows()) {
             String val = row.getValue().trim();
             if (val.isEmpty() || val.equals("(no parameters)")) continue;
             try { Double.parseDouble(val); } catch (NumberFormatException e) {
@@ -509,7 +1296,11 @@ public class StrategyBuilderPanel extends VBox {
                 return false;
             }
         }
-        showAlert("Validation Passed ✓",
+        if (!validateSignalThreshold(minBuySignalsField, countRules("BUY"), "Minimum Buy Signals")
+                || !validateSignalThreshold(minSellSignalsField, countRules("SELL"), "Minimum Sell Signals")) {
+            return false;
+        }
+        showAlert("Validation Passed",
                 "Strategy '" + name + "' is valid and ready to save.");
         log.info("Strategy '{}' validated OK", name);
         return true;
@@ -523,8 +1314,9 @@ public class StrategyBuilderPanel extends VBox {
         StrategyDefinition definition = currentStrategyDefinition();
         persistStrategyDefinition(definition);
 
-        String indicatorSummary = parameterRows.stream()
-                .map(StrategyParameterRow::getIndicatorName)
+        String indicatorSummary = (ruleRows != null && !ruleRows.isEmpty() ? ruleRows.stream()
+                .map(StrategyRuleRow::getIndicatorName) : parameterRows.stream()
+                .map(StrategyParameterRow::getIndicatorName))
                 .distinct()
                 .collect(Collectors.joining(", "));
 
@@ -556,39 +1348,55 @@ public class StrategyBuilderPanel extends VBox {
         }
 
         TradePair pair = testPair.get();
-        CompletableFuture
-                .supplyAsync(() -> runRealBacktest(definition, pair, selectedTimeframe))
-                .whenComplete((report, throwable) -> Platform.runLater(() -> {
-                    if (throwable != null) {
-                        log.error("Strategy backtest failed for {}", definition.getName(), throwable);
-                        showAlert("Backtest Failed", throwable.getMessage());
-                        return;
-                    }
+        openBacktestingAndRun(definition, pair, selectedTimeframe);
+    }
 
-                    if (report == null) {
-                        showAlert("Backtest Failed", "No backtest result was produced.");
-                        return;
-                    }
-
-                    showAlert("Backtest Complete",
-                            summarizeBacktest(report));
-                    log.info("Backtest completed for '{}' on {}/{} score={} return={}%% trades={}",
-                            report.getStrategyName(),
-                            report.getSymbol(),
-                            report.getTimeframe().getCode(),
-                            report.getScore(),
-                            report.getTotalReturn(),
-                            report.getTotalTrades());
-                }));
+    private void openBacktestingAndRun(StrategyDefinition definition, TradePair pair, Timeframe timeframe) {
+        try {
+            BacktestingPanel backtestingPanel = new BacktestingPanel(systemCore);
+            Stage stage = new Stage();
+            stage.setTitle("Backtesting - " + definition.getName());
+            stage.setScene(new Scene(backtestingPanel, 1200, 820));
+            stage.setResizable(true);
+            stage.show();
+            backtestingPanel.configureAndRun(definition.getName(), pair, timeframe);
+            log.info("Opened Backtesting panel and started '{}' on {}/{}",
+                    definition.getName(), pair.toString('/'), timeframe.getCode());
+        } catch (Exception exception) {
+            log.error("Unable to open Backtesting panel for {}", definition.getName(), exception);
+            CompletableFuture
+                    .supplyAsync(() -> runRealBacktest(definition, pair, timeframe))
+                    .whenComplete((report, throwable) -> Platform.runLater(() -> {
+                        if (throwable != null) {
+                            showAlert("Backtest Failed", throwable.getMessage());
+                        } else if (report == null) {
+                            showAlert("Backtest Failed", "No backtest result was produced.");
+                        } else {
+                            showAlert("Backtest Complete", summarizeBacktest(report));
+                        }
+                    }));
+        }
     }
 
     private void resetForm() {
         strategyNameField.clear();
         categoryCombo.setValue(null);
         timeframeCombo.setValue(null);
-        categoryFilterCombo.getSelectionModel().selectFirst();
+        if (categoryFilterCombo != null) {
+            categoryFilterCombo.getSelectionModel().selectFirst();
+        }
         strategyDescriptionArea.clear();
+        if (ruleRows != null) {
+            ruleRows.clear();
+        }
         parameterRows.clear();
+        if (minBuySignalsField != null) {
+            minBuySignalsField.setText("1");
+        }
+        if (minSellSignalsField != null) {
+            minSellSignalsField.setText("1");
+        }
+        updateSignalThresholdLabels();
         updatePreview();
         log.info("Strategy builder form reset");
     }
@@ -599,7 +1407,23 @@ public class StrategyBuilderPanel extends VBox {
                 .name(name)
                 .baseName(name)
                 .parameters(buildParameters())
+                .rules(buildRuleDefinitions())
                 .build();
+    }
+
+    private List<StrategyRuleDefinition> buildRuleDefinitions() {
+        if (ruleRows == null || ruleRows.isEmpty()) {
+            return List.of();
+        }
+        return ruleRows.stream()
+                .map(row -> new StrategyRuleDefinition(
+                        row.getRuleSource(),
+                        row.getSignalType(),
+                        row.getIndicator(),
+                        row.getCandlePattern(),
+                        row.getTimeframe(),
+                        Map.copyOf(row.getParameters())))
+                .toList();
     }
 
     private void persistStrategyDefinition(StrategyDefinition definition) {
@@ -772,6 +1596,119 @@ public class StrategyBuilderPanel extends VBox {
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
+    private List<StrategyParameterRow> effectiveParameterRows() {
+        if (ruleRows != null && !ruleRows.isEmpty()) {
+            syncParameterRowsFromRules();
+        }
+        return parameterRows;
+    }
+
+    private int countRules(String signalType) {
+        if (ruleRows == null) {
+            return 0;
+        }
+        return (int) ruleRows.stream()
+                .filter(row -> row.getSignalType().name().equalsIgnoreCase(signalType))
+                .count();
+    }
+
+    private boolean validateSignalThreshold(TextField field, int max, String label) {
+        if (field == null) {
+            return true;
+        }
+        try {
+            int value = Integer.parseInt(field.getText().trim());
+            if (value < 1 || value > Math.max(max, 1)) {
+                showAlert("Validation Error", label + " must be between 1 and " + Math.max(max, 1) + ".");
+                return false;
+            }
+            return true;
+        } catch (NumberFormatException exception) {
+            showAlert("Validation Error", label + " must be numeric.");
+            return false;
+        }
+    }
+
+    private void adjustSignalThreshold(TextField field, int delta) {
+        if (field == null) {
+            return;
+        }
+        int current;
+        try {
+            current = Integer.parseInt(field.getText().trim());
+        } catch (NumberFormatException exception) {
+            current = 1;
+        }
+        field.setText(Integer.toString(Math.max(1, current + delta)));
+    }
+
+    private void updateSignalThresholdLabels() {
+        if (minBuyOutOfLabel != null) {
+            minBuyOutOfLabel.setText("out of " + countRules("BUY"));
+        }
+        if (minSellOutOfLabel != null) {
+            minSellOutOfLabel.setText("out of " + countRules("SELL"));
+        }
+    }
+
+    private String buildCodePreview() {
+        if (ruleRows == null || ruleRows.isEmpty()) {
+            return "No rules configured.";
+        }
+        return ruleRows.stream()
+                .map(row -> row.getSignalType() + " " + row.getIndicatorName() + " on " + row.getCandleSize()
+                        + " " + row.getParameters())
+                .collect(Collectors.joining("\n"));
+    }
+
+    private boolean hasCandlePatternRules() {
+        return ruleRows != null && ruleRows.stream()
+                .anyMatch(row -> row.getRuleSource() == StrategyRuleSource.CANDLE_PATTERN);
+    }
+
+    private @NonNull Button primaryButton(String text) {
+        Button button = new Button(text);
+        button.getStyleClass().add("strategy-primary-button");
+        return button;
+    }
+
+    private @NonNull Button secondaryButton(String text) {
+        Button button = new Button(text);
+        button.getStyleClass().add("strategy-secondary-button");
+        return button;
+    }
+
+    private @NonNull VBox createStackedInput(String label, Control input) {
+        Label lbl = mutedLabel(label);
+        VBox box = new VBox(6, lbl, input);
+        VBox.setVgrow(input, Priority.NEVER);
+        return box;
+    }
+
+    private @NonNull Label mutedLabel(String text) {
+        Label label = new Label(text);
+        label.getStyleClass().add("strategy-muted-label");
+        return label;
+    }
+
+    private @NonNull ListCell<IndicatorCategory> indicatorCategoryCell(String emptyText) {
+        return new ListCell<>() {
+            @Override protected void updateItem(IndicatorCategory item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? emptyText : item.name());
+            }
+        };
+    }
+
+    private @NonNull ListCell<INDICATORS> indicatorCell() {
+        return new ListCell<>() {
+            @Override protected void updateItem(INDICATORS item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : "[" + item.getCategory().name() + "] " + item.getDisplayName());
+            }
+        };
+    }
+
     private VBox styledSection(String borderColor) {
         VBox v = new VBox(10);
         v.setPadding(new Insets(12));
@@ -830,6 +1767,107 @@ public class StrategyBuilderPanel extends VBox {
     // -----------------------------------------------------------------------
     // Observable row model for the parameters table
     // -----------------------------------------------------------------------
+    public static class StrategyRuleRow {
+        private final BooleanProperty selected = new SimpleBooleanProperty(true);
+        private final StrategyRuleSource ruleSource;
+        private final SignalType signalType;
+        private final INDICATORS indicator;
+        private final CandlePattern candlePattern;
+        private final SimpleStringProperty sourceName;
+        private final SimpleStringProperty displayName;
+        private final SimpleStringProperty signalTypeName;
+        private final Timeframe timeframe;
+        private final SimpleStringProperty candleSize;
+        private final Map<String, String> parameters = new LinkedHashMap<>();
+
+        public StrategyRuleRow(String signalType, INDICATORS indicator, Timeframe timeframe) {
+            this(StrategyRuleSource.INDICATOR,
+                    parseSignalType(signalType),
+                    indicator,
+                    null,
+                    timeframe);
+        }
+
+        public StrategyRuleRow(CandlePattern candlePattern, Timeframe timeframe) {
+            this(StrategyRuleSource.CANDLE_PATTERN,
+                    candlePattern == null ? SignalType.NEUTRAL : candlePattern.getDefaultSignal(),
+                    null,
+                    candlePattern,
+                    timeframe);
+        }
+
+        public StrategyRuleRow(
+                StrategyRuleSource ruleSource,
+                SignalType signalType,
+                INDICATORS indicator,
+                CandlePattern candlePattern,
+                Timeframe timeframe) {
+            this.ruleSource = ruleSource == null ? StrategyRuleSource.INDICATOR : ruleSource;
+            this.signalType = signalType == null ? SignalType.NEUTRAL : signalType;
+            this.indicator = indicator;
+            this.candlePattern = candlePattern;
+            this.sourceName = new SimpleStringProperty(displaySource(this.ruleSource));
+            this.displayName = new SimpleStringProperty(resolveDisplayName(this.ruleSource, indicator, candlePattern));
+            this.signalTypeName = new SimpleStringProperty(this.signalType.name());
+            this.timeframe = timeframe;
+            this.candleSize = new SimpleStringProperty(timeframe == null ? "" : timeframe.getCode());
+            if (indicator != null) {
+                IndicatorDefinition definition = IndicatorDefinitionRegistry.get(indicator);
+                definition.parameters().forEach(parameter ->
+                        parameters.put(parameter.name(), parameter.defaultValue()));
+            }
+        }
+
+        public BooleanProperty selectedProperty() { return selected; }
+        public SimpleStringProperty signalTypeProperty() { return signalTypeName; }
+        public SimpleStringProperty sourceNameProperty() { return sourceName; }
+        public SimpleStringProperty displayNameProperty() { return displayName; }
+        public SimpleStringProperty indicatorNameProperty() { return displayName; }
+        public SimpleStringProperty candleSizeProperty() { return candleSize; }
+
+        public boolean isSelected() { return selected.get(); }
+        public void setSelected(boolean selected) { this.selected.set(selected); }
+        public StrategyRuleSource getRuleSource() { return ruleSource; }
+        public SignalType getSignalType() { return signalType; }
+        public INDICATORS getIndicator() { return indicator; }
+        public CandlePattern getCandlePattern() { return candlePattern; }
+        public String getDisplayName() { return displayName.get(); }
+        public String getIndicatorName() { return displayName.get(); }
+        public Timeframe getTimeframe() { return timeframe; }
+        public String getCandleSize() { return candleSize.get(); }
+        public Map<String, String> getParameters() { return parameters; }
+
+        private static SignalType parseSignalType(String value) {
+            if (value == null || value.isBlank()) {
+                return SignalType.BUY;
+            }
+            try {
+                return SignalType.valueOf(value.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException exception) {
+                return SignalType.NEUTRAL;
+            }
+        }
+
+        private static String resolveDisplayName(
+                StrategyRuleSource ruleSource,
+                INDICATORS indicator,
+                CandlePattern candlePattern) {
+            if (ruleSource == StrategyRuleSource.CANDLE_PATTERN) {
+                return candlePattern == null ? "Unknown Candle Pattern" : candlePattern.getDisplayName();
+            }
+            return indicator == null ? "Unknown Indicator" : indicator.getDisplayName();
+        }
+
+        private static String displaySource(StrategyRuleSource source) {
+            return switch (source == null ? StrategyRuleSource.INDICATOR : source) {
+                case INDICATOR -> "Indicator";
+                case CANDLE_PATTERN -> "Candle Pattern";
+                case PRICE_ACTION -> "Price Action";
+                case AI_FILTER -> "AI Filter";
+            };
+        }
+    }
+
     public static class StrategyParameterRow {
         private final SimpleStringProperty indicatorName;
         private final SimpleStringProperty parameterName;

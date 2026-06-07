@@ -2,7 +2,9 @@ package org.investpro.strategy;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.ToString;
 
+@ToString
 @Getter
 @Builder(toBuilder = true)
 public class StrategyParameters {

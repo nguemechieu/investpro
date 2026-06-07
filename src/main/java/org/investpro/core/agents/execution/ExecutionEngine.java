@@ -474,9 +474,12 @@ public class ExecutionEngine {
         }
 
         if (instrument.isDerivative()) {
-            return PositionExecutionResult.failed(
-                    "Order blocked: " + instrument.nativeSymbol()
-                            + " is a derivative contract and derivative order routing is not implemented or not permitted.");
+            if (instrument.tradability() == null || !instrument.tradability().orderSubmissionAllowed()) {
+                return PositionExecutionResult.failed(
+                        "Order blocked: " + instrument.nativeSymbol()
+                                + " is a derivative contract but derivative order submission is not permitted.");
+            }
+            return null;
         }
 
         if (instrument.marketType() != MarketType.SPOT) {

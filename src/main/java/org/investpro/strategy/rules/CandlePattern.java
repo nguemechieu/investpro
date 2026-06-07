@@ -1,0 +1,110 @@
+package org.investpro.strategy.rules;
+
+public enum CandlePattern {
+    ABANDONED_BABY_BEARISH("Abandoned Baby Bearish", SignalType.SELL),
+    ABANDONED_BABY_BULLISH("Abandoned Baby Bullish", SignalType.BUY),
+    ADVANCE_BLOCK("Advance Block", SignalType.SELL),
+    BELT_HOLD_BEARISH("Belt-hold Bearish", SignalType.SELL),
+    BELT_HOLD_BULLISH("Belt-hold Bullish", SignalType.BUY),
+    BREAKAWAY_BEARISH("Breakaway Bearish", SignalType.SELL),
+    BREAKAWAY_BULLISH("Breakaway Bullish", SignalType.BUY),
+    CLOSING_MARUBOZU_BEARISH("Closing Marubozu Bearish", SignalType.SELL),
+    CLOSING_MARUBOZU_BULLISH("Closing Marubozu Bullish", SignalType.BUY),
+    CONCEALING_BABY_SWALLOW("Concealing Baby Swallow", SignalType.BUY),
+    COUNTERATTACK_BEARISH("Counterattack Bearish", SignalType.SELL),
+    COUNTERATTACK_BULLISH("Counterattack Bullish", SignalType.BUY),
+    DARK_CLOUD_COVER("Dark Cloud Cover", SignalType.SELL),
+    DOJI_STAR_BEARISH("Doji Star Bearish", SignalType.SELL),
+    DOJI_STAR_BULLISH("Doji Star Bullish", SignalType.BUY),
+    DOWNSIDE_GAP_THREE_METHODS_BULLISH("Downside Gap Three Methods Bullish", SignalType.BUY),
+    DOWNSIDE_TASUKI_GAP("Downside Tasuki Gap", SignalType.SELL),
+    DRAGONFLY_DOJI("Dragonfly Doji", SignalType.BUY),
+    ENGULFING_BEARISH("Engulfing Bearish", SignalType.SELL),
+    ENGULFING_BULLISH("Engulfing Bullish", SignalType.BUY),
+    EVENING_DOJI_STAR("Evening Doji Star", SignalType.SELL),
+    EVENING_STAR("Evening Star", SignalType.SELL),
+    FALLING_THREE_METHODS("Falling Three Methods", SignalType.SELL),
+    GRAVESTONE_DOJI("Gravestone Doji", SignalType.SELL),
+    HAMMER("Hammer", SignalType.BUY),
+    HANGING_MAN("Hanging Man", SignalType.SELL),
+    HARAMI_BEARISH("Harami Bearish", SignalType.SELL),
+    HARAMI_BULLISH("Harami Bullish", SignalType.BUY),
+    HARAMI_CROSS_BEARISH("Harami Cross Bearish", SignalType.SELL),
+    HARAMI_CROSS_BULLISH("Harami Cross Bullish", SignalType.BUY),
+    HIGH_WAVE_BEARISH("High-Wave Bearish", SignalType.SELL),
+    HIGH_WAVE_BULLISH("High-Wave Bullish", SignalType.BUY),
+    HIKKAKE_BEARISH("Hikkake Bearish", SignalType.SELL),
+    HIKKAKE_BULLISH("Hikkake Bullish", SignalType.BUY),
+    HOMING_PIGEON_BEARISH("Homing Pigeon Bearish", SignalType.SELL),
+    HOMING_PIGEON_BULLISH("Homing Pigeon Bullish", SignalType.BUY),
+    IDENTICAL_THREE_CROWS("Identical Three Crows", SignalType.SELL),
+    IN_NECK("In-Neck", SignalType.SELL),
+    INVERTED_HAMMER("Inverted Hammer", SignalType.SELL),
+    KICKING_BEARISH("Kicking Bearish", SignalType.SELL),
+    KICKING_BULLISH("Kicking Bullish", SignalType.BUY),
+    KICKING_BY_LENGTH_BEARISH("Kicking by Length Bearish", SignalType.SELL),
+    KICKING_BY_LENGTH_BULLISH("Kicking by Length Bullish", SignalType.BUY),
+    LADDER_BOTTOM("Ladder Bottom", SignalType.BUY),
+    LADDER_TOP("Ladder Top", SignalType.SELL),
+    LONG_LINE_BEARISH("Long Line Bearish", SignalType.SELL),
+    LONG_LINE_BULLISH("Long Line Bullish", SignalType.BUY),
+    MARUBOZU_BEARISH("Marubozu Bearish", SignalType.SELL),
+    MARUBOZU_BULLISH("Marubozu Bullish", SignalType.BUY),
+    MAT_HOLD_BEARISH("Mat Hold Bearish", SignalType.SELL),
+    MAT_HOLD_BULLISH("Mat Hold Bullish", SignalType.BUY),
+    MATCHING_LOW("Matching Low", SignalType.BUY),
+    MODIFIED_HIKKAKE_BEARISH("Modified Hikkake Bearish", SignalType.SELL),
+    MODIFIED_HIKKAKE_BULLISH("Modified Hikkake Bullish", SignalType.BUY),
+    MORNING_DOJI_STAR("Morning Doji Star", SignalType.BUY),
+    MORNING_STAR("Morning Star", SignalType.BUY),
+    ON_NECK("On-Neck", SignalType.SELL),
+    PIERCING("Piercing", SignalType.BUY),
+    RICKSHAW_MAN("Rickshaw Man", SignalType.BUY),
+    RISING_THREE_METHODS("Rising Three Methods", SignalType.BUY),
+    SEPARATING_LINES_BEARISH("Separating Lines Bearish", SignalType.SELL),
+    SEPARATING_LINES_BULLISH("Separating Lines Bullish", SignalType.BUY),
+    SHOOTING_STAR("Shooting Star", SignalType.SELL),
+    SHORT_LINE_BEARISH("Short Line Bearish", SignalType.SELL),
+    SHORT_LINE_BULLISH("Short Line Bullish", SignalType.BUY),
+    SPINNING_TOP_BEARISH("Spinning Top Bearish", SignalType.SELL),
+    SPINNING_TOP_BULLISH("Spinning Top Bullish", SignalType.BUY),
+    STALLED_PATTERN_BEARISH("Stalled Pattern Bearish", SignalType.SELL),
+    STALLED_PATTERN_BULLISH("Stalled Pattern Bullish", SignalType.BUY),
+    STICK_SANDWICH_BEARISH("Stick Sandwich Bearish", SignalType.SELL),
+    STICK_SANDWICH_BULLISH("Stick Sandwich Bullish", SignalType.BUY),
+    TAKURI_LINE("Takuri Line", SignalType.BUY),
+    THREE_ADVANCING_WHITE_SOLDIERS("Three Advancing White Soldiers", SignalType.BUY),
+    THREE_BLACK_CROWS("Three Black Crows", SignalType.SELL),
+    THREE_INSIDE_UP_DOWN_BEARISH("Three Inside Up/Down Bearish", SignalType.SELL),
+    THREE_INSIDE_UP_DOWN_BULLISH("Three Inside Up/Down Bullish", SignalType.BUY),
+    THREE_OUTSIDE_UP_DOWN_BEARISH("Three Outside Up/Down Bearish", SignalType.SELL),
+    THREE_OUTSIDE_UP_DOWN_BULLISH("Three Outside Up/Down Bullish", SignalType.BUY),
+    THREE_STARS_IN_THE_SOUTH("Three Stars In The South", SignalType.BUY),
+    THREE_LINE_STRIKE_BEARISH("Three-Line Strike Bearish", SignalType.SELL),
+    THREE_LINE_STRIKE_BULLISH("Three-Line Strike Bullish", SignalType.BUY),
+    TRI_STAR_BEARISH("Tri-Star Bearish", SignalType.SELL),
+    TRI_STAR_BULLISH("Tri-Star Bullish", SignalType.BUY),
+    TWO_CROWS("Two Crows", SignalType.SELL),
+    UNIQUE_3_RIVER("Unique 3 River", SignalType.BUY),
+    UP_DOWN_GAP_SIDE_BY_SIDE_WHITE_LINES_BEARISH("Up/Down-gap side-by-side white lines Bearish", SignalType.SELL),
+    UP_DOWN_GAP_SIDE_BY_SIDE_WHITE_LINES_BULLISH("Up/Down-gap side-by-side white lines Bullish", SignalType.BUY),
+    UPSIDE_GAP_THREE_METHODS_BEARISH("Upside Gap Three Methods Bearish", SignalType.SELL),
+    UPSIDE_GAP_TWO_CROWS("Upside Gap Two Crows", SignalType.SELL),
+    UPSIDE_TASUKI_GAP("Upside Tasuki Gap", SignalType.BUY);
+
+    private final String displayName;
+    private final SignalType defaultSignal;
+
+    CandlePattern(String displayName, SignalType defaultSignal) {
+        this.displayName = displayName;
+        this.defaultSignal = defaultSignal;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public SignalType getDefaultSignal() {
+        return defaultSignal;
+    }
+}

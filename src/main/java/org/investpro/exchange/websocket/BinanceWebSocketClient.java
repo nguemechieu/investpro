@@ -81,6 +81,10 @@ public class BinanceWebSocketClient extends ExchangeWebSocketClient {
 
             // Also check if it's a trade event for backward compatibility
             if (messageJson.has("e") && messageJson.get("e").asText().equals("trade")) {
+                if (getTradePair() == null && !streamHandlers.isEmpty()) {
+                    logger.debug("Binance trade message handled by stream-specific consumers");
+                    return;
+                }
                 handleTradeMessage(messageJson);
             } else if (messageJson.has("s")) {
                 // This might be an aggregated trade or kline
