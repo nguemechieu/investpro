@@ -1,5 +1,6 @@
 package org.investpro.broker.ibkr;
 
+import org.investpro.exchange.ibkr.IbkrExchange;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.Order;
 import org.investpro.models.trading.TradePair;
@@ -14,9 +15,9 @@ import java.util.List;
 
 public class IBKROrderService {
 
-    private final org.investpro.exchange.ibkr.IbkrExchange exchange;
+    private final IbkrExchange exchange;
 
-    public IBKROrderService(org.investpro.exchange.ibkr.IbkrExchange exchange) {
+    public IBKROrderService(IbkrExchange exchange) {
         this.exchange = exchange;
     }
 
@@ -43,6 +44,7 @@ public class IBKROrderService {
             case MARKET -> exchange.createMarketOrder(pair, side, quantity).join();
             case LIMIT -> exchange.createLimitOrder(pair, side, quantity, order.getPrice()).join();
             case STOP_LIMIT -> exchange.createStopOrder(pair, side, quantity, order.getPrice()).join();
+            case TRAILING_STOP -> exchange.createTrailingStopOrder(pair, side, quantity,quantity/2, true).join();
         };
     }
 
