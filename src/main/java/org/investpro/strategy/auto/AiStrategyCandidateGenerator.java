@@ -2,9 +2,9 @@ package org.investpro.strategy.auto;
 
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.ai.AiModelCatalog;
-import org.investpro.ai.AiStrategyGenerationRequest;
-import org.investpro.ai.AiStrategyGenerationResult;
-import org.investpro.ai.AiStrategyGenerator;
+import org.investpro.ai.strategy.AiStrategyGenerationRequest;
+import org.investpro.ai.strategy.AiStrategyGenerationResult;
+import org.investpro.ai.strategy.AiStrategyGenerator;
 import org.investpro.config.AppConfig;
 
 import java.time.Instant;

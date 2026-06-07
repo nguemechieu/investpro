@@ -1,4 +1,4 @@
-package org.investpro.ai;
+package org.investpro.ai.strategy;
 
 import org.investpro.strategy.StrategyDefinition;
 

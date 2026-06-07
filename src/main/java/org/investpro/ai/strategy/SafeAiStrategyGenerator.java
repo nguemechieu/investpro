@@ -1,8 +1,9 @@
-package org.investpro.ai;
+package org.investpro.ai.strategy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.ai.AiCostEstimator;
 import org.investpro.config.AppConfig;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.indicators.INDICATORS;

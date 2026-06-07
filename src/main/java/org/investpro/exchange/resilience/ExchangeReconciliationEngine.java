@@ -135,13 +135,16 @@ public final class ExchangeReconciliationEngine {
                         Map<String, Double> balances = balanceFuture.join();
                         Map<String, Integer> positions = positionFuture.join();
                         int openOrders = orderFuture.join();
+                        ReconciliationReport previousReport = lastReport.get();
+                        boolean driftDetected = previousReport != null
+                                && hasDrift(previousReport, balances, positions, openOrders);
 
                         ReconciliationReport report = new ReconciliationReport(
                                 exchangeName,
                                 balances,
                                 positions,
                                 openOrders,
-                                false, // TODO: implement drift detection against cached state
+                                driftDetected,
                                 startedAt,
                                 Instant.now()
                         );
@@ -152,6 +155,31 @@ public final class ExchangeReconciliationEngine {
         } catch (Exception e) {
             log.warn("Reconciliation error for {}: {}", exchangeName, e.getMessage());
         }
+    }
+
+    private boolean hasDrift(
+            @NotNull ReconciliationReport previousReport,
+            @NotNull Map<String, Double> liveBalances,
+            @NotNull Map<String, Integer> livePositions,
+            int liveOpenOrders) {
+        return balancesChanged(previousReport.liveBalances(), liveBalances)
+                || !previousReport.livePositions().equals(livePositions)
+                || previousReport.liveOpenOrders() != liveOpenOrders;
+    }
+
+    private boolean balancesChanged(Map<String, Double> previous, Map<String, Double> current) {
+        if (!previous.keySet().equals(current.keySet())) {
+            return true;
+        }
+        for (Map.Entry<String, Double> entry : current.entrySet()) {
+            double previousValue = previous.getOrDefault(entry.getKey(), 0.0);
+            double currentValue = entry.getValue() == null ? 0.0 : entry.getValue();
+            double tolerance = Math.max(0.00000001, Math.abs(previousValue) * 0.000001);
+            if (Math.abs(previousValue - currentValue) > tolerance) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void publishReport(@NotNull ReconciliationReport report) {

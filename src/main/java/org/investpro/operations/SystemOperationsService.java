@@ -178,8 +178,8 @@ public class SystemOperationsService {
                 .websocketState(getWebSocketState(exchange))
                 .restAvailable(isRestAvailable(service, exchangeName))
                 .authStatus(getAuthStatus(service, exchangeName))
-                .lastRestRequestTime(null) // TODO: track from exchange adapter
-                .lastWebsocketMessageTime(null) // TODO: track from websocket client
+                .lastRestRequestTime(getInstantMetric(exchange, "getLastRestRequestTime", "getLastRestRequestAt", "lastRestRequestTime"))
+                .lastWebsocketMessageTime(getWebsocketInstantMetric(exchange, "getLastWebsocketMessageTime", "getLastMessageTime", "getLastMessageAt"))
                 .supportedMarketTypes(getSupportedMarketTypes(exchange))
                 .currentTradePair(getCurrentTradePair(exchange))
                 .activeSubscriptions(getActiveSubscriptions(exchange))
@@ -363,8 +363,29 @@ public class SystemOperationsService {
     }
 
     private int getActiveSubscriptions(ExchangeIdentity exchange) {
-        // TODO: Implement when subscription tracking is available
-        return 0;
+        Integer direct = getIntegerMetric(exchange,
+                "getActiveSubscriptions",
+                "getActiveSubscriptionCount",
+                "activeSubscriptionCount");
+        if (direct != null) {
+            return direct;
+        }
+
+        Object subscription = invokeNoArg(exchange, "getActiveSubscription", "getCurrentSubscription");
+        if (subscription != null) {
+            Object tradePairs = invokeNoArg(subscription, "getTradePairs");
+            if (tradePairs instanceof Collection<?> collection) {
+                return collection.size();
+            }
+            return 1;
+        }
+
+        Object websocketClient = invokeNoArg(exchange, "getWebsocketClient", "getWebSocketClient");
+        Integer websocketCount = websocketClient == null ? null : getIntegerMetric(websocketClient,
+                "getActiveSubscriptions",
+                "getActiveSubscriptionCount",
+                "getSubscriptionCount");
+        return websocketCount == null ? 0 : websocketCount;
     }
 
     private int getOpenStreams(ExchangeIdentity exchange) {
@@ -387,7 +408,91 @@ public class SystemOperationsService {
 
     @Nullable
     private String getLastError(ExchangeIdentity exchange) {
-        // TODO: Implement when error tracking is available in exchange adapters
+        Object value = invokeNoArg(exchange,
+                "getLastError",
+                "getLastException",
+                "getLastFailure",
+                "lastError");
+        if (value != null) {
+            return value instanceof Throwable throwable ? throwable.getMessage() : String.valueOf(value);
+        }
+        Object websocketClient = invokeNoArg(exchange, "getWebsocketClient", "getWebSocketClient");
+        Object websocketError = websocketClient == null ? null : invokeNoArg(websocketClient,
+                "getLastError",
+                "getLastException",
+                "getLastFailure");
+        if (websocketError == null) {
+            return null;
+        }
+        return websocketError instanceof Throwable throwable ? throwable.getMessage() : String.valueOf(websocketError);
+    }
+
+    @Nullable
+    private Instant getWebsocketInstantMetric(ExchangeIdentity exchange, String... methodNames) {
+        Object websocketClient = invokeNoArg(exchange, "getWebsocketClient", "getWebSocketClient");
+        Instant fromClient = websocketClient == null ? null : getInstantMetric(websocketClient, methodNames);
+        return fromClient != null ? fromClient : getInstantMetric(exchange, methodNames);
+    }
+
+    @Nullable
+    private Instant getInstantMetric(Object target, String... methodNames) {
+        Object value = invokeNoArg(target, methodNames);
+        if (value instanceof Instant instant) {
+            return instant;
+        }
+        if (value instanceof Number number && number.longValue() > 0L) {
+            long raw = number.longValue();
+            return raw > 10_000_000_000L ? Instant.ofEpochMilli(raw) : Instant.ofEpochSecond(raw);
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Instant.parse(text.trim());
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private Integer getIntegerMetric(Object target, String... methodNames) {
+        Object value = invokeNoArg(target, methodNames);
+        if (value instanceof Number number) {
+            return Math.max(0, number.intValue());
+        }
+        if (value instanceof Collection<?> collection) {
+            return collection.size();
+        }
+        if (value instanceof Map<?, ?> map) {
+            return map.size();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Math.max(0, Integer.parseInt(text.trim()));
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private Object invokeNoArg(Object target, String... methodNames) {
+        if (target == null || methodNames == null) {
+            return null;
+        }
+        for (String methodName : methodNames) {
+            if (methodName == null || methodName.isBlank()) {
+                continue;
+            }
+            try {
+                var method = target.getClass().getMethod(methodName);
+                method.setAccessible(true);
+                return method.invoke(target);
+            } catch (Exception ignored) {
+                // Optional adapter metric.
+            }
+        }
         return null;
     }
 

@@ -1,6 +1,6 @@
 package org.investpro.strategy.auto;
 
-import org.investpro.ai.AiStrategyGenerationResult;
+import org.investpro.ai.strategy.AiStrategyGenerationResult;
 import org.investpro.enums.timeframe.Timeframe;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;

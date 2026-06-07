@@ -499,7 +499,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     }
 
     private void sendSubscribeAsync(
-            TradePair tradePair,
+           @NotNull TradePair tradePair,
             @NotNull String channel,
             @NotNull Runnable onSuccess,
             @NotNull Consumer<Exception> onFailure

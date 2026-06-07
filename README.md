@@ -917,6 +917,9 @@ Important system events are persisted for review and debugging. Logs should help
 - [x] Telegram integration
 - [x] Docker/noVNC deployment
 - [x] StrategyLab stabilization
+- [x] Auto Strategy Lab phase 1 and phase 2
+- [x] User strategy builder UI
+- [x] AI-assisted strategy draft workflow, disabled by default
 - [x] Better automated tests
 - [x] Production installer packaging
 
@@ -925,10 +928,9 @@ Important system events are persisted for review and debugging. Logs should help
 - [ ] Advanced backtesting
 - [ ] Walk-forward testing
 - [ ] Monte Carlo testing
-- [ ] Strategy ranking and auto-assignment
+- [x] Strategy ranking and guarded assignment registry updates
 - [ ] Portfolio-level analytics
 - [ ] Sharpe, Sortino, max drawdown dashboard
-- [ ] User strategy builder UI
 - [ ] Improved execution simulator
 
 ### v2.0 — Future
@@ -938,7 +940,7 @@ Important system events are persisted for review and debugging. Logs should help
 - [ ] Cloud sync
 - [ ] Multi-machine agent coordination
 - [ ] Mobile companion app
-- [ ] Advanced AI strategy assistant
+- [ ] Advanced AI strategy assistant with external model execution
 - [ ] Plugin marketplace for user strategies
 
 ---

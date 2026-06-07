@@ -13,6 +13,19 @@ A comprehensive catalog-driven strategy architecture for the InvestPro trading p
 
 ### Core Components
 
+#### Auto Strategy Lab (`org.investpro.strategy.auto`)
+Auto Strategy Lab builds on the normal `StrategyDefinition` model. It can generate
+rule-based candidates, mutate existing strategies, evaluate them with
+`StrategyBacktestRunner`, rank the results, and write assignment decisions to the
+strategy assignment registry only after safety checks pass.
+
+The scheduled improvement path is handled by `AutoStrategyScheduler` and stays off the
+JavaFX thread. Persistent memory is stored by `FileStrategyMemoryRepository` in
+`data/auto-strategy-memory.json`.
+
+AI-specific strategy generation lives in `org.investpro.ai.strategy`; shared AI catalog,
+credit, provider, and disclaimer classes remain in `org.investpro.ai`.
+
 #### 1. **StrategyParameters** (`org.investpro.strategy.StrategyParameters`)
 Defines technical indicator periods and risk thresholds with builder pattern.
 

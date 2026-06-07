@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.sql.SQLException;
+import java.util.Objects;
 
 /**
  * A monetary amount - models some fixed amount in a given
@@ -312,9 +313,8 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public int compareTo(@NotNull DefaultMoney other) {
-        // TODO is this really the behavior we want?
+        Objects.requireNonNull(other, "other money must not be null");
         checkCurrenciesEqual(other);
-
         return amount.compareTo(other.amount);
     }
 

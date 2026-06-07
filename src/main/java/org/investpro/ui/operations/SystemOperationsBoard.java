@@ -9,6 +9,7 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -19,6 +20,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.jspecify.annotations.NonNull;
+
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Professional Operations Center board for InvestPro.
@@ -45,6 +52,7 @@ public class SystemOperationsBoard extends BorderPane {
     private TextArea snapshotJsonArea;
     private Label exchangeStatusLabel;
     private TableView<SystemSnapshot.ExchangeStatusSnapshot> exchangeTableView;
+    private Label notificationLabel;
 
     private static final int REFRESH_INTERVAL_MS = 2000; // 2 seconds
     private static final ObjectMapper SNAPSHOT_MAPPER = new ObjectMapper()
@@ -99,6 +107,8 @@ public class SystemOperationsBoard extends BorderPane {
         heartbeatLabel.getStyleClass().add("operations-info-label");
         runtimeErrorsLabel = new Label("Runtime Errors: 0");
         runtimeErrorsLabel.getStyleClass().add("operations-info-label");
+        notificationLabel = new Label("");
+        notificationLabel.getStyleClass().add("operations-info-label");
 
         Button refreshBtn = new Button("🔄 Refresh");
         refreshBtn.getStyleClass().add("operations-button");
@@ -125,7 +135,8 @@ public class SystemOperationsBoard extends BorderPane {
                 sep,
                 refreshBtn,
                 exportBtn,
-                clearLogsBtn);
+                clearLogsBtn,
+                notificationLabel);
         HBox.setHgrow(sep, Priority.ALWAYS);
 
         return toolbar;
@@ -555,13 +566,50 @@ public class SystemOperationsBoard extends BorderPane {
     }
 
     private void exportSnapshotJson() {
-        // TODO: Implement file save dialog
-        showNotification("Export not yet implemented");
+        saveSnapshotToFile(snapshotJsonArea.getText());
     }
 
     private void exportSnapshot() {
-        // TODO: Implement full export dialog
-        showNotification("Exporting system snapshot...");
+        SystemSnapshot snapshot = operationsService.createSnapshot();
+        try {
+            saveSnapshotToFile(SNAPSHOT_MAPPER.writeValueAsString(snapshot));
+        } catch (Exception exception) {
+            log.error("Unable to export system snapshot", exception);
+            showNotification("Snapshot export failed: " + exception.getMessage());
+        }
+    }
+
+    private void saveSnapshotToFile(String json) {
+        if (json == null || json.isBlank()) {
+            try {
+                json = SNAPSHOT_MAPPER.writeValueAsString(operationsService.createSnapshot());
+            } catch (Exception exception) {
+                showNotification("Snapshot export failed: " + exception.getMessage());
+                return;
+            }
+        }
+
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Export InvestPro System Snapshot");
+        chooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("JSON Files", "*.json"),
+                new FileChooser.ExtensionFilter("All Files", "*.*"));
+        chooser.setInitialFileName("investpro-system-snapshot-"
+                + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+                + ".json");
+        File target = chooser.showSaveDialog(getScene() == null ? null : getScene().getWindow());
+        if (target == null) {
+            showNotification("Snapshot export cancelled");
+            return;
+        }
+
+        try {
+            Files.writeString(target.toPath(), json, StandardCharsets.UTF_8);
+            showNotification("Snapshot exported: " + target.getAbsolutePath());
+        } catch (Exception exception) {
+            log.error("Unable to write system snapshot to {}", target, exception);
+            showNotification("Snapshot export failed: " + exception.getMessage());
+        }
     }
 
     private void clearActivityLogs() {
@@ -640,7 +688,17 @@ public class SystemOperationsBoard extends BorderPane {
     }
 
     private void showNotification(String message) {
-        // TODO: Implement toast notification or similar
         log.info(message);
+        if (notificationLabel == null) {
+            return;
+        }
+        Platform.runLater(() -> {
+            notificationLabel.setText(message == null ? "" : message);
+            Timeline clearTimeline = new Timeline(new KeyFrame(
+                    javafx.util.Duration.seconds(5),
+                    event -> notificationLabel.setText("")));
+            clearTimeline.setCycleCount(1);
+            clearTimeline.play();
+        });
     }
 }

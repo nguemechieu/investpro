@@ -1,5 +1,6 @@
-package org.investpro.ai;
+package org.investpro.ai.strategy;
 
+import org.investpro.ai.AiModelCatalog;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.indicators.INDICATORS;
 import org.junit.jupiter.api.AfterEach;
