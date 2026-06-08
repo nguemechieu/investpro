@@ -18,6 +18,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
+import java.net.ConnectException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.http.HttpTimeoutException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
@@ -34,6 +38,8 @@ import java.util.function.Consumer;
 @Getter
 @Setter
 public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
+
+    private static final long DUPLICATE_TRANSIENT_ERROR_LOG_INTERVAL_MS = 30_000L;
 
     private final TradingDesk tradingDesk;
 
@@ -66,6 +72,9 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     private volatile String lastStatusMessage = "";
     private volatile String lastRawChannel = "";
     private volatile TradePair lastTradePair;
+    private volatile String lastStreamErrorKey = "";
+    private volatile long lastStreamErrorLogMs = 0L;
+    private final AtomicLong suppressedDuplicateErrors = new AtomicLong();
 
     public DesktopExchangeStreamBridge(@NotNull TradingDesk tradingDesk) {
         this.tradingDesk = Objects.requireNonNull(tradingDesk, "tradingDesk must not be null");
@@ -389,12 +398,39 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         lastErrorAt = Instant.now();
         markEvent(safeExchangeName, null);
 
-        log.warn(
-                "Desktop exchange stream error. exchange={} error={}",
-                safeExchangeName,
-                message,
-                throwable
-        );
+        Throwable root = rootCause(throwable);
+        String errorKey = safeExchangeName + "|" + root.getClass().getName() + "|" + message;
+        long nowMs = System.currentTimeMillis();
+        boolean transientDuplicate = isTransientNetworkError(root)
+                && errorKey.equals(lastStreamErrorKey)
+                && nowMs - lastStreamErrorLogMs < DUPLICATE_TRANSIENT_ERROR_LOG_INTERVAL_MS;
+
+        if (transientDuplicate) {
+            suppressedDuplicateErrors.incrementAndGet();
+            log.debug("Suppressed duplicate transient stream error. exchange={} error={}", safeExchangeName, message);
+            return;
+        }
+
+        long suppressed = suppressedDuplicateErrors.getAndSet(0);
+        lastStreamErrorKey = errorKey;
+        lastStreamErrorLogMs = nowMs;
+
+        if (isTransientNetworkError(root)) {
+            log.warn(
+                    "Desktop exchange stream transient error. exchange={} error={} suppressedDuplicates={}",
+                    safeExchangeName,
+                    message,
+                    suppressed
+            );
+        } else {
+            log.warn(
+                    "Desktop exchange stream error. exchange={} error={} suppressedDuplicates={}",
+                    safeExchangeName,
+                    message,
+                    suppressed,
+                    throwable
+            );
+        }
 
         runOnFx("stream error", () -> {
             tradingDesk.updateStreamingStatus("%s stream error".formatted(safeExchangeName));
@@ -506,16 +542,29 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
             return "Unknown stream error";
         }
 
-        Throwable current = throwable;
+        Throwable root = rootCause(throwable);
+        String message = root.getMessage();
 
+        return message == null || message.isBlank()
+                ? root.getClass().getSimpleName()
+                : message;
+    }
+
+    private Throwable rootCause(@Nullable Throwable throwable) {
+        if (throwable == null) {
+            return new RuntimeException("Unknown stream error");
+        }
+        Throwable current = throwable;
         while (current.getCause() != null) {
             current = current.getCause();
         }
+        return current;
+    }
 
-        String message = current.getMessage();
-
-        return message == null || message.isBlank()
-                ? current.getClass().getSimpleName()
-                : message;
+    private boolean isTransientNetworkError(@Nullable Throwable throwable) {
+        return throwable instanceof HttpTimeoutException
+                || throwable instanceof SocketTimeoutException
+                || throwable instanceof SocketException
+                || throwable instanceof ConnectException;
     }
 }

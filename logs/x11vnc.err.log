@@ -1,83 +1,83 @@
-07/06/2026 19:50:02 passing arg to libvncserver: -rfbport
-07/06/2026 19:50:02 passing arg to libvncserver: 5900
-07/06/2026 19:50:02 passing arg to libvncserver: -passwd
-07/06/2026 19:50:02 x11vnc version: 0.9.17 lastmod: 2025-04-11  pid: 21
-07/06/2026 19:50:02 Using X display :0
-07/06/2026 19:50:02 rootwin: 0x21f reswin: 0x800001 dpy: 0x5eebe200
-07/06/2026 19:50:02 
-07/06/2026 19:50:02 ------------------ USEFUL INFORMATION ------------------
-07/06/2026 19:50:02 X DAMAGE available on display, using it for polling hints.
-07/06/2026 19:50:02   To disable this behavior use: '-noxdamage'
-07/06/2026 19:50:02 
-07/06/2026 19:50:02   Most compositing window managers like 'compiz' or 'beryl'
-07/06/2026 19:50:02   cause X DAMAGE to fail, and so you may not see any screen
-07/06/2026 19:50:02   updates via VNC.  Either disable 'compiz' (recommended) or
-07/06/2026 19:50:02   supply the x11vnc '-noxdamage' command line option.
-07/06/2026 19:50:02 
-07/06/2026 19:50:02 Wireframing: -wireframe mode is in effect for window moves.
-07/06/2026 19:50:02   If this yields undesired behavior (poor response, painting
-07/06/2026 19:50:02   errors, etc) it may be disabled:
-07/06/2026 19:50:02    - use '-nowf' to disable wireframing completely.
-07/06/2026 19:50:02    - use '-nowcr' to disable the Copy Rectangle after the
-07/06/2026 19:50:02      moved window is released in the new position.
-07/06/2026 19:50:02   Also see the -help entry for tuning parameters.
-07/06/2026 19:50:02   You can press 3 Alt_L's (Left "Alt" key) in a row to 
-07/06/2026 19:50:02   repaint the screen, also see the -fixscreen option for
-07/06/2026 19:50:02   periodic repaints.
-07/06/2026 19:50:02 
-07/06/2026 19:50:02 XFIXES available on display, resetting cursor mode
-07/06/2026 19:50:02   to: '-cursor most'.
-07/06/2026 19:50:02   to disable this behavior use: '-cursor arrow'
-07/06/2026 19:50:02   or '-noxfixes'.
-07/06/2026 19:50:02 using XFIXES for cursor drawing.
-07/06/2026 19:50:02 GrabServer control via XTEST.
-07/06/2026 19:50:02 
-07/06/2026 19:50:02 Scroll Detection: -scrollcopyrect mode is in effect to
-07/06/2026 19:50:02   use RECORD extension to try to detect scrolling windows
-07/06/2026 19:50:02   (induced by either user keystroke or mouse input).
-07/06/2026 19:50:02   If this yields undesired behavior (poor response, painting
-07/06/2026 19:50:02   errors, etc) it may be disabled via: '-noscr'
-07/06/2026 19:50:02   Also see the -help entry for tuning parameters.
-07/06/2026 19:50:02   You can press 3 Alt_L's (Left "Alt" key) in a row to 
-07/06/2026 19:50:02   repaint the screen, also see the -fixscreen option for
-07/06/2026 19:50:02   periodic repaints.
-07/06/2026 19:50:02 
-07/06/2026 19:50:02 XKEYBOARD: number of keysyms per keycode 7 is greater
-07/06/2026 19:50:02   than 4 and 51 keysyms are mapped above 4.
-07/06/2026 19:50:02   Automatically switching to -xkb mode.
-07/06/2026 19:50:02   If this makes the key mapping worse you can
-07/06/2026 19:50:02   disable it with the "-noxkb" option.
-07/06/2026 19:50:02   Also, remember "-remap DEAD" for accenting characters.
-07/06/2026 19:50:02 
-07/06/2026 19:50:02 X FBPM extension not supported.
+08/06/2026 12:00:55 passing arg to libvncserver: -rfbport
+08/06/2026 12:00:55 passing arg to libvncserver: 5900
+08/06/2026 12:00:55 passing arg to libvncserver: -passwd
+08/06/2026 12:00:55 x11vnc version: 0.9.17 lastmod: 2025-04-11  pid: 21
+08/06/2026 12:00:55 Using X display :0
+08/06/2026 12:00:55 rootwin: 0x21f reswin: 0x800001 dpy: 0x720ef200
+08/06/2026 12:00:55 
+08/06/2026 12:00:55 ------------------ USEFUL INFORMATION ------------------
+08/06/2026 12:00:55 X DAMAGE available on display, using it for polling hints.
+08/06/2026 12:00:55   To disable this behavior use: '-noxdamage'
+08/06/2026 12:00:55 
+08/06/2026 12:00:55   Most compositing window managers like 'compiz' or 'beryl'
+08/06/2026 12:00:55   cause X DAMAGE to fail, and so you may not see any screen
+08/06/2026 12:00:55   updates via VNC.  Either disable 'compiz' (recommended) or
+08/06/2026 12:00:55   supply the x11vnc '-noxdamage' command line option.
+08/06/2026 12:00:55 
+08/06/2026 12:00:55 Wireframing: -wireframe mode is in effect for window moves.
+08/06/2026 12:00:55   If this yields undesired behavior (poor response, painting
+08/06/2026 12:00:55   errors, etc) it may be disabled:
+08/06/2026 12:00:55    - use '-nowf' to disable wireframing completely.
+08/06/2026 12:00:55    - use '-nowcr' to disable the Copy Rectangle after the
+08/06/2026 12:00:55      moved window is released in the new position.
+08/06/2026 12:00:55   Also see the -help entry for tuning parameters.
+08/06/2026 12:00:55   You can press 3 Alt_L's (Left "Alt" key) in a row to 
+08/06/2026 12:00:55   repaint the screen, also see the -fixscreen option for
+08/06/2026 12:00:55   periodic repaints.
+08/06/2026 12:00:55 
+08/06/2026 12:00:55 XFIXES available on display, resetting cursor mode
+08/06/2026 12:00:55   to: '-cursor most'.
+08/06/2026 12:00:55   to disable this behavior use: '-cursor arrow'
+08/06/2026 12:00:55   or '-noxfixes'.
+08/06/2026 12:00:55 using XFIXES for cursor drawing.
+08/06/2026 12:00:55 GrabServer control via XTEST.
+08/06/2026 12:00:55 
+08/06/2026 12:00:55 Scroll Detection: -scrollcopyrect mode is in effect to
+08/06/2026 12:00:55   use RECORD extension to try to detect scrolling windows
+08/06/2026 12:00:55   (induced by either user keystroke or mouse input).
+08/06/2026 12:00:55   If this yields undesired behavior (poor response, painting
+08/06/2026 12:00:55   errors, etc) it may be disabled via: '-noscr'
+08/06/2026 12:00:55   Also see the -help entry for tuning parameters.
+08/06/2026 12:00:55   You can press 3 Alt_L's (Left "Alt" key) in a row to 
+08/06/2026 12:00:55   repaint the screen, also see the -fixscreen option for
+08/06/2026 12:00:55   periodic repaints.
+08/06/2026 12:00:55 
+08/06/2026 12:00:55 XKEYBOARD: number of keysyms per keycode 7 is greater
+08/06/2026 12:00:55   than 4 and 51 keysyms are mapped above 4.
+08/06/2026 12:00:55   Automatically switching to -xkb mode.
+08/06/2026 12:00:55   If this makes the key mapping worse you can
+08/06/2026 12:00:55   disable it with the "-noxkb" option.
+08/06/2026 12:00:55   Also, remember "-remap DEAD" for accenting characters.
+08/06/2026 12:00:55 
+08/06/2026 12:00:55 X FBPM extension not supported.
 Xlib:  extension "DPMS" missing on display ":0".
-07/06/2026 19:50:02 X display is not capable of DPMS.
-07/06/2026 19:50:02 --------------------------------------------------------
-07/06/2026 19:50:02 
-07/06/2026 19:50:02 Default visual ID: 0x21
-07/06/2026 19:50:02 Read initial data from X display into framebuffer.
-07/06/2026 19:50:02 initialize_screen: fb_depth/fb_bpp/fb_Bpl 24/32/6120
-07/06/2026 19:50:02 WARNING: Width (1530) is not a multiple of 4. VncViewer has problems with that.
-07/06/2026 19:50:02 
-07/06/2026 19:50:02 X display :0 is 32bpp depth=24 true color
-07/06/2026 19:50:02 
-07/06/2026 19:50:02 Listening for VNC connections on TCP port 5900
-07/06/2026 19:50:02 Listening for VNC connections on TCP6 port 5900
-07/06/2026 19:50:02 listen6: bind: Address already in use
-07/06/2026 19:50:02 Not listening on IPv6 interface.
-07/06/2026 19:50:02 
-07/06/2026 19:50:02 Xinerama is present and active (e.g. multi-head).
-07/06/2026 19:50:02 Xinerama: number of sub-screens: 1
-07/06/2026 19:50:02 Xinerama: no blackouts needed (only one sub-screen)
-07/06/2026 19:50:02 
-07/06/2026 19:50:02 fb read rate: 1228 MB/sec
-07/06/2026 19:50:02 fast read: reset -wait  ms to: 10
-07/06/2026 19:50:02 fast read: reset -defer ms to: 10
-07/06/2026 19:50:02 The X server says there are 10 mouse buttons.
-07/06/2026 19:50:02 screen setup finished.
-07/06/2026 19:50:02 
+08/06/2026 12:00:55 X display is not capable of DPMS.
+08/06/2026 12:00:55 --------------------------------------------------------
+08/06/2026 12:00:55 
+08/06/2026 12:00:55 Default visual ID: 0x21
+08/06/2026 12:00:55 Read initial data from X display into framebuffer.
+08/06/2026 12:00:55 initialize_screen: fb_depth/fb_bpp/fb_Bpl 24/32/6120
+08/06/2026 12:00:55 WARNING: Width (1530) is not a multiple of 4. VncViewer has problems with that.
+08/06/2026 12:00:55 
+08/06/2026 12:00:55 X display :0 is 32bpp depth=24 true color
+08/06/2026 12:00:55 
+08/06/2026 12:00:55 Listening for VNC connections on TCP port 5900
+08/06/2026 12:00:55 Listening for VNC connections on TCP6 port 5900
+08/06/2026 12:00:55 listen6: bind: Address already in use
+08/06/2026 12:00:55 Not listening on IPv6 interface.
+08/06/2026 12:00:55 
+08/06/2026 12:00:55 Xinerama is present and active (e.g. multi-head).
+08/06/2026 12:00:55 Xinerama: number of sub-screens: 1
+08/06/2026 12:00:55 Xinerama: no blackouts needed (only one sub-screen)
+08/06/2026 12:00:55 
+08/06/2026 12:00:55 fb read rate: 994 MB/sec
+08/06/2026 12:00:55 fast read: reset -wait  ms to: 10
+08/06/2026 12:00:55 fast read: reset -defer ms to: 10
+08/06/2026 12:00:55 The X server says there are 10 mouse buttons.
+08/06/2026 12:00:55 screen setup finished.
+08/06/2026 12:00:55 
 
-The VNC desktop is:      4c264e555419:0
+The VNC desktop is:      e6f470cad6f5:0
 
 ******************************************************************************
 Have you tried the x11vnc '-ncache' VNC client-side pixel caching feature yet?
@@ -90,169 +90,98 @@ retrieval.  It should work with any VNC viewer.  Try it by running:
 One can also add -ncache_cr for smooth 'copyrect' window motion.
 More info: http://www.karlrunge.com/x11vnc/faq.html#faq-client-caching
 
-07/06/2026 19:50:08 Got connection from client 127.0.0.1
-07/06/2026 19:50:08   0 other clients
-07/06/2026 19:50:08 Normal socket connection
-07/06/2026 19:50:08 Disabled X server key autorepeat.
-07/06/2026 19:50:08   to force back on run: 'xset r on' (3 times)
-07/06/2026 19:50:08 incr accepted_client=1 for 127.0.0.1:55898  sock=10
-07/06/2026 19:50:08 Client Protocol Version 3.8
-07/06/2026 19:50:08 Protocol version sent 3.8, using 3.8
-07/06/2026 19:50:08 rfbProcessClientSecurityType: executing handler for type 2
-07/06/2026 19:50:08 Pixel format for client 127.0.0.1:
-07/06/2026 19:50:08   32 bpp, depth 24, little endian
-07/06/2026 19:50:08   true colour: max r 255 g 255 b 255, shift r 0 g 8 b 16
-07/06/2026 19:50:08 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000032)
-07/06/2026 19:50:08 rfbProcessClientNormalMessage: ignoring unsupported encoding type tightPng
-07/06/2026 19:50:08 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000015)
-07/06/2026 19:50:08 Using image quality level 6 for client 127.0.0.1
-07/06/2026 19:50:08 Using JPEG subsampling 0, Q79 for client 127.0.0.1
-07/06/2026 19:50:08 Using compression level 2 for client 127.0.0.1
-07/06/2026 19:50:08 Enabling NewFBSize protocol extension for client 127.0.0.1
-07/06/2026 19:50:08 Enabling LastRect protocol extension for client 127.0.0.1
-07/06/2026 19:50:08 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFE)
-07/06/2026 19:50:08 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFB)
-07/06/2026 19:50:08 Enabling ExtDesktopSize protocol extension for client 127.0.0.1
-07/06/2026 19:50:08 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC8)
-07/06/2026 19:50:08 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC7)
-07/06/2026 19:50:08 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFECD)
-07/06/2026 19:50:08 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC4)
-07/06/2026 19:50:08 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x574D5664)
-07/06/2026 19:50:08 Enabling full-color cursor updates for client 127.0.0.1
-07/06/2026 19:50:08 Using tight encoding for client 127.0.0.1
-07/06/2026 19:50:08 Sending rfbEncodingExtDesktopSize for size (1530x840) 
-07/06/2026 19:50:08 client 1 network rate 1464.1 KB/sec (194119.3 eff KB/sec)
-07/06/2026 19:50:08 client 1 latency:  3.5 ms
-07/06/2026 19:50:08 dt1: 0.0054, dt2: 0.0229 dt3: 0.0035 bytes: 38785
-07/06/2026 19:50:08 link_rate: LR_LAN - 3 ms, 1464 KB/s
-07/06/2026 19:50:09 client_set_net: 127.0.0.1  0.0003
-07/06/2026 19:50:09 created   xdamage object: 0x800034
-07/06/2026 19:50:09 copy_tiles: allocating first_line at size 49
-07/06/2026 19:50:18 created selwin: 0x800035
-07/06/2026 19:50:18 called initialize_xfixes()
-07/06/2026 19:50:27 client_count: 0
-07/06/2026 19:50:27 Restored X server key autorepeat to: 1
-07/06/2026 19:50:27 Client 127.0.0.1 gone
-07/06/2026 19:50:27 Statistics             events    Transmit/ RawEquiv ( saved)
-07/06/2026 19:50:27  ServerCutText       :      1 |         8/        8 (  0.0%)
-07/06/2026 19:50:27  FramebufferUpdate   :     66 |         0/        0 (  0.0%)
-07/06/2026 19:50:27  LastRect            :      5 |        60/       60 (  0.0%)
-07/06/2026 19:50:27  tight               :    250 |    253735/ 16166780 ( 98.4%)
-07/06/2026 19:50:27  RichCursor          :      2 |      3774/     3774 (  0.0%)
-07/06/2026 19:50:27  ExtendedDesktopSize :      1 |        32/       32 (  0.0%)
-07/06/2026 19:50:27  TOTALS              :    325 |    257609/ 16170654 ( 98.4%)
-07/06/2026 19:50:27 Statistics             events    Received/ RawEquiv ( saved)
-07/06/2026 19:50:27  PointerEvent        :     18 |       108/      108 (  0.0%)
-07/06/2026 19:50:27  FramebufferUpdate   :     68 |       680/      680 (  0.0%)
-07/06/2026 19:50:27  SetEncodings        :      1 |       104/      104 (  0.0%)
-07/06/2026 19:50:27  SetPixelFormat      :      1 |        20/       20 (  0.0%)
-07/06/2026 19:50:27  TOTALS              :     88 |       912/      912 (  0.0%)
-07/06/2026 19:50:27 destroyed xdamage object: 0x800034
-07/06/2026 19:50:29 Got connection from client 127.0.0.1
-07/06/2026 19:50:29   0 other clients
-07/06/2026 19:50:29 Normal socket connection
-07/06/2026 19:50:29 Disabled X server key autorepeat.
-07/06/2026 19:50:29   to force back on run: 'xset r on' (3 times)
-07/06/2026 19:50:29 incr accepted_client=2 for 127.0.0.1:35462  sock=10
-07/06/2026 19:50:29 Client Protocol Version 3.8
-07/06/2026 19:50:29 Protocol version sent 3.8, using 3.8
-07/06/2026 19:50:29 rfbProcessClientSecurityType: executing handler for type 2
-07/06/2026 19:50:30 created   xdamage object: 0x800036
-07/06/2026 19:50:35 authProcessClientMessage: authentication failed from 127.0.0.1
-07/06/2026 19:50:35 rfbAuthProcessClientMessage: password check failed
-07/06/2026 19:50:35 rfbClientSendString("password check failed!")
-07/06/2026 19:50:35 client_count: 0
-07/06/2026 19:50:35 Restored X server key autorepeat to: 1
-07/06/2026 19:50:35 Client 127.0.0.1 gone
-07/06/2026 19:50:35 Statistics             events    Transmit/ RawEquiv ( saved)
-07/06/2026 19:50:35  TOTALS              :      0 |         0/        0 (  0.0%)
-07/06/2026 19:50:35 Statistics             events    Received/ RawEquiv ( saved)
-07/06/2026 19:50:35  TOTALS              :      0 |         0/        0 (  0.0%)
-07/06/2026 19:50:35 destroyed xdamage object: 0x800036
-07/06/2026 19:50:38 Got connection from client 127.0.0.1
-07/06/2026 19:50:38   0 other clients
-07/06/2026 19:50:38 Normal socket connection
-07/06/2026 19:50:38 Disabled X server key autorepeat.
-07/06/2026 19:50:38   to force back on run: 'xset r on' (3 times)
-07/06/2026 19:50:38 incr accepted_client=3 for 127.0.0.1:60880  sock=10
-07/06/2026 19:50:38 Client Protocol Version 3.8
-07/06/2026 19:50:38 Protocol version sent 3.8, using 3.8
-07/06/2026 19:50:38 rfbProcessClientSecurityType: executing handler for type 2
-07/06/2026 19:50:38 created   xdamage object: 0x800037
-07/06/2026 19:50:43 Pixel format for client 127.0.0.1:
-07/06/2026 19:50:43   32 bpp, depth 24, little endian
-07/06/2026 19:50:43   true colour: max r 255 g 255 b 255, shift r 0 g 8 b 16
-07/06/2026 19:50:43 client_set_net: 127.0.0.1  0.0001
-07/06/2026 19:50:43 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000032)
-07/06/2026 19:50:43 rfbProcessClientNormalMessage: ignoring unsupported encoding type tightPng
-07/06/2026 19:50:43 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000015)
-07/06/2026 19:50:43 Using image quality level 6 for client 127.0.0.1
-07/06/2026 19:50:43 Using JPEG subsampling 0, Q79 for client 127.0.0.1
-07/06/2026 19:50:43 Using compression level 2 for client 127.0.0.1
-07/06/2026 19:50:43 Enabling NewFBSize protocol extension for client 127.0.0.1
-07/06/2026 19:50:43 Enabling LastRect protocol extension for client 127.0.0.1
-07/06/2026 19:50:43 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFE)
-07/06/2026 19:50:43 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFB)
-07/06/2026 19:50:43 Enabling ExtDesktopSize protocol extension for client 127.0.0.1
-07/06/2026 19:50:43 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC8)
-07/06/2026 19:50:43 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC7)
-07/06/2026 19:50:43 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFECD)
-07/06/2026 19:50:43 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC4)
-07/06/2026 19:50:43 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x574D5664)
-07/06/2026 19:50:43 Enabling full-color cursor updates for client 127.0.0.1
-07/06/2026 19:50:43 Using tight encoding for client 127.0.0.1
-07/06/2026 19:50:43 Sending rfbEncodingExtDesktopSize for size (1530x840) 
-07/06/2026 19:50:43 client 3 network rate 1387.6 KB/sec (59743.3 eff KB/sec)
-07/06/2026 19:50:43 client 3 latency:  1.8 ms
-07/06/2026 19:50:43 dt1: 0.0255, dt2: 0.0615 dt3: 0.0018 bytes: 119495
-07/06/2026 19:50:43 link_rate: LR_LAN - 1 ms, 1387 KB/s
-07/06/2026 19:55:47 XDAMAGE is not working well... misses: 140/206
-07/06/2026 19:55:47 Maybe an OpenGL app like Beryl or Compiz is the problem?
-07/06/2026 19:55:47 Use x11vnc -noxdamage or disable the Beryl/Compiz app.
-07/06/2026 19:55:47 To disable this check and warning specify -xdamage twice.
-07/06/2026 20:03:38 XDAMAGE is not working well... misses: 76/208
-07/06/2026 20:03:38 Maybe an OpenGL app like Beryl or Compiz is the problem?
-07/06/2026 20:03:38 Use x11vnc -noxdamage or disable the Beryl/Compiz app.
-07/06/2026 20:03:38 To disable this check and warning specify -xdamage twice.
-07/06/2026 20:05:02 XDAMAGE is not working well... misses: 49/219
-07/06/2026 20:05:02 Maybe an OpenGL app like Beryl or Compiz is the problem?
-07/06/2026 20:05:02 Use x11vnc -noxdamage or disable the Beryl/Compiz app.
-07/06/2026 20:05:02 To disable this check and warning specify -xdamage twice.
-07/06/2026 20:05:47 XDAMAGE is not working well... misses: 198/210
-07/06/2026 20:05:47 Maybe an OpenGL app like Beryl or Compiz is the problem?
-07/06/2026 20:05:47 Use x11vnc -noxdamage or disable the Beryl/Compiz app.
-07/06/2026 20:05:47 To disable this check and warning specify -xdamage twice.
-07/06/2026 20:08:28 idle keyboard:   turning X autorepeat back on.
-07/06/2026 20:08:29 XDAMAGE is not working well... misses: 155/201
-07/06/2026 20:08:29 Maybe an OpenGL app like Beryl or Compiz is the problem?
-07/06/2026 20:08:29 Use x11vnc -noxdamage or disable the Beryl/Compiz app.
-07/06/2026 20:08:29 To disable this check and warning specify -xdamage twice.
-07/06/2026 20:13:12 XDAMAGE is not working well... misses: 56/211
-07/06/2026 20:13:12 Maybe an OpenGL app like Beryl or Compiz is the problem?
-07/06/2026 20:13:12 Use x11vnc -noxdamage or disable the Beryl/Compiz app.
-07/06/2026 20:13:12 To disable this check and warning specify -xdamage twice.
-07/06/2026 20:14:16 active keyboard: waiting until all keys are up. key_down=37 Control_L.  If the key is inaccessible via keyboard, consider 'x11vnc -R clear_all'
-07/06/2026 20:14:18 active keyboard: turning X autorepeat off.
-07/06/2026 20:19:48 idle keyboard:   turning X autorepeat back on.
-07/06/2026 20:21:34 active keyboard: turning X autorepeat off.
-07/06/2026 20:33:03 XDAMAGE is not working well... misses: 50/221
-07/06/2026 20:33:03 Maybe an OpenGL app like Beryl or Compiz is the problem?
-07/06/2026 20:33:03 Use x11vnc -noxdamage or disable the Beryl/Compiz app.
-07/06/2026 20:33:03 To disable this check and warning specify -xdamage twice.
-07/06/2026 20:33:40 idle keyboard:   turning X autorepeat back on.
-07/06/2026 20:34:24 XDAMAGE is not working well... misses: 50/221
-07/06/2026 20:34:24 Maybe an OpenGL app like Beryl or Compiz is the problem?
-07/06/2026 20:34:24 Use x11vnc -noxdamage or disable the Beryl/Compiz app.
-07/06/2026 20:34:24 To disable this check and warning specify -xdamage twice.
-07/06/2026 20:35:32 active keyboard: turning X autorepeat off.
-07/06/2026 20:37:33 XDAMAGE is not working well... misses: 52/214
-07/06/2026 20:37:33 Maybe an OpenGL app like Beryl or Compiz is the problem?
-07/06/2026 20:37:33 Use x11vnc -noxdamage or disable the Beryl/Compiz app.
-07/06/2026 20:37:33 To disable this check and warning specify -xdamage twice.
-07/06/2026 20:38:06 XDAMAGE is not working well... misses: 144/214
-07/06/2026 20:38:06 Maybe an OpenGL app like Beryl or Compiz is the problem?
-07/06/2026 20:38:06 Use x11vnc -noxdamage or disable the Beryl/Compiz app.
-07/06/2026 20:38:06 To disable this check and warning specify -xdamage twice.
-07/06/2026 20:38:06 XDAMAGE appears broken (OpenGL app?), turning it off.
-07/06/2026 20:38:06 destroyed xdamage object: 0x800037
-07/06/2026 20:40:34 idle keyboard:   turning X autorepeat back on.
+08/06/2026 12:00:59 Got connection from client 127.0.0.1
+08/06/2026 12:00:59   0 other clients
+08/06/2026 12:00:59 Normal socket connection
+08/06/2026 12:00:59 Disabled X server key autorepeat.
+08/06/2026 12:00:59   to force back on run: 'xset r on' (3 times)
+08/06/2026 12:00:59 incr accepted_client=1 for 127.0.0.1:54164  sock=10
+08/06/2026 12:00:59 Client Protocol Version 3.8
+08/06/2026 12:00:59 Protocol version sent 3.8, using 3.8
+08/06/2026 12:00:59 rfbProcessClientSecurityType: executing handler for type 2
+08/06/2026 12:00:59 Pixel format for client 127.0.0.1:
+08/06/2026 12:00:59   32 bpp, depth 24, little endian
+08/06/2026 12:00:59   true colour: max r 255 g 255 b 255, shift r 0 g 8 b 16
+08/06/2026 12:00:59 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000032)
+08/06/2026 12:00:59 rfbProcessClientNormalMessage: ignoring unsupported encoding type tightPng
+08/06/2026 12:00:59 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000015)
+08/06/2026 12:00:59 Using image quality level 6 for client 127.0.0.1
+08/06/2026 12:00:59 Using JPEG subsampling 0, Q79 for client 127.0.0.1
+08/06/2026 12:00:59 Using compression level 2 for client 127.0.0.1
+08/06/2026 12:00:59 Enabling NewFBSize protocol extension for client 127.0.0.1
+08/06/2026 12:00:59 Enabling LastRect protocol extension for client 127.0.0.1
+08/06/2026 12:00:59 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFE)
+08/06/2026 12:00:59 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFB)
+08/06/2026 12:00:59 Enabling ExtDesktopSize protocol extension for client 127.0.0.1
+08/06/2026 12:00:59 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC8)
+08/06/2026 12:00:59 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC7)
+08/06/2026 12:00:59 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFECD)
+08/06/2026 12:00:59 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC4)
+08/06/2026 12:00:59 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x574D5664)
+08/06/2026 12:00:59 Enabling full-color cursor updates for client 127.0.0.1
+08/06/2026 12:00:59 Using tight encoding for client 127.0.0.1
+08/06/2026 12:00:59 Sending rfbEncodingExtDesktopSize for size (1530x840) 
+08/06/2026 12:00:59 client 1 network rate 3168.6 KB/sec (418201.8 eff KB/sec)
+08/06/2026 12:00:59 client 1 latency:  1.7 ms
+08/06/2026 12:00:59 dt1: 0.0041, dt2: 0.0091 dt3: 0.0017 bytes: 38962
+08/06/2026 12:00:59 link_rate: LR_LAN - 1 ms, 3168 KB/s
+08/06/2026 12:01:00 client_set_net: 127.0.0.1  0.0002
+08/06/2026 12:01:00 created   xdamage object: 0x800034
+08/06/2026 12:01:00 copy_tiles: allocating first_line at size 49
+08/06/2026 12:01:09 created selwin: 0x800035
+08/06/2026 12:01:09 called initialize_xfixes()
+08/06/2026 12:01:46 client_count: 0
+08/06/2026 12:01:46 Restored X server key autorepeat to: 1
+08/06/2026 12:01:46 Client 127.0.0.1 gone
+08/06/2026 12:01:46 Statistics             events    Transmit/ RawEquiv ( saved)
+08/06/2026 12:01:46  ServerCutText       :      1 |         8/        8 (  0.0%)
+08/06/2026 12:01:46  FramebufferUpdate   :    149 |         0/        0 (  0.0%)
+08/06/2026 12:01:46  LastRect            :      5 |        60/       60 (  0.0%)
+08/06/2026 12:01:46  tight               :    335 |    327332/ 16427772 ( 98.0%)
+08/06/2026 12:01:46  RichCursor          :      3 |      6174/     6174 (  0.0%)
+08/06/2026 12:01:46  ExtendedDesktopSize :      1 |        32/       32 (  0.0%)
+08/06/2026 12:01:46  TOTALS              :    494 |    333606/ 16434046 ( 98.0%)
+08/06/2026 12:01:46 Statistics             events    Received/ RawEquiv ( saved)
+08/06/2026 12:01:46  PointerEvent        :     57 |       342/      342 (  0.0%)
+08/06/2026 12:01:46  FramebufferUpdate   :    151 |      1510/     1510 (  0.0%)
+08/06/2026 12:01:46  SetEncodings        :      1 |       104/      104 (  0.0%)
+08/06/2026 12:01:46  SetPixelFormat      :      1 |        20/       20 (  0.0%)
+08/06/2026 12:01:46  TOTALS              :    210 |      1976/     1976 (  0.0%)
+08/06/2026 12:01:46 destroyed xdamage object: 0x800034
+08/06/2026 12:01:47 Got connection from client 127.0.0.1
+08/06/2026 12:01:47   0 other clients
+08/06/2026 12:01:47 Normal socket connection
+08/06/2026 12:01:47 Disabled X server key autorepeat.
+08/06/2026 12:01:47   to force back on run: 'xset r on' (3 times)
+08/06/2026 12:01:47 incr accepted_client=2 for 127.0.0.1:36032  sock=10
+08/06/2026 12:01:47 Client Protocol Version 3.8
+08/06/2026 12:01:47 Protocol version sent 3.8, using 3.8
+08/06/2026 12:01:47 rfbProcessClientSecurityType: executing handler for type 2
+08/06/2026 12:01:48 created   xdamage object: 0x800036
+08/06/2026 12:01:53 Pixel format for client 127.0.0.1:
+08/06/2026 12:01:53   32 bpp, depth 24, little endian
+08/06/2026 12:01:53   true colour: max r 255 g 255 b 255, shift r 0 g 8 b 16
+08/06/2026 12:01:53 client_set_net: 127.0.0.1  0.0001
+08/06/2026 12:01:53 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000032)
+08/06/2026 12:01:53 rfbProcessClientNormalMessage: ignoring unsupported encoding type tightPng
+08/06/2026 12:01:53 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000015)
+08/06/2026 12:01:53 Using image quality level 6 for client 127.0.0.1
+08/06/2026 12:01:53 Using JPEG subsampling 0, Q79 for client 127.0.0.1
+08/06/2026 12:01:53 Using compression level 2 for client 127.0.0.1
+08/06/2026 12:01:53 Enabling NewFBSize protocol extension for client 127.0.0.1
+08/06/2026 12:01:53 Enabling LastRect protocol extension for client 127.0.0.1
+08/06/2026 12:01:53 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFE)
+08/06/2026 12:01:53 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFB)
+08/06/2026 12:01:53 Enabling ExtDesktopSize protocol extension for client 127.0.0.1
+08/06/2026 12:01:53 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC8)
+08/06/2026 12:01:53 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC7)
+08/06/2026 12:01:53 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFECD)
+08/06/2026 12:01:53 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC4)
+08/06/2026 12:01:53 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x574D5664)
+08/06/2026 12:01:53 Enabling full-color cursor updates for client 127.0.0.1
+08/06/2026 12:01:53 Using tight encoding for client 127.0.0.1
+08/06/2026 12:01:53 Sending rfbEncodingExtDesktopSize for size (1530x840) 
+08/06/2026 12:01:53 client 2 network rate 2398.0 KB/sec (103292.6 eff KB/sec)
+08/06/2026 12:01:53 client 2 latency:  1.2 ms
+08/06/2026 12:01:53 dt1: 0.0160, dt2: 0.0344 dt3: 0.0012 bytes: 119445
+08/06/2026 12:01:53 link_rate: LR_LAN - 1 ms, 2397 KB/s

@@ -3,6 +3,7 @@ package org.investpro.exchange.infrastructure;
 import org.investpro.models.trading.TradePair;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.Coinbase;
+import org.investpro.exchange.Oanda;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
@@ -108,6 +109,9 @@ public class PollingExchangeStreamer {
         if (exchange instanceof Coinbase) {
             return 20L;
         }
+        if (exchange instanceof Oanda) {
+            return 30L;
+        }
         return DEFAULT_TICKER_PERIOD_SECONDS;
     }
 
@@ -115,7 +119,24 @@ public class PollingExchangeStreamer {
         if (exchange instanceof Coinbase) {
             return 60L;
         }
+        if (exchange instanceof Oanda) {
+            return 60L;
+        }
         return DEFAULT_ORDER_BOOK_PERIOD_SECONDS;
+    }
+
+    private long accountPeriodSeconds() {
+        if (exchange instanceof Oanda) {
+            return 60L;
+        }
+        return DEFAULT_ACCOUNT_PERIOD_SECONDS;
+    }
+
+    private long privatePeriodSeconds() {
+        if (exchange instanceof Oanda) {
+            return 60L;
+        }
+        return DEFAULT_PRIVATE_PERIOD_SECONDS;
     }
 
     public void streamAccount(ExchangeStreamConsumer consumer) {
@@ -144,7 +165,7 @@ public class PollingExchangeStreamer {
             } catch (Exception exception) {
                 consumer.onError(exchange.getName(), exception);
             }
-        }, DEFAULT_ACCOUNT_PERIOD_SECONDS);
+        }, accountPeriodSeconds());
     }
 
     public void streamOrders(ExchangeStreamConsumer consumer) {
@@ -163,7 +184,7 @@ public class PollingExchangeStreamer {
             } catch (Exception exception) {
                 consumer.onError(exchange.getName(), exception);
             }
-        }, DEFAULT_PRIVATE_PERIOD_SECONDS);
+        }, privatePeriodSeconds());
     }
 
     public void streamPositions(ExchangeStreamConsumer consumer) {
@@ -182,7 +203,7 @@ public class PollingExchangeStreamer {
             } catch (Exception exception) {
                 consumer.onError(exchange.getName(), exception);
             }
-        }, DEFAULT_PRIVATE_PERIOD_SECONDS);
+        }, privatePeriodSeconds());
     }
 
     public void stopTicker(TradePair tradePair) {

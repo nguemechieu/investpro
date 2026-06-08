@@ -100,6 +100,9 @@ public class Oanda extends Exchange {
     private static final String ACCOUNT_TRANSACTIONS_ROUTE = "/v3/accounts/%s/transactions";
     private static final long CONNECTIVITY_LOG_INTERVAL_MS = 60_000L;
     private static final long ACCOUNT_CONNECTIVITY_FAILURE_TTL_MS = 30_000L;
+    private static final int PRICING_BATCH_SIZE = 20;
+    private static final long PRICING_CACHE_TTL_MS = 5_000L;
+    private static final long PRICING_CONNECTIVITY_FAILURE_TTL_MS = 15_000L;
 
     private final HttpClient httpClient;
     private final PollingExchangeStreamer pollingStreamer;
@@ -151,6 +154,8 @@ public class Oanda extends Exchange {
     private CompletableFuture<Account> inflightAccountRequest = null;
     private CompletableFuture<List<Position>> inflightPositionsRequest = null;
     private CompletableFuture<List<OpenOrder>> inflightOpenOrdersRequest = null;
+    private final ConcurrentHashMap<String, CompletableFuture<Map<String, Ticker>>> inflightPricingRequests =
+            new ConcurrentHashMap<>();
 
     // Diagnostics
     private final AtomicLong totalOandaRequests = new AtomicLong(0);
@@ -164,6 +169,7 @@ public class Oanda extends Exchange {
     private String last429Endpoint = "";
     private volatile long lastConnectivityLogMs = 0L;
     private volatile long accountConnectivityUnavailableUntilMs = 0L;
+    private volatile long pricingConnectivityUnavailableUntilMs = 0L;
 
     private static final Random jitterRandom = new Random();
 
@@ -1287,10 +1293,33 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
-        // Use batch pricing instead of individual requests
-        return getLatestPrices(tradePairs)
-                .thenApply(priceMap -> tradePairs.stream()
-                        .filter(Objects::nonNull)
+        List<TradePair> cleanedPairs = tradePairs.stream()
+                .filter(Objects::nonNull)
+                .toList();
+        if (cleanedPairs.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
+        if (cleanedPairs.size() > PRICING_BATCH_SIZE) {
+            List<List<TradePair>> batches = new ArrayList<>();
+            for (int i = 0; i < cleanedPairs.size(); i += PRICING_BATCH_SIZE) {
+                batches.add(cleanedPairs.subList(i, Math.min(i + PRICING_BATCH_SIZE, cleanedPairs.size())));
+            }
+            CompletableFuture<Map<String, Ticker>> chain = CompletableFuture.completedFuture(new LinkedHashMap<>());
+            for (List<TradePair> batch : batches) {
+                chain = chain.thenCompose(accumulator -> getLatestPrices(batch).thenApply(prices -> {
+                    accumulator.putAll(prices);
+                    return accumulator;
+                }));
+            }
+            return chain.thenApply(priceMap -> cleanedPairs.stream()
+                    .map(pair -> priceMap.getOrDefault(toInstrument(pair), emptyTicker()))
+                    .toList());
+        }
+
+        // Use batch pricing instead of individual requests.
+        return getLatestPrices(cleanedPairs)
+                .thenApply(priceMap -> cleanedPairs.stream()
                         .map(pair -> {
                             String instrument = toInstrument(pair);
                             return priceMap.getOrDefault(instrument, emptyTicker());
@@ -1300,7 +1329,9 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<List<Ticker>> getTicker(TradePair pair) {
-        return fetchTickers((List<TradePair>) pair);
+        return pair == null
+                ? CompletableFuture.completedFuture(Collections.emptyList())
+                : fetchTickers(List.of(pair));
     }
 
     // ---------------------------------------------------------------------
@@ -3590,7 +3621,7 @@ public class Oanda extends Exchange {
     }
 
     public void setPricingCached(String cacheKey, Map<String, Ticker> prices) {
-        setCached(cacheKey, prices, 500, pricingCache); // 500ms TTL
+        setCached(cacheKey, prices, PRICING_CACHE_TTL_MS, pricingCache);
     }
 
     public Account getAccountCached(String cacheKey) {
@@ -4137,6 +4168,7 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(new LinkedHashMap<>());
         }
 
+        long nowMs = System.currentTimeMillis();
         String account = resolveAccountId();
         if (account.isBlank()) {
             return CompletableFuture.completedFuture(new LinkedHashMap<>());
@@ -4147,6 +4179,17 @@ public class Oanda extends Exchange {
         Map<String, Ticker> cached = getPricingCached(cacheKey);
         if (cached != null) {
             return CompletableFuture.completedFuture(cached);
+        }
+
+        if (nowMs < pricingConnectivityUnavailableUntilMs) {
+            log.debug("OANDA pricing request skipped during connectivity cooldown. remainingMs={}",
+                    pricingConnectivityUnavailableUntilMs - nowMs);
+            return CompletableFuture.completedFuture(new LinkedHashMap<>());
+        }
+
+        CompletableFuture<Map<String, Ticker>> inflight = inflightPricingRequests.get(cacheKey);
+        if (inflight != null) {
+            return inflight;
         }
 
         // Batch instruments: EUR_USD,USD_JPY,...
@@ -4165,7 +4208,7 @@ public class Oanda extends Exchange {
 
         HttpRequest request = requestBuilder(url).GET().build();
 
-        return sendWithExponentialBackoff(request)
+        CompletableFuture<Map<String, Ticker>> requestFuture = sendWithExponentialBackoff(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         logger.warn("OANDA batch pricing failed HTTP {}", response.statusCode());
@@ -4202,7 +4245,22 @@ public class Oanda extends Exchange {
                         logger.error("Failed to parse batch pricing response", e);
                         return new LinkedHashMap<>();
                     }
-                });
+                })
+                .exceptionally(exception -> {
+                    Throwable root = rootCause(exception);
+                    if (isConnectivityException(root)) {
+                        pricingConnectivityUnavailableUntilMs = System.currentTimeMillis()
+                                + PRICING_CONNECTIVITY_FAILURE_TTL_MS;
+                        logConnectivityFailure("OANDA pricing", extractEndpoint(request.uri().toString()), root);
+                    } else {
+                        logger.debug("OANDA batch pricing failed: {}", safe(root.getMessage()));
+                    }
+                    return new LinkedHashMap<>();
+                })
+                .whenComplete((ignored, ignoredException) -> inflightPricingRequests.remove(cacheKey)).newIncompleteFuture();
+
+        CompletableFuture<Map<String, Ticker>> existing = inflightPricingRequests.putIfAbsent(cacheKey, requestFuture);
+        return existing == null ? requestFuture : existing;
     }
 
     private Ticker emptyTicker() {
