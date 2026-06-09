@@ -32,8 +32,9 @@ import org.investpro.data.CandleData;
 import org.investpro.enums.StrategyCategory;
 import org.investpro.indicators.INDICATORS;
 import org.investpro.indicators.INDICATORS.IndicatorCategory;
+import org.investpro.indicators.IndicatorCatalog;
 import org.investpro.indicators.metadata.IndicatorDefinition;
-import org.investpro.indicators.metadata.IndicatorDefinitionRegistry;
+
 import org.investpro.i18n.LocalizationService;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.models.trading.TradePair;
@@ -92,79 +93,80 @@ public class StrategyBuilderPanel extends VBox {
     public static final Map<String, StrategyDefinition> USER_DEFINED_STRATEGIES = new ConcurrentHashMap<>();
 
     // -----------------------------------------------------------------------
-    // Indicator → default parameter definitions  [paramName, defaultValue]
+    // Indicator → default parameter definitions [paramName, defaultValue]
     // -----------------------------------------------------------------------
     private static final Map<INDICATORS, List<String[]>> INDICATOR_DEFAULTS;
 
     static {
         Map<INDICATORS, List<String[]>> m = new LinkedHashMap<>();
-        m.put(INDICATORS.RSI,               defaults(p("period","14"), p("oversold","35.0"), p("overbought","65.0")));
-        m.put(INDICATORS.SMA,               defaults(p("period","20")));
-        m.put(INDICATORS.EMA,               defaults(p("period","20")));
-        m.put(INDICATORS.EMA_FAST,          defaults(p("period","12")));
-        m.put(INDICATORS.EMA_SLOW,          defaults(p("period","26")));
-        m.put(INDICATORS.WMA,               defaults(p("period","20")));
-        m.put(INDICATORS.HMA,               defaults(p("period","20")));
-        m.put(INDICATORS.DEMA,              defaults(p("period","20")));
-        m.put(INDICATORS.TEMA,              defaults(p("period","20")));
-        m.put(INDICATORS.VWMA,              defaults(p("period","20")));
-        m.put(INDICATORS.KAMA,              defaults(p("period","10")));
-        m.put(INDICATORS.ZLEMA,             defaults(p("period","20")));
-        m.put(INDICATORS.MA_CROSSOVER,      defaults(p("fastPeriod","12"), p("slowPeriod","26")));
-        m.put(INDICATORS.MACD,              defaults(p("fastPeriod","12"), p("slowPeriod","26"), p("signalPeriod","9")));
-        m.put(INDICATORS.MACD_LINE,         defaults(p("fastPeriod","12"), p("slowPeriod","26")));
-        m.put(INDICATORS.MACD_SIGNAL,       defaults(p("signalPeriod","9")));
-        m.put(INDICATORS.MACD_HISTOGRAM,    defaults(p("fastPeriod","12"), p("slowPeriod","26"), p("signalPeriod","9")));
-        m.put(INDICATORS.ATR,               defaults(p("period","14")));
-        m.put(INDICATORS.ATR_PERCENT,       defaults(p("period","14")));
-        m.put(INDICATORS.BOLLINGER_BANDS,   defaults(p("period","20"), p("stdDevMult","2.0")));
-        m.put(INDICATORS.BOLLINGER_UPPER,   defaults(p("period","20"), p("stdDevMult","2.0")));
-        m.put(INDICATORS.BOLLINGER_MIDDLE,  defaults(p("period","20")));
-        m.put(INDICATORS.BOLLINGER_LOWER,   defaults(p("period","20"), p("stdDevMult","2.0")));
-        m.put(INDICATORS.BOLLINGER_WIDTH,   defaults(p("period","20"), p("stdDevMult","2.0")));
-        m.put(INDICATORS.BOLLINGER_PERCENT_B, defaults(p("period","20"), p("stdDevMult","2.0")));
-        m.put(INDICATORS.KELTNER_CHANNEL,   defaults(p("emaPeriod","20"), p("atrPeriod","14"), p("atrMult","1.5")));
-        m.put(INDICATORS.KELTNER_UPPER,     defaults(p("emaPeriod","20"), p("atrPeriod","14"), p("atrMult","1.5")));
-        m.put(INDICATORS.KELTNER_LOWER,     defaults(p("emaPeriod","20"), p("atrPeriod","14"), p("atrMult","1.5")));
-        m.put(INDICATORS.DONCHIAN_CHANNEL,  defaults(p("period","20")));
-        m.put(INDICATORS.DONCHIAN_HIGH,     defaults(p("period","20")));
-        m.put(INDICATORS.DONCHIAN_LOW,      defaults(p("period","20")));
-        m.put(INDICATORS.STANDARD_DEVIATION, defaults(p("period","20")));
-        m.put(INDICATORS.HISTORICAL_VOLATILITY, defaults(p("period","20")));
-        m.put(INDICATORS.STOCHASTIC,        defaults(p("kPeriod","14"), p("dPeriod","3"), p("smooth","3")));
-        m.put(INDICATORS.STOCHASTIC_K,      defaults(p("kPeriod","14"), p("smooth","3")));
-        m.put(INDICATORS.STOCHASTIC_D,      defaults(p("dPeriod","3")));
-        m.put(INDICATORS.STOCH_RSI,         defaults(p("rsiPeriod","14"), p("stochPeriod","14"), p("kSmooth","3"), p("dSmooth","3")));
-        m.put(INDICATORS.CCI,               defaults(p("period","20")));
-        m.put(INDICATORS.MOMENTUM,          defaults(p("period","10")));
-        m.put(INDICATORS.ROC,               defaults(p("period","12")));
-        m.put(INDICATORS.WILLIAMS_R,        defaults(p("period","14")));
-        m.put(INDICATORS.TRIX,              defaults(p("period","15")));
-        m.put(INDICATORS.ULTIMATE_OSCILLATOR, defaults(p("period1","7"), p("period2","14"), p("period3","28")));
-        m.put(INDICATORS.ADX,               defaults(p("period","14")));
-        m.put(INDICATORS.PSAR,              defaults(p("step","0.02"), p("maxStep","0.2")));
-        m.put(INDICATORS.ICHIMOKU,          defaults(p("tenkan","9"), p("kijun","26"), p("senkouB","52")));
-        m.put(INDICATORS.ICHIMOKU_TENKAN,   defaults(p("period","9")));
-        m.put(INDICATORS.ICHIMOKU_KIJUN,    defaults(p("period","26")));
+        m.put(INDICATORS.RSI, defaults(p("period", "14"), p("oversold", "35.0"), p("overbought", "65.0")));
+        m.put(INDICATORS.SMA, defaults(p("period", "20")));
+        m.put(INDICATORS.EMA, defaults(p("period", "20")));
+        m.put(INDICATORS.EMA_FAST, defaults(p("period", "12")));
+        m.put(INDICATORS.EMA_SLOW, defaults(p("period", "26")));
+        m.put(INDICATORS.WMA, defaults(p("period", "20")));
+        m.put(INDICATORS.HMA, defaults(p("period", "20")));
+        m.put(INDICATORS.DEMA, defaults(p("period", "20")));
+        m.put(INDICATORS.TEMA, defaults(p("period", "20")));
+        m.put(INDICATORS.VWMA, defaults(p("period", "20")));
+        m.put(INDICATORS.KAMA, defaults(p("period", "10")));
+        m.put(INDICATORS.ZLEMA, defaults(p("period", "20")));
+        m.put(INDICATORS.MA_CROSSOVER, defaults(p("fastPeriod", "12"), p("slowPeriod", "26")));
+        m.put(INDICATORS.MACD, defaults(p("fastPeriod", "12"), p("slowPeriod", "26"), p("signalPeriod", "9")));
+        m.put(INDICATORS.MACD_LINE, defaults(p("fastPeriod", "12"), p("slowPeriod", "26")));
+        m.put(INDICATORS.MACD_SIGNAL, defaults(p("signalPeriod", "9")));
+        m.put(INDICATORS.MACD_HISTOGRAM,
+                defaults(p("fastPeriod", "12"), p("slowPeriod", "26"), p("signalPeriod", "9")));
+        m.put(INDICATORS.ATR, defaults(p("period", "14")));
+        m.put(INDICATORS.ATR_PERCENT, defaults(p("period", "14")));
+        m.put(INDICATORS.BOLLINGER_BANDS, defaults(p("period", "20"), p("stdDevMult", "2.0")));
+        m.put(INDICATORS.BOLLINGER_UPPER, defaults(p("period", "20"), p("stdDevMult", "2.0")));
+        m.put(INDICATORS.BOLLINGER_MIDDLE, defaults(p("period", "20")));
+        m.put(INDICATORS.BOLLINGER_LOWER, defaults(p("period", "20"), p("stdDevMult", "2.0")));
+        m.put(INDICATORS.BOLLINGER_WIDTH, defaults(p("period", "20"), p("stdDevMult", "2.0")));
+        m.put(INDICATORS.BOLLINGER_PERCENT_B, defaults(p("period", "20"), p("stdDevMult", "2.0")));
+        m.put(INDICATORS.KELTNER_CHANNEL, defaults(p("emaPeriod", "20"), p("atrPeriod", "14"), p("atrMult", "1.5")));
+        m.put(INDICATORS.KELTNER_UPPER, defaults(p("emaPeriod", "20"), p("atrPeriod", "14"), p("atrMult", "1.5")));
+        m.put(INDICATORS.KELTNER_LOWER, defaults(p("emaPeriod", "20"), p("atrPeriod", "14"), p("atrMult", "1.5")));
+        m.put(INDICATORS.DONCHIAN_CHANNEL, defaults(p("period", "20")));
+        m.put(INDICATORS.DONCHIAN_HIGH, defaults(p("period", "20")));
+        m.put(INDICATORS.DONCHIAN_LOW, defaults(p("period", "20")));
+        m.put(INDICATORS.STANDARD_DEVIATION, defaults(p("period", "20")));
+        m.put(INDICATORS.HISTORICAL_VOLATILITY, defaults(p("period", "20")));
+        m.put(INDICATORS.STOCHASTIC, defaults(p("kPeriod", "14"), p("dPeriod", "3"), p("smooth", "3")));
+        m.put(INDICATORS.STOCHASTIC_K, defaults(p("kPeriod", "14"), p("smooth", "3")));
+        m.put(INDICATORS.STOCHASTIC_D, defaults(p("dPeriod", "3")));
+        m.put(INDICATORS.STOCH_RSI,
+                defaults(p("rsiPeriod", "14"), p("stochPeriod", "14"), p("kSmooth", "3"), p("dSmooth", "3")));
+        m.put(INDICATORS.CCI, defaults(p("period", "20")));
+        m.put(INDICATORS.MOMENTUM, defaults(p("period", "10")));
+        m.put(INDICATORS.ROC, defaults(p("period", "12")));
+        m.put(INDICATORS.WILLIAMS_R, defaults(p("period", "14")));
+        m.put(INDICATORS.TRIX, defaults(p("period", "15")));
+        m.put(INDICATORS.ULTIMATE_OSCILLATOR, defaults(p("period1", "7"), p("period2", "14"), p("period3", "28")));
+        m.put(INDICATORS.ADX, defaults(p("period", "14")));
+        m.put(INDICATORS.PSAR, defaults(p("step", "0.02"), p("maxStep", "0.2")));
+        m.put(INDICATORS.ICHIMOKU, defaults(p("tenkan", "9"), p("kijun", "26"), p("senkouB", "52")));
+        m.put(INDICATORS.ICHIMOKU_TENKAN, defaults(p("period", "9")));
+        m.put(INDICATORS.ICHIMOKU_KIJUN, defaults(p("period", "26")));
         m.put(INDICATORS.ICHIMOKU_SENKOU_A, defaults());
-        m.put(INDICATORS.ICHIMOKU_SENKOU_B, defaults(p("period","52")));
-        m.put(INDICATORS.ICHIMOKU_CHIKOU,   defaults(p("displacement","26")));
-        m.put(INDICATORS.VOLUME_SMA,        defaults(p("period","20")));
-        m.put(INDICATORS.VOLUME_RATIO,      defaults(p("period","20")));
-        m.put(INDICATORS.MFI,               defaults(p("period","14")));
-        m.put(INDICATORS.CMF,               defaults(p("period","20")));
-        m.put(INDICATORS.VWAP,              defaults());
-        m.put(INDICATORS.OBV,               defaults());
-        m.put(INDICATORS.ADL,               defaults());
-        m.put(INDICATORS.VOLUME_SPIKE,      defaults(p("thresholdMult","2.0"), p("period","20")));
+        m.put(INDICATORS.ICHIMOKU_SENKOU_B, defaults(p("period", "52")));
+        m.put(INDICATORS.ICHIMOKU_CHIKOU, defaults(p("displacement", "26")));
+        m.put(INDICATORS.VOLUME_SMA, defaults(p("period", "20")));
+        m.put(INDICATORS.VOLUME_RATIO, defaults(p("period", "20")));
+        m.put(INDICATORS.MFI, defaults(p("period", "14")));
+        m.put(INDICATORS.CMF, defaults(p("period", "20")));
+        m.put(INDICATORS.VWAP, defaults());
+        m.put(INDICATORS.OBV, defaults());
+        m.put(INDICATORS.ADL, defaults());
+        m.put(INDICATORS.VOLUME_SPIKE, defaults(p("thresholdMult", "2.0"), p("period", "20")));
         INDICATOR_DEFAULTS = Collections.unmodifiableMap(m);
     }
 
     @Contract(value = "_, _ -> new", pure = true)
     private static String @NonNull [] p(String name, String def) {
-        return new String[]{name, def};
+        return new String[] { name, def };
     }
-
 
     @Contract(pure = true)
     private static @NonNull List<String[]> defaults(String[]... entries) {
@@ -269,13 +271,15 @@ public class StrategyBuilderPanel extends VBox {
         categoryCombo.setMaxWidth(Double.MAX_VALUE);
         categoryCombo.getStyleClass().add("strategy-input");
         categoryCombo.setCellFactory(lv -> new ListCell<>() {
-            @Override protected void updateItem(StrategyCategory c, boolean empty) {
+            @Override
+            protected void updateItem(StrategyCategory c, boolean empty) {
                 super.updateItem(c, empty);
                 setText(empty || c == null ? null : c.getDisplayName());
             }
         });
         categoryCombo.setButtonCell(new ListCell<>() {
-            @Override protected void updateItem(StrategyCategory c, boolean empty) {
+            @Override
+            protected void updateItem(StrategyCategory c, boolean empty) {
                 super.updateItem(c, empty);
                 setText(empty || c == null ? "Select category..." : c.getDisplayName());
             }
@@ -343,7 +347,8 @@ public class StrategyBuilderPanel extends VBox {
         autoStrategyStatusLabel = mutedLabel("Auto Strategy Lab: idle");
         autoStrategyStatusLabel.getStyleClass().add("strategy-auto-status");
 
-        card.getChildren().addAll(createWorkspaceToolbar(), rulesTable, addRuleButton, thresholds, autoStrategyStatusLabel, createParamsPreviewSection());
+        card.getChildren().addAll(createWorkspaceToolbar(), rulesTable, addRuleButton, thresholds,
+                autoStrategyStatusLabel, createParamsPreviewSection());
         return card;
     }
 
@@ -434,7 +439,8 @@ public class StrategyBuilderPanel extends VBox {
         typeCol.setCellValueFactory(c -> c.getValue().signalTypeProperty());
         typeCol.setPrefWidth(120);
         typeCol.setCellFactory(col -> new TableCell<>() {
-            @Override protected void updateItem(String item, boolean empty) {
+            @Override
+            protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setGraphic(null);
@@ -456,7 +462,8 @@ public class StrategyBuilderPanel extends VBox {
         sourceCol.setCellValueFactory(c -> c.getValue().sourceNameProperty());
         sourceCol.setPrefWidth(150);
         sourceCol.setCellFactory(col -> new TableCell<>() {
-            @Override protected void updateItem(String item, boolean empty) {
+            @Override
+            protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setGraphic(null);
@@ -500,7 +507,9 @@ public class StrategyBuilderPanel extends VBox {
                     updatePreview();
                 });
             }
-            @Override protected void updateItem(Void v, boolean empty) {
+
+            @Override
+            protected void updateItem(Void v, boolean empty) {
                 super.updateItem(v, empty);
                 setGraphic(empty ? null : actions);
             }
@@ -558,13 +567,15 @@ public class StrategyBuilderPanel extends VBox {
         categoryCombo.setPrefHeight(35);
         categoryCombo.setMaxWidth(Double.MAX_VALUE);
         categoryCombo.setCellFactory(lv -> new ListCell<>() {
-            @Override protected void updateItem(StrategyCategory c, boolean empty) {
+            @Override
+            protected void updateItem(StrategyCategory c, boolean empty) {
                 super.updateItem(c, empty);
                 setText(empty || c == null ? null : c.getDisplayName());
             }
         });
         categoryCombo.setButtonCell(new ListCell<>() {
-            @Override protected void updateItem(StrategyCategory c, boolean empty) {
+            @Override
+            protected void updateItem(StrategyCategory c, boolean empty) {
                 super.updateItem(c, empty);
                 setText(empty || c == null ? "Select category…" : c.getDisplayName());
             }
@@ -594,13 +605,15 @@ public class StrategyBuilderPanel extends VBox {
         categoryFilterCombo.setPrefHeight(32);
         categoryFilterCombo.setMaxWidth(Double.MAX_VALUE);
         categoryFilterCombo.setButtonCell(new ListCell<>() {
-            @Override protected void updateItem(IndicatorCategory ic, boolean empty) {
+            @Override
+            protected void updateItem(IndicatorCategory ic, boolean empty) {
                 super.updateItem(ic, empty);
                 setText(empty || ic == null ? "All categories" : ic.name());
             }
         });
         categoryFilterCombo.setCellFactory(lv -> new ListCell<>() {
-            @Override protected void updateItem(IndicatorCategory ic, boolean empty) {
+            @Override
+            protected void updateItem(IndicatorCategory ic, boolean empty) {
                 super.updateItem(ic, empty);
                 setText(empty || ic == null ? "All categories" : ic.name());
             }
@@ -611,9 +624,13 @@ public class StrategyBuilderPanel extends VBox {
         indicatorCombo.setPrefHeight(32);
         indicatorCombo.setMaxWidth(Double.MAX_VALUE);
         Callback<INDICATORS> indicatorCellFactory = () -> new ListCell<>() {
-            @Override protected void updateItem(INDICATORS ind, boolean empty) {
+            @Override
+            protected void updateItem(INDICATORS ind, boolean empty) {
                 super.updateItem(ind, empty);
-                if (empty || ind == null) { setText(null); return; }
+                if (empty || ind == null) {
+                    setText(null);
+                    return;
+                }
                 setText("[" + ind.getCategory().name() + "] " + ind.getDisplayName());
             }
         };
@@ -627,11 +644,13 @@ public class StrategyBuilderPanel extends VBox {
 
         // Tooltip shows description of selected indicator
         indicatorCombo.getSelectionModel().selectedItemProperty().addListener((obs, o, sel) -> {
-            if (sel != null) indicatorCombo.setTooltip(new Tooltip(sel.getDescription()));
+            if (sel != null)
+                indicatorCombo.setTooltip(new Tooltip(sel.getDescription()));
         });
 
         Button addBtn = new Button("+ Add");
-        addBtn.setStyle("-fx-padding: 6px 18px; -fx-background-color: #10b981; -fx-text-fill: white; -fx-font-weight: bold;");
+        addBtn.setStyle(
+                "-fx-padding: 6px 18px; -fx-background-color: #10b981; -fx-text-fill: white; -fx-font-weight: bold;");
         addBtn.setOnAction(e -> addIndicatorToTable());
 
         HBox pickerRow = new HBox(8,
@@ -659,8 +678,10 @@ public class StrategyBuilderPanel extends VBox {
                 .filter(i -> filter == null || i.getCategory() == filter)
                 .collect(Collectors.toList());
         indicatorCombo.getItems().setAll(filtered);
-        if (prev != null && filtered.contains(prev)) indicatorCombo.setValue(prev);
-        else if (!filtered.isEmpty()) indicatorCombo.getSelectionModel().selectFirst();
+        if (prev != null && filtered.contains(prev))
+            indicatorCombo.setValue(prev);
+        else if (!filtered.isEmpty())
+            indicatorCombo.getSelectionModel().selectFirst();
     }
 
     private TableView<StrategyParameterRow> buildParametersTable() {
@@ -695,14 +716,17 @@ public class StrategyBuilderPanel extends VBox {
         actionCol.setCellFactory(col -> new TableCell<>() {
             private final Button removeBtn = new Button("✕");
             {
-                removeBtn.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; -fx-padding: 2px 8px; -fx-font-size: 11px;");
+                removeBtn.setStyle(
+                        "-fx-background-color: #ef4444; -fx-text-fill: white; -fx-padding: 2px 8px; -fx-font-size: 11px;");
                 removeBtn.setOnAction(e -> {
                     StrategyParameterRow row = getTableView().getItems().get(getIndex());
                     parameterRows.remove(row);
                     updatePreview();
                 });
             }
-            @Override protected void updateItem(Void v, boolean empty) {
+
+            @Override
+            protected void updateItem(Void v, boolean empty) {
                 super.updateItem(v, empty);
                 setGraphic(empty ? null : removeBtn);
             }
@@ -798,7 +822,7 @@ public class StrategyBuilderPanel extends VBox {
         ruleCategoryCombo.setCellFactory(lv -> indicatorCategoryCell("All categories"));
 
         ObservableList<INDICATORS> indicators = FXCollections.observableArrayList(
-                IndicatorDefinitionRegistry.all().stream()
+                IndicatorDefinition.all().stream()
                         .map(IndicatorDefinition::indicator)
                         .toList());
         FilteredList<INDICATORS> filteredIndicators = new FilteredList<>(indicators, indicator -> true);
@@ -809,7 +833,7 @@ public class StrategyBuilderPanel extends VBox {
                     ? ""
                     : searchField.getText().trim().toLowerCase(Locale.ROOT);
             filteredIndicators.setPredicate(indicator -> {
-                IndicatorDefinition definition = IndicatorDefinitionRegistry.get(indicator);
+                IndicatorDefinition definition = IndicatorDefinition.get(indicator);
                 boolean categoryMatches = selectedCategory == null || definition.category() == selectedCategory;
                 boolean queryMatches = query.isBlank()
                         || definition.displayName().toLowerCase(Locale.ROOT).contains(query)
@@ -823,17 +847,23 @@ public class StrategyBuilderPanel extends VBox {
         indicatorList.getStyleClass().add("candle-pattern-list");
         indicatorList.setPrefHeight(300);
         indicatorList.setCellFactory(list -> new ListCell<>() {
-            @Override protected void updateItem(INDICATORS indicator, boolean empty) {
+            @Override
+            protected void updateItem(INDICATORS indicator, boolean empty) {
                 super.updateItem(indicator, empty);
+
                 if (empty || indicator == null) {
                     setGraphic(null);
                     return;
                 }
-                IndicatorDefinition definition = IndicatorDefinitionRegistry.get(indicator);
+
+                IndicatorDefinition definition = IndicatorDefinition.get(indicator);
+
                 Label name = new Label(definition.displayName());
                 HBox.setHgrow(name, Priority.ALWAYS);
+
                 Label category = new Label(definition.category().name());
                 category.getStyleClass().add("strategy-rule-source");
+
                 HBox row = new HBox(10, name, category);
                 row.setAlignment(Pos.CENTER_LEFT);
                 setGraphic(row);
@@ -860,30 +890,38 @@ public class StrategyBuilderPanel extends VBox {
         Runnable refreshParameters = () -> {
             parameterBox.getChildren().clear();
             parameterEditors.clear();
+
             INDICATORS selectedIndicator = indicatorList.getSelectionModel().getSelectedItem();
+
             if (selectedIndicator == null) {
                 parameterBox.getChildren().add(mutedLabel("Select an indicator to edit parameters."));
                 return;
             }
-            IndicatorDefinition definition = IndicatorDefinitionRegistry.get(selectedIndicator);
+
+            IndicatorDefinition definition = IndicatorCatalog.get(selectedIndicator);
+
             Label description = mutedLabel(definition.description());
             description.setWrapText(true);
             parameterBox.getChildren().add(description);
+
             if (definition.parameters().isEmpty()) {
                 parameterBox.getChildren().add(mutedLabel("No configurable parameters."));
                 return;
             }
+
             for (var parameter : definition.parameters()) {
                 TextField field = new TextField(parameter.defaultValue());
                 field.getStyleClass().add("strategy-input");
+
                 parameterEditors.put(parameter.name(), field);
                 parameterBox.getChildren().add(createStackedInput(parameter.displayName(), field));
             }
         };
-
         searchField.textProperty().addListener((obs, oldValue, newValue) -> applyFilter.run());
-        ruleCategoryCombo.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> applyFilter.run());
-        indicatorList.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refreshParameters.run());
+        ruleCategoryCombo.getSelectionModel().selectedItemProperty()
+                .addListener((obs, oldValue, newValue) -> applyFilter.run());
+        indicatorList.getSelectionModel().selectedItemProperty()
+                .addListener((obs, oldValue, newValue) -> refreshParameters.run());
         indicatorList.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2 && indicatorList.getSelectionModel().getSelectedItem() != null) {
                 Button addButton = (Button) dialog.getDialogPane().lookupButton(addButtonType);
@@ -953,15 +991,16 @@ public class StrategyBuilderPanel extends VBox {
         FilteredList<CandlePattern> filteredPatterns = new FilteredList<>(patterns, pattern -> true);
         searchField.textProperty().addListener((obs, oldValue, newValue) -> {
             String query = newValue == null ? "" : newValue.trim().toLowerCase(Locale.ROOT);
-            filteredPatterns.setPredicate(pattern ->
-                    query.isEmpty() || pattern.getDisplayName().toLowerCase(Locale.ROOT).contains(query));
+            filteredPatterns.setPredicate(
+                    pattern -> query.isEmpty() || pattern.getDisplayName().toLowerCase(Locale.ROOT).contains(query));
         });
 
         ListView<CandlePattern> patternList = new ListView<>(filteredPatterns);
         patternList.getStyleClass().add("candle-pattern-list");
         patternList.setPrefHeight(420);
         patternList.setCellFactory(list -> new ListCell<>() {
-            @Override protected void updateItem(CandlePattern pattern, boolean empty) {
+            @Override
+            protected void updateItem(CandlePattern pattern, boolean empty) {
                 super.updateItem(pattern, empty);
                 if (empty || pattern == null) {
                     setGraphic(null);
@@ -1085,7 +1124,8 @@ public class StrategyBuilderPanel extends VBox {
         conversation.setText("AI: " + buildAiWelcomeMessage() + "\n");
 
         TextArea prompt = new TextArea();
-        prompt.setPromptText("Ask AI to review, improve, explain, add RSI, add Hammer, balance signals, or test the strategy...");
+        prompt.setPromptText(
+                "Ask AI to review, improve, explain, add RSI, add Hammer, balance signals, or test the strategy...");
         prompt.setWrapText(true);
         prompt.setPrefRowCount(3);
         prompt.getStyleClass().add("strategy-text-area");
@@ -1149,7 +1189,8 @@ public class StrategyBuilderPanel extends VBox {
         modelCombo.setValue(AiModelCatalog.defaultModel());
         modelCombo.setMaxWidth(Double.MAX_VALUE);
         modelCombo.setCellFactory(list -> new ListCell<>() {
-            @Override protected void updateItem(AiModelDefinition item, boolean empty) {
+            @Override
+            protected void updateItem(AiModelDefinition item, boolean empty) {
                 super.updateItem(item, empty);
                 setText(empty || item == null ? null : item.displayName() + (item.free() ? " (Free)" : ""));
             }
@@ -1180,7 +1221,8 @@ public class StrategyBuilderPanel extends VBox {
             AiModelDefinition model = modelCombo.getValue();
             BigDecimal estimatedCost = AiCostEstimator.estimateTotalCredits(model, prompt.getText());
             modelDescription.setText(model == null ? "No model selected." : model.description());
-            creditLabel.setText("Credits: free " + creditAccount.freeCredits() + " | paid " + creditAccount.paidCredits());
+            creditLabel
+                    .setText("Credits: free " + creditAccount.freeCredits() + " | paid " + creditAccount.paidCredits());
             costLabel.setText("Estimated cost: " + estimatedCost + " credits");
             createButton.setDisable(!aiEnabled
                     || model == null
@@ -1220,7 +1262,8 @@ public class StrategyBuilderPanel extends VBox {
             setAutoStrategyStatus("AI strategy generation started...");
             CompletableFuture
                     .supplyAsync(() -> new SafeAiStrategyGenerator().generate(request))
-                    .whenComplete((result, throwable) -> Platform.runLater(() -> handleAiStrategyResult(result, throwable)));
+                    .whenComplete(
+                            (result, throwable) -> Platform.runLater(() -> handleAiStrategyResult(result, throwable)));
         });
     }
 
@@ -1258,7 +1301,8 @@ public class StrategyBuilderPanel extends VBox {
                     lastAutoEvaluations = List.of();
                     setAutoStrategyStatus("Generated " + lastAutoCandidates.size()
                             + " candidate(s). Best template score="
-                            + lastAutoCandidates.stream().mapToDouble(StrategyCandidate::generationScore).max().orElse(0.0));
+                            + lastAutoCandidates.stream().mapToDouble(StrategyCandidate::generationScore).max()
+                                    .orElse(0.0));
                 }));
     }
 
@@ -1273,7 +1317,8 @@ public class StrategyBuilderPanel extends VBox {
         CompletableFuture
                 .supplyAsync(() -> {
                     StrategyGenerationContext context = createAutoStrategyContext(timeframe, true);
-                    return new AbstractMap.SimpleEntry<>(context, autoStrategyLab.evaluateCandidates(lastAutoCandidates, context).join());
+                    return new AbstractMap.SimpleEntry<>(context,
+                            autoStrategyLab.evaluateCandidates(lastAutoCandidates, context).join());
                 })
                 .whenComplete((entry, throwable) -> Platform.runLater(() -> {
                     if (throwable != null) {
@@ -1299,8 +1344,9 @@ public class StrategyBuilderPanel extends VBox {
         }
         StrategyAssignmentDecision decision = autoStrategyLab.assignBest(
                 lastAutoEvaluations,
-                lastAutoContext == null ? null : org.investpro.strategy.StrategySelectionService.getInstance()
-                        .getCurrentAssignment(lastAutoContext.symbol(), lastAutoContext.timeframe()),
+                lastAutoContext == null ? null
+                        : org.investpro.strategy.StrategySelectionService.getInstance()
+                                .getCurrentAssignment(lastAutoContext.symbol(), lastAutoContext.timeframe()),
                 lastAutoContext,
                 true);
         setAutoStrategyStatus("Decision: " + decision.reason());
@@ -1338,7 +1384,8 @@ public class StrategyBuilderPanel extends VBox {
                 : List.of();
         MarketRegime regime = candles.isEmpty() ? MarketRegime.UNKNOWN : marketRegimeDetector.detect(candles);
         NewsContext newsContext = CryptoNewsIntelligence.contextService()
-                .getContextForSymbol(symbol.contains("/") ? symbol.substring(0, symbol.indexOf('/')) : symbol, Duration.ofHours(24));
+                .getContextForSymbol(symbol.contains("/") ? symbol.substring(0, symbol.indexOf('/')) : symbol,
+                        Duration.ofHours(24));
         return new StrategyGenerationContext(
                 symbol,
                 timeframe,
@@ -1408,8 +1455,10 @@ public class StrategyBuilderPanel extends VBox {
         if (ruleRows == null || ruleRows.isEmpty()) {
             response.append("No rules are configured yet. Start with one indicator rule and one confirmation rule.");
         } else {
-            long indicatorCount = ruleRows.stream().filter(r -> r.getRuleSource() == StrategyRuleSource.INDICATOR).count();
-            long candleCount = ruleRows.stream().filter(r -> r.getRuleSource() == StrategyRuleSource.CANDLE_PATTERN).count();
+            long indicatorCount = ruleRows.stream().filter(r -> r.getRuleSource() == StrategyRuleSource.INDICATOR)
+                    .count();
+            long candleCount = ruleRows.stream().filter(r -> r.getRuleSource() == StrategyRuleSource.CANDLE_PATTERN)
+                    .count();
             response.append("You have ").append(indicatorCount).append(" indicator rule(s) and ")
                     .append(candleCount).append(" candle-pattern rule(s). ");
             if (indicatorCount == 0) {
@@ -1418,7 +1467,8 @@ public class StrategyBuilderPanel extends VBox {
             if (candleCount == 0) {
                 response.append("Add a candle pattern if you want price-action confirmation. ");
             }
-            response.append("Run Backtesting after each change and compare trade count, return, drawdown, and profit factor.");
+            response.append(
+                    "Run Backtesting after each change and compare trade count, return, drawdown, and profit factor.");
         }
         return response.toString();
     }
@@ -1433,8 +1483,8 @@ public class StrategyBuilderPanel extends VBox {
                 parameterRows.add(new StrategyParameterRow(rule.getIndicatorName(), "(no parameters)", ""));
                 continue;
             }
-            rule.getParameters().forEach((name, value) ->
-                    parameterRows.add(new StrategyParameterRow(rule.getIndicatorName(), name, value)));
+            rule.getParameters().forEach(
+                    (name, value) -> parameterRows.add(new StrategyParameterRow(rule.getIndicatorName(), name, value)));
         }
     }
 
@@ -1458,7 +1508,8 @@ public class StrategyBuilderPanel extends VBox {
         if (pattern == null) {
             return;
         }
-        StrategyRuleRow row = new StrategyRuleRow(pattern, timeframe == null ? selectedOrDefaultTimeframe() : timeframe);
+        StrategyRuleRow row = new StrategyRuleRow(pattern,
+                timeframe == null ? selectedOrDefaultTimeframe() : timeframe);
         ruleRows.add(row);
         syncParameterRowsFromRules();
         updateSignalThresholdLabels();
@@ -1485,29 +1536,36 @@ public class StrategyBuilderPanel extends VBox {
         }
         for (StrategyParameterRow row : effectiveParameterRows()) {
             String param = row.getParameterName().toLowerCase(Locale.ROOT).replace(" ", "");
-            String val   = row.getValue().trim();
-            if (val.isEmpty() || val.equals("(no parameters)")) continue;
+            String val = row.getValue().trim();
+            if (val.isEmpty() || val.equals("(no parameters)"))
+                continue;
             try {
                 switch (param) {
                     case "period" -> {
                         // Route "period" to the correct field based on indicator name
                         String ind = row.getIndicatorName().toLowerCase(Locale.ROOT);
-                        if (ind.contains("rsi"))        builder.rsiPeriod(Integer.parseInt(val));
-                        else if (ind.contains("atr"))   builder.atrPeriod(Integer.parseInt(val));
-                        else if (ind.contains("fast"))  builder.emaFast(Integer.parseInt(val));
-                        else if (ind.contains("slow"))  builder.emaSlow(Integer.parseInt(val));
-                        else if (ind.contains("breakout") || ind.contains("donchian")) builder.breakoutLookback(Integer.parseInt(val));
+                        if (ind.contains("rsi"))
+                            builder.rsiPeriod(Integer.parseInt(val));
+                        else if (ind.contains("atr"))
+                            builder.atrPeriod(Integer.parseInt(val));
+                        else if (ind.contains("fast"))
+                            builder.emaFast(Integer.parseInt(val));
+                        else if (ind.contains("slow"))
+                            builder.emaSlow(Integer.parseInt(val));
+                        else if (ind.contains("breakout") || ind.contains("donchian"))
+                            builder.breakoutLookback(Integer.parseInt(val));
                     }
-                    case "rsiperiod"      -> builder.rsiPeriod(Integer.parseInt(val));
-                    case "fastperiod"     -> builder.emaFast(Integer.parseInt(val));
-                    case "slowperiod"     -> builder.emaSlow(Integer.parseInt(val));
-                    case "atrperiod"      -> builder.atrPeriod(Integer.parseInt(val));
+                    case "rsiperiod" -> builder.rsiPeriod(Integer.parseInt(val));
+                    case "fastperiod" -> builder.emaFast(Integer.parseInt(val));
+                    case "slowperiod" -> builder.emaSlow(Integer.parseInt(val));
+                    case "atrperiod" -> builder.atrPeriod(Integer.parseInt(val));
                     case "breakoutlookback" -> builder.breakoutLookback(Integer.parseInt(val));
-                    case "oversold"       -> builder.oversoldThreshold(Double.parseDouble(val));
-                    case "overbought"     -> builder.overboughtThreshold(Double.parseDouble(val));
-                    case "minconfidence"  -> builder.minConfidence(Double.parseDouble(val));
-                    case "signalamount"   -> builder.signalAmount(Double.parseDouble(val));
-                    default -> { /* indicator-specific param — stored in description/metadata */ }
+                    case "oversold" -> builder.oversoldThreshold(Double.parseDouble(val));
+                    case "overbought" -> builder.overboughtThreshold(Double.parseDouble(val));
+                    case "minconfidence" -> builder.minConfidence(Double.parseDouble(val));
+                    case "signalamount" -> builder.signalAmount(Double.parseDouble(val));
+                    default -> {
+                        /* indicator-specific param — stored in description/metadata */ }
                 }
             } catch (NumberFormatException ex) {
                 log.warn("Non-numeric value '{}' for param '{}' — skipped", val, param);
@@ -1530,22 +1588,28 @@ public class StrategyBuilderPanel extends VBox {
             switch (param) {
                 case "period" -> {
                     String ind = indicatorName == null ? "" : indicatorName.toLowerCase(Locale.ROOT);
-                    if (ind.contains("rsi"))        builder.rsiPeriod(Integer.parseInt(val));
-                    else if (ind.contains("atr"))   builder.atrPeriod(Integer.parseInt(val));
-                    else if (ind.contains("fast"))  builder.emaFast(Integer.parseInt(val));
-                    else if (ind.contains("slow"))  builder.emaSlow(Integer.parseInt(val));
-                    else if (ind.contains("breakout") || ind.contains("donchian")) builder.breakoutLookback(Integer.parseInt(val));
+                    if (ind.contains("rsi"))
+                        builder.rsiPeriod(Integer.parseInt(val));
+                    else if (ind.contains("atr"))
+                        builder.atrPeriod(Integer.parseInt(val));
+                    else if (ind.contains("fast"))
+                        builder.emaFast(Integer.parseInt(val));
+                    else if (ind.contains("slow"))
+                        builder.emaSlow(Integer.parseInt(val));
+                    else if (ind.contains("breakout") || ind.contains("donchian"))
+                        builder.breakoutLookback(Integer.parseInt(val));
                 }
-                case "rsiperiod"        -> builder.rsiPeriod(Integer.parseInt(val));
-                case "fastperiod"       -> builder.emaFast(Integer.parseInt(val));
-                case "slowperiod"       -> builder.emaSlow(Integer.parseInt(val));
-                case "atrperiod"        -> builder.atrPeriod(Integer.parseInt(val));
+                case "rsiperiod" -> builder.rsiPeriod(Integer.parseInt(val));
+                case "fastperiod" -> builder.emaFast(Integer.parseInt(val));
+                case "slowperiod" -> builder.emaSlow(Integer.parseInt(val));
+                case "atrperiod" -> builder.atrPeriod(Integer.parseInt(val));
                 case "breakoutlookback" -> builder.breakoutLookback(Integer.parseInt(val));
-                case "oversold"         -> builder.oversoldThreshold(Double.parseDouble(val));
-                case "overbought"       -> builder.overboughtThreshold(Double.parseDouble(val));
-                case "minconfidence"    -> builder.minConfidence(Double.parseDouble(val));
-                case "signalamount"     -> builder.signalAmount(Double.parseDouble(val));
-                default -> { /* indicator-specific param stored in rule metadata */ }
+                case "oversold" -> builder.oversoldThreshold(Double.parseDouble(val));
+                case "overbought" -> builder.overboughtThreshold(Double.parseDouble(val));
+                case "minconfidence" -> builder.minConfidence(Double.parseDouble(val));
+                case "signalamount" -> builder.signalAmount(Double.parseDouble(val));
+                default -> {
+                    /* indicator-specific param stored in rule metadata */ }
             }
         } catch (NumberFormatException ex) {
             log.warn("Non-numeric value '{}' for param '{}' skipped", val, param);
@@ -1553,7 +1617,8 @@ public class StrategyBuilderPanel extends VBox {
     }
 
     private void updatePreview() {
-        if (paramsPreviewLabel == null) return;
+        if (paramsPreviewLabel == null)
+            return;
         if (parameterRows.isEmpty()) {
             paramsPreviewLabel.setText("(no indicators added yet)");
             return;
@@ -1561,7 +1626,7 @@ public class StrategyBuilderPanel extends VBox {
         StrategyParameters sp = buildParameters();
         String preview = String.format(
                 "rsiPeriod=%d  emaFast=%d  emaSlow=%d  atrPeriod=%d  breakoutLookback=%d%n" +
-                "oversold=%.1f  overbought=%.1f  minConfidence=%.2f  signalAmount=%.2f",
+                        "oversold=%.1f  overbought=%.1f  minConfidence=%.2f  signalAmount=%.2f",
                 sp.getRsiPeriod(), sp.getEmaFast(), sp.getEmaSlow(),
                 sp.getAtrPeriod(), sp.getBreakoutLookback(),
                 sp.getOversoldThreshold(), sp.getOverboughtThreshold(),
@@ -1590,14 +1655,17 @@ public class StrategyBuilderPanel extends VBox {
         // Check all editable values are numeric where applicable
         for (StrategyParameterRow row : effectiveParameterRows()) {
             String val = row.getValue().trim();
-            if (val.isEmpty() || val.equals("(no parameters)")) continue;
-            try { Double.parseDouble(val); } catch (NumberFormatException e) {
+            if (val.isEmpty() || val.equals("(no parameters)"))
+                continue;
+            try {
+                Double.parseDouble(val);
+            } catch (NumberFormatException e) {
                 if (val.matches("[A-Za-z_\\- ]+")) {
                     continue;
                 }
                 showAlert("Validation Error",
                         "Parameter '" + row.getParameterName() + "' of " + row.getIndicatorName() +
-                        " has non-numeric value: " + val);
+                                " has non-numeric value: " + val);
                 return false;
             }
         }
@@ -1620,8 +1688,9 @@ public class StrategyBuilderPanel extends VBox {
         persistStrategyDefinition(definition);
 
         String indicatorSummary = (ruleRows != null && !ruleRows.isEmpty() ? ruleRows.stream()
-                .map(StrategyRuleRow::getIndicatorName) : parameterRows.stream()
-                .map(StrategyParameterRow::getIndicatorName))
+                .map(StrategyRuleRow::getIndicatorName)
+                : parameterRows.stream()
+                        .map(StrategyParameterRow::getIndicatorName))
                 .distinct()
                 .collect(Collectors.joining(", "));
 
@@ -1629,7 +1698,8 @@ public class StrategyBuilderPanel extends VBox {
                 "'" + definition.getName() + "' is now registered in the live strategy registry.\n"
                         + "Indicators: " + indicatorSummary
                         + "\n\nIt can now be assigned from the Strategy Lab, Backtesting, or decision engines.");
-        log.info("User strategy '{}' saved and registered with params: {}", definition.getName(), definition.getParameters());
+        log.info("User strategy '{}' saved and registered with params: {}", definition.getName(),
+                definition.getParameters());
     }
 
     private void testStrategy() {
@@ -1799,7 +1869,8 @@ public class StrategyBuilderPanel extends VBox {
         }
 
         try {
-            UniversalTradabilityService tradabilityService = new UniversalTradabilityService(systemCore.getExchange(), null);
+            UniversalTradabilityService tradabilityService = new UniversalTradabilityService(systemCore.getExchange(),
+                    null);
             List<SymbolTradability> statuses = tradabilityService.getTradability(tradePairs).get();
             Set<String> marketDataAllowed = statuses.stream()
                     .filter(Objects::nonNull)
@@ -1849,7 +1920,7 @@ public class StrategyBuilderPanel extends VBox {
         if (candles.size() < 50) {
             throw new IllegalStateException(
                     "Not enough historical candles for backtest: " + candles.size() +
-                    ". Try a different timeframe or ensure data is available for " + pair.toString('/') + ".");
+                            ". Try a different timeframe or ensure data is available for " + pair.toString('/') + ".");
         }
 
         StrategyBacktestRequest request = StrategyBacktestRequest.builder()
@@ -1873,7 +1944,8 @@ public class StrategyBuilderPanel extends VBox {
             CandleDataSupplier supplier = systemCore.getExchange()
                     .getCandleDataSupplier(timeframe.getSeconds(), pair);
             if (supplier == null) {
-                log.warn("Exchange returned null CandleDataSupplier for {}/{}", pair.toString('/'), timeframe.getCode());
+                log.warn("Exchange returned null CandleDataSupplier for {}/{}", pair.toString('/'),
+                        timeframe.getCode());
                 return List.of();
             }
 
@@ -1881,7 +1953,8 @@ public class StrategyBuilderPanel extends VBox {
             List<CandleData> fetched = future.get();
 
             if (fetched != null && !fetched.isEmpty()) {
-                log.info("Fetched {} candles from exchange for {}/{}", fetched.size(), pair.toString('/'), timeframe.getCode());
+                log.info("Fetched {} candles from exchange for {}/{}", fetched.size(), pair.toString('/'),
+                        timeframe.getCode());
                 // Persist for future backtest runs
                 try {
                     repository.saveHistoricalData(pair, startTime, endTime, timeframe.getCode(), fetched);
@@ -1894,7 +1967,8 @@ public class StrategyBuilderPanel extends VBox {
             Thread.currentThread().interrupt();
             log.warn("Candle fetch interrupted for {}/{}", pair.toString('/'), timeframe.getCode());
         } catch (Exception ex) {
-            log.warn("Failed to fetch candles from exchange for {}/{}: {}", pair.toString('/'), timeframe.getCode(), ex.getMessage());
+            log.warn("Failed to fetch candles from exchange for {}/{}: {}", pair.toString('/'), timeframe.getCode(),
+                    ex.getMessage());
         }
         return List.of();
     }
@@ -2038,7 +2112,8 @@ public class StrategyBuilderPanel extends VBox {
 
     private @NonNull ListCell<IndicatorCategory> indicatorCategoryCell(String emptyText) {
         return new ListCell<>() {
-            @Override protected void updateItem(IndicatorCategory item, boolean empty) {
+            @Override
+            protected void updateItem(IndicatorCategory item, boolean empty) {
                 super.updateItem(item, empty);
                 setText(empty || item == null ? emptyText : item.name());
             }
@@ -2047,7 +2122,8 @@ public class StrategyBuilderPanel extends VBox {
 
     private @NonNull ListCell<INDICATORS> indicatorCell() {
         return new ListCell<>() {
-            @Override protected void updateItem(INDICATORS item, boolean empty) {
+            @Override
+            protected void updateItem(INDICATORS item, boolean empty) {
                 super.updateItem(item, empty);
                 setText(empty || item == null ? null : "[" + item.getCategory().name() + "] " + item.getDisplayName());
             }
@@ -2089,7 +2165,8 @@ public class StrategyBuilderPanel extends VBox {
 
     private @NonNull Button styledBtn(String text, String color) {
         Button b = new Button(text);
-        b.setStyle("-fx-padding: 10px 22px; -fx-font-size: 13px; -fx-background-color: " + color + "; -fx-text-fill: white;");
+        b.setStyle("-fx-padding: 10px 22px; -fx-font-size: 13px; -fx-background-color: " + color
+                + "; -fx-text-fill: white;");
         return b;
     }
 
@@ -2102,7 +2179,8 @@ public class StrategyBuilderPanel extends VBox {
     }
 
     private void setAutoStrategyStatus(String message) {
-        String text = message == null || message.isBlank() ? "Auto Strategy Lab: idle" : "Auto Strategy Lab: " + message;
+        String text = message == null || message.isBlank() ? "Auto Strategy Lab: idle"
+                : "Auto Strategy Lab: " + message;
         if (autoStrategyStatusLabel != null) {
             autoStrategyStatusLabel.setText(text);
         }
@@ -2165,30 +2243,79 @@ public class StrategyBuilderPanel extends VBox {
             this.timeframe = timeframe;
             this.candleSize = new SimpleStringProperty(timeframe == null ? "" : timeframe.getCode());
             if (indicator != null) {
-                IndicatorDefinition definition = IndicatorDefinitionRegistry.get(indicator);
-                definition.parameters().forEach(parameter ->
-                        parameters.put(parameter.name(), parameter.defaultValue()));
+                IndicatorDefinition definition = IndicatorCatalog.get(indicator);
+                definition.parameters()
+                        .forEach(parameter -> parameters.put(parameter.name(), parameter.defaultValue()));
             }
         }
 
-        public BooleanProperty selectedProperty() { return selected; }
-        public SimpleStringProperty signalTypeProperty() { return signalTypeName; }
-        public SimpleStringProperty sourceNameProperty() { return sourceName; }
-        public SimpleStringProperty displayNameProperty() { return displayName; }
-        public SimpleStringProperty indicatorNameProperty() { return displayName; }
-        public SimpleStringProperty candleSizeProperty() { return candleSize; }
+        public BooleanProperty selectedProperty() {
+            return selected;
+        }
 
-        public boolean isSelected() { return selected.get(); }
-        public void setSelected(boolean selected) { this.selected.set(selected); }
-        public StrategyRuleSource getRuleSource() { return ruleSource; }
-        public SignalType getSignalType() { return signalType; }
-        public INDICATORS getIndicator() { return indicator; }
-        public CandlePattern getCandlePattern() { return candlePattern; }
-        public String getDisplayName() { return displayName.get(); }
-        public String getIndicatorName() { return displayName.get(); }
-        public Timeframe getTimeframe() { return timeframe; }
-        public String getCandleSize() { return candleSize.get(); }
-        public Map<String, String> getParameters() { return parameters; }
+        public SimpleStringProperty signalTypeProperty() {
+            return signalTypeName;
+        }
+
+        public SimpleStringProperty sourceNameProperty() {
+            return sourceName;
+        }
+
+        public SimpleStringProperty displayNameProperty() {
+            return displayName;
+        }
+
+        public SimpleStringProperty indicatorNameProperty() {
+            return displayName;
+        }
+
+        public SimpleStringProperty candleSizeProperty() {
+            return candleSize;
+        }
+
+        public boolean isSelected() {
+            return selected.get();
+        }
+
+        public void setSelected(boolean selected) {
+            this.selected.set(selected);
+        }
+
+        public StrategyRuleSource getRuleSource() {
+            return ruleSource;
+        }
+
+        public SignalType getSignalType() {
+            return signalType;
+        }
+
+        public INDICATORS getIndicator() {
+            return indicator;
+        }
+
+        public CandlePattern getCandlePattern() {
+            return candlePattern;
+        }
+
+        public String getDisplayName() {
+            return displayName.get();
+        }
+
+        public String getIndicatorName() {
+            return displayName.get();
+        }
+
+        public Timeframe getTimeframe() {
+            return timeframe;
+        }
+
+        public String getCandleSize() {
+            return candleSize.get();
+        }
+
+        public Map<String, String> getParameters() {
+            return parameters;
+        }
 
         private static SignalType parseSignalType(String value) {
             if (value == null || value.isBlank()) {
@@ -2229,23 +2356,44 @@ public class StrategyBuilderPanel extends VBox {
         public StrategyParameterRow(String indicatorName, String parameterName, String value) {
             this.indicatorName = new SimpleStringProperty(indicatorName);
             this.parameterName = new SimpleStringProperty(parameterName);
-            this.value         = new SimpleStringProperty(value);
+            this.value = new SimpleStringProperty(value);
         }
 
-        public SimpleStringProperty indicatorNameProperty() { return indicatorName; }
-        public SimpleStringProperty parameterNameProperty() { return parameterName; }
-        public SimpleStringProperty valueProperty()         { return value; }
+        public SimpleStringProperty indicatorNameProperty() {
+            return indicatorName;
+        }
 
-        public String getIndicatorName() { return indicatorName.get(); }
-        public String getParameterName() { return parameterName.get(); }
-        public String getValue()         { return value.get(); }
-        public void   setValue(String v) { value.set(v); }
+        public SimpleStringProperty parameterNameProperty() {
+            return parameterName;
+        }
+
+        public SimpleStringProperty valueProperty() {
+            return value;
+        }
+
+        public String getIndicatorName() {
+            return indicatorName.get();
+        }
+
+        public String getParameterName() {
+            return parameterName.get();
+        }
+
+        public String getValue() {
+            return value.get();
+        }
+
+        public void setValue(String v) {
+            value.set(v);
+        }
     }
 
     /**
      * @deprecated Use {@link StrategyParameterRow} instead.
-     * Kept for binary compatibility if anything still references the old record.
+     *             Kept for binary compatibility if anything still references the
+     *             old record.
      */
     @Deprecated
-    public record StrategyParameter(String name, String parameter, String value) {}
+    public record StrategyParameter(String name, String parameter, String value) {
+    }
 }

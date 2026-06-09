@@ -4,11 +4,14 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.market.NewsEvent;
 import org.investpro.service.NewsDataProvider;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,8 +21,8 @@ import java.util.List;
  * Displays markers, lines, and labels for economic events to help traders
  * correlate news with price movements.
  */
-@Getter
-@Setter
+@EqualsAndHashCode(callSuper = true)
+@Data
 @Slf4j
 public class NewsEventOverlay extends Canvas {
     private final NewsDataProvider newsDataProvider;
@@ -32,7 +35,7 @@ public class NewsEventOverlay extends Canvas {
     private double chartStartPrice;
     private double chartEndPrice;
 
-    public NewsEventOverlay(NewsDataProvider newsDataProvider, double width, double height) {
+    public NewsEventOverlay(@NonNull NewsDataProvider newsDataProvider, double width, double height) {
         super(width, height);
         this.newsDataProvider = newsDataProvider;
         this.chartWidth = width;
@@ -85,7 +88,7 @@ public class NewsEventOverlay extends Canvas {
         drawLegend(gc);
     }
 
-    private void drawNewsEvent(GraphicsContext gc, NewsEvent event) {
+    private void drawNewsEvent(GraphicsContext gc, @NonNull NewsEvent event) {
         // Calculate X coordinate from event time
         double xCoord = getXFromTime(event.getEventTime());
 

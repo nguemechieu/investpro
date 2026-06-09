@@ -24,10 +24,39 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
             case "kraken" -> resolveKraken();
             case "oanda" -> resolveOanda();
             case "alpaca" -> resolveAlpaca();
+            case "schwab" -> resolveSchwab();
             case "interactive_brokers" -> resolveInteractiveBrokers();
             case "stellar_network" -> resolveStellar();
             default -> new ExchangeCredentials(id, null, null, null, null, null, null, false);
         };
+    }
+
+    private ExchangeCredentials resolveSchwab() {
+        Map<String, String> params = new HashMap<>();
+        putIfPresent(params, "clientId",
+                provider.getOrNull("SCHWAB_CLIENT_ID"),
+                provider.getOrNull("SCHWAB_API_KEY"));
+        putIfPresent(params, "clientSecret",
+                provider.getOrNull("SCHWAB_CLIENT_SECRET"),
+                provider.getOrNull("SCHWAB_API_SECRET"));
+        putIfPresent(params, "refreshToken", provider.getOrNull("SCHWAB_REFRESH_TOKEN"));
+        putIfPresent(params, "accountId", provider.getOrNull("SCHWAB_ACCOUNT_ID"));
+        putIfPresent(params, "baseUrl", provider.getOrNull("SCHWAB_BASE_URL"));
+        putIfPresent(params, "environment", provider.getOrNull("SCHWAB_ENVIRONMENT"));
+
+        String sandbox = provider.getOrNull("SCHWAB_SANDBOX");
+        String environment = provider.getOrNull("SCHWAB_ENVIRONMENT");
+
+        return new ExchangeCredentials(
+                "schwab",
+                firstPresent(provider.getOrNull("SCHWAB_CLIENT_ID"), provider.getOrNull("SCHWAB_API_KEY")),
+                firstPresent(provider.getOrNull("SCHWAB_CLIENT_SECRET"), provider.getOrNull("SCHWAB_API_SECRET")),
+                null,
+                null,
+                provider.getOrNull("SCHWAB_REFRESH_TOKEN"),
+                provider.getOrNull("SCHWAB_ACCOUNT_ID"),
+                isSandbox(sandbox, environment),
+                params);
     }
 
     private ExchangeCredentials resolveInteractiveBrokers() {
@@ -35,7 +64,8 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
         putIfPresent(params, "host", provider.getOrNull("IBKR_HOST"), provider.getOrNull("IBK_HOST"));
         putIfPresent(params, "port", provider.getOrNull("IBKR_PORT"), provider.getOrNull("IBK_PORT"));
         putIfPresent(params, "clientId", provider.getOrNull("IBKR_CLIENT_ID"), provider.getOrNull("IBK_CLIENT_ID"));
-        putIfPresent(params, "environment", provider.getOrNull("IBKR_ENVIRONMENT"), provider.getOrNull("IBK_ENVIRONMENT"));
+        putIfPresent(params, "environment", provider.getOrNull("IBKR_ENVIRONMENT"),
+                provider.getOrNull("IBK_ENVIRONMENT"));
         putIfPresent(params, "authMode", provider.getOrNull("IBKR_AUTH_MODE"), provider.getOrNull("IBK_AUTH_MODE"));
         putIfPresent(params, "clientPortalUrl",
                 provider.getOrNull("IBKR_CLIENT_PORTAL_URL"),

@@ -1,6 +1,6 @@
 package org.investpro.ui.charts;
 
-import lombok.Data;
+import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
@@ -51,8 +51,6 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.FileChooser;
 import javafx.util.Duration;
-import lombok.Getter;
-import lombok.Setter;
 import org.investpro.data.CandleData;
 import org.investpro.data.CandleDataPager;
 import org.investpro.enums.TradingSessionStatus;
@@ -74,6 +72,7 @@ import org.investpro.utils.FXUtils;
 import org.investpro.utils.LogOnExceptionThreadFactory;
 import org.investpro.utils.ZoomDirection;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import javax.imageio.ImageIO;
 import java.io.File;
@@ -102,11 +101,13 @@ import static org.investpro.ui.charts.ChartColors.PLACE_HOLDER_FILL_COLOR;
  * Professional canvas-based candlestick chart for InvestPro.
  * This chart should be created by {@link ChartContainer}.
  */
-@Getter
-@Setter
+@EqualsAndHashCode(callSuper = true)
+@Data
 @Slf4j
-@SuppressWarnings({ "unused", "SameParameterValue" })
+@ToString(callSuper = true)
+
 public class CandleStickChart extends Region {
+    @Getter
     public enum ChartType {
         LINE("Line"),
         BAR_OHLC("Bar (OHLC)"),
@@ -120,10 +121,6 @@ public class CandleStickChart extends Region {
 
         ChartType(String displayName) {
             this.displayName = displayName;
-        }
-
-        public String getDisplayName() {
-            return displayName;
         }
 
         public ChartType next() {
@@ -686,17 +683,17 @@ public class CandleStickChart extends Region {
         buttonColumn.setStyle("-fx-background-color: transparent;");
 
         buttonColumn.getChildren().addAll(
-                createToolToggle("\u25a3", "Cursor", this::activateCursorTool, ChartInteractionTool.CURSOR),
-                createToolAction("\u2573", "Crosshair", this::toggleCrosshair),
+                createToolToggle("▣", "Cursor", this::activateCursorTool, ChartInteractionTool.CURSOR),
+                createToolAction("+", "Crosshair", this::toggleCrosshair),
                 new Separator(),
                 createToolToggle("/", "Trendline", this::activateTrendlineTool, ChartInteractionTool.TRENDLINE),
-                createToolToggle("\u2500", "Horizontal Line", this::activateHorizontalLineTool,
+                createToolToggle("─", "Horizontal Line", this::activateHorizontalLineTool,
                         ChartInteractionTool.HORIZONTAL_LINE),
-                createToolToggle("\u2502", "Vertical Line", this::activateVerticalLineTool,
+                createToolToggle("│", "Vertical Line", this::activateVerticalLineTool,
                         ChartInteractionTool.VERTICAL_LINE),
-                createToolToggle("\u25ad", "Rectangle", this::activateRectangleTool, ChartInteractionTool.RECTANGLE),
-                createToolToggle("\u25b3", "Triangle", this::activateTriangleTool, ChartInteractionTool.TRIANGLE),
-                createToolToggle("\u25ef", "Circle", this::activateCircleTool, ChartInteractionTool.CIRCLE),
+                createToolToggle("▭", "Rectangle", this::activateRectangleTool, ChartInteractionTool.RECTANGLE),
+                createToolToggle("△", "Triangle", this::activateTriangleTool, ChartInteractionTool.TRIANGLE),
+                createToolToggle("◯", "Circle", this::activateCircleTool, ChartInteractionTool.CIRCLE),
                 createToolToggle("F", "Fibonacci", this::activateFibonacciTool, ChartInteractionTool.FIBONACCI),
                 createToolToggle("M", "Measure", this::activateMeasureTool, ChartInteractionTool.MEASURE),
                 createToolToggle("R", "Long/Short (Risk/Reward)", this::activateRiskRewardTool,
@@ -732,7 +729,7 @@ public class CandleStickChart extends Region {
         syncLeftToolPaletteSelection();
     }
 
-    private ToggleButton createToolToggle(
+    private @NonNull ToggleButton createToolToggle(
             String label,
             String tooltip,
             Runnable action,
@@ -1857,9 +1854,7 @@ public class CandleStickChart extends Region {
         graphicsContext.setTextAlign(TextAlignment.LEFT);
     }
 
-    public ChartType getChartType() {
-        return chartType;
-    }
+
 
     public void setChartType(ChartType newChartType) {
         if (newChartType == null) {
@@ -2272,19 +2267,10 @@ public class CandleStickChart extends Region {
     }
 
     private boolean isPriceOverlayIndicator(String indicatorName) {
-        String normalized = normalizeIndicatorName(indicatorName);
-        return normalized.startsWith("SMA")
-                || normalized.startsWith("EMA")
-                || normalized.startsWith("BOLLINGERBANDS")
-                || normalized.startsWith("VWAP")
-                || normalized.startsWith("ICHIMOKU")
-                || normalized.startsWith("PARABOLICSAR")
-                || normalized.startsWith("FIBONACCIRETRACEMENT")
-                || normalized.startsWith("ZIGZAG")
-                || normalized.startsWith("FRACTAL");
+        return IndicatorCatalog.isPriceOverlay(indicatorName);
     }
 
-    private String normalizeIndicatorName(String indicatorName) {
+    private @NonNull String normalizeIndicatorName(String indicatorName) {
         return indicatorName == null ? "" : indicatorName.replaceAll("\\s+", "").toUpperCase(Locale.ROOT);
     }
 

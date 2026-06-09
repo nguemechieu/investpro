@@ -14,7 +14,7 @@ class IndicatorDefinitionRegistryTest {
     void providesDefinitionForEveryIndicator() {
         EnumSet<INDICATORS> seen = EnumSet.noneOf(INDICATORS.class);
 
-        for (IndicatorDefinition definition : IndicatorDefinitionRegistry.all()) {
+        for (IndicatorDefinition definition : IndicatorDefinition.all()) {
             assertNotNull(definition.indicator());
             assertFalse(definition.displayName().isBlank(), definition.indicator().name());
             assertFalse(definition.description().isBlank(), definition.indicator().name());
@@ -37,7 +37,7 @@ class IndicatorDefinitionRegistryTest {
     }
 
     private static void assertHasParameter(INDICATORS indicator, String name, String defaultValue) {
-        IndicatorDefinition definition = IndicatorDefinitionRegistry.get(indicator);
+        IndicatorDefinition definition = IndicatorDefinition.get(indicator);
         boolean found = definition.parameters().stream()
                 .anyMatch(parameter -> parameter.name().equals(name)
                         && parameter.defaultValue().equals(defaultValue));

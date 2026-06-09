@@ -14,6 +14,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.SystemCore;
@@ -40,8 +42,9 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.function.Consumer;
 
+@EqualsAndHashCode(callSuper = true)
 @Slf4j
-@Getter
+@Data
 public class ChartContainer extends Region {
     private static final int DEFAULT_SECONDS_PER_CANDLE = 3_600;
     private static final Duration CHART_FADE_DURATION = Duration.millis(220);

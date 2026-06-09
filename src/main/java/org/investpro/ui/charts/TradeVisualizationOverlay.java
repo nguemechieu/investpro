@@ -6,6 +6,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.TextAlignment;
 import lombok.Builder;
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +26,7 @@ import java.util.List;
  * @author NOEL NGUEMECHIEU
  */
 @Slf4j
-@Getter
-@Setter
+@Data
 public class TradeVisualizationOverlay {
 
     // Colors matching TradingView pro theme
