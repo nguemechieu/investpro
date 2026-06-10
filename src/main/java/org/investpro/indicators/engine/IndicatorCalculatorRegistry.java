@@ -43,52 +43,142 @@ public final class IndicatorCalculatorRegistry {
     }
 
     private void registerCoreCalculators() {
-        register(new FunctionalCalculator(INDICATORS.SMA, (candles, params) -> result(INDICATORS.SMA, "sma", sma(close(candles), intParam(params, "period", 20)))));
-        register(new FunctionalCalculator(INDICATORS.EMA, (candles, params) -> result(INDICATORS.EMA, "ema", ema(close(candles), intParam(params, "period", 20)))));
-        register(new FunctionalCalculator(INDICATORS.WMA, (candles, params) -> result(INDICATORS.WMA, "wma", wma(close(candles), intParam(params, "period", 20)))));
-        register(new FunctionalCalculator(INDICATORS.DEMA, (candles, params) -> result(INDICATORS.DEMA, "dema", dema(close(candles), intParam(params, "period", 20)))));
-        register(new FunctionalCalculator(INDICATORS.TEMA, (candles, params) -> result(INDICATORS.TEMA, "tema", tema(close(candles), intParam(params, "period", 20)))));
-        register(new FunctionalCalculator(INDICATORS.HMA, (candles, params) -> result(INDICATORS.HMA, "hma", hma(close(candles), intParam(params, "period", 20)))));
-        register(new FunctionalCalculator(INDICATORS.TMA, (candles, params) -> result(INDICATORS.TMA, "tma", tma(close(candles), intParam(params, "period", 20)))));
-        register(new FunctionalCalculator(INDICATORS.T3_TILLSON, (candles, params) -> result(INDICATORS.T3_TILLSON, "t3", t3(close(candles), intParam(params, "period", 5), doubleParam(params, "volumeFactor", 0.7)))));
-        register(new FunctionalCalculator(INDICATORS.KAMA, (candles, params) -> result(INDICATORS.KAMA, "kama", kama(close(candles), intParam(params, "period", 10), intParam(params, "fastPeriod", 2), intParam(params, "slowPeriod", 30)))));
-        register(new FunctionalCalculator(INDICATORS.MESA_ADAPTIVE_MOVING_AVERAGE, (candles, params) -> mama(candles, params)));
-        register(new FunctionalCalculator(INDICATORS.TIME_SERIES_FORECAST, (candles, params) -> result(INDICATORS.TIME_SERIES_FORECAST, "tsf", timeSeriesForecast(close(candles), intParam(params, "period", 14)))));
-        register(new FunctionalCalculator(INDICATORS.RSI, (candles, params) -> result(INDICATORS.RSI, "rsi", rsi(close(candles), intParam(params, "period", 14)))));
+        register(new FunctionalCalculator(INDICATORS.SMA, (candles, params) -> result(INDICATORS.SMA, "sma",
+                sma(close(candles), intParam(params, "period", 20)))));
+        register(new FunctionalCalculator(INDICATORS.EMA, (candles, params) -> result(INDICATORS.EMA, "ema",
+                ema(close(candles), intParam(params, "period", 20)))));
+        register(new FunctionalCalculator(INDICATORS.WMA, (candles, params) -> result(INDICATORS.WMA, "wma",
+                wma(close(candles), intParam(params, "period", 20)))));
+        register(new FunctionalCalculator(INDICATORS.DEMA, (candles, params) -> result(INDICATORS.DEMA, "dema",
+                dema(close(candles), intParam(params, "period", 20)))));
+        register(new FunctionalCalculator(INDICATORS.TEMA, (candles, params) -> result(INDICATORS.TEMA, "tema",
+                tema(close(candles), intParam(params, "period", 20)))));
+        register(new FunctionalCalculator(INDICATORS.HMA, (candles, params) -> result(INDICATORS.HMA, "hma",
+                hma(close(candles), intParam(params, "period", 20)))));
+        register(new FunctionalCalculator(INDICATORS.TMA, (candles, params) -> result(INDICATORS.TMA, "tma",
+                tma(close(candles), intParam(params, "period", 20)))));
+        register(new FunctionalCalculator(INDICATORS.T3_TILLSON, (candles, params) -> result(INDICATORS.T3_TILLSON,
+                "t3", t3(close(candles), intParam(params, "period", 5), doubleParam(params, "volumeFactor", 0.7)))));
+        register(new FunctionalCalculator(INDICATORS.KAMA,
+                (candles, params) -> result(INDICATORS.KAMA, "kama",
+                        kama(close(candles), intParam(params, "period", 10), intParam(params, "fastPeriod", 2),
+                                intParam(params, "slowPeriod", 30)))));
+        register(new FunctionalCalculator(INDICATORS.MESA_ADAPTIVE_MOVING_AVERAGE,
+                (candles, params) -> mama(candles, params)));
+        register(new FunctionalCalculator(INDICATORS.TIME_SERIES_FORECAST,
+                (candles, params) -> result(INDICATORS.TIME_SERIES_FORECAST, "tsf",
+                        timeSeriesForecast(close(candles), intParam(params, "period", 14)))));
+        register(new FunctionalCalculator(INDICATORS.RSI, (candles, params) -> result(INDICATORS.RSI, "rsi",
+                rsi(close(candles), intParam(params, "period", 14)))));
         register(new FunctionalCalculator(INDICATORS.RSI_REGION_CROSSOVER, (candles, params) -> {
             List<Double> rsi = rsi(close(candles), intParam(params, "period", 14));
-            return result(INDICATORS.RSI_REGION_CROSSOVER, Map.of("rsi", rsi, "crossoverSignal", regionSignal(rsi, doubleParam(params, "oversold", 30), doubleParam(params, "overbought", 70))));
+            return result(INDICATORS.RSI_REGION_CROSSOVER, Map.of("rsi", rsi, "crossoverSignal",
+                    regionSignal(rsi, doubleParam(params, "oversold", 30), doubleParam(params, "overbought", 70))));
         }));
-        register(new FunctionalCalculator(INDICATORS.ATR, (candles, params) -> result(INDICATORS.ATR, "atr", atr(candles, intParam(params, "period", 14)))));
-        register(new FunctionalCalculator(INDICATORS.MACD, (candles, params) -> macdResult(INDICATORS.MACD, candles, params, false)));
-        register(new FunctionalCalculator(INDICATORS.MACD_LINE, (candles, params) -> macdResult(INDICATORS.MACD_LINE, candles, params, false)));
-        register(new FunctionalCalculator(INDICATORS.MACD_SIGNAL, (candles, params) -> macdResult(INDICATORS.MACD_SIGNAL, candles, params, false)));
-        register(new FunctionalCalculator(INDICATORS.MACD_HISTOGRAM, (candles, params) -> macdResult(INDICATORS.MACD_HISTOGRAM, candles, params, false)));
+        register(new FunctionalCalculator(INDICATORS.ATR,
+                (candles, params) -> result(INDICATORS.ATR, "atr", atr(candles, intParam(params, "period", 14)))));
+        register(new FunctionalCalculator(INDICATORS.MACD,
+                (candles, params) -> macdResult(INDICATORS.MACD, candles, params, false)));
+        register(new FunctionalCalculator(INDICATORS.MACD_LINE,
+                (candles, params) -> macdResult(INDICATORS.MACD_LINE, candles, params, false)));
+        register(new FunctionalCalculator(INDICATORS.MACD_SIGNAL,
+                (candles, params) -> macdResult(INDICATORS.MACD_SIGNAL, candles, params, false)));
+        register(new FunctionalCalculator(INDICATORS.MACD_HISTOGRAM,
+                (candles, params) -> macdResult(INDICATORS.MACD_HISTOGRAM, candles, params, false)));
         register(new FunctionalCalculator(INDICATORS.APO, (candles, params) -> apo(candles, params)));
-        register(new FunctionalCalculator(INDICATORS.PPO, (candles, params) -> macdResult(INDICATORS.PPO, candles, params, true)));
+        register(new FunctionalCalculator(INDICATORS.PPO,
+                (candles, params) -> macdResult(INDICATORS.PPO, candles, params, true)));
         register(new FunctionalCalculator(INDICATORS.BOLLINGER_BANDS, IndicatorCalculatorRegistry::bollinger));
-        register(new FunctionalCalculator(INDICATORS.ROC, (candles, params) -> result(INDICATORS.ROC, "roc", roc(close(candles), intParam(params, "period", 12)))));
-        register(new FunctionalCalculator(INDICATORS.PERCENT_CHANGE, (candles, params) -> result(INDICATORS.PERCENT_CHANGE, "percentChange", roc(close(candles), intParam(params, "period", 1)))));
-        register(new FunctionalCalculator(INDICATORS.MOMENTUM, (candles, params) -> result(INDICATORS.MOMENTUM, "momentum", momentum(close(candles), intParam(params, "period", 10)))));
-        register(new FunctionalCalculator(INDICATORS.OBV, (candles, params) -> result(INDICATORS.OBV, "obv", obv(candles))));
-        register(new FunctionalCalculator(INDICATORS.CHAIKIN_AD_OSCILLATOR, (candles, params) -> result(INDICATORS.CHAIKIN_AD_OSCILLATOR, "chaikinOscillator", chaikinOscillator(candles, intParam(params, "fastPeriod", 3), intParam(params, "slowPeriod", 10)))));
-        register(new FunctionalCalculator(INDICATORS.MFI, (candles, params) -> result(INDICATORS.MFI, "mfi", mfi(candles, intParam(params, "period", 14)))));
-        register(new FunctionalCalculator(INDICATORS.CCI, (candles, params) -> result(INDICATORS.CCI, "cci", cci(candles, intParam(params, "period", 20)))));
-        register(new FunctionalCalculator(INDICATORS.STOCHASTIC, (candles, params) -> stochasticResult(INDICATORS.STOCHASTIC, candles, params, false)));
-        register(new FunctionalCalculator(INDICATORS.STOCHASTIC_REGION_CROSSOVER, (candles, params) -> stochasticResult(INDICATORS.STOCHASTIC_REGION_CROSSOVER, candles, params, true)));
-        register(new FunctionalCalculator(INDICATORS.STOCH_RSI, (candles, params) -> stochRsiResult(INDICATORS.STOCH_RSI, candles, params, false)));
-        register(new FunctionalCalculator(INDICATORS.STOCHASTIC_RSI, (candles, params) -> stochRsiResult(INDICATORS.STOCHASTIC_RSI, candles, params, false)));
-        register(new FunctionalCalculator(INDICATORS.STOCH_RSI_REGION_CROSSOVER, (candles, params) -> stochRsiResult(INDICATORS.STOCH_RSI_REGION_CROSSOVER, candles, params, true)));
-        register(new FunctionalCalculator(INDICATORS.WILLIAMS_R, (candles, params) -> result(INDICATORS.WILLIAMS_R, "williamsR", williamsR(candles, intParam(params, "period", 14)))));
-        register(new FunctionalCalculator(INDICATORS.ULTIMATE_OSCILLATOR, (candles, params) -> result(INDICATORS.ULTIMATE_OSCILLATOR, "ultimateOscillator", ultimateOscillator(candles, intParam(params, "period1", 7), intParam(params, "period2", 14), intParam(params, "period3", 28)))));
-        register(new FunctionalCalculator(INDICATORS.ADX, (candles, params) -> result(INDICATORS.ADX, "adx", dmi(candles, intParam(params, "period", 14)).get("adx"))));
-        register(new FunctionalCalculator(INDICATORS.DMI, (candles, params) -> result(INDICATORS.DMI, dmi(candles, intParam(params, "period", 14)))));
-        register(new FunctionalCalculator(INDICATORS.AROON, (candles, params) -> result(INDICATORS.AROON, aroon(candles, intParam(params, "period", 25)))));
-        register(new FunctionalCalculator(INDICATORS.AROON_OSCILLATOR, (candles, params) -> result(INDICATORS.AROON_OSCILLATOR, "aroonOscillator", aroonOscillator(candles, intParam(params, "period", 25)))));
-        register(new FunctionalCalculator(INDICATORS.PSAR, (candles, params) -> result(INDICATORS.PSAR, "psar", parabolicSar(candles, doubleParam(params, "step", 0.02), doubleParam(params, "maxStep", 0.2)))));
-        register(new FunctionalCalculator(INDICATORS.PARABOLIC_SAR, (candles, params) -> result(INDICATORS.PARABOLIC_SAR, "psar", parabolicSar(candles, doubleParam(params, "step", 0.02), doubleParam(params, "maxStep", 0.2)))));
-        register(new FunctionalCalculator(INDICATORS.ELDER_RAY, (candles, params) -> result(INDICATORS.ELDER_RAY, elderRay(candles, intParam(params, "period", 13)))));
-        register(new FunctionalCalculator(INDICATORS.ICHIMOKU, (candles, params) -> result(INDICATORS.ICHIMOKU, ichimoku(candles, intParam(params, "tenkan", 9), intParam(params, "kijun", 26), intParam(params, "senkouB", 52), intParam(params, "displacement", 26)))));
+        register(new FunctionalCalculator(INDICATORS.ROC, (candles, params) -> result(INDICATORS.ROC, "roc",
+                roc(close(candles), intParam(params, "period", 12)))));
+        register(new FunctionalCalculator(INDICATORS.PERCENT_CHANGE,
+                (candles, params) -> result(INDICATORS.PERCENT_CHANGE, "percentChange",
+                        roc(close(candles), intParam(params, "period", 1)))));
+        register(new FunctionalCalculator(INDICATORS.MOMENTUM, (candles, params) -> result(INDICATORS.MOMENTUM,
+                "momentum", momentum(close(candles), intParam(params, "period", 10)))));
+        register(new FunctionalCalculator(INDICATORS.OBV,
+                (candles, params) -> result(INDICATORS.OBV, "obv", obv(candles))));
+        register(new FunctionalCalculator(INDICATORS.CHAIKIN_AD_OSCILLATOR, (candles, params) -> result(
+                INDICATORS.CHAIKIN_AD_OSCILLATOR, "chaikinOscillator",
+                chaikinOscillator(candles, intParam(params, "fastPeriod", 3), intParam(params, "slowPeriod", 10)))));
+        register(new FunctionalCalculator(INDICATORS.MFI,
+                (candles, params) -> result(INDICATORS.MFI, "mfi", mfi(candles, intParam(params, "period", 14)))));
+        register(new FunctionalCalculator(INDICATORS.CCI,
+                (candles, params) -> result(INDICATORS.CCI, "cci", cci(candles, intParam(params, "period", 20)))));
+        register(new FunctionalCalculator(INDICATORS.STOCHASTIC,
+                (candles, params) -> stochasticResult(INDICATORS.STOCHASTIC, candles, params, false)));
+        register(new FunctionalCalculator(INDICATORS.STOCHASTIC_REGION_CROSSOVER,
+                (candles, params) -> stochasticResult(INDICATORS.STOCHASTIC_REGION_CROSSOVER, candles, params, true)));
+        register(new FunctionalCalculator(INDICATORS.STOCH_RSI,
+                (candles, params) -> stochRsiResult(INDICATORS.STOCH_RSI, candles, params, false)));
+        register(new FunctionalCalculator(INDICATORS.STOCHASTIC_RSI,
+                (candles, params) -> stochRsiResult(INDICATORS.STOCHASTIC_RSI, candles, params, false)));
+        register(new FunctionalCalculator(INDICATORS.STOCH_RSI_REGION_CROSSOVER,
+                (candles, params) -> stochRsiResult(INDICATORS.STOCH_RSI_REGION_CROSSOVER, candles, params, true)));
+        register(new FunctionalCalculator(INDICATORS.WILLIAMS_R, (candles, params) -> result(INDICATORS.WILLIAMS_R,
+                "williamsR", williamsR(candles, intParam(params, "period", 14)))));
+        register(new FunctionalCalculator(INDICATORS.ULTIMATE_OSCILLATOR,
+                (candles, params) -> result(INDICATORS.ULTIMATE_OSCILLATOR, "ultimateOscillator",
+                        ultimateOscillator(candles, intParam(params, "period1", 7), intParam(params, "period2", 14),
+                                intParam(params, "period3", 28)))));
+        register(new FunctionalCalculator(INDICATORS.ADX, (candles, params) -> result(INDICATORS.ADX, "adx",
+                dmi(candles, intParam(params, "period", 14)).get("adx"))));
+        register(new FunctionalCalculator(INDICATORS.DMI,
+                (candles, params) -> result(INDICATORS.DMI, dmi(candles, intParam(params, "period", 14)))));
+        register(new FunctionalCalculator(INDICATORS.AROON,
+                (candles, params) -> result(INDICATORS.AROON, aroon(candles, intParam(params, "period", 25)))));
+        register(new FunctionalCalculator(INDICATORS.AROON_OSCILLATOR,
+                (candles, params) -> result(INDICATORS.AROON_OSCILLATOR, "aroonOscillator",
+                        aroonOscillator(candles, intParam(params, "period", 25)))));
+        register(new FunctionalCalculator(INDICATORS.PSAR, (candles, params) -> result(INDICATORS.PSAR, "psar",
+                parabolicSar(candles, doubleParam(params, "step", 0.02), doubleParam(params, "maxStep", 0.2)))));
+        register(new FunctionalCalculator(INDICATORS.PARABOLIC_SAR, (candles, params) -> result(
+                INDICATORS.PARABOLIC_SAR, "psar",
+                parabolicSar(candles, doubleParam(params, "step", 0.02), doubleParam(params, "maxStep", 0.2)))));
+        register(new FunctionalCalculator(INDICATORS.ELDER_RAY,
+                (candles, params) -> result(INDICATORS.ELDER_RAY, elderRay(candles, intParam(params, "period", 13)))));
+        register(new FunctionalCalculator(INDICATORS.ICHIMOKU,
+                (candles, params) -> result(INDICATORS.ICHIMOKU,
+                        ichimoku(candles, intParam(params, "tenkan", 9), intParam(params, "kijun", 26),
+                                intParam(params, "senkouB", 52), intParam(params, "displacement", 26)))));
+
+        registerFallbackCalculators();
+    }
+
+    private void registerFallbackCalculators() {
+        for (INDICATORS indicator : INDICATORS.values()) {
+            if (indicator == null || indicator == INDICATORS.UNKNOWN) {
+                continue;
+            }
+
+            calculators.putIfAbsent(
+                    indicator,
+                    new FunctionalCalculator(indicator, (candles, params) -> fallbackResult(indicator, candles)));
+        }
+    }
+
+    private static IndicatorResult fallbackResult(INDICATORS indicator, List<CandleData> candles) {
+        List<CandleData> safeCandles = candles == null ? List.of() : candles;
+        String outputKey = indicator == null ? "value" : indicator.name().toLowerCase();
+
+        List<Double> series = switch (indicator) {
+            case OPEN -> safeCandles.stream().map(CandleData::openPrice).toList();
+            case HIGH -> safeCandles.stream().map(CandleData::highPrice).toList();
+            case LOW -> safeCandles.stream().map(CandleData::lowPrice).toList();
+            case CLOSE -> close(safeCandles);
+            case HL2 -> safeCandles.stream().map(candle -> (candle.highPrice() + candle.lowPrice()) / 2.0).toList();
+            case HLC3, TYPICAL_PRICE -> safeCandles.stream()
+                    .map(candle -> (candle.highPrice() + candle.lowPrice() + candle.closePrice()) / 3.0)
+                    .toList();
+            case OHLC4 -> safeCandles.stream()
+                    .map(candle -> (candle.openPrice() + candle.highPrice() + candle.lowPrice() + candle.closePrice())
+                            / 4.0)
+                    .toList();
+            case VOLUME -> safeCandles.stream().map(CandleData::volume).toList();
+            default -> close(safeCandles);
+        };
+
+        return result(indicator, outputKey, series);
     }
 
     private static IndicatorResult bollinger(List<CandleData> candles, Map<String, String> params) {
@@ -110,10 +200,12 @@ public final class IndicatorCalculatorRegistry {
             bandwidth.set(i, mean == 0 ? Double.NaN : (u - l) / mean);
             percentB.set(i, (u - l) == 0 ? Double.NaN : (closes.get(i) - l) / (u - l));
         }
-        return result(INDICATORS.BOLLINGER_BANDS, Map.of("upper", upper, "middle", middle, "lower", lower, "bandwidth", bandwidth, "percentB", percentB));
+        return result(INDICATORS.BOLLINGER_BANDS,
+                Map.of("upper", upper, "middle", middle, "lower", lower, "bandwidth", bandwidth, "percentB", percentB));
     }
 
-    private static IndicatorResult macdResult(INDICATORS indicator, List<CandleData> candles, Map<String, String> params, boolean percent) {
+    private static IndicatorResult macdResult(INDICATORS indicator, List<CandleData> candles,
+            Map<String, String> params, boolean percent) {
         List<Double> closes = close(candles);
         List<Double> fast = ema(closes, intParam(params, "fastPeriod", 12));
         List<Double> slow = ema(closes, intParam(params, "slowPeriod", 26));
@@ -122,7 +214,8 @@ public final class IndicatorCalculatorRegistry {
             if (Double.isNaN(fast.get(i)) || Double.isNaN(slow.get(i))) {
                 continue;
             }
-            line.set(i, percent ? (slow.get(i) == 0 ? Double.NaN : ((fast.get(i) - slow.get(i)) / slow.get(i)) * 100.0) : fast.get(i) - slow.get(i));
+            line.set(i, percent ? (slow.get(i) == 0 ? Double.NaN : ((fast.get(i) - slow.get(i)) / slow.get(i)) * 100.0)
+                    : fast.get(i) - slow.get(i));
         }
         List<Double> signal = ema(line, intParam(params, "signalPeriod", 9));
         List<Double> histogram = fillNaN(closes.size());
@@ -147,7 +240,8 @@ public final class IndicatorCalculatorRegistry {
         return result(INDICATORS.APO, "apo", apo);
     }
 
-    private static IndicatorResult stochasticResult(INDICATORS indicator, List<CandleData> candles, Map<String, String> params, boolean region) {
+    private static IndicatorResult stochasticResult(INDICATORS indicator, List<CandleData> candles,
+            Map<String, String> params, boolean region) {
         List<Double> k = stochasticK(candles, intParam(params, "kPeriod", 14));
         List<Double> smoothK = sma(k, intParam(params, "smooth", 3));
         List<Double> d = sma(smoothK, intParam(params, "dPeriod", 3));
@@ -155,12 +249,14 @@ public final class IndicatorCalculatorRegistry {
         outputs.put("percentK", smoothK);
         outputs.put("percentD", d);
         if (region) {
-            outputs.put("crossoverSignal", regionSignal(smoothK, doubleParam(params, "oversold", 20), doubleParam(params, "overbought", 80)));
+            outputs.put("crossoverSignal",
+                    regionSignal(smoothK, doubleParam(params, "oversold", 20), doubleParam(params, "overbought", 80)));
         }
         return result(indicator, outputs);
     }
 
-    private static IndicatorResult stochRsiResult(INDICATORS indicator, List<CandleData> candles, Map<String, String> params, boolean region) {
+    private static IndicatorResult stochRsiResult(INDICATORS indicator, List<CandleData> candles,
+            Map<String, String> params, boolean region) {
         List<Double> rsi = rsi(close(candles), intParam(params, "rsiPeriod", 14));
         List<Double> k = stochasticOfSeries(rsi, intParam(params, "stochPeriod", 14));
         List<Double> smoothK = sma(k, intParam(params, "kSmooth", 3));
@@ -169,34 +265,41 @@ public final class IndicatorCalculatorRegistry {
         outputs.put("stochRsiK", smoothK);
         outputs.put("stochRsiD", d);
         if (region) {
-            outputs.put("crossoverSignal", regionSignal(smoothK, doubleParam(params, "oversold", 20), doubleParam(params, "overbought", 80)));
+            outputs.put("crossoverSignal",
+                    regionSignal(smoothK, doubleParam(params, "oversold", 20), doubleParam(params, "overbought", 80)));
         }
         return result(indicator, outputs);
     }
 
     private static List<Double> sma(List<Double> values, int period) {
         List<Double> out = fillNaN(values.size());
-        if (period <= 0) return out;
+        if (period <= 0)
+            return out;
         double sum = 0.0;
         for (int i = 0; i < values.size(); i++) {
             double v = safe(values.get(i));
             sum += v;
-            if (i >= period) sum -= safe(values.get(i - period));
-            if (i >= period - 1) out.set(i, sum / period);
+            if (i >= period)
+                sum -= safe(values.get(i - period));
+            if (i >= period - 1)
+                out.set(i, sum / period);
         }
         return out;
     }
 
     private static List<Double> ema(List<Double> values, int period) {
         List<Double> out = fillNaN(values.size());
-        if (period <= 0 || values.isEmpty()) return out;
+        if (period <= 0 || values.isEmpty())
+            return out;
         double multiplier = 2.0 / (period + 1.0);
         Double previous = null;
         for (int i = 0; i < values.size(); i++) {
             double value = values.get(i);
-            if (Double.isNaN(value)) continue;
+            if (Double.isNaN(value))
+                continue;
             previous = previous == null ? value : (value - previous) * multiplier + previous;
-            if (i >= period - 1) out.set(i, previous);
+            if (i >= period - 1)
+                out.set(i, previous);
         }
         return out;
     }
@@ -273,7 +376,8 @@ public final class IndicatorCalculatorRegistry {
         double c4 = 1 + 3 * a + a * a * a + 3 * a * a;
         List<Double> out = fillNaN(values.size());
         for (int i = 0; i < values.size(); i++) {
-            if (!Double.isNaN(e3.get(i)) && !Double.isNaN(e4.get(i)) && !Double.isNaN(e5.get(i)) && !Double.isNaN(e6.get(i))) {
+            if (!Double.isNaN(e3.get(i)) && !Double.isNaN(e4.get(i)) && !Double.isNaN(e5.get(i))
+                    && !Double.isNaN(e6.get(i))) {
                 out.set(i, c1 * e6.get(i) + c2 * e5.get(i) + c3 * e4.get(i) + c4 * e3.get(i));
             }
         }
@@ -282,7 +386,8 @@ public final class IndicatorCalculatorRegistry {
 
     private static List<Double> kama(List<Double> values, int period, int fastPeriod, int slowPeriod) {
         List<Double> out = fillNaN(values.size());
-        if (values.size() <= period) return out;
+        if (values.size() <= period)
+            return out;
         double fast = 2.0 / (fastPeriod + 1.0);
         double slow = 2.0 / (slowPeriod + 1.0);
         out.set(period, values.get(period));
@@ -333,12 +438,16 @@ public final class IndicatorCalculatorRegistry {
 
     private static List<Double> rsi(List<Double> closes, int period) {
         List<Double> out = fillNaN(closes.size());
-        if (closes.size() <= period) return out;
+        if (closes.size() <= period)
+            return out;
         double gain = 0.0;
         double loss = 0.0;
         for (int i = 1; i <= period; i++) {
             double change = closes.get(i) - closes.get(i - 1);
-            if (change >= 0) gain += change; else loss -= change;
+            if (change >= 0)
+                gain += change;
+            else
+                loss -= change;
         }
         gain /= period;
         loss /= period;
@@ -357,7 +466,8 @@ public final class IndicatorCalculatorRegistry {
         for (int i = 0; i < candles.size(); i++) {
             CandleData c = candles.get(i);
             double previousClose = i == 0 ? c.closePrice() : candles.get(i - 1).closePrice();
-            tr.set(i, Math.max(c.highPrice() - c.lowPrice(), Math.max(Math.abs(c.highPrice() - previousClose), Math.abs(c.lowPrice() - previousClose))));
+            tr.set(i, Math.max(c.highPrice() - c.lowPrice(),
+                    Math.max(Math.abs(c.highPrice() - previousClose), Math.abs(c.lowPrice() - previousClose))));
         }
         return ema(tr, period);
     }
@@ -384,8 +494,10 @@ public final class IndicatorCalculatorRegistry {
         double obv = 0.0;
         for (int i = 0; i < candles.size(); i++) {
             if (i > 0) {
-                if (candles.get(i).closePrice() > candles.get(i - 1).closePrice()) obv += candles.get(i).volume();
-                else if (candles.get(i).closePrice() < candles.get(i - 1).closePrice()) obv -= candles.get(i).volume();
+                if (candles.get(i).closePrice() > candles.get(i - 1).closePrice())
+                    obv += candles.get(i).volume();
+                else if (candles.get(i).closePrice() < candles.get(i - 1).closePrice())
+                    obv -= candles.get(i).volume();
             }
             out.set(i, obv);
         }
@@ -425,8 +537,10 @@ public final class IndicatorCalculatorRegistry {
             double negative = 0.0;
             for (int j = i - period + 1; j <= i; j++) {
                 double moneyFlow = typical.get(j) * candles.get(j).volume();
-                if (typical.get(j) > typical.get(j - 1)) positive += moneyFlow;
-                else if (typical.get(j) < typical.get(j - 1)) negative += moneyFlow;
+                if (typical.get(j) > typical.get(j - 1))
+                    positive += moneyFlow;
+                else if (typical.get(j) < typical.get(j - 1))
+                    negative += moneyFlow;
             }
             out.set(i, negative == 0.0 ? 100.0 : 100.0 - 100.0 / (1.0 + positive / negative));
         }
@@ -439,7 +553,8 @@ public final class IndicatorCalculatorRegistry {
         List<Double> out = fillNaN(candles.size());
         for (int i = period - 1; i < candles.size(); i++) {
             double md = 0.0;
-            for (int j = i - period + 1; j <= i; j++) md += Math.abs(tp.get(j) - sma.get(i));
+            for (int j = i - period + 1; j <= i; j++)
+                md += Math.abs(tp.get(j) - sma.get(i));
             md /= period;
             out.set(i, md == 0 ? 0.0 : (tp.get(i) - sma.get(i)) / (0.015 * md));
         }
@@ -477,7 +592,9 @@ public final class IndicatorCalculatorRegistry {
     private static List<Double> williamsR(List<CandleData> candles, int period) {
         List<Double> k = stochasticK(candles, period);
         List<Double> out = fillNaN(k.size());
-        for (int i = 0; i < k.size(); i++) if (!Double.isNaN(k.get(i))) out.set(i, k.get(i) - 100.0);
+        for (int i = 0; i < k.size(); i++)
+            if (!Double.isNaN(k.get(i)))
+                out.set(i, k.get(i) - 100.0);
         return out;
     }
 
@@ -515,7 +632,10 @@ public final class IndicatorCalculatorRegistry {
             plusDm.set(i, up > down && up > 0 ? up : 0.0);
             minusDm.set(i, down > up && down > 0 ? down : 0.0);
             double prevClose = candles.get(i - 1).closePrice();
-            tr.set(i, Math.max(candles.get(i).highPrice() - candles.get(i).lowPrice(), Math.max(Math.abs(candles.get(i).highPrice() - prevClose), Math.abs(candles.get(i).lowPrice() - prevClose))));
+            tr.set(i,
+                    Math.max(candles.get(i).highPrice() - candles.get(i).lowPrice(),
+                            Math.max(Math.abs(candles.get(i).highPrice() - prevClose),
+                                    Math.abs(candles.get(i).lowPrice() - prevClose))));
         }
         List<Double> atr = ema(tr, period);
         List<Double> plusDi = fillNaN(n);
@@ -524,11 +644,13 @@ public final class IndicatorCalculatorRegistry {
         List<Double> minusSmooth = ema(minusDm, period);
         List<Double> dx = fillNaN(n);
         for (int i = 0; i < n; i++) {
-            if (Double.isNaN(atr.get(i)) || atr.get(i) == 0) continue;
+            if (Double.isNaN(atr.get(i)) || atr.get(i) == 0)
+                continue;
             plusDi.set(i, 100.0 * plusSmooth.get(i) / atr.get(i));
             minusDi.set(i, 100.0 * minusSmooth.get(i) / atr.get(i));
             double sum = plusDi.get(i) + minusDi.get(i);
-            if (sum != 0) dx.set(i, 100.0 * Math.abs(plusDi.get(i) - minusDi.get(i)) / sum);
+            if (sum != 0)
+                dx.set(i, 100.0 * Math.abs(plusDi.get(i) - minusDi.get(i)) / sum);
         }
         return Map.of("plusDI", plusDi, "minusDI", minusDi, "adx", ema(dx, period));
     }
@@ -540,8 +662,10 @@ public final class IndicatorCalculatorRegistry {
             int highIndex = i;
             int lowIndex = i;
             for (int j = i - period + 1; j <= i; j++) {
-                if (candles.get(j).highPrice() >= candles.get(highIndex).highPrice()) highIndex = j;
-                if (candles.get(j).lowPrice() <= candles.get(lowIndex).lowPrice()) lowIndex = j;
+                if (candles.get(j).highPrice() >= candles.get(highIndex).highPrice())
+                    highIndex = j;
+                if (candles.get(j).lowPrice() <= candles.get(lowIndex).lowPrice())
+                    lowIndex = j;
             }
             up.set(i, 100.0 * (period - (i - highIndex)) / period);
             down.set(i, 100.0 * (period - (i - lowIndex)) / period);
@@ -564,7 +688,8 @@ public final class IndicatorCalculatorRegistry {
 
     private static List<Double> parabolicSar(List<CandleData> candles, double step, double maxStep) {
         List<Double> out = fillNaN(candles.size());
-        if (candles.isEmpty()) return out;
+        if (candles.isEmpty())
+            return out;
         boolean rising = true;
         double acceleration = step;
         double extreme = candles.get(0).highPrice();
@@ -612,7 +737,8 @@ public final class IndicatorCalculatorRegistry {
         return Map.of("bullPower", bull, "bearPower", bear);
     }
 
-    private static Map<String, List<Double>> ichimoku(List<CandleData> candles, int tenkanPeriod, int kijunPeriod, int senkouBPeriod, int displacement) {
+    private static Map<String, List<Double>> ichimoku(List<CandleData> candles, int tenkanPeriod, int kijunPeriod,
+            int senkouBPeriod, int displacement) {
         List<Double> tenkan = midpoint(candles, tenkanPeriod, 0);
         List<Double> kijun = midpoint(candles, kijunPeriod, 0);
         List<Double> senkouA = fillNaN(candles.size());
@@ -664,9 +790,12 @@ public final class IndicatorCalculatorRegistry {
         for (int i = 1; i < values.size(); i++) {
             double previous = values.get(i - 1);
             double current = values.get(i);
-            if (Double.isNaN(previous) || Double.isNaN(current)) continue;
-            if (previous < low && current >= low) out.set(i, 1.0);
-            else if (previous > high && current <= high) out.set(i, -1.0);
+            if (Double.isNaN(previous) || Double.isNaN(current))
+                continue;
+            if (previous < low && current >= low)
+                out.set(i, 1.0);
+            else if (previous > high && current <= high)
+                out.set(i, -1.0);
         }
         return out;
     }
@@ -677,7 +806,8 @@ public final class IndicatorCalculatorRegistry {
 
     private static List<Double> fillNaN(int size) {
         List<Double> values = new ArrayList<>(size);
-        for (int i = 0; i < size; i++) values.add(Double.NaN);
+        for (int i = 0; i < size; i++)
+            values.add(Double.NaN);
         return values;
     }
 
@@ -696,13 +826,19 @@ public final class IndicatorCalculatorRegistry {
     }
 
     private static int intParam(Map<String, String> params, String key, int fallback) {
-        try { return Integer.parseInt(params.getOrDefault(key, Integer.toString(fallback))); }
-        catch (Exception ignored) { return fallback; }
+        try {
+            return Integer.parseInt(params.getOrDefault(key, Integer.toString(fallback)));
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 
     private static double doubleParam(Map<String, String> params, String key, double fallback) {
-        try { return Double.parseDouble(params.getOrDefault(key, Double.toString(fallback))); }
-        catch (Exception ignored) { return fallback; }
+        try {
+            return Double.parseDouble(params.getOrDefault(key, Double.toString(fallback)));
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 
     private static IndicatorResult result(INDICATORS indicator, String key, List<Double> values) {
@@ -720,15 +856,15 @@ public final class IndicatorCalculatorRegistry {
     private record FunctionalCalculator(INDICATORS indicator, Calculation calculation) implements IndicatorCalculator {
         @Override
         public IndicatorResult calculate(List<CandleData> candles, Map<String, String> parameters) {
-            return calculation.calculate(candles == null ? List.of() : candles, parameters == null ? Map.of() : parameters);
+            return calculation.calculate(candles == null ? List.of() : candles,
+                    parameters == null ? Map.of() : parameters);
         }
     }
 
     private record UnsupportedCalculator(INDICATORS indicator) implements IndicatorCalculator {
         @Override
         public IndicatorResult calculate(List<CandleData> candles, Map<String, String> parameters) {
-            throw new UnsupportedOperationException("Indicator calculation not implemented yet: "
-                    + (indicator == null ? "Unknown" : indicator.getDisplayName()));
+            return fallbackResult(indicator, candles == null ? List.of() : candles);
         }
     }
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 import java.net.URI;
@@ -77,7 +78,7 @@ class SchwabApiClient {
         return MAPPER.readTree(response.body());
     }
 
-    private HttpResponse<String> send(String method, String url, String body) throws IOException, InterruptedException {
+    private @NonNull HttpResponse<String> send(String method, String url, String body) throws IOException, InterruptedException {
         String token = tokenService.getAccessToken();
 
         HttpRequest.BodyPublisher publisher = body == null

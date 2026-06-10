@@ -3,9 +3,15 @@ package org.investpro.strategy;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
+import org.investpro.enums.timeframe.Timeframe;
+import org.investpro.indicators.INDICATORS;
 import org.investpro.spi.PluginRegistry;
 import org.investpro.spi.StrategyProvider;
 import org.investpro.strategy.persistence.UserStrategyDefinitionStore;
+import org.investpro.strategy.rules.CandlePattern;
+import org.investpro.strategy.rules.SignalType;
+import org.investpro.strategy.rules.StrategyRuleDefinition;
+import org.investpro.strategy.rules.StrategyRuleSource;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -15,8 +21,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class StrategyCatalog {
-
-
 
     public static final List<String> CORE_STRATEGY_NAMES = List.of(
             "Trend Following",
@@ -35,8 +39,7 @@ public final class StrategyCatalog {
             "RSI Failure Swing",
             "Volume Spike Reversal",
             "ML Model",
-            "Adaptive Momentum Pullback"
-    );
+            "Adaptive Momentum Pullback");
 
     public static final Map<String, StrategyDefinition> STRATEGY_DEFINITIONS = buildCatalog();
     private static final Map<String, StrategyDefinition> RUNTIME_DEFINITIONS = new ConcurrentHashMap<>();
@@ -58,8 +61,7 @@ public final class StrategyCatalog {
                                 .emaSlow(21)
                                 .atrPeriod(7)
                                 .breakoutLookback(8)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Intraday",
                         StrategyParameters.builder()
@@ -68,8 +70,7 @@ public final class StrategyCatalog {
                                 .emaSlow(26)
                                 .atrPeriod(10)
                                 .breakoutLookback(12)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Swing",
                         StrategyParameters.builder()
@@ -78,8 +79,7 @@ public final class StrategyCatalog {
                                 .emaSlow(50)
                                 .atrPeriod(14)
                                 .breakoutLookback(20)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Position",
                         StrategyParameters.builder()
@@ -88,8 +88,7 @@ public final class StrategyCatalog {
                                 .emaSlow(89)
                                 .atrPeriod(21)
                                 .breakoutLookback(34)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Asia Session",
                         StrategyParameters.builder()
@@ -98,8 +97,7 @@ public final class StrategyCatalog {
                                 .emaSlow(34)
                                 .atrPeriod(10)
                                 .breakoutLookback(10)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "London Session",
                         StrategyParameters.builder()
@@ -108,8 +106,7 @@ public final class StrategyCatalog {
                                 .emaSlow(35)
                                 .atrPeriod(12)
                                 .breakoutLookback(14)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "New York Session",
                         StrategyParameters.builder()
@@ -118,8 +115,7 @@ public final class StrategyCatalog {
                                 .emaSlow(40)
                                 .atrPeriod(12)
                                 .breakoutLookback(16)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Volatility Focus",
                         StrategyParameters.builder()
@@ -128,8 +124,7 @@ public final class StrategyCatalog {
                                 .emaSlow(45)
                                 .atrPeriod(20)
                                 .breakoutLookback(18)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Mean Revert Focus",
                         StrategyParameters.builder()
@@ -140,8 +135,7 @@ public final class StrategyCatalog {
                                 .breakoutLookback(12)
                                 .oversoldThreshold(30)
                                 .overboughtThreshold(70)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Trend Strength",
                         StrategyParameters.builder()
@@ -150,8 +144,7 @@ public final class StrategyCatalog {
                                 .emaSlow(55)
                                 .atrPeriod(16)
                                 .breakoutLookback(24)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Multi Confirm",
                         StrategyParameters.builder()
@@ -160,9 +153,7 @@ public final class StrategyCatalog {
                                 .emaSlow(55)
                                 .atrPeriod(18)
                                 .breakoutLookback(21)
-                                .build()
-                )
-        );
+                                .build()));
 
         List<VariantProfile> riskProfiles = List.of(
                 new VariantProfile(
@@ -172,8 +163,7 @@ public final class StrategyCatalog {
                                 .overboughtThreshold(68)
                                 .minConfidence(0.64)
                                 .signalAmount(0.50)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Balanced",
                         StrategyParameters.builder()
@@ -181,8 +171,7 @@ public final class StrategyCatalog {
                                 .overboughtThreshold(65)
                                 .minConfidence(0.58)
                                 .signalAmount(1.00)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Aggressive",
                         StrategyParameters.builder()
@@ -190,8 +179,7 @@ public final class StrategyCatalog {
                                 .overboughtThreshold(62)
                                 .minConfidence(0.54)
                                 .signalAmount(1.35)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Institutional",
                         StrategyParameters.builder()
@@ -199,8 +187,7 @@ public final class StrategyCatalog {
                                 .overboughtThreshold(66)
                                 .minConfidence(0.60)
                                 .signalAmount(0.85)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Quant",
                         StrategyParameters.builder()
@@ -208,9 +195,7 @@ public final class StrategyCatalog {
                                 .overboughtThreshold(67)
                                 .minConfidence(0.57)
                                 .signalAmount(1.15)
-                                .build()
-                )
-        );
+                                .build()));
 
         List<VariantProfile> marketContextProfiles = List.of(
                 new VariantProfile(
@@ -221,8 +206,7 @@ public final class StrategyCatalog {
                                 .atrPeriod(10)
                                 .breakoutLookback(12)
                                 .minConfidence(0.60)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Crypto Expansion",
                         StrategyParameters.builder()
@@ -231,8 +215,7 @@ public final class StrategyCatalog {
                                 .atrPeriod(18)
                                 .breakoutLookback(24)
                                 .signalAmount(1.20)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Equities Macro",
                         StrategyParameters.builder()
@@ -241,8 +224,7 @@ public final class StrategyCatalog {
                                 .atrPeriod(20)
                                 .breakoutLookback(34)
                                 .minConfidence(0.62)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Futures Carry",
                         StrategyParameters.builder()
@@ -251,8 +233,7 @@ public final class StrategyCatalog {
                                 .atrPeriod(16)
                                 .breakoutLookback(20)
                                 .signalAmount(1.10)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Commodities Trend",
                         StrategyParameters.builder()
@@ -261,8 +242,7 @@ public final class StrategyCatalog {
                                 .atrPeriod(22)
                                 .breakoutLookback(28)
                                 .minConfidence(0.61)
-                                .build()
-                ),
+                                .build()),
                 new VariantProfile(
                         "Index Rotation",
                         StrategyParameters.builder()
@@ -271,9 +251,7 @@ public final class StrategyCatalog {
                                 .atrPeriod(18)
                                 .breakoutLookback(26)
                                 .signalAmount(0.95)
-                                .build()
-                )
-        );
+                                .build()));
 
         for (String baseName : CORE_STRATEGY_NAMES) {
             put(catalog, baseName, baseName, StrategyParameters.builder().build());
@@ -283,13 +261,11 @@ public final class StrategyCatalog {
                     String variantName = "%s | %s %s".formatted(
                             baseName,
                             style.label(),
-                            risk.label()
-                    );
+                            risk.label());
 
                     StrategyParameters params = merge(
                             style.parameters(),
-                            risk.parameters()
-                    );
+                            risk.parameters());
 
                     put(catalog, variantName, baseName, params);
 
@@ -298,14 +274,12 @@ public final class StrategyCatalog {
                                 baseName,
                                 style.label(),
                                 risk.label(),
-                                context.label()
-                        );
+                                context.label());
 
                         StrategyParameters contextualParams = merge(
                                 style.parameters(),
                                 risk.parameters(),
-                                context.parameters()
-                        );
+                                context.parameters());
 
                         put(catalog, contextualVariantName, baseName, contextualParams);
                     }
@@ -327,18 +301,26 @@ public final class StrategyCatalog {
                         .overboughtThreshold(66)
                         .minConfidence(0.66)
                         .signalAmount(0.90)
-                        .build()
-        );
+                        .build());
+
+        put(catalog, buildCandleReversalConfirmation());
 
         return Map.copyOf(catalog);
+    }
+
+    private static void put(Map<String, StrategyDefinition> catalog, StrategyDefinition definition) {
+        if (definition == null || definition.getName() == null || definition.getName().isBlank()) {
+            return;
+        }
+
+        catalog.putIfAbsent(definition.getName(), definition);
     }
 
     private static void put(
             Map<String, StrategyDefinition> catalog,
             String name,
             String baseName,
-            StrategyParameters parameters
-    ) {
+            StrategyParameters parameters) {
         if (name == null || name.isBlank()) {
             return;
         }
@@ -353,8 +335,156 @@ public final class StrategyCatalog {
                         .name(name)
                         .baseName(baseName)
                         .parameters(parameters == null ? StrategyParameters.builder().build() : parameters)
-                        .build()
-        );
+                        .build());
+    }
+
+    private static StrategyDefinition buildCandleReversalConfirmation() {
+        StrategyParameters parameters = StrategyParameters.builder()
+                .rsiPeriod(14)
+                .emaFast(200)
+                .emaSlow(200)
+                .atrPeriod(14)
+                .oversoldThreshold(30.0)
+                .overboughtThreshold(70.0)
+                .minConfidence(0.70)
+                .signalAmount(1.0)
+                .build();
+
+        List<StrategyRuleDefinition> rules = new ArrayList<>();
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.CANDLE_PATTERN,
+                SignalType.BUY,
+                null,
+                CandlePattern.HAMMER,
+                Timeframe.H1,
+                Map.of("confirmatorySide", "BUY")));
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.CANDLE_PATTERN,
+                SignalType.BUY,
+                null,
+                CandlePattern.ENGULFING_BULLISH,
+                Timeframe.H1,
+                Map.of("confirmatorySide", "BUY")));
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.CANDLE_PATTERN,
+                SignalType.BUY,
+                null,
+                CandlePattern.MORNING_STAR,
+                Timeframe.H1,
+                Map.of("confirmatorySide", "BUY")));
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.CANDLE_PATTERN,
+                SignalType.BUY,
+                null,
+                CandlePattern.DRAGONFLY_DOJI,
+                Timeframe.H1,
+                Map.of("confirmatorySide", "BUY")));
+
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.CANDLE_PATTERN,
+                SignalType.SELL,
+                null,
+                CandlePattern.SHOOTING_STAR,
+                Timeframe.H1,
+                Map.of("confirmatorySide", "SELL")));
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.CANDLE_PATTERN,
+                SignalType.SELL,
+                null,
+                CandlePattern.ENGULFING_BEARISH,
+                Timeframe.H1,
+                Map.of("confirmatorySide", "SELL")));
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.CANDLE_PATTERN,
+                SignalType.SELL,
+                null,
+                CandlePattern.EVENING_STAR,
+                Timeframe.H1,
+                Map.of("confirmatorySide", "SELL")));
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.CANDLE_PATTERN,
+                SignalType.SELL,
+                null,
+                CandlePattern.GRAVESTONE_DOJI,
+                Timeframe.H1,
+                Map.of("confirmatorySide", "SELL")));
+
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.INDICATOR,
+                SignalType.BUY,
+                INDICATORS.RSI_REGION_CROSSOVER,
+                null,
+                Timeframe.H1,
+                Map.of(
+                        "period", "14",
+                        "oversold", "30",
+                        "overbought", "70",
+                        "minimumBuySignals", "2",
+                        "confirmationRequired", "true")));
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.INDICATOR,
+                SignalType.BUY,
+                INDICATORS.EMA,
+                null,
+                Timeframe.H1,
+                Map.of(
+                        "period", "200",
+                        "minimumBuySignals", "2",
+                        "confirmationRequired", "true")));
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.INDICATOR,
+                SignalType.BUY,
+                INDICATORS.ATR,
+                null,
+                Timeframe.H1,
+                Map.of(
+                        "period", "14",
+                        "stopLossAtrMultiple", "1.5",
+                        "takeProfitAtrMultiple", "2.5",
+                        "minimumBuySignals", "2",
+                        "confirmationRequired", "true")));
+
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.INDICATOR,
+                SignalType.SELL,
+                INDICATORS.RSI_REGION_CROSSOVER,
+                null,
+                Timeframe.H1,
+                Map.of(
+                        "period", "14",
+                        "oversold", "30",
+                        "overbought", "70",
+                        "minimumSellSignals", "2",
+                        "confirmationRequired", "true")));
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.INDICATOR,
+                SignalType.SELL,
+                INDICATORS.EMA,
+                null,
+                Timeframe.H1,
+                Map.of(
+                        "period", "200",
+                        "minimumSellSignals", "2",
+                        "confirmationRequired", "true")));
+        rules.add(new StrategyRuleDefinition(
+                StrategyRuleSource.INDICATOR,
+                SignalType.SELL,
+                INDICATORS.ATR,
+                null,
+                Timeframe.H1,
+                Map.of(
+                        "period", "14",
+                        "stopLossAtrMultiple", "1.5",
+                        "takeProfitAtrMultiple", "2.5",
+                        "minimumSellSignals", "2",
+                        "confirmationRequired", "true")));
+
+        return StrategyDefinition.builder()
+                .name("Candle Reversal Confirmation")
+                .baseName("Candle Reversal Confirmation")
+                .parameters(parameters)
+                .rules(List.copyOf(rules))
+                .build();
     }
 
     private static StrategyParameters merge(StrategyParameters... profiles) {
@@ -435,6 +565,9 @@ public final class StrategyCatalog {
         aliases.put("AI", "AI Hybrid");
         aliases.put("AI HYBRID", "AI Hybrid");
         aliases.put("LSTM", "AI Hybrid");
+
+        aliases.put("CANDLE REVERSAL CONFIRMATION", "Candle Reversal Confirmation");
+        aliases.put("CANDLE_REVERSAL_CONFIRMATION", "Candle Reversal Confirmation");
 
         aliases.put("ML", "ML Model");
         aliases.put("ML MODEL", "ML Model");

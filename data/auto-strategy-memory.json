@@ -1583,6 +1583,1682 @@
       } ],
       "marketCompatibility" : [ "ALL" ]
     }
+  }, {
+    "id" : "04dc8e30-5d69-479e-a50f-6ce604247351",
+    "name" : "RSI Mean Reversion EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 74.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050624.294862200,
+    "strategyDefinition" : {
+      "name" : "RSI Mean Reversion EUR/AUD 5m",
+      "baseName" : "RSI Mean Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "e44f3467-ad3f-4fdc-82ea-6814083e5e77",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "oversold" : "30",
+          "period" : "14",
+          "crossoverMode" : "REGION_EXIT",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "ca2bf69f-b85d-4807-889f-c93d0fbf02bc",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "oversold" : "30",
+          "period" : "14",
+          "crossoverMode" : "REGION_EXIT",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "59fc143a-7718-497c-b893-859b9cd95d42",
+    "name" : "MACD Trend Expansion EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 72.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050624.294862200,
+    "strategyDefinition" : {
+      "name" : "MACD Trend Expansion EUR/AUD 5m",
+      "baseName" : "MACD Trend Expansion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "5422681d-453b-4e38-8666-407cfbb73902",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "signalPeriod" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "69c6e036-4231-4aad-847c-9fa583d207f6",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "signalPeriod" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "6f7fe6dd-674d-4af2-9904-0853e2af3044",
+    "name" : "Bollinger Range Reversion EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 69.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050624.294862200,
+    "strategyDefinition" : {
+      "name" : "Bollinger Range Reversion EUR/AUD 5m",
+      "baseName" : "Bollinger Range Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "fc71a895-262a-47c1-957a-60314ad45b24",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20",
+          "stdDevMult" : "2.0"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "b057fbd0-9bb3-42c8-9c36-4224eb96d0bd",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20",
+          "stdDevMult" : "2.0"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "5fec4389-29eb-45c5-a9f3-1a792c02d821",
+    "name" : "EMA Momentum Cross EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 67.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050624.294862200,
+    "strategyDefinition" : {
+      "name" : "EMA Momentum Cross EUR/AUD 5m",
+      "baseName" : "EMA Momentum Cross",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "1766e8e6-b6d2-4458-9346-a39a167fa8f7",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "128ff3a9-853a-43e3-9499-3d1e6f0f2ae5",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "81e97c43-47e1-4311-923c-1d9d82c78b21",
+    "name" : "Stochastic Reversal EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 65.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050624.296865600,
+    "strategyDefinition" : {
+      "name" : "Stochastic Reversal EUR/AUD 5m",
+      "baseName" : "Stochastic Reversal",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "f79aca46-daa0-4e6f-a6ca-802fad50c74d",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "smooth" : "3",
+          "crossoverMode" : "REGION_EXIT",
+          "oversold" : "20",
+          "kPeriod" : "14",
+          "dPeriod" : "3",
+          "overbought" : "80"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "686407a6-2fc1-4b0e-ada5-602c16919cf7",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "smooth" : "3",
+          "crossoverMode" : "REGION_EXIT",
+          "oversold" : "20",
+          "kPeriod" : "14",
+          "dPeriod" : "3",
+          "overbought" : "80"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "9054383e-ceb0-4b55-a461-b4433cad0ba5",
+    "name" : "ATR Volatility Breakout EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 63.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050624.296865600,
+    "strategyDefinition" : {
+      "name" : "ATR Volatility Breakout EUR/AUD 5m",
+      "baseName" : "ATR Volatility Breakout",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "96ffb9a9-ae3b-49aa-95a3-154e6e16b101",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "28ba4d81-0dc7-4699-9479-834c1971f88e",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "4c9d1317-accf-4f3f-9a4c-b48c3fd48dea",
+    "name" : "Candle Confirmation Swing EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 61.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050624.296865600,
+    "strategyDefinition" : {
+      "name" : "Candle Confirmation Swing EUR/AUD 5m",
+      "baseName" : "Candle Confirmation Swing",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "a9149b5f-52dc-4405-b80a-a84b3916fcce",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "92ae63df-3770-460e-8ebc-09121bf18f54",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "ENGULFING_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "2afa9e6f-7338-4597-8821-c5662acba2bd",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "7e0c6ff3-6728-4401-932c-0ea9cad5c224",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "e9f3166b-00b6-4a4e-8613-1823f9743955",
+    "name" : "RSI Mean Reversion EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 74.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.109355300,
+    "strategyDefinition" : {
+      "name" : "RSI Mean Reversion EUR/AUD 5m",
+      "baseName" : "RSI Mean Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "57cc838e-3869-41af-8ae9-f70a77a39e76",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "oversold" : "30",
+          "period" : "14",
+          "crossoverMode" : "REGION_EXIT",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "17db3aa6-c582-4e0d-b182-7c0548b298c4",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "oversold" : "30",
+          "period" : "14",
+          "crossoverMode" : "REGION_EXIT",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "63699de3-ff12-45af-abe7-7cb8a5052a05",
+    "name" : "MACD Trend Expansion EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 72.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.109355300,
+    "strategyDefinition" : {
+      "name" : "MACD Trend Expansion EUR/AUD 5m",
+      "baseName" : "MACD Trend Expansion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "def1b959-af52-442f-ba4e-4a8add98dff8",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "signalPeriod" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "9ec91b55-e65d-47bb-be97-f8c2f8ff0296",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "signalPeriod" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "d1f95400-def0-4854-8214-76ff0fdfb479",
+    "name" : "Bollinger Range Reversion EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 69.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.109355300,
+    "strategyDefinition" : {
+      "name" : "Bollinger Range Reversion EUR/AUD 5m",
+      "baseName" : "Bollinger Range Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "3ebb3a4e-bbbe-449e-b88b-c164c4c38d28",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20",
+          "stdDevMult" : "2.0"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "03602dff-f204-4bb3-aa0a-6681b5437385",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20",
+          "stdDevMult" : "2.0"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "c5c3fcf0-f51c-4fee-9537-6dbd4b2b4e86",
+    "name" : "EMA Momentum Cross EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 67.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.109355300,
+    "strategyDefinition" : {
+      "name" : "EMA Momentum Cross EUR/AUD 5m",
+      "baseName" : "EMA Momentum Cross",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "10fbf88f-d65f-4fe4-8064-aa8a459c5ba2",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "e6c39d5a-90fc-4280-b21c-554bc9c2c75d",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "da288b76-ab2d-4585-ad7b-5522d6e2c015",
+    "name" : "Stochastic Reversal EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 65.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.110360000,
+    "strategyDefinition" : {
+      "name" : "Stochastic Reversal EUR/AUD 5m",
+      "baseName" : "Stochastic Reversal",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "c4001078-6ce0-42f3-b699-600aaf590354",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "smooth" : "3",
+          "crossoverMode" : "REGION_EXIT",
+          "oversold" : "20",
+          "kPeriod" : "14",
+          "dPeriod" : "3",
+          "overbought" : "80"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "68cad3be-7b17-4c11-aa71-af81e895ff26",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "smooth" : "3",
+          "crossoverMode" : "REGION_EXIT",
+          "oversold" : "20",
+          "kPeriod" : "14",
+          "dPeriod" : "3",
+          "overbought" : "80"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "9457d236-fa13-430d-9abd-afdbdca0df5f",
+    "name" : "ATR Volatility Breakout EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 63.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.110360000,
+    "strategyDefinition" : {
+      "name" : "ATR Volatility Breakout EUR/AUD 5m",
+      "baseName" : "ATR Volatility Breakout",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "e1421534-5cf2-4bdc-adfe-add2104b56fb",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "7ba25a67-51ae-41ff-a394-18be77643eee",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "0ea09d4d-0d45-4efc-ae15-5ff6544740ca",
+    "name" : "Candle Confirmation Swing EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 61.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.110360000,
+    "strategyDefinition" : {
+      "name" : "Candle Confirmation Swing EUR/AUD 5m",
+      "baseName" : "Candle Confirmation Swing",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "8c7ec578-5676-42a7-8e0e-5577d39d4621",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "b6e97f03-efd9-4a75-91de-db2916abc36b",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "ENGULFING_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "9673b551-15ef-4ed0-9948-096614f3c93a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "826f66bd-03b6-4fe8-b847-9525f48b2bce",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "86ea521d-977e-4d97-a5a2-a38a9481258a",
+    "name" : "general RSI More Sensitive",
+    "symbol" : "EUR/AUD",
+    "source" : "MUTATION",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 45.0,
+    "rationale" : [ "Mutated parameters from general" ],
+    "generatedAt" : 1781050636.113358700,
+    "strategyDefinition" : {
+      "name" : "general RSI More Sensitive",
+      "baseName" : "general",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "10"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "WMA",
+        "candlePattern" : null,
+        "timeframe" : "M30",
+        "parameters" : {
+          "period" : "10"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "LONG_LINE_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "6a704076-1b9e-4b1b-a916-f67afdf1ef2c",
+    "name" : "general RSI Smoother",
+    "symbol" : "EUR/AUD",
+    "source" : "MUTATION",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 45.0,
+    "rationale" : [ "Mutated parameters from general" ],
+    "generatedAt" : 1781050636.121304300,
+    "strategyDefinition" : {
+      "name" : "general RSI Smoother",
+      "baseName" : "general",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "21"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "WMA",
+        "candlePattern" : null,
+        "timeframe" : "M30",
+        "parameters" : {
+          "period" : "21"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "LONG_LINE_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "da3bd5f6-4536-47d9-a783-e6b38f5171be",
+    "name" : "general EMA Faster",
+    "symbol" : "EUR/AUD",
+    "source" : "MUTATION",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 45.0,
+    "rationale" : [ "Mutated parameters from general" ],
+    "generatedAt" : 1781050636.121304300,
+    "strategyDefinition" : {
+      "name" : "general EMA Faster",
+      "baseName" : "general",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "WMA",
+        "candlePattern" : null,
+        "timeframe" : "M30",
+        "parameters" : {
+          "period" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "LONG_LINE_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "36597cf3-9323-4298-af71-6f2ad985cd2a",
+    "name" : "general EMA Slower",
+    "symbol" : "EUR/AUD",
+    "source" : "MUTATION",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 45.0,
+    "rationale" : [ "Mutated parameters from general" ],
+    "generatedAt" : 1781050636.121304300,
+    "strategyDefinition" : {
+      "name" : "general EMA Slower",
+      "baseName" : "general",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "34"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "WMA",
+        "candlePattern" : null,
+        "timeframe" : "M30",
+        "parameters" : {
+          "period" : "34"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "LONG_LINE_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "ee5d3cf5-bb00-48e1-ad1f-4905625e1aee",
+    "name" : "general ATR Tight",
+    "symbol" : "EUR/AUD",
+    "source" : "MUTATION",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 45.0,
+    "rationale" : [ "Mutated parameters from general" ],
+    "generatedAt" : 1781050636.121304300,
+    "strategyDefinition" : {
+      "name" : "general ATR Tight",
+      "baseName" : "general",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "10"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "WMA",
+        "candlePattern" : null,
+        "timeframe" : "M30",
+        "parameters" : {
+          "period" : "10"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "LONG_LINE_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "2c07e755-d5b1-4c1c-bf94-3c5c9501b8e9",
+    "name" : "RSI Mean Reversion EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 74.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050647.226605400,
+    "strategyDefinition" : {
+      "name" : "RSI Mean Reversion EUR/AUD 5m",
+      "baseName" : "RSI Mean Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "4af26e59-758e-4a4c-9556-608ecb65e0dd",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "oversold" : "30",
+          "period" : "14",
+          "crossoverMode" : "REGION_EXIT",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "c4eff46c-8931-42bd-af6a-9b0096629f12",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "oversold" : "30",
+          "period" : "14",
+          "crossoverMode" : "REGION_EXIT",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "f9f506d7-8edd-4e98-a969-b5fca61191c1",
+    "name" : "MACD Trend Expansion EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 72.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050647.226605400,
+    "strategyDefinition" : {
+      "name" : "MACD Trend Expansion EUR/AUD 5m",
+      "baseName" : "MACD Trend Expansion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "de7a7711-9e86-4dbb-8762-1045d695309a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "signalPeriod" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "f1373089-bb9f-46f7-93d4-aad63597ca9b",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "signalPeriod" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "0b642028-7b42-42a3-8483-3fc97ffb5c12",
+    "name" : "Bollinger Range Reversion EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 69.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050647.227116200,
+    "strategyDefinition" : {
+      "name" : "Bollinger Range Reversion EUR/AUD 5m",
+      "baseName" : "Bollinger Range Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "d4f3f8be-2038-4a7d-883d-4f1b478f968d",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20",
+          "stdDevMult" : "2.0"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "a9c4fe46-d5b2-4411-b3ab-bb7fb41d9472",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20",
+          "stdDevMult" : "2.0"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "123ed442-f4b9-4d6f-a32f-194aef3764aa",
+    "name" : "EMA Momentum Cross EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 67.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050647.227116200,
+    "strategyDefinition" : {
+      "name" : "EMA Momentum Cross EUR/AUD 5m",
+      "baseName" : "EMA Momentum Cross",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "e4e372e2-7ad7-4e38-bec5-f5cb69d6b155",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "48ccc899-2abf-40f7-b973-bd18c0cfd368",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "24796893-61e3-487d-bee4-6dfa4b82485d",
+    "name" : "Stochastic Reversal EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 65.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050647.227116200,
+    "strategyDefinition" : {
+      "name" : "Stochastic Reversal EUR/AUD 5m",
+      "baseName" : "Stochastic Reversal",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "0b99d29e-a31c-4d48-817f-b265af748fec",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "smooth" : "3",
+          "crossoverMode" : "REGION_EXIT",
+          "oversold" : "20",
+          "kPeriod" : "14",
+          "dPeriod" : "3",
+          "overbought" : "80"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "d1befc6c-9f8a-4559-a872-789305f8bbaa",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "smooth" : "3",
+          "crossoverMode" : "REGION_EXIT",
+          "oversold" : "20",
+          "kPeriod" : "14",
+          "dPeriod" : "3",
+          "overbought" : "80"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "41d8de1c-f25b-4107-833f-b55018057f7a",
+    "name" : "ATR Volatility Breakout EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 63.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050647.227116200,
+    "strategyDefinition" : {
+      "name" : "ATR Volatility Breakout EUR/AUD 5m",
+      "baseName" : "ATR Volatility Breakout",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "449f4d18-74d4-4784-9362-d146bd28437a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "96b1d82a-bbcd-482f-ba2d-6485aae66eaa",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "105bfe15-4276-4497-ac3c-27320ef5a6f3",
+    "name" : "Candle Confirmation Swing EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 61.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1781050647.227116200,
+    "strategyDefinition" : {
+      "name" : "Candle Confirmation Swing EUR/AUD 5m",
+      "baseName" : "Candle Confirmation Swing",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "9df2467f-4010-4f1b-ab8b-c75392c9b844",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "7d12024f-2470-4bfb-8a17-4f5d2a39f6bf",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "ENGULFING_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "90cee625-869f-43d0-a5f0-4d5c824c9d44",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "95f935dc-cff2-43af-ba94-cf0ae54f3cc8",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
   } ],
   "evaluations" : [ {
     "symbol" : "00/USD",
@@ -3612,6 +5288,1378 @@
     "warnings" : [ ],
     "errors" : [ ],
     "evaluatedAt" : 1780828364.467629700
+  }, {
+    "symbol" : "EUR/AUD",
+    "candidate" : {
+      "id" : "e9f3166b-00b6-4a4e-8613-1823f9743955",
+      "name" : "RSI Mean Reversion EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "LOW_VOLATILITY",
+      "generationScore" : 74.0,
+      "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+      "generatedAt" : 1781050636.109355300,
+      "strategyDefinition" : {
+        "name" : "RSI Mean Reversion EUR/AUD 5m",
+        "baseName" : "RSI Mean Reversion",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "57cc838e-3869-41af-8ae9-f70a77a39e76",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "RSI_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "oversold" : "30",
+            "period" : "14",
+            "crossoverMode" : "REGION_EXIT",
+            "overbought" : "70"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "17db3aa6-c582-4e0d-b182-7c0548b298c4",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "RSI_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "oversold" : "30",
+            "period" : "14",
+            "crossoverMode" : "REGION_EXIT",
+            "overbought" : "70"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "RSI Mean Reversion EUR/AUD 5m",
+      "baseStrategyName" : "RSI Mean Reversion EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 1,
+      "winRate" : 0.0,
+      "totalReturn" : -5.488748000061605E-5,
+      "netProfit" : -0.005488748000061605,
+      "maxDrawdown" : 5.488748000061605E-7,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : -1.412999081119547E12,
+      "score" : 8.326868894486545,
+      "warnings" : [ "Insufficient trades (1) for meaningful statistics" ],
+      "generatedAt" : 1781050636.846732000
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "RSI Mean Reversion EUR/AUD 5m",
+      "baseStrategyName" : "RSI Mean Reversion EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 0.0,
+      "warnings" : [ "Request validation failed" ],
+      "generatedAt" : 1781050636.847734100
+    },
+    "score" : 3.7470910025189452,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1781050636.858733500
+  }, {
+    "symbol" : "EUR/AUD",
+    "candidate" : {
+      "id" : "63699de3-ff12-45af-abe7-7cb8a5052a05",
+      "name" : "MACD Trend Expansion EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "LOW_VOLATILITY",
+      "generationScore" : 72.0,
+      "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+      "generatedAt" : 1781050636.109355300,
+      "strategyDefinition" : {
+        "name" : "MACD Trend Expansion EUR/AUD 5m",
+        "baseName" : "MACD Trend Expansion",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "def1b959-af52-442f-ba4e-4a8add98dff8",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "MACD_SIGNAL",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "signalPeriod" : "9"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "9ec91b55-e65d-47bb-be97-f8c2f8ff0296",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "MACD_SIGNAL",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "signalPeriod" : "9"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "MACD Trend Expansion EUR/AUD 5m",
+      "baseStrategyName" : "MACD Trend Expansion EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 4,
+      "winRate" : 0.0,
+      "totalReturn" : -1.558979193396226E-4,
+      "netProfit" : -0.01558979193396226,
+      "maxDrawdown" : 1.558979193396226E-6,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : -93.54487610319822,
+      "score" : 8.812926716066587,
+      "warnings" : [ "Insufficient trades (4) for meaningful statistics" ],
+      "generatedAt" : 1781050636.928489800
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "MACD Trend Expansion EUR/AUD 5m",
+      "baseStrategyName" : "MACD Trend Expansion EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 0.0,
+      "warnings" : [ "Request validation failed" ],
+      "generatedAt" : 1781050636.928489800
+    },
+    "score" : 3.965817022229964,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1781050636.938487800
+  }, {
+    "symbol" : "EUR/AUD",
+    "candidate" : {
+      "id" : "d1f95400-def0-4854-8214-76ff0fdfb479",
+      "name" : "Bollinger Range Reversion EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "LOW_VOLATILITY",
+      "generationScore" : 69.0,
+      "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+      "generatedAt" : 1781050636.109355300,
+      "strategyDefinition" : {
+        "name" : "Bollinger Range Reversion EUR/AUD 5m",
+        "baseName" : "Bollinger Range Reversion",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "3ebb3a4e-bbbe-449e-b88b-c164c4c38d28",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "BOLLINGER_BANDS",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "20",
+            "stdDevMult" : "2.0"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "03602dff-f204-4bb3-aa0a-6681b5437385",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "BOLLINGER_BANDS",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "20",
+            "stdDevMult" : "2.0"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "Bollinger Range Reversion EUR/AUD 5m",
+      "baseStrategyName" : "Bollinger Range Reversion EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 1,
+      "winRate" : 0.0,
+      "totalReturn" : -5.31453599978704E-5,
+      "netProfit" : -0.00531453599978704,
+      "maxDrawdown" : 5.31453599978704E-7,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : -3.962755064871896E11,
+      "score" : 8.378322951972402,
+      "warnings" : [ "Insufficient trades (1) for meaningful statistics" ],
+      "generatedAt" : 1781050637.090815200
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "Bollinger Range Reversion EUR/AUD 5m",
+      "baseStrategyName" : "Bollinger Range Reversion EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 0.0,
+      "warnings" : [ "Request validation failed" ],
+      "generatedAt" : 1781050637.090815200
+    },
+    "score" : 3.770245328387581,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1781050637.098826900
+  }, {
+    "symbol" : "EUR/AUD",
+    "candidate" : {
+      "id" : "c5c3fcf0-f51c-4fee-9537-6dbd4b2b4e86",
+      "name" : "EMA Momentum Cross EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "LOW_VOLATILITY",
+      "generationScore" : 67.0,
+      "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+      "generatedAt" : 1781050636.109355300,
+      "strategyDefinition" : {
+        "name" : "EMA Momentum Cross EUR/AUD 5m",
+        "baseName" : "EMA Momentum Cross",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "10fbf88f-d65f-4fe4-8064-aa8a459c5ba2",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "e6c39d5a-90fc-4280-b21c-554bc9c2c75d",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "20"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "EMA Momentum Cross EUR/AUD 5m",
+      "baseStrategyName" : "EMA Momentum Cross EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 3,
+      "winRate" : 0.0,
+      "totalReturn" : -8.023285992749152E-5,
+      "netProfit" : -0.008023285992749152,
+      "maxDrawdown" : 8.023285992749151E-7,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : -108.1712131353834,
+      "score" : 9.185686427509262,
+      "warnings" : [ "Insufficient trades (3) for meaningful statistics" ],
+      "generatedAt" : 1781050637.139826400
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "EMA Momentum Cross EUR/AUD 5m",
+      "baseStrategyName" : "EMA Momentum Cross EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 0.0,
+      "warnings" : [ "Request validation failed" ],
+      "generatedAt" : 1781050637.140826100
+    },
+    "score" : 4.133558892379168,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1781050637.171826500
+  }, {
+    "symbol" : "EUR/AUD",
+    "candidate" : {
+      "id" : "da288b76-ab2d-4585-ad7b-5522d6e2c015",
+      "name" : "Stochastic Reversal EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "LOW_VOLATILITY",
+      "generationScore" : 65.0,
+      "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+      "generatedAt" : 1781050636.110360000,
+      "strategyDefinition" : {
+        "name" : "Stochastic Reversal EUR/AUD 5m",
+        "baseName" : "Stochastic Reversal",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "c4001078-6ce0-42f3-b699-600aaf590354",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "smooth" : "3",
+            "crossoverMode" : "REGION_EXIT",
+            "oversold" : "20",
+            "kPeriod" : "14",
+            "dPeriod" : "3",
+            "overbought" : "80"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "68cad3be-7b17-4c11-aa71-af81e895ff26",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "smooth" : "3",
+            "crossoverMode" : "REGION_EXIT",
+            "oversold" : "20",
+            "kPeriod" : "14",
+            "dPeriod" : "3",
+            "overbought" : "80"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "Stochastic Reversal EUR/AUD 5m",
+      "baseStrategyName" : "Stochastic Reversal EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 4,
+      "winRate" : 0.0,
+      "totalReturn" : -1.4917500579031184E-4,
+      "netProfit" : -0.014917500579031184,
+      "maxDrawdown" : 1.4917500579031184E-6,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : -95.35749915746717,
+      "score" : 8.864034572557166,
+      "warnings" : [ "Insufficient trades (4) for meaningful statistics" ],
+      "generatedAt" : 1781050637.241567800
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "Stochastic Reversal EUR/AUD 5m",
+      "baseStrategyName" : "Stochastic Reversal EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 0.0,
+      "warnings" : [ "Request validation failed" ],
+      "generatedAt" : 1781050637.242580200
+    },
+    "score" : 3.988815557650725,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1781050637.260601200
+  }, {
+    "symbol" : "EUR/AUD",
+    "candidate" : {
+      "id" : "9457d236-fa13-430d-9abd-afdbdca0df5f",
+      "name" : "ATR Volatility Breakout EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "LOW_VOLATILITY",
+      "generationScore" : 63.0,
+      "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+      "generatedAt" : 1781050636.110360000,
+      "strategyDefinition" : {
+        "name" : "ATR Volatility Breakout EUR/AUD 5m",
+        "baseName" : "ATR Volatility Breakout",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "e1421534-5cf2-4bdc-adfe-add2104b56fb",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "ATR",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "7ba25a67-51ae-41ff-a394-18be77643eee",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "ATR",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "14"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "ATR Volatility Breakout EUR/AUD 5m",
+      "baseStrategyName" : "ATR Volatility Breakout EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 15.0,
+      "warnings" : [ "Insufficient trades (0) for meaningful statistics" ],
+      "generatedAt" : 1781050637.327974000
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "ATR Volatility Breakout EUR/AUD 5m",
+      "baseStrategyName" : "ATR Volatility Breakout EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 0.0,
+      "warnings" : [ "Request validation failed" ],
+      "generatedAt" : 1781050637.327974000
+    },
+    "score" : 6.75,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1781050637.341873700
+  }, {
+    "symbol" : "EUR/AUD",
+    "candidate" : {
+      "id" : "0ea09d4d-0d45-4efc-ae15-5ff6544740ca",
+      "name" : "Candle Confirmation Swing EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "source" : "RULE_BASED",
+      "marketRegime" : "LOW_VOLATILITY",
+      "generationScore" : 61.0,
+      "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+      "generatedAt" : 1781050636.110360000,
+      "strategyDefinition" : {
+        "name" : "Candle Confirmation Swing EUR/AUD 5m",
+        "baseName" : "Candle Confirmation Swing",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "8c7ec578-5676-42a7-8e0e-5577d39d4621",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "HAMMER",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "b6e97f03-efd9-4a75-91de-db2916abc36b",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "ENGULFING_BEARISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "9673b551-15ef-4ed0-9948-096614f3c93a",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "RSI",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "14",
+            "oversold" : "30",
+            "overbought" : "70"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "826f66bd-03b6-4fe8-b847-9525f48b2bce",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "RSI",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "14",
+            "oversold" : "30",
+            "overbought" : "70"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "Candle Confirmation Swing EUR/AUD 5m",
+      "baseStrategyName" : "Candle Confirmation Swing EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 1,
+      "winRate" : 0.0,
+      "totalReturn" : -7.580752000649227E-5,
+      "netProfit" : -0.007580752000649227,
+      "maxDrawdown" : 7.580752000649227E-7,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : -1.853217727341034E11,
+      "score" : 7.68886896831775,
+      "warnings" : [ "Insufficient trades (1) for meaningful statistics" ],
+      "generatedAt" : 1781050637.563492200
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "Candle Confirmation Swing EUR/AUD 5m",
+      "baseStrategyName" : "Candle Confirmation Swing EUR/AUD 5m",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 0.0,
+      "warnings" : [ "Request validation failed" ],
+      "generatedAt" : 1781050637.563492200
+    },
+    "score" : 3.4599910357429873,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1781050637.630745200
+  }, {
+    "symbol" : "EUR/AUD",
+    "candidate" : {
+      "id" : "86ea521d-977e-4d97-a5a2-a38a9481258a",
+      "name" : "general RSI More Sensitive",
+      "symbol" : "EUR/AUD",
+      "source" : "MUTATION",
+      "marketRegime" : "LOW_VOLATILITY",
+      "generationScore" : 45.0,
+      "rationale" : [ "Mutated parameters from general" ],
+      "generatedAt" : 1781050636.113358700,
+      "strategyDefinition" : {
+        "name" : "general RSI More Sensitive",
+        "baseName" : "general",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "DOJI_STAR_BULLISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "10"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "DOJI_STAR_BULLISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "WMA",
+          "candlePattern" : null,
+          "timeframe" : "M30",
+          "parameters" : {
+            "period" : "10"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "LONG_LINE_BEARISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "HAMMER",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "general RSI More Sensitive",
+      "baseStrategyName" : "general RSI More Sensitive",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 4,
+      "winRate" : 0.0,
+      "totalReturn" : -2.0560181270411706E-4,
+      "netProfit" : -0.020560181270411704,
+      "maxDrawdown" : 2.0560181270411706E-6,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : -119.15535045423444,
+      "score" : 8.433847057981378,
+      "warnings" : [ "Insufficient trades (4) for meaningful statistics" ],
+      "generatedAt" : 1781050637.749777300
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "general RSI More Sensitive",
+      "baseStrategyName" : "general RSI More Sensitive",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 0.0,
+      "warnings" : [ "Request validation failed" ],
+      "generatedAt" : 1781050637.751778100
+    },
+    "score" : 3.79523117609162,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1781050637.809783300
+  }, {
+    "symbol" : "EUR/AUD",
+    "candidate" : {
+      "id" : "6a704076-1b9e-4b1b-a916-f67afdf1ef2c",
+      "name" : "general RSI Smoother",
+      "symbol" : "EUR/AUD",
+      "source" : "MUTATION",
+      "marketRegime" : "LOW_VOLATILITY",
+      "generationScore" : 45.0,
+      "rationale" : [ "Mutated parameters from general" ],
+      "generatedAt" : 1781050636.121304300,
+      "strategyDefinition" : {
+        "name" : "general RSI Smoother",
+        "baseName" : "general",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "DOJI_STAR_BULLISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "21"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "DOJI_STAR_BULLISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "WMA",
+          "candlePattern" : null,
+          "timeframe" : "M30",
+          "parameters" : {
+            "period" : "21"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "LONG_LINE_BEARISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "HAMMER",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "general RSI Smoother",
+      "baseStrategyName" : "general RSI Smoother",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 1,
+      "winRate" : 0.0,
+      "totalReturn" : -7.440392000717111E-5,
+      "netProfit" : -0.007440392000717111,
+      "maxDrawdown" : 7.440392000717111E-7,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : -1.6471952976539548E11,
+      "score" : 7.731549645893932,
+      "warnings" : [ "Insufficient trades (1) for meaningful statistics" ],
+      "generatedAt" : 1781050637.861627000
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "general RSI Smoother",
+      "baseStrategyName" : "general RSI Smoother",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 0.0,
+      "warnings" : [ "Request validation failed" ],
+      "generatedAt" : 1781050637.861627000
+    },
+    "score" : 3.4791973406522696,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1781050637.886946700
+  }, {
+    "symbol" : "EUR/AUD",
+    "candidate" : {
+      "id" : "da3bd5f6-4536-47d9-a783-e6b38f5171be",
+      "name" : "general EMA Faster",
+      "symbol" : "EUR/AUD",
+      "source" : "MUTATION",
+      "marketRegime" : "LOW_VOLATILITY",
+      "generationScore" : 45.0,
+      "rationale" : [ "Mutated parameters from general" ],
+      "generatedAt" : 1781050636.121304300,
+      "strategyDefinition" : {
+        "name" : "general EMA Faster",
+        "baseName" : "general",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "DOJI_STAR_BULLISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "9"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "DOJI_STAR_BULLISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "WMA",
+          "candlePattern" : null,
+          "timeframe" : "M30",
+          "parameters" : {
+            "period" : "9"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "LONG_LINE_BEARISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "HAMMER",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "general EMA Faster",
+      "baseStrategyName" : "general EMA Faster",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 4,
+      "winRate" : 0.0,
+      "totalReturn" : -2.0560181270411706E-4,
+      "netProfit" : -0.020560181270411704,
+      "maxDrawdown" : 2.0560181270411706E-6,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : -119.15535045423444,
+      "score" : 8.433847057981378,
+      "warnings" : [ "Insufficient trades (4) for meaningful statistics" ],
+      "generatedAt" : 1781050637.926501700
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "general EMA Faster",
+      "baseStrategyName" : "general EMA Faster",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 0.0,
+      "warnings" : [ "Request validation failed" ],
+      "generatedAt" : 1781050637.926501700
+    },
+    "score" : 3.79523117609162,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1781050637.941688100
+  }, {
+    "symbol" : "EUR/AUD",
+    "candidate" : {
+      "id" : "36597cf3-9323-4298-af71-6f2ad985cd2a",
+      "name" : "general EMA Slower",
+      "symbol" : "EUR/AUD",
+      "source" : "MUTATION",
+      "marketRegime" : "LOW_VOLATILITY",
+      "generationScore" : 45.0,
+      "rationale" : [ "Mutated parameters from general" ],
+      "generatedAt" : 1781050636.121304300,
+      "strategyDefinition" : {
+        "name" : "general EMA Slower",
+        "baseName" : "general",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "DOJI_STAR_BULLISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "34"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "DOJI_STAR_BULLISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "WMA",
+          "candlePattern" : null,
+          "timeframe" : "M30",
+          "parameters" : {
+            "period" : "34"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "LONG_LINE_BEARISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "HAMMER",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "general EMA Slower",
+      "baseStrategyName" : "general EMA Slower",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 2,
+      "winRate" : 0.0,
+      "totalReturn" : -4.259271558112232E-5,
+      "netProfit" : -0.004259271558112232,
+      "maxDrawdown" : 4.259271558112232E-7,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : -143.3109011780647,
+      "score" : 9.351317395800438,
+      "warnings" : [ "Insufficient trades (2) for meaningful statistics" ],
+      "generatedAt" : 1781050638.013916900
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "general EMA Slower",
+      "baseStrategyName" : "general EMA Slower",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 0.0,
+      "warnings" : [ "Request validation failed" ],
+      "generatedAt" : 1781050638.018916100
+    },
+    "score" : 4.208092828110197,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1781050638.029920600
+  }, {
+    "symbol" : "EUR/AUD",
+    "candidate" : {
+      "id" : "ee5d3cf5-bb00-48e1-ad1f-4905625e1aee",
+      "name" : "general ATR Tight",
+      "symbol" : "EUR/AUD",
+      "source" : "MUTATION",
+      "marketRegime" : "LOW_VOLATILITY",
+      "generationScore" : 45.0,
+      "rationale" : [ "Mutated parameters from general" ],
+      "generatedAt" : 1781050636.121304300,
+      "strategyDefinition" : {
+        "name" : "general ATR Tight",
+        "baseName" : "general",
+        "parameters" : {
+          "rsiPeriod" : 14,
+          "emaFast" : 20,
+          "emaSlow" : 50,
+          "atrPeriod" : 14,
+          "breakoutLookback" : 20,
+          "oversoldThreshold" : 35.0,
+          "overboughtThreshold" : 65.0,
+          "minConfidence" : 0.55,
+          "signalAmount" : 1.0
+        },
+        "rules" : [ {
+          "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "DOJI_STAR_BULLISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "BUY",
+          "indicator" : "EMA",
+          "candlePattern" : null,
+          "timeframe" : "M5",
+          "parameters" : {
+            "period" : "10"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "DOJI_STAR_BULLISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+          "ruleSource" : "INDICATOR",
+          "signalType" : "SELL",
+          "indicator" : "WMA",
+          "candlePattern" : null,
+          "timeframe" : "M30",
+          "parameters" : {
+            "period" : "10"
+          },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "SELL",
+          "indicator" : null,
+          "candlePattern" : "LONG_LINE_BEARISH",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        }, {
+          "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+          "ruleSource" : "CANDLE_PATTERN",
+          "signalType" : "BUY",
+          "indicator" : null,
+          "candlePattern" : "HAMMER",
+          "timeframe" : "M5",
+          "parameters" : { },
+          "conditions" : [ ],
+          "enabled" : true
+        } ],
+        "marketCompatibility" : [ "ALL" ]
+      }
+    },
+    "inSampleReport" : {
+      "strategyName" : "general ATR Tight",
+      "baseStrategyName" : "general ATR Tight",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 4,
+      "winRate" : 0.0,
+      "totalReturn" : -2.0560181270411706E-4,
+      "netProfit" : -0.020560181270411704,
+      "maxDrawdown" : 2.0560181270411706E-6,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : -119.15535045423444,
+      "score" : 8.433847057981378,
+      "warnings" : [ "Insufficient trades (4) for meaningful statistics" ],
+      "generatedAt" : 1781050638.062929000
+    },
+    "outOfSampleReport" : {
+      "strategyName" : "general ATR Tight",
+      "baseStrategyName" : "general ATR Tight",
+      "symbol" : "EUR/AUD",
+      "timeframe" : "M5",
+      "totalTrades" : 0,
+      "winRate" : 0.0,
+      "totalReturn" : 0.0,
+      "netProfit" : 0.0,
+      "maxDrawdown" : 0.0,
+      "profitFactor" : 0.0,
+      "sharpeApproximation" : 0.0,
+      "score" : 0.0,
+      "warnings" : [ "Request validation failed" ],
+      "generatedAt" : 1781050638.062929000
+    },
+    "score" : 3.79523117609162,
+    "passed" : false,
+    "warnings" : [ ],
+    "errors" : [ ],
+    "evaluatedAt" : 1781050638.075459000
   } ],
   "decisions" : [ {
     "symbol" : "00/USD",
@@ -3635,6 +6683,17 @@
     "reason" : "Best candidate did not pass evaluation thresholds.",
     "warnings" : [ ],
     "decidedAt" : 1780828131.598510400
+  }, {
+    "symbol" : "EUR/AUD",
+    "currentStrategyName" : "",
+    "selectedStrategyName" : "ATR Volatility Breakout EUR/AUD 5m",
+    "assigned" : false,
+    "liveAssignmentAllowed" : false,
+    "currentScore" : 0.0,
+    "selectedScore" : 6.75,
+    "reason" : "Best candidate did not pass evaluation thresholds.",
+    "warnings" : [ ],
+    "decidedAt" : 1781050638.112087900
   } ],
   "rejectedCandidates" : [ {
     "id" : "e446ec2a-004a-4ef6-bb66-035098d01780",
@@ -4819,6 +7878,898 @@
           "oversold" : "30",
           "period" : "14"
         },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "e9f3166b-00b6-4a4e-8613-1823f9743955",
+    "name" : "RSI Mean Reversion EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 74.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.109355300,
+    "strategyDefinition" : {
+      "name" : "RSI Mean Reversion EUR/AUD 5m",
+      "baseName" : "RSI Mean Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "57cc838e-3869-41af-8ae9-f70a77a39e76",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "oversold" : "30",
+          "period" : "14",
+          "crossoverMode" : "REGION_EXIT",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "17db3aa6-c582-4e0d-b182-7c0548b298c4",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "oversold" : "30",
+          "period" : "14",
+          "crossoverMode" : "REGION_EXIT",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "63699de3-ff12-45af-abe7-7cb8a5052a05",
+    "name" : "MACD Trend Expansion EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 72.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.109355300,
+    "strategyDefinition" : {
+      "name" : "MACD Trend Expansion EUR/AUD 5m",
+      "baseName" : "MACD Trend Expansion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "def1b959-af52-442f-ba4e-4a8add98dff8",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "signalPeriod" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "9ec91b55-e65d-47bb-be97-f8c2f8ff0296",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "signalPeriod" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "d1f95400-def0-4854-8214-76ff0fdfb479",
+    "name" : "Bollinger Range Reversion EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 69.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.109355300,
+    "strategyDefinition" : {
+      "name" : "Bollinger Range Reversion EUR/AUD 5m",
+      "baseName" : "Bollinger Range Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "3ebb3a4e-bbbe-449e-b88b-c164c4c38d28",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20",
+          "stdDevMult" : "2.0"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "03602dff-f204-4bb3-aa0a-6681b5437385",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20",
+          "stdDevMult" : "2.0"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "c5c3fcf0-f51c-4fee-9537-6dbd4b2b4e86",
+    "name" : "EMA Momentum Cross EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 67.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.109355300,
+    "strategyDefinition" : {
+      "name" : "EMA Momentum Cross EUR/AUD 5m",
+      "baseName" : "EMA Momentum Cross",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "10fbf88f-d65f-4fe4-8064-aa8a459c5ba2",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "e6c39d5a-90fc-4280-b21c-554bc9c2c75d",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "da288b76-ab2d-4585-ad7b-5522d6e2c015",
+    "name" : "Stochastic Reversal EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 65.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.110360000,
+    "strategyDefinition" : {
+      "name" : "Stochastic Reversal EUR/AUD 5m",
+      "baseName" : "Stochastic Reversal",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "c4001078-6ce0-42f3-b699-600aaf590354",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "smooth" : "3",
+          "crossoverMode" : "REGION_EXIT",
+          "oversold" : "20",
+          "kPeriod" : "14",
+          "dPeriod" : "3",
+          "overbought" : "80"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "68cad3be-7b17-4c11-aa71-af81e895ff26",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "smooth" : "3",
+          "crossoverMode" : "REGION_EXIT",
+          "oversold" : "20",
+          "kPeriod" : "14",
+          "dPeriod" : "3",
+          "overbought" : "80"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "9457d236-fa13-430d-9abd-afdbdca0df5f",
+    "name" : "ATR Volatility Breakout EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 63.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.110360000,
+    "strategyDefinition" : {
+      "name" : "ATR Volatility Breakout EUR/AUD 5m",
+      "baseName" : "ATR Volatility Breakout",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "e1421534-5cf2-4bdc-adfe-add2104b56fb",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "7ba25a67-51ae-41ff-a394-18be77643eee",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "0ea09d4d-0d45-4efc-ae15-5ff6544740ca",
+    "name" : "Candle Confirmation Swing EUR/AUD 5m",
+    "symbol" : "EUR/AUD",
+    "source" : "RULE_BASED",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 61.0,
+    "rationale" : [ "Generated from InvestPro rule templates for LOW_VOLATILITY" ],
+    "generatedAt" : 1781050636.110360000,
+    "strategyDefinition" : {
+      "name" : "Candle Confirmation Swing EUR/AUD 5m",
+      "baseName" : "Candle Confirmation Swing",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "8c7ec578-5676-42a7-8e0e-5577d39d4621",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "b6e97f03-efd9-4a75-91de-db2916abc36b",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "ENGULFING_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "9673b551-15ef-4ed0-9948-096614f3c93a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "826f66bd-03b6-4fe8-b847-9525f48b2bce",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "86ea521d-977e-4d97-a5a2-a38a9481258a",
+    "name" : "general RSI More Sensitive",
+    "symbol" : "EUR/AUD",
+    "source" : "MUTATION",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 45.0,
+    "rationale" : [ "Mutated parameters from general" ],
+    "generatedAt" : 1781050636.113358700,
+    "strategyDefinition" : {
+      "name" : "general RSI More Sensitive",
+      "baseName" : "general",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "10"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "WMA",
+        "candlePattern" : null,
+        "timeframe" : "M30",
+        "parameters" : {
+          "period" : "10"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "LONG_LINE_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "6a704076-1b9e-4b1b-a916-f67afdf1ef2c",
+    "name" : "general RSI Smoother",
+    "symbol" : "EUR/AUD",
+    "source" : "MUTATION",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 45.0,
+    "rationale" : [ "Mutated parameters from general" ],
+    "generatedAt" : 1781050636.121304300,
+    "strategyDefinition" : {
+      "name" : "general RSI Smoother",
+      "baseName" : "general",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "21"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "WMA",
+        "candlePattern" : null,
+        "timeframe" : "M30",
+        "parameters" : {
+          "period" : "21"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "LONG_LINE_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "da3bd5f6-4536-47d9-a783-e6b38f5171be",
+    "name" : "general EMA Faster",
+    "symbol" : "EUR/AUD",
+    "source" : "MUTATION",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 45.0,
+    "rationale" : [ "Mutated parameters from general" ],
+    "generatedAt" : 1781050636.121304300,
+    "strategyDefinition" : {
+      "name" : "general EMA Faster",
+      "baseName" : "general",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "WMA",
+        "candlePattern" : null,
+        "timeframe" : "M30",
+        "parameters" : {
+          "period" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "LONG_LINE_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "36597cf3-9323-4298-af71-6f2ad985cd2a",
+    "name" : "general EMA Slower",
+    "symbol" : "EUR/AUD",
+    "source" : "MUTATION",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 45.0,
+    "rationale" : [ "Mutated parameters from general" ],
+    "generatedAt" : 1781050636.121304300,
+    "strategyDefinition" : {
+      "name" : "general EMA Slower",
+      "baseName" : "general",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "34"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "WMA",
+        "candlePattern" : null,
+        "timeframe" : "M30",
+        "parameters" : {
+          "period" : "34"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "LONG_LINE_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "ee5d3cf5-bb00-48e1-ad1f-4905625e1aee",
+    "name" : "general ATR Tight",
+    "symbol" : "EUR/AUD",
+    "source" : "MUTATION",
+    "marketRegime" : "LOW_VOLATILITY",
+    "generationScore" : 45.0,
+    "rationale" : [ "Mutated parameters from general" ],
+    "generatedAt" : 1781050636.121304300,
+    "strategyDefinition" : {
+      "name" : "general ATR Tight",
+      "baseName" : "general",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ae8740d1-0698-4d62-9ee8-7df459d78b5e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "766daf76-fde0-4348-9253-47a17f0ec875",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "M5",
+        "parameters" : {
+          "period" : "10"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0728b460-27d9-4ca0-81c1-734931cd641e",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "DOJI_STAR_BULLISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "acdb2243-4918-44b2-8695-d7d83907df5a",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "WMA",
+        "candlePattern" : null,
+        "timeframe" : "M30",
+        "parameters" : {
+          "period" : "10"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0a3c8010-dc39-4e30-ae1d-dacd1c1aea3f",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "45ac0108-5d65-45e1-82fc-4eddd72d39ef",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "LONG_LINE_BEARISH",
+        "timeframe" : "M5",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "47600153-84a8-4db0-a0c3-c06da038f053",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "M5",
+        "parameters" : { },
         "conditions" : [ ],
         "enabled" : true
       } ],

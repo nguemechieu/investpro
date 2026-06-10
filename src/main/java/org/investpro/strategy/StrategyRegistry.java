@@ -1,6 +1,7 @@
 package org.investpro.strategy;
 
-import lombok.Getter;
+import lombok.Data;
+
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.spi.PluginRegistry;
 import org.investpro.spi.StrategyProvider;
@@ -20,10 +21,10 @@ import java.util.Optional;
 
 /**
  * Registry for catalog-driven trading strategies.
- *
+ * <p>
  * This registry stores StrategyDefinition objects first and lazily creates
  * UnifiedStrategy instances only when requested.
- *
+ * <p>
  * This mirrors the Python strategy registry pattern:
  * - register built-in definitions
  * - lazy instantiate selected strategy
@@ -32,7 +33,7 @@ import java.util.Optional;
  * - configure parameters dynamically
  */
 @Slf4j
-@Getter
+@Data
 public final class StrategyRegistry {
 
     private static volatile StrategyRegistry instance;
@@ -140,7 +141,7 @@ public final class StrategyRegistry {
 
     /**
      * Registers a concrete strategy instance.
-     *
+     * <p>
      * Useful for custom strategies that are not catalog-driven.
      */
     public synchronized void register(@NotNull String name, @NotNull TradingStrategy strategy) {
@@ -186,7 +187,7 @@ public final class StrategyRegistry {
 
     /**
      * Gets a strategy by name or alias.
-     *
+     * <p>
      * If the strategy has not been instantiated yet, this lazily creates it.
      */
     @Nullable
@@ -425,7 +426,7 @@ public final class StrategyRegistry {
 
     /**
      * Unregister a strategy from the registry.
-     *
+     * <p>
      * Used to disable or remove strategies (e.g., on validation failure).
      *
      * @param strategyId the ID of the strategy to remove
@@ -459,7 +460,7 @@ public final class StrategyRegistry {
 
     /**
      * Instantiates all registered strategy definitions upfront.
-     *
+     * <p>
      * This ensures all strategies are "wired" and available for use by the
      * StrategyEngine
      * rather than being lazily instantiated on-demand.

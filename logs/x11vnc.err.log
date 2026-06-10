@@ -190,3 +190,236 @@ More info: http://www.karlrunge.com/x11vnc/faq.html#faq-client-caching
 09/06/2026 01:42:49 Using tight encoding for client 127.0.0.1
 09/06/2026 01:42:50 Sending rfbEncodingExtDesktopSize for size (1530x840) 
 09/06/2026 01:47:34 idle keyboard:   turning X autorepeat back on.
+09/06/2026 02:50:13 client_count: 0
+09/06/2026 02:50:13 Client 127.0.0.1 gone
+09/06/2026 02:50:14 Statistics             events    Transmit/ RawEquiv ( saved)
+09/06/2026 02:50:14  FramebufferUpdate   :   9381 |         0/        0 (  0.0%)
+09/06/2026 02:50:15  LastRect            :      1 |        12/       12 (  0.0%)
+09/06/2026 02:50:15  tight               :  10140 |   8348271/ 36799632 ( 77.3%)
+09/06/2026 02:50:15  RichCursor          :      1 |      2400/     2400 (  0.0%)
+09/06/2026 02:50:15  ExtendedDesktopSize :      1 |        32/       32 (  0.0%)
+09/06/2026 02:50:15  TOTALS              :  19524 |   8350715/ 36802076 ( 77.3%)
+09/06/2026 02:50:15 Statistics             events    Received/ RawEquiv ( saved)
+09/06/2026 02:50:15  FramebufferUpdate   :   9382 |     93820/    93820 (  0.0%)
+09/06/2026 02:50:15  SetEncodings        :      1 |       104/      104 (  0.0%)
+09/06/2026 02:50:15  SetPixelFormat      :      1 |        20/       20 (  0.0%)
+09/06/2026 02:50:15  TOTALS              :   9384 |     93944/    93944 (  0.0%)
+09/06/2026 02:50:15 destroyed xdamage object: 0x800036
+09/06/2026 23:28:41 Got connection from client 127.0.0.1
+09/06/2026 23:28:41   0 other clients
+09/06/2026 23:28:41 Normal socket connection
+09/06/2026 23:28:41 Disabled X server key autorepeat.
+09/06/2026 23:28:41   to force back on run: 'xset r on' (3 times)
+09/06/2026 23:28:41 incr accepted_client=3 for 127.0.0.1:42656  sock=10
+09/06/2026 23:28:42 active keyboard: turning X autorepeat off.
+09/06/2026 23:28:42 created   xdamage object: 0x800037
+09/06/2026 23:29:19 Client Protocol Version 3.8
+09/06/2026 23:29:19 Protocol version sent 3.8, using 3.8
+09/06/2026 23:29:19 rfbProcessClientSecurityType: executing handler for type 2
+09/06/2026 23:29:20 client_set_net: 127.0.0.1  0.0026
+09/06/2026 23:29:20 Pixel format for client 127.0.0.1:
+09/06/2026 23:29:20   32 bpp, depth 24, little endian
+09/06/2026 23:29:20   true colour: max r 255 g 255 b 255, shift r 0 g 8 b 16
+09/06/2026 23:29:20 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000032)
+09/06/2026 23:29:20 rfbProcessClientNormalMessage: ignoring unsupported encoding type tightPng
+09/06/2026 23:29:20 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000015)
+09/06/2026 23:29:20 Using image quality level 6 for client 127.0.0.1
+09/06/2026 23:29:20 Using JPEG subsampling 0, Q79 for client 127.0.0.1
+09/06/2026 23:29:20 Using compression level 2 for client 127.0.0.1
+09/06/2026 23:29:20 Enabling NewFBSize protocol extension for client 127.0.0.1
+09/06/2026 23:29:20 Enabling LastRect protocol extension for client 127.0.0.1
+09/06/2026 23:29:20 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFE)
+09/06/2026 23:29:20 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFB)
+09/06/2026 23:29:20 Enabling ExtDesktopSize protocol extension for client 127.0.0.1
+09/06/2026 23:29:20 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC8)
+09/06/2026 23:29:20 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC7)
+09/06/2026 23:29:20 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFECD)
+09/06/2026 23:29:20 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC4)
+09/06/2026 23:29:20 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x574D5664)
+09/06/2026 23:29:20 Enabling full-color cursor updates for client 127.0.0.1
+09/06/2026 23:29:20 Using tight encoding for client 127.0.0.1
+09/06/2026 23:29:21 Sending rfbEncodingExtDesktopSize for size (1530x840) 
+09/06/2026 23:33:42 idle keyboard:   turning X autorepeat back on.
+09/06/2026 23:36:35 Got connection from client 127.0.0.1
+09/06/2026 23:36:35   1 other clients
+09/06/2026 23:36:35 Normal socket connection
+09/06/2026 23:36:35 incr accepted_client=4 for 127.0.0.1:53630  sock=11
+09/06/2026 23:36:35 Client Protocol Version 3.8
+09/06/2026 23:36:36 Protocol version sent 3.8, using 3.8
+09/06/2026 23:36:36 rfbProcessClientSecurityType: executing handler for type 2
+09/06/2026 23:36:36 active keyboard: turning X autorepeat off.
+09/06/2026 23:36:44 authProcessClientMessage: authentication failed from 127.0.0.1
+09/06/2026 23:36:44 rfbAuthProcessClientMessage: password check failed
+09/06/2026 23:36:44 rfbClientSendString("password check failed!")
+09/06/2026 23:36:44 client_count: 1
+09/06/2026 23:36:44 Client 127.0.0.1 gone
+09/06/2026 23:36:44 Statistics             events    Transmit/ RawEquiv ( saved)
+09/06/2026 23:36:44  TOTALS              :      0 |         0/        0 (  0.0%)
+09/06/2026 23:36:44 Statistics             events    Received/ RawEquiv ( saved)
+09/06/2026 23:36:44  TOTALS              :      0 |         0/        0 (  0.0%)
+09/06/2026 23:36:49 Got connection from client 127.0.0.1
+09/06/2026 23:36:49   1 other clients
+09/06/2026 23:36:49 Normal socket connection
+09/06/2026 23:36:50 incr accepted_client=5 for 127.0.0.1:46974  sock=11
+09/06/2026 23:36:50 Client Protocol Version 3.8
+09/06/2026 23:36:50 Protocol version sent 3.8, using 3.8
+09/06/2026 23:36:50 rfbProcessClientSecurityType: executing handler for type 2
+09/06/2026 23:37:08 Pixel format for client 127.0.0.1:
+09/06/2026 23:37:09   32 bpp, depth 24, little endian
+09/06/2026 23:37:09   true colour: max r 255 g 255 b 255, shift r 0 g 8 b 16
+09/06/2026 23:37:09 client_set_net: 127.0.0.1  0.0004
+09/06/2026 23:37:09 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000032)
+09/06/2026 23:37:09 rfbProcessClientNormalMessage: ignoring unsupported encoding type tightPng
+09/06/2026 23:37:09 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000015)
+09/06/2026 23:37:09 Using image quality level 6 for client 127.0.0.1
+09/06/2026 23:37:09 Using JPEG subsampling 0, Q79 for client 127.0.0.1
+09/06/2026 23:37:09 Using compression level 2 for client 127.0.0.1
+09/06/2026 23:37:09 Enabling NewFBSize protocol extension for client 127.0.0.1
+09/06/2026 23:37:09 Enabling LastRect protocol extension for client 127.0.0.1
+09/06/2026 23:37:09 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFE)
+09/06/2026 23:37:09 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFB)
+09/06/2026 23:37:09 Enabling ExtDesktopSize protocol extension for client 127.0.0.1
+09/06/2026 23:37:09 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC8)
+09/06/2026 23:37:09 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC7)
+09/06/2026 23:37:09 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFECD)
+09/06/2026 23:37:09 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC4)
+09/06/2026 23:37:09 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x574D5664)
+09/06/2026 23:37:09 Enabling full-color cursor updates for client 127.0.0.1
+09/06/2026 23:37:09 Using tight encoding for client 127.0.0.1
+09/06/2026 23:37:09 Sending rfbEncodingExtDesktopSize for size (1530x840) 
+09/06/2026 23:37:11 client 5 network rate 341.9 KB/sec (14484.6 eff KB/sec)
+09/06/2026 23:37:11 client 5 latency:  9.3 ms
+09/06/2026 23:37:11 dt1: 0.1030, dt2: 0.2569 dt3: 0.0093 bytes: 121460
+09/06/2026 23:37:11 link_rate: LR_LAN - 9 ms, 341 KB/s
+09/06/2026 23:42:25 idle keyboard:   turning X autorepeat back on.
+10/06/2026 00:00:00 client 3 network rate 61.4 KB/sec (786.6 eff KB/sec)
+10/06/2026 00:00:00 client 3 latency:  4.2 ms
+10/06/2026 00:00:00 dt1: 0.0048, dt2: 0.2436 dt3: 0.0042 bytes: 15119
+10/06/2026 00:00:00 link_rate: LR_LAN - 9 ms, 341 KB/s
+10/06/2026 00:03:28 Got connection from client 127.0.0.1
+10/06/2026 00:03:28   2 other clients
+10/06/2026 00:03:28 Normal socket connection
+10/06/2026 00:03:28 incr accepted_client=6 for 127.0.0.1:60310  sock=12
+10/06/2026 00:03:28 Client Protocol Version 3.8
+10/06/2026 00:03:28 Protocol version sent 3.8, using 3.8
+10/06/2026 00:03:28 increased wireframe timeouts for slow network connection.
+10/06/2026 00:03:28 netrate: 61 KB/sec, latency: 9 ms
+10/06/2026 00:03:28 rfbProcessClientSecurityType: executing handler for type 2
+10/06/2026 00:03:29 active keyboard: turning X autorepeat off.
+10/06/2026 00:08:29 idle keyboard:   turning X autorepeat back on.
+10/06/2026 00:26:08 client_count: 2
+10/06/2026 00:26:08 Client 127.0.0.1 gone
+10/06/2026 00:26:08 Statistics             events    Transmit/ RawEquiv ( saved)
+10/06/2026 00:26:08  FramebufferUpdate   :   4300 |         0/        0 (  0.0%)
+10/06/2026 00:26:08  LastRect            :      3 |        36/       36 (  0.0%)
+10/06/2026 00:26:08  tight               :   5377 |   3069047/ 15531468 ( 80.2%)
+10/06/2026 00:26:08  RichCursor          :     16 |     38400/    38400 (  0.0%)
+10/06/2026 00:26:08  ExtendedDesktopSize :      1 |        32/       32 (  0.0%)
+10/06/2026 00:26:08  TOTALS              :   9697 |   3107515/ 15569936 ( 80.0%)
+10/06/2026 00:26:08 Statistics             events    Received/ RawEquiv ( saved)
+10/06/2026 00:26:08  FramebufferUpdate   :   4302 |     43020/    43020 (  0.0%)
+10/06/2026 00:26:08  SetEncodings        :      1 |       104/      104 (  0.0%)
+10/06/2026 00:26:08  SetPixelFormat      :      1 |        20/       20 (  0.0%)
+10/06/2026 00:26:08  TOTALS              :   4304 |     43144/    43144 (  0.0%)
+10/06/2026 00:26:09 Got connection from client 127.0.0.1
+10/06/2026 00:26:09   2 other clients
+10/06/2026 00:26:09 Normal socket connection
+10/06/2026 00:26:09 incr accepted_client=7 for 127.0.0.1:47390  sock=10
+10/06/2026 00:26:09 Client Protocol Version 3.8
+10/06/2026 00:26:09 Protocol version sent 3.8, using 3.8
+10/06/2026 00:26:09 rfbProcessClientSecurityType: executing handler for type 2
+10/06/2026 00:26:11 active keyboard: turning X autorepeat off.
+10/06/2026 00:26:15 Pixel format for client 127.0.0.1:
+10/06/2026 00:26:15   32 bpp, depth 24, little endian
+10/06/2026 00:26:15   true colour: max r 255 g 255 b 255, shift r 0 g 8 b 16
+10/06/2026 00:26:15 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000032)
+10/06/2026 00:26:15 rfbProcessClientNormalMessage: ignoring unsupported encoding type tightPng
+10/06/2026 00:26:15 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000015)
+10/06/2026 00:26:15 Using image quality level 6 for client 127.0.0.1
+10/06/2026 00:26:15 Using JPEG subsampling 0, Q79 for client 127.0.0.1
+10/06/2026 00:26:15 Using compression level 2 for client 127.0.0.1
+10/06/2026 00:26:15 Enabling NewFBSize protocol extension for client 127.0.0.1
+10/06/2026 00:26:16 Enabling LastRect protocol extension for client 127.0.0.1
+10/06/2026 00:26:16 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFE)
+10/06/2026 00:26:16 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFB)
+10/06/2026 00:26:16 Enabling ExtDesktopSize protocol extension for client 127.0.0.1
+10/06/2026 00:26:16 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC8)
+10/06/2026 00:26:16 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC7)
+10/06/2026 00:26:16 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFECD)
+10/06/2026 00:26:16 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC4)
+10/06/2026 00:26:16 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x574D5664)
+10/06/2026 00:26:16 Enabling full-color cursor updates for client 127.0.0.1
+10/06/2026 00:26:16 Using tight encoding for client 127.0.0.1
+10/06/2026 00:26:16 Sending rfbEncodingExtDesktopSize for size (1530x840) 
+10/06/2026 00:26:16 client 7 network rate 483.6 KB/sec (20807.4 eff KB/sec)
+10/06/2026 00:26:16 client 7 latency:  0.9 ms
+10/06/2026 00:26:16 dt1: 0.1584, dt2: 0.0893 dt3: 0.0009 bytes: 119583
+10/06/2026 00:26:16 link_rate: LR_LAN - 9 ms, 341 KB/s
+10/06/2026 00:26:34 Got connection from client 127.0.0.1
+10/06/2026 00:26:34   3 other clients
+10/06/2026 00:26:34 Normal socket connection
+10/06/2026 00:26:34 incr accepted_client=8 for 127.0.0.1:54254  sock=13
+10/06/2026 00:26:34 Client Protocol Version 3.8
+10/06/2026 00:26:34 Protocol version sent 3.8, using 3.8
+10/06/2026 00:26:34 rfbProcessClientSecurityType: executing handler for type 2
+10/06/2026 00:26:34 client_count: 3
+10/06/2026 00:26:34 Client 127.0.0.1 gone
+10/06/2026 00:26:34 Statistics             events    Transmit/ RawEquiv ( saved)
+10/06/2026 00:26:34  TOTALS              :      0 |         0/        0 (  0.0%)
+10/06/2026 00:26:34 Statistics             events    Received/ RawEquiv ( saved)
+10/06/2026 00:26:34  TOTALS              :      0 |         0/        0 (  0.0%)
+10/06/2026 00:31:35 idle keyboard:   turning X autorepeat back on.
+10/06/2026 01:03:39 Pixel format for client 127.0.0.1:
+10/06/2026 01:03:39   32 bpp, depth 24, little endian
+10/06/2026 01:03:39   true colour: max r 255 g 255 b 255, shift r 0 g 8 b 16
+10/06/2026 01:03:39 client_set_net: 127.0.0.1  0.0147
+10/06/2026 01:03:39 client_set_net: 127.0.0.1  0.0002
+10/06/2026 01:03:39 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000032)
+10/06/2026 01:03:39 rfbProcessClientNormalMessage: ignoring unsupported encoding type tightPng
+10/06/2026 01:03:39 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x00000015)
+10/06/2026 01:03:39 Using image quality level 6 for client 127.0.0.1
+10/06/2026 01:03:39 Using JPEG subsampling 0, Q79 for client 127.0.0.1
+10/06/2026 01:03:39 Using compression level 2 for client 127.0.0.1
+10/06/2026 01:03:39 Enabling NewFBSize protocol extension for client 127.0.0.1
+10/06/2026 01:03:39 Enabling LastRect protocol extension for client 127.0.0.1
+10/06/2026 01:03:39 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFE)
+10/06/2026 01:03:39 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEFB)
+10/06/2026 01:03:39 Enabling ExtDesktopSize protocol extension for client 127.0.0.1
+10/06/2026 01:03:39 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC8)
+10/06/2026 01:03:39 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC7)
+10/06/2026 01:03:39 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFECD)
+10/06/2026 01:03:39 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0xFFFFFEC4)
+10/06/2026 01:03:39 rfbProcessClientNormalMessage: ignoring unsupported encoding type Enc(0x574D5664)
+10/06/2026 01:03:39 Enabling full-color cursor updates for client 127.0.0.1
+10/06/2026 01:03:39 Using tight encoding for client 127.0.0.1
+10/06/2026 01:03:39 Sending rfbEncodingExtDesktopSize for size (1530x840) 
+10/06/2026 01:12:18 client_count: 2
+10/06/2026 01:12:18 Client 127.0.0.1 gone
+10/06/2026 01:12:18 Statistics             events    Transmit/ RawEquiv ( saved)
+10/06/2026 01:12:18  FramebufferUpdate   :    345 |         0/        0 (  0.0%)
+10/06/2026 01:12:18  LastRect            :      1 |        12/       12 (  0.0%)
+10/06/2026 01:12:18  tight               :    704 |    334106/  5991516 ( 94.4%)
+10/06/2026 01:12:18  RichCursor          :      8 |     19200/    19200 (  0.0%)
+10/06/2026 01:12:18  ExtendedDesktopSize :      1 |        32/       32 (  0.0%)
+10/06/2026 01:12:18  TOTALS              :   1059 |    353350/  6010760 ( 94.1%)
+10/06/2026 01:12:18 Statistics             events    Received/ RawEquiv ( saved)
+10/06/2026 01:12:18  PointerEvent        :    108 |       648/      648 (  0.0%)
+10/06/2026 01:12:18  FramebufferUpdate   :    346 |      3460/     3460 (  0.0%)
+10/06/2026 01:12:18  SetEncodings        :      1 |       104/      104 (  0.0%)
+10/06/2026 01:12:18  SetPixelFormat      :      1 |        20/       20 (  0.0%)
+10/06/2026 01:12:18  TOTALS              :    456 |      4232/     4232 (  0.0%)
+10/06/2026 01:12:25 client_count: 1
+10/06/2026 01:12:25 Client 127.0.0.1 gone
+10/06/2026 01:12:25 Statistics             events    Transmit/ RawEquiv ( saved)
+10/06/2026 01:12:25  FramebufferUpdate   :   2869 |         0/        0 (  0.0%)
+10/06/2026 01:12:25  LastRect            :      1 |        12/       12 (  0.0%)
+10/06/2026 01:12:25  tight               :   4221 |   1877320/ 11581500 ( 83.8%)
+10/06/2026 01:12:25  RichCursor          :     22 |     52800/    52800 (  0.0%)
+10/06/2026 01:12:25  ExtendedDesktopSize :      1 |        32/       32 (  0.0%)
+10/06/2026 01:12:25  TOTALS              :   7114 |   1930164/ 11634344 ( 83.4%)
+10/06/2026 01:12:25 Statistics             events    Received/ RawEquiv ( saved)
+10/06/2026 01:12:25  PointerEvent        :    272 |      1632/     1632 (  0.0%)
+10/06/2026 01:12:26  FramebufferUpdate   :   2870 |     28700/    28700 (  0.0%)
+10/06/2026 01:12:27  SetEncodings        :      1 |       104/      104 (  0.0%)
+10/06/2026 01:12:27  SetPixelFormat      :      1 |        20/       20 (  0.0%)
+10/06/2026 01:12:27  TOTALS              :   3144 |     30456/    30456 (  0.0%)

@@ -1854,8 +1854,6 @@ public class CandleStickChart extends Region {
         graphicsContext.setTextAlign(TextAlignment.LEFT);
     }
 
-
-
     public void setChartType(ChartType newChartType) {
         if (newChartType == null) {
             return;
@@ -2195,16 +2193,13 @@ public class CandleStickChart extends Region {
             boolean priceOverlay = isPriceOverlayIndicator(indicator.getName());
             java.util.Map<String, javafx.scene.paint.Color> lineColors = getIndicatorColors(indicator.getName());
 
-            for (java.util.Map.Entry<String, double[]> entry : values.entrySet()) {
-                String lineName = entry.getKey();
-                double[] lineValues = entry.getValue();
-                if (lineValues == null || lineValues.length == 0) {
-                    continue;
-                }
-
-                double minValue = Double.POSITIVE_INFINITY;
-                double maxValue = Double.NEGATIVE_INFINITY;
-                if (!priceOverlay) {
+            double minValue = Double.POSITIVE_INFINITY;
+            double maxValue = Double.NEGATIVE_INFINITY;
+            if (!priceOverlay) {
+                for (double[] lineValues : values.values()) {
+                    if (lineValues == null || lineValues.length == 0) {
+                        continue;
+                    }
                     for (CandleData candle : visible) {
                         int dataIndex = indexOfOpenTime(allCandles, candle.openTime());
                         if (dataIndex < 0 || dataIndex >= lineValues.length) {
@@ -2217,23 +2212,31 @@ public class CandleStickChart extends Region {
                         minValue = Math.min(minValue, candidate);
                         maxValue = Math.max(maxValue, candidate);
                     }
-
-                    if (!Double.isFinite(minValue) || !Double.isFinite(maxValue)) {
-                        continue;
-                    }
-
-                    double range = maxValue - minValue;
-                    double padding = Math.max(1.0, Math.max(Math.abs(maxValue), Math.abs(minValue)) * 0.05);
-                    if (range < 1e-9) {
-                        minValue -= padding;
-                        maxValue += padding;
-                    } else {
-                        minValue -= padding;
-                        maxValue += padding;
-                    }
                 }
 
-                javafx.scene.paint.Color color = lineColors.getOrDefault(lineName, javafx.scene.paint.Color.CYAN);
+                if (!Double.isFinite(minValue) || !Double.isFinite(maxValue)) {
+                    continue;
+                }
+
+                double range = maxValue - minValue;
+                double padding = Math.max(1.0, Math.max(Math.abs(maxValue), Math.abs(minValue)) * 0.05);
+                if (range < 1e-9) {
+                    minValue -= padding;
+                    maxValue += padding;
+                } else {
+                    minValue -= padding;
+                    maxValue += padding;
+                }
+            }
+
+            for (java.util.Map.Entry<String, double[]> entry : values.entrySet()) {
+                String lineName = entry.getKey();
+                double[] lineValues = entry.getValue();
+                if (lineValues == null || lineValues.length == 0) {
+                    continue;
+                }
+
+                javafx.scene.paint.Color color = resolveIndicatorLineColor(lineColors, lineName);
 
                 double lastX = -1, lastY = -1;
                 for (int i = 0; i < visible.size(); i++) {
@@ -2274,6 +2277,15 @@ public class CandleStickChart extends Region {
         return indicatorName == null ? "" : indicatorName.replaceAll("\\s+", "").toUpperCase(Locale.ROOT);
     }
 
+    private @NonNull String normalizeIndicatorLineName(String lineName) {
+        if (lineName == null) {
+            return "";
+        }
+        return lineName
+                .replaceAll("[_\\s]+", "")
+                .toUpperCase(Locale.ROOT);
+    }
+
     private double indicatorToY(double value, double minValue, double maxValue) {
         double chartHeight = Math.max(1.0, canvas.getHeight() - 24.0);
         double topPadding = 12.0;
@@ -2286,15 +2298,16 @@ public class CandleStickChart extends Region {
     private java.util.Map<String, javafx.scene.paint.Color> getIndicatorColors(String indicatorName) {
         java.util.Map<String, javafx.scene.paint.Color> colors = new java.util.HashMap<>();
         switch (normalizeIndicatorName(indicatorName)) {
-            case "SMA20" -> colors.put("SMA", javafx.scene.paint.Color.web("#87CEEB"));
-            case "EMA12" -> colors.put("EMA", javafx.scene.paint.Color.web("#FFA500"));
-            case "RSI14" -> colors.put("RSI", javafx.scene.paint.Color.web("#9370DB"));
+            case "SMA20", "SMA", "SIMPLEMOVINGAVERAGE" -> colors.put("SMA", javafx.scene.paint.Color.web("#87CEEB"));
+            case "EMA12", "EMA", "EXPONENTIALMOVINGAVERAGE" ->
+                colors.put("EMA", javafx.scene.paint.Color.web("#FFA500"));
+            case "RSI14", "RSI", "RELATIVESTRENGTHINDEX" -> colors.put("RSI", javafx.scene.paint.Color.web("#9370DB"));
             case "MACD" -> {
                 colors.put("MACD", javafx.scene.paint.Color.web("#2ecc71"));
                 colors.put("Signal", javafx.scene.paint.Color.web("#e74c3c"));
                 colors.put("Histogram", javafx.scene.paint.Color.web("#3498db"));
             }
-            case "Bollinger Bands" -> {
+            case "BOLLINGERBANDS" -> {
                 colors.put("MiddleBand", javafx.scene.paint.Color.web("#3498db"));
                 colors.put("UpperBand", javafx.scene.paint.Color.web("#95a5a6"));
                 colors.put("LowerBand", javafx.scene.paint.Color.web("#95a5a6"));
@@ -2336,6 +2349,25 @@ public class CandleStickChart extends Region {
             default -> colors.put("Line", javafx.scene.paint.Color.CYAN);
         }
         return colors;
+    }
+
+    private javafx.scene.paint.Color resolveIndicatorLineColor(
+            java.util.Map<String, javafx.scene.paint.Color> lineColors,
+            String lineName) {
+        if (lineColors == null || lineColors.isEmpty()) {
+            return javafx.scene.paint.Color.CYAN;
+        }
+        javafx.scene.paint.Color direct = lineColors.get(lineName);
+        if (direct != null) {
+            return direct;
+        }
+        String normalizedLine = normalizeIndicatorLineName(lineName);
+        for (java.util.Map.Entry<String, javafx.scene.paint.Color> entry : lineColors.entrySet()) {
+            if (normalizeIndicatorLineName(entry.getKey()).equals(normalizedLine)) {
+                return entry.getValue();
+            }
+        }
+        return javafx.scene.paint.Color.CYAN;
     }
 
     /**
@@ -3726,19 +3758,14 @@ public class CandleStickChart extends Region {
     // Indicator management methods
     public void openIndicatorDialog() {
         runOnFx(() -> {
-            List<String> choices = List.of(
-                    "SMA 20",
-                    "SMA 50",
-                    "EMA 12",
-                    "EMA 26",
-                    "Bollinger Bands",
-                    "MACD",
-                    "RSI 14",
-                    "ATR 14",
-                    "VWAP",
-                    "Clear Indicators");
+            List<String> choices = new ArrayList<>(PluginIndicatorFactory.supportedChoices());
+            if (choices.isEmpty()) {
+                showErrorMessage("No indicators are currently available.");
+                return;
+            }
+            choices.add("Clear Indicators");
 
-            javafx.scene.control.ChoiceDialog<String> dialog = new javafx.scene.control.ChoiceDialog<>("SMA 20",
+            javafx.scene.control.ChoiceDialog<String> dialog = new javafx.scene.control.ChoiceDialog<>(choices.get(0),
                     choices);
             dialog.setTitle("Indicators");
             dialog.setHeaderText("Add chart indicator");

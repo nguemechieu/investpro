@@ -5,7 +5,10 @@ import org.investpro.indicators.ADX;
 import org.investpro.indicators.ATR;
 import org.investpro.indicators.BollingerBands;
 import org.investpro.indicators.CCI;
+import org.investpro.indicators.EngineBackedIndicator;
 import org.investpro.indicators.Indicator;
+import org.investpro.indicators.IndicatorCatalog;
+import org.investpro.indicators.INDICATORS;
 import org.investpro.indicators.ExponentialMovingAverage;
 import org.investpro.indicators.FibonacciRetracement;
 import org.investpro.indicators.Fractal;
@@ -20,7 +23,9 @@ import org.investpro.indicators.Volatility;
 import org.investpro.indicators.Volume;
 import org.investpro.indicators.VWAP;
 import org.investpro.indicators.Zigzag;
+import org.investpro.indicators.metadata.IndicatorParameterDefinition;
 
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -33,83 +38,41 @@ public final class PluginIndicatorFactory {
 
     private static final Preferences PREFS = Preferences.userNodeForPackage(PluginIndicatorFactory.class)
             .node("indicator-config");
-    private static final List<String> SUPPORTED_CHOICES = List.of(
-            "SMA 20",
-            "SMA 50",
-            "SMA 200",
-            "EMA 12",
-            "EMA 26",
-            "RSI 14",
-            "Stochastic",
-            "CCI 20",
-            "MACD",
-            "Bollinger Bands",
-            "ATR 14",
-            "VWAP",
-            "OBV",
-            "Volume",
-            "ADX 14",
-            "Ichimoku",
-            "Parabolic SAR",
-            "Fibonacci Retracement",
-            "Zigzag",
-            "Fractal",
-            "Volatility");
 
     private PluginIndicatorFactory() {
     }
 
     public static List<String> supportedChoices() {
-        return SUPPORTED_CHOICES;
+        LinkedHashSet<String> choices = new LinkedHashSet<>();
+        for (INDICATORS indicator : IndicatorCatalog.allIndicators()) {
+            choices.add(IndicatorCatalog.get(indicator).displayName());
+        }
+        return List.copyOf(choices);
     }
 
     public static List<IndicatorParameter> parametersFor(String choice) {
-        return switch (normalize(choice)) {
-            case "SMA 20", "SMA 50", "SMA 200", "EMA 12", "EMA 26", "RSI 14", "CCI 20", "ATR 14", "ADX 14" -> List.of(
-                    new IndicatorParameter("period", "Period", IndicatorValueType.INTEGER,
-                            String.valueOf(defaultPeriodValue(choice)), "Lookback period"));
-            case "STOCHASTIC" -> List.of(
-                    new IndicatorParameter("kPeriod", "%K Period", IndicatorValueType.INTEGER, "14",
-                            "Fast stochastic lookback"),
-                    new IndicatorParameter("kSlowPeriod", "%K Smoothing", IndicatorValueType.INTEGER, "3",
-                            "Smoothing for %K"),
-                    new IndicatorParameter("dPeriod", "%D Period", IndicatorValueType.INTEGER, "3",
-                            "Signal period for %D"));
-            case "MACD" -> List.of(
-                    new IndicatorParameter("fastPeriod", "Fast Period", IndicatorValueType.INTEGER, "12",
-                            "Fast EMA length"),
-                    new IndicatorParameter("slowPeriod", "Slow Period", IndicatorValueType.INTEGER, "26",
-                            "Slow EMA length"),
-                    new IndicatorParameter("signalPeriod", "Signal Period", IndicatorValueType.INTEGER, "9",
-                            "Signal EMA length"));
-            case "BOLLINGER BANDS" -> List.of(
-                    new IndicatorParameter("period", "Period", IndicatorValueType.INTEGER, "20",
-                            "Moving average lookback"),
-                    new IndicatorParameter("stdDevMultiplier", "Std Dev Multiplier", IndicatorValueType.DOUBLE, "2.0",
-                            "Band width multiplier"));
-            case "ICHIMOKU" -> List.of(
-                    new IndicatorParameter("conversionPeriod", "Conversion Period", IndicatorValueType.INTEGER, "9",
-                            "Tenkan-sen lookback"),
-                    new IndicatorParameter("basePeriod", "Base Period", IndicatorValueType.INTEGER, "26",
-                            "Kijun-sen lookback"),
-                    new IndicatorParameter("leadingSpanPeriod", "Leading Span Period", IndicatorValueType.INTEGER, "52",
-                            "Senkou Span B lookback"));
-            case "PARABOLIC SAR" -> List.of(
-                    new IndicatorParameter("initialAF", "Initial AF", IndicatorValueType.DOUBLE, "0.02",
-                            "Acceleration factor start"),
-                    new IndicatorParameter("maxAF", "Max AF", IndicatorValueType.DOUBLE, "0.2",
-                            "Acceleration factor cap"));
-            case "FIBONACCI RETRACEMENT" -> List.of(
-                    new IndicatorParameter("lookbackPeriod", "Lookback Period", IndicatorValueType.INTEGER, "20",
-                            "Range used to derive levels"));
-            case "ZIGZAG" -> List.of(
-                    new IndicatorParameter("thresholdPercent", "Threshold %", IndicatorValueType.DOUBLE, "5.0",
-                            "Minimum swing percentage"));
-            case "FRACTAL" -> List.of(
-                    new IndicatorParameter("lookback", "Lookback", IndicatorValueType.INTEGER, "5",
-                            "Bars used to detect fractals"));
-            default -> List.of();
-        };
+        Optional<INDICATORS> parsed = parseChoiceIndicator(choice);
+        if (parsed.isEmpty()) {
+            return List.of();
+        }
+
+        int explicitPeriod = explicitPeriod(choice);
+        return IndicatorCatalog.get(parsed.get()).parameters().stream()
+                .map(parameter -> {
+                    String defaultValue = parameter.defaultValue();
+                    if (explicitPeriod > 0 && "period".equalsIgnoreCase(parameter.name())) {
+                        defaultValue = String.valueOf(explicitPeriod);
+                    }
+                    return new IndicatorParameter(
+                            parameter.name(),
+                            parameter.displayName() == null || parameter.displayName().isBlank()
+                                    ? humanizeKey(parameter.name())
+                                    : parameter.displayName(),
+                            parseValueType(parameter),
+                            defaultValue,
+                            parameter.description() == null ? "" : parameter.description());
+                })
+                .toList();
     }
 
     public static Map<String, String> defaultConfig(String choice) {
@@ -172,7 +135,7 @@ public final class PluginIndicatorFactory {
 
     private static Optional<Indicator> createFallback(String choice, Map<String, String> config) {
         try {
-            return Optional.ofNullable(switch (normalize(choice)) {
+            Optional<Indicator> fallback = Optional.ofNullable(switch (normalize(choice)) {
                 case "SMA 20", "SMA 50", "SMA 200" ->
                     new SimpleMovingAverage(intConfig(config, "period", defaultPeriodValue(choice)));
                 case "EMA 12", "EMA 26" ->
@@ -208,6 +171,12 @@ public final class PluginIndicatorFactory {
                 case "VOLATILITY" -> new Volatility();
                 default -> null;
             });
+            if (fallback.isPresent()) {
+                return fallback;
+            }
+
+            return parseChoiceIndicator(choice)
+                    .map(indicator -> (Indicator) new EngineBackedIndicator(indicator, mergeConfig(choice, config)));
         } catch (Exception exception) {
             log.warn("Indicator fallback failed for '{}': {}", choice, exception.getMessage(), exception);
             return Optional.empty();
@@ -218,6 +187,10 @@ public final class PluginIndicatorFactory {
         Map<String, String> merged = new LinkedHashMap<>(defaultConfig(choice));
         if (config != null) {
             merged.putAll(config);
+        }
+        int explicitPeriod = explicitPeriod(choice);
+        if (explicitPeriod > 0) {
+            merged.put("period", String.valueOf(explicitPeriod));
         }
         return merged;
     }
@@ -283,7 +256,80 @@ public final class PluginIndicatorFactory {
         return normalize(choice).replace(' ', '_');
     }
 
-    private record IndicatorRequest(String providerId, Map<String, String> config) {
+    private static Optional<INDICATORS> parseChoiceIndicator(String choice) {
+        Optional<INDICATORS> parsed = IndicatorCatalog.parse(choice);
+        if (parsed.isPresent()) {
+            return parsed;
+        }
+
+        return switch (normalize(choice)) {
+            case "SMA 20", "SMA 50", "SMA 200" -> Optional.of(INDICATORS.SMA);
+            case "EMA 12", "EMA 26" -> Optional.of(INDICATORS.EMA);
+            case "RSI 14" -> Optional.of(INDICATORS.RSI);
+            case "CCI 20" -> Optional.of(INDICATORS.CCI);
+            case "ATR 14" -> Optional.of(INDICATORS.ATR);
+            case "ADX 14" -> Optional.of(INDICATORS.ADX);
+            default -> Optional.empty();
+        };
+    }
+
+    private static int explicitPeriod(String choice) {
+        if (choice == null || choice.isBlank()) {
+            return -1;
+        }
+        String[] tokens = choice.trim().split("\\s+");
+        if (tokens.length == 0) {
+            return -1;
+        }
+        String tail = tokens[tokens.length - 1];
+        try {
+            return Integer.parseInt(tail);
+        } catch (NumberFormatException ex) {
+            return -1;
+        }
+    }
+
+    private static IndicatorValueType parseValueType(IndicatorParameterDefinition parameter) {
+        String type = parameter.type() == null ? "" : parameter.type().trim().toUpperCase(Locale.ROOT);
+        return switch (type) {
+            case "INTEGER", "INT", "LONG" -> IndicatorValueType.INTEGER;
+            case "DOUBLE", "FLOAT", "DECIMAL", "NUMBER" -> IndicatorValueType.DOUBLE;
+            case "BOOLEAN", "BOOL" -> IndicatorValueType.BOOLEAN;
+            default -> {
+                String defaultValue = parameter.defaultValue() == null ? "" : parameter.defaultValue().trim();
+                if (defaultValue.matches("[-+]?\\d+")) {
+                    yield IndicatorValueType.INTEGER;
+                }
+                if (defaultValue.matches("[-+]?\\d*\\.\\d+")) {
+                    yield IndicatorValueType.DOUBLE;
+                }
+                if ("true".equalsIgnoreCase(defaultValue) || "false".equalsIgnoreCase(defaultValue)) {
+                    yield IndicatorValueType.BOOLEAN;
+                }
+                yield IndicatorValueType.TEXT;
+            }
+        };
+    }
+
+    private static String humanizeKey(String key) {
+        if (key == null || key.isBlank()) {
+            return "Parameter";
+        }
+        String normalized = key.replace('_', ' ');
+        StringBuilder builder = new StringBuilder(normalized.length());
+        char[] chars = normalized.toCharArray();
+        for (int index = 0; index < chars.length; index++) {
+            char current = chars[index];
+            if (index > 0 && Character.isUpperCase(current) && Character.isLowerCase(chars[index - 1])) {
+                builder.append(' ');
+            }
+            builder.append(current);
+        }
+        String spaced = builder.toString().trim();
+        if (spaced.isEmpty()) {
+            return "Parameter";
+        }
+        return Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
     }
 
     public record IndicatorParameter(String key, String label, IndicatorValueType type, String defaultValue,

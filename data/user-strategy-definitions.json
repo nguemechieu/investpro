@@ -74,4 +74,94 @@
     "enabled" : true
   } ],
   "marketCompatibility" : [ "ALL" ]
+}, {
+  "name" : "general",
+  "baseName" : "general",
+  "parameters" : {
+    "rsiPeriod" : 14,
+    "emaFast" : 20,
+    "emaSlow" : 50,
+    "atrPeriod" : 14,
+    "breakoutLookback" : 20,
+    "oversoldThreshold" : 35.0,
+    "overboughtThreshold" : 65.0,
+    "minConfidence" : 0.55,
+    "signalAmount" : 1.0
+  },
+  "rules" : [ {
+    "id" : "070f8faf-d298-4458-b93e-4bcf76f7e3a1",
+    "ruleSource" : "CANDLE_PATTERN",
+    "signalType" : "BUY",
+    "indicator" : null,
+    "candlePattern" : "DOJI_STAR_BULLISH",
+    "timeframe" : "M5",
+    "parameters" : { },
+    "conditions" : [ ],
+    "enabled" : true
+  }, {
+    "id" : "d6274c29-bac5-4e60-a722-56802b39e448",
+    "ruleSource" : "INDICATOR",
+    "signalType" : "BUY",
+    "indicator" : "EMA",
+    "candlePattern" : null,
+    "timeframe" : "M5",
+    "parameters" : {
+      "period" : "20"
+    },
+    "conditions" : [ ],
+    "enabled" : true
+  }, {
+    "id" : "873cc495-c8c7-4ae9-ac40-fe755a4fbd4a",
+    "ruleSource" : "CANDLE_PATTERN",
+    "signalType" : "BUY",
+    "indicator" : null,
+    "candlePattern" : "DOJI_STAR_BULLISH",
+    "timeframe" : "M5",
+    "parameters" : { },
+    "conditions" : [ ],
+    "enabled" : true
+  }, {
+    "id" : "7a4066f8-5bd6-4173-bba5-44a2589a06f6",
+    "ruleSource" : "INDICATOR",
+    "signalType" : "SELL",
+    "indicator" : "WMA",
+    "candlePattern" : null,
+    "timeframe" : "M30",
+    "parameters" : {
+      "period" : "20"
+    },
+    "conditions" : [ ],
+    "enabled" : true
+  }, {
+    "id" : "5cf571d6-8dc4-4dc8-b733-38188aed5886",
+    "ruleSource" : "CANDLE_PATTERN",
+    "signalType" : "SELL",
+    "indicator" : null,
+    "candlePattern" : "CLOSING_MARUBOZU_BEARISH",
+    "timeframe" : "M5",
+    "parameters" : { },
+    "conditions" : [ ],
+    "enabled" : true
+  }, {
+    "id" : "fd40f180-0b82-49ad-b716-1627e33978e3",
+    "ruleSource" : "CANDLE_PATTERN",
+    "signalType" : "SELL",
+    "indicator" : null,
+    "candlePattern" : "LONG_LINE_BEARISH",
+    "timeframe" : "M5",
+    "parameters" : { },
+    "conditions" : [ ],
+    "enabled" : true
+  }, {
+    "id" : "b12cf658-f34e-462b-baa5-410229765bcc",
+    "ruleSource" : "CANDLE_PATTERN",
+    "signalType" : "BUY",
+    "indicator" : null,
+    "candlePattern" : "HAMMER",
+    "timeframe" : "M5",
+    "parameters" : { },
+    "conditions" : [ ],
+    "enabled" : true
+  } ],
+  "marketCompatibility" : [ "ALL" ]
 } ]

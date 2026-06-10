@@ -3,6 +3,9 @@ package org.investpro.exchange.schwab;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import javafx.beans.property.SimpleIntegerProperty;
+import lombok.*;
+import org.investpro.data.CandleData;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.exchange.Exchange;
@@ -41,7 +44,11 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-
+@EqualsAndHashCode(callSuper = true)
+@Data
+@Getter
+@Setter
+@ToString(callSuper = true)
 public class Schwab extends Exchange {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final DateTimeFormatter ISO_UTC = DateTimeFormatter.ISO_INSTANT.withZone(ZoneOffset.UTC);
@@ -497,7 +504,46 @@ public class Schwab extends Exchange {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return null;
+        TradePair pair = tradePair;
+        if (pair == null) {
+            try {
+                pair = getSelectedTradePair();
+            } catch (Exception exception) {
+                return null;
+            }
+        }
+
+        TradePair resolvedPair = pair;
+        return new CandleDataSupplier(200, Math.max(60, secondsPerCandle), resolvedPair,
+                new SimpleIntegerProperty((int) Instant.now().getEpochSecond())) {
+            @Override
+            public java.util.concurrent.Future<List<CandleData>> get() {
+                return CompletableFuture.completedFuture(getCandleData());
+            }
+
+            @Override
+            public List<CandleData> getCandleData() {
+                return List.of();
+            }
+
+            @Override
+            public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+                return Schwab.this.getCandleDataSupplier(secondsPerCandle, tradePair);
+            }
+
+            @Override
+            public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair,
+                    Instant currentCandleStartedAt,
+                    long secondsIntoCurrentCandle,
+                    int secondsPerCandle) {
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+
+            @Override
+            public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+                return CompletableFuture.completedFuture(List.of());
+            }
+        };
     }
 
     @Override

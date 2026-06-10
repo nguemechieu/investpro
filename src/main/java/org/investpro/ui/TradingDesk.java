@@ -469,8 +469,8 @@ public class TradingDesk extends BorderPane {
 
     private record AssetBalanceRow(String asset, double balance, double equity, double margin, double freeMargin) {
     }
-@Data
-private static final class DetachedChartWindow {
+    @Data
+    private static final class DetachedChartWindow {
         private String title;
         private final Tab originalTab;
         private final Tab floatingTab;
@@ -637,7 +637,7 @@ private static final class DetachedChartWindow {
 
         if (!ibkrDeskBlocked
                 && (hasExchangeCredentials(exchangeSelector.getSelectionModel().getSelectedItem())
-                        || hasConfiguredCredentials())) {
+                || hasConfiguredCredentials())) {
             proceedWithConnection();
         }
 
@@ -2500,8 +2500,8 @@ private static final class DetachedChartWindow {
 
             List<StrategyAssignment> sorted = merged.values().stream()
                     .sorted(Comparator.comparing(
-                            StrategyAssignment::getAssignedAt,
-                            Comparator.nullsLast(Comparator.naturalOrder()))
+                                    StrategyAssignment::getAssignedAt,
+                                    Comparator.nullsLast(Comparator.naturalOrder()))
                             .reversed())
                     .toList();
 
@@ -3712,7 +3712,7 @@ private static final class DetachedChartWindow {
                 score -> String.valueOf(score.getStatus()), 100);
         TableColumn<PositionHealthScore, String> scoreCol = tableColumn("Health",
                 score -> number(score.getOverallScore()), 85);
-        TableColumn<PositionHealthScore, String> pnlCol = tableColumn("PnL", score -> number(score.getPnlScore()), 75);
+        TableColumn<PositionHealthScore, String> pnlCol = tableColumn("PnL %$", score -> number(score.getPnlScore()), 75);
         TableColumn<PositionHealthScore, String> riskCol = tableColumn("Risk", score -> number(score.getRiskScore()),
                 75);
         TableColumn<PositionHealthScore, String> technicalCol = tableColumn("Technical",
@@ -4670,8 +4670,8 @@ private static final class DetachedChartWindow {
     }
 
     private void addSummaryRow(GridPane grid, int row, String labelStyle,
-            String label1, Label value1,
-            String label2, Label value2) {
+                               String label1, Label value1,
+                               String label2, Label value2) {
         Label l1 = new Label(label1 + ":");
         l1.setStyle(labelStyle);
         Label l2 = new Label(label2 + ":");
@@ -5056,7 +5056,7 @@ private static final class DetachedChartWindow {
         deskOrdersLabel.setText(openOrders + " open");
         deskMarketLabel.setText(market.hasMarketData()
                 ? formatSignedPercent(market.averageChangePercent(), 2) + " breadth "
-                        + formatNumber(market.positiveBreadth(), 0)
+                + formatNumber(market.positiveBreadth(), 0)
                 : marketWatchItems.size() + " symbols");
         deskSpreadLabel.setText(spreadPercent > 0.0 ? formatNumber(spreadPercent, 3) + "%" : "Spread: --");
         deskStrategyLabel.setText(strategy.totalTrades() > 0
@@ -5234,10 +5234,10 @@ private static final class DetachedChartWindow {
         if (exchange != null
                 && (Boolean.TRUE.equals(exchange.isConnected()) || exchange.isPaperTrading())
                 && Objects.equals(normalizeExchangeName(firstNonBlank(
-                        exchange.getName(),
-                        exchange.getExchangeId(),
-                        exchange.getDisplayName(),
-                        exchange.getClass().getSimpleName())), normalized)) {
+                exchange.getName(),
+                exchange.getExchangeId(),
+                exchange.getDisplayName(),
+                exchange.getClass().getSimpleName())), normalized)) {
             return true;
         }
 
@@ -6170,7 +6170,7 @@ private static final class DetachedChartWindow {
     }
 
     private void submitOrderByType(String orderType, TradePair tradePair, org.investpro.utils.Side side,
-            double amount) {
+                                   double amount) {
         // Check if pair is tradable now using MarketDataEngine
         if (marketDataEngine != null && !marketDataEngine.isTradableNow(tradePair)) {
             String hours = marketDataEngine.getTradingHours(tradePair);
@@ -7647,7 +7647,7 @@ private static final class DetachedChartWindow {
     }
 
     private String buildTradabilityDiagnostics(TradePair pair, SymbolTradability status,
-            OpenOrder.OrderType orderType) {
+                                               OpenOrder.OrderType orderType) {
         String symbol = pair == null ? "-" : pair.toString('/');
         String exchangeName = exchange == null ? "-" : exchange.getDisplayName();
 
@@ -7722,7 +7722,7 @@ private static final class DetachedChartWindow {
     private boolean isCryptoDiagnosticCode(String code) {
         return switch (code == null ? "" : code.toUpperCase(java.util.Locale.ROOT)) {
             case "BTC", "ETH", "SOL", "XLM", "XRP", "USDC", "USDT", "DAI", "LTC", "BCH", "DOGE", "ADA", "AVAX",
-                    "1INCH" -> true;
+                 "1INCH" -> true;
             default -> false;
         };
     }
@@ -7784,7 +7784,7 @@ private static final class DetachedChartWindow {
         if (!marketOrderAllowed) {
             String reason = status.reason().isBlank()
                     ? org.investpro.trading.tradability.InstrumentTradeStatus.from(status.status()).name().replace('_',
-                            ' ')
+                    ' ')
                     : status.reason();
             String tip = "Cannot trade " + selected.toSlashSymbol() + ": " + reason;
             Tooltip.install(buyButton, new Tooltip(tip));
@@ -7969,7 +7969,7 @@ private static final class DetachedChartWindow {
         return CRYPTO_SYMBOL_CODES.contains(base)
                 || CRYPTO_SYMBOL_CODES.contains(quote)
                 || CRYPTO_SYMBOL_CODES.stream()
-                        .anyMatch(code -> symbol.startsWith(code + "/") || symbol.endsWith("/" + code));
+                .anyMatch(code -> symbol.startsWith(code + "/") || symbol.endsWith("/" + code));
     }
 
     private boolean isReservedMarketWatchSymbol(TradePair pair) {
@@ -9289,14 +9289,14 @@ private static final class DetachedChartWindow {
         sentimentList.getItems().setAll("Loading market sentiment...");
 
         CompletableFuture.supplyAsync(() -> List.of(
-                "Market Sentiment Index: " + getMarketSentimentIndex() + "/100",
-                "Overall Market Sentiment: " + getOverallMarketSentiment(),
-                "Investor Confidence: " + getInvestorConfidence(),
-                "Market Fear Index (VIX Proxy): " + getMarketVIX(),
-                "Bitcoin Dominance: " + getBitcoinDominance(),
-                "Trading Volume: " + getTradingVolume(),
-                buildNewsBiasLine(),
-                buildUpcomingEventPressureLine()), autoRefreshExecutor)
+                        "Market Sentiment Index: " + getMarketSentimentIndex() + "/100",
+                        "Overall Market Sentiment: " + getOverallMarketSentiment(),
+                        "Investor Confidence: " + getInvestorConfidence(),
+                        "Market Fear Index (VIX Proxy): " + getMarketVIX(),
+                        "Bitcoin Dominance: " + getBitcoinDominance(),
+                        "Trading Volume: " + getTradingVolume(),
+                        buildNewsBiasLine(),
+                        buildUpcomingEventPressureLine()), autoRefreshExecutor)
                 .whenComplete((lines, throwable) -> runOnFx(() -> {
                     if (throwable != null) {
                         label.setText("Market Sentiment Index: unavailable");
@@ -9361,8 +9361,8 @@ private static final class DetachedChartWindow {
             String value = eventTime == null
                     ? "-"
                     : DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                            .withZone(ZoneId.systemDefault())
-                            .format(eventTime);
+                    .withZone(ZoneId.systemDefault())
+                    .format(eventTime);
             return new ReadOnlyStringWrapper(value);
         });
 
@@ -9953,18 +9953,18 @@ private static final class DetachedChartWindow {
                         summaryRows[i][0],
                         i == 0 ? number(rm.get("totalTrades"))
                                 : i == 1 ? String.format("%.1f%%", rm.get("winRate"))
-                                        : i == 2 ? money(rm.get("netPnl"))
-                                                : i == 3 ? money(rm.get("avgPnl"))
-                                                        : i == 4 ? String.format("%.2f", rm.get("profitFactor"))
-                                                                : i == 5 ? money(rm.get("avgWin"))
-                                                                        : i == 6 ? money(rm.get("avgLoss"))
-                                                                                : i == 7 ? money(rm.get("bestTrade"))
-                                                                                        : i == 8 ? money(
-                                                                                                rm.get("worstTrade"))
-                                                                                                : i == 9 ? number(rm
-                                                                                                        .get("maxConsWins"))
-                                                                                                        : number(rm.get(
-                                                                                                                "maxConsLosses"))
+                                : i == 2 ? money(rm.get("netPnl"))
+                                : i == 3 ? money(rm.get("avgPnl"))
+                                : i == 4 ? String.format("%.2f", rm.get("profitFactor"))
+                                : i == 5 ? money(rm.get("avgWin"))
+                                : i == 6 ? money(rm.get("avgLoss"))
+                                : i == 7 ? money(rm.get("bestTrade"))
+                                : i == 8 ? money(
+                                rm.get("worstTrade"))
+                                : i == 9 ? number(rm
+                                .get("maxConsWins"))
+                                : number(rm.get(
+                                "maxConsLosses"))
                 };
                 summaryRows[i][1] = rowData[1];
             }
@@ -10078,12 +10078,12 @@ private static final class DetachedChartWindow {
             double rawVal = metrics.getOrDefault(
                     i == 0 ? "totalTrades"
                             : i == 1 ? "totalProfit"
-                                    : i == 2 ? "totalLoss"
-                                            : i == 3 ? "netPnl"
-                                                    : i == 4 ? "winRate"
-                                                            : i == 5 ? "avgWin"
-                                                                    : i == 6 ? "avgLoss"
-                                                                            : i == 7 ? "bestTrade" : "worstTrade",
+                            : i == 2 ? "totalLoss"
+                            : i == 3 ? "netPnl"
+                            : i == 4 ? "winRate"
+                            : i == 5 ? "avgWin"
+                            : i == 6 ? "avgLoss"
+                            : i == 7 ? "bestTrade" : "worstTrade",
                     0.0);
             Label val = new Label(pnlRows[i][1]);
             String clr = (i == 0 || i == 4) ? "#ffffff" : rawVal >= 0 ? "#10b981" : "#ef4444";
@@ -11042,7 +11042,7 @@ private static final class DetachedChartWindow {
      * Apply visibility settings to panels
      */
     private void applyVisibilitySettings(boolean showMarketWatch, boolean showOrderBook, boolean showTerminal,
-            boolean showCharts) {
+                                         boolean showCharts) {
         // Market Watch visibility
         if (marketWatchWrapper != null) {
             marketWatchWrapper.setVisible(showMarketWatch);
@@ -11152,11 +11152,11 @@ private static final class DetachedChartWindow {
         String apiPrompt = oanda
                 ? "Enter your OANDA v20 API token"
                 : (stellar ? "Paste your Stellar public account ID (G...)"
-                        : "Paste your API key here");
+                : "Paste your API key here");
         String secretPrompt = oanda
                 ? "Account ID (e.g. 001-001-123456-001)"
                 : (stellar ? "Paste your Stellar secret seed (S...) for live trading"
-                        : "Paste your API secret / private key");
+                : "Paste your API secret / private key");
 
         String apiFieldInitialValue = configuredApiKey;
         if (stellar && apiFieldInitialValue.isBlank() && !configuredAccountId.isBlank()) {
@@ -11763,11 +11763,11 @@ private static final class DetachedChartWindow {
                 case "BITFINEX" -> new Bitfinex(credentials);
                 case "ALPACA" -> new Alpaca(credentials);
                 case "INTERACTIVE BROKERS", "INTERACTIVE_BROKER", "IBKR", "IBK", "SCHWAB", "CHARLES SCHWAB" ->
-                    new IbkrExchange(credentials);
+                        new IbkrExchange(credentials);
                 case "COINBASE" -> new Coinbase(credentials);
                 case "STELLAR NETWORK", "STELLAR-NETWORK", "STELLAR_NETWORK" -> new StellarNetwork(credentials);
                 case  "SOLONA NETWORK", "SOLONA-NETWORK", "SOLONA_NETWORK" ->
-                    new SolonaNetwork(credentials);
+                        new SolonaNetwork(credentials);
                 default -> {
                     log.warn("Exchange {} is not implemented yet. Falling back to Coinbase.", exchangeName);
                     throw new RuntimeException("UNSUPPORTED EXCHANGE");
@@ -11815,20 +11815,20 @@ private static final class DetachedChartWindow {
 
         return switch (key) {
             case "COINBASE_API_KEY", "COINBASE_KEY_NAME", "BINANCE_API_KEY", "BINANCE_US_API_KEY", "BITFINEX_API_KEY",
-                    "OANDA_API_KEY", "ALPACA_API_KEY", "SOLONA_API_KEY", "SOLONA_WALLET_ADDRESS", "SOLONA_PUBLIC_KEY",
-                    "SOLONA_NETWORK_API_KEY" ->
-                Optional.ofNullable(credentials.apiKey());
+                 "OANDA_API_KEY", "ALPACA_API_KEY", "SOLONA_API_KEY", "SOLONA_WALLET_ADDRESS", "SOLONA_PUBLIC_KEY",
+                 "SOLONA_NETWORK_API_KEY" ->
+                    Optional.ofNullable(credentials.apiKey());
             case "STELLAR_PUBLIC_KEY", "STELLAR_NETWORK_API_KEY", "STELLAR_NETWORK_ACCOUNT_ID" ->
-                Optional.ofNullable(
-                        safe(credentials.accountId()).isBlank() ? credentials.apiKey() : credentials.accountId());
+                    Optional.ofNullable(
+                            safe(credentials.accountId()).isBlank() ? credentials.apiKey() : credentials.accountId());
             case "COINBASE_API_SECRET", "COINBASE_PRIVATE_KEY", "BINANCE_API_SECRET", "BINANCE_US_API_SECRET",
-                    "BITFINEX_API_SECRET", "OANDA_API_SECRET", "ALPACA_API_SECRET", "SOLONA_API_SECRET",
-                    "SOLONA_NETWORK_API_SECRET", "STELLAR_SECRET_KEY", "STELLAR_NETWORK_API_SECRET" ->
-                Optional.ofNullable(credentials.apiSecret());
+                 "BITFINEX_API_SECRET", "OANDA_API_SECRET", "ALPACA_API_SECRET", "SOLONA_API_SECRET",
+                 "SOLONA_NETWORK_API_SECRET", "STELLAR_SECRET_KEY", "STELLAR_NETWORK_API_SECRET" ->
+                    Optional.ofNullable(credentials.apiSecret());
             case "OANDA_ACCOUNT_ID" -> Optional.ofNullable(credentials.accountId());
             case "OANDA_SANDBOX", "ALPACA_PAPER" -> Optional.of(String.valueOf(credentials.sandbox()));
             case "STELLAR_NETWORK", "STELLAR_NETWORK_TRADING_MODE" ->
-                Optional.of(credentials.sandbox() ? "PAPER" : "LIVE");
+                    Optional.of(credentials.sandbox() ? "PAPER" : "LIVE");
             default -> Optional.empty();
         };
     }
@@ -11844,11 +11844,11 @@ private static final class DetachedChartWindow {
             case "OANDA", "OANDA FX", "OANDA FOREX" -> "OANDA";
             case "ALPACA", "ALPACA STOCKS", "ALPACA EQUITIES" -> "ALPACA";
             case "INTERACTIVE BROKERS", "INTERACTIVEBROKERS", "IBKR", "IBK" ->
-                "INTERACTIVE BROKERS";
+                    "INTERACTIVE BROKERS";
             case "SCHWAB", "CHARLES SCHWAB", "CHARLESSCHWAB" -> "SCHWAB";
             case "STELLAR", "STELLAR NETWORK", "STELLARNETWORK" -> "STELLAR NETWORK";
             case "SOLONA", "SOLONA NETWORK", "SOLONANETWORK", "SOL" ->
-                "SOLONA NETWORK";
+                    "SOLONA NETWORK";
             default -> name;
         };
     }
@@ -12198,7 +12198,7 @@ private static final class DetachedChartWindow {
             tradePair.setUpdatedAt(Instant.now());
             changed = true;
         }
-        if (changed && marketWatchTable != null) {
+        if (changed) {
             marketWatchTable.refresh();
             symbolCountLabel.setText(t("label.symbols", marketWatchItems.size()));
         }
@@ -12805,7 +12805,7 @@ private static final class DetachedChartWindow {
     }
 
     private Map<Timeframe, List<CandleData>> loadBacktestCandlesForAllTimeframes(Exchange targetExchange,
-            TradePair symbol) {
+                                                                                 TradePair symbol) {
         if (targetExchange == null) {
             return Map.of();
         }
@@ -12850,9 +12850,9 @@ private static final class DetachedChartWindow {
                 List<CandleData> candles = future == null ? List.of() : future.get(30, TimeUnit.SECONDS);
                 List<CandleData> cleanCandles = candles == null ? List.of()
                         : candles.stream()
-                                .filter(Objects::nonNull)
-                                .sorted(Comparator.comparingLong(CandleData::openTime))
-                                .toList();
+                        .filter(Objects::nonNull)
+                        .sorted(Comparator.comparingLong(CandleData::openTime))
+                        .toList();
                 if (cleanCandles.size() >= 50) {
                     candlesByTimeframe.put(timeframe, cleanCandles);
                 } else {
@@ -13170,7 +13170,7 @@ private static final class DetachedChartWindow {
     }
 
     private List<TradePair> resolveStreamingSymbolsForExchange(Exchange targetExchange,
-            List<TradePair> selectedSymbols) {
+                                                               List<TradePair> selectedSymbols) {
         if (targetExchange == null || Objects.equals(targetExchange, exchange)) {
             return resolveStreamingSymbolsForEverythingMode(selectedSymbols);
         }
@@ -13520,9 +13520,9 @@ private static final class DetachedChartWindow {
         refreshAssignmentIndicator.run();
 
         javafx.beans.value.ChangeListener<TradePair> symbolRefreshListener = (obs, oldValue,
-                newValue) -> refreshAssignmentIndicator.run();
+                                                                              newValue) -> refreshAssignmentIndicator.run();
         javafx.beans.value.ChangeListener<Timeframe> timeframeRefreshListener = (obs, oldValue,
-                newValue) -> refreshAssignmentIndicator.run();
+                                                                                 newValue) -> refreshAssignmentIndicator.run();
 
         symbolSelector.getSelectionModel().selectedItemProperty().addListener(symbolRefreshListener);
         timeframeSelector.getSelectionModel().selectedItemProperty().addListener(timeframeRefreshListener);
@@ -14722,8 +14722,8 @@ private static final class DetachedChartWindow {
                     double confidence = assignment == null
                             ? 0.0
                             : assignment.getScoreAtAssignment() > 1.0
-                                    ? assignment.getScoreAtAssignment() / 100.0
-                                    : assignment.getScoreAtAssignment();
+                            ? assignment.getScoreAtAssignment() / 100.0
+                            : assignment.getScoreAtAssignment();
                     return new TradingSystemStatusSnapshot.StrategyStatus(
                             assignment == null ? "ALL" : safe(assignment.getSymbol()),
                             strategyName,

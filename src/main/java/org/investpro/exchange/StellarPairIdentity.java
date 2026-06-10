@@ -1,6 +1,8 @@
 package org.investpro.exchange;
 
 import org.investpro.models.trading.TradePair;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.NonNull;
 
 import java.sql.SQLException;
 import java.util.Locale;
@@ -18,7 +20,8 @@ public record StellarPairIdentity(
         }
     }
 
-    public TradePair toTradePair() {
+    @Contract(" -> new")
+    public @NonNull TradePair toTradePair() {
         try {
             return new TradePair(base.code(), quote.code());
         } catch (SQLException | ClassNotFoundException exception) {

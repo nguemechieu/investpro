@@ -53,7 +53,7 @@
 .combo-box:disabled,
 .text-field:disabled {
     -fx-opacity: 0.5;
-    -fx-cursor: not-allowed;
+    -fx-cursor: default;
 }
 
 .button:disabled:hover {
