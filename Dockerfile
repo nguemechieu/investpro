@@ -16,9 +16,7 @@ RUN mvn -B -Dmaven.test.skip=true clean package
 # Runtime stage
 # Java 21 + JavaFX desktop runtime + noVNC
 # ============================================================
-FROM eclipse-temurin:21-jdk-alpine
-
-RUN apk add --no-cache ca-certificates openssl
+FROM eclipse-temurin:21-jdk
 
 ENV DEBIAN_FRONTEND=noninteractive \
     APP_HOME=/app \
