@@ -1,6 +1,6 @@
 package org.investpro.exchange.providers;
 
-import org.investpro.exchange.Alpaca;
+import org.investpro.exchange.alpaca.Alpaca;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.spi.ExchangeProvider;

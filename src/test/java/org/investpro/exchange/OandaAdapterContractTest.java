@@ -1,6 +1,7 @@
 package org.investpro.exchange;
 
 import org.investpro.exchange.models.*;
+import org.investpro.exchange.oanda.Oanda;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

@@ -1,5 +1,6 @@
 package org.investpro.exchange;
 
+import org.investpro.exchange.coinbase.Coinbase;
 import org.investpro.exchange.models.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

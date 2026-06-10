@@ -2,9 +2,9 @@ package org.investpro.trading.tradability;
 
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
-import org.investpro.exchange.StellarNetwork;
-import org.investpro.exchange.StellarPairIdentity;
-import org.investpro.exchange.StellarTradabilityEvaluator;
+import org.investpro.exchange.stellar.StellarNetwork;
+import org.investpro.exchange.stellar.StellarPairIdentity;
+import org.investpro.exchange.stellar.StellarTradabilityEvaluator;
 import org.investpro.market.MarketDataEngine;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.TradePair;

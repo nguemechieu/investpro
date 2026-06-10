@@ -22,6 +22,21 @@ if not exist "%APP_HOME%target\classes\org\investpro\ui\models\MarketWatchRow.cl
   if errorlevel 1 exit /b %errorlevel%
 )
 
+if not exist "%APP_HOME%target\classes\org\investpro\ui\tools\ChartToolbar.class" (
+  call "%APP_HOME%mvnw.cmd" -DskipTests package
+  if errorlevel 1 exit /b %errorlevel%
+)
+
+if not exist "%APP_HOME%target\classes\org\investpro\ui\charts\CandleStickChart.class" (
+  call "%APP_HOME%mvnw.cmd" -DskipTests package
+  if errorlevel 1 exit /b %errorlevel%
+)
+
+if not exist "%APP_HOME%target\classes\org\investpro\ui\charts\CandleStickChart$CandlePageConsumer.class" (
+  call "%APP_HOME%mvnw.cmd" -DskipTests package
+  if errorlevel 1 exit /b %errorlevel%
+)
+
 if not exist "%APP_HOME%target\lib" (
   call "%APP_HOME%mvnw.cmd" -DskipTests package
   if errorlevel 1 exit /b %errorlevel%

@@ -1,6 +1,7 @@
 package org.investpro.exchange;
 
 import org.investpro.exchange.credentials.ExchangeCredentials;
+import org.investpro.exchange.stellar.StellarNetwork;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;

@@ -3,6 +3,7 @@ package org.investpro.exchange;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.investpro.exchange.coinbase.Coinbase;
 import org.investpro.models.trading.Order;
 import org.investpro.utils.Side;
 import org.junit.jupiter.api.Test;

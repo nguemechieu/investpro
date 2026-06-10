@@ -1,7 +1,7 @@
 package org.investpro.exchange.providers;
 
 import org.investpro.exchange.Exchange;
-import org.investpro.exchange.SolonaNetwork;
+import org.investpro.exchange.solona.SolonaNetwork;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.spi.ExchangeProvider;
 import org.investpro.spi.ExchangeProviderContext;

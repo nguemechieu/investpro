@@ -2,13 +2,12 @@ package org.investpro.exchange.infrastructure;
 
 import org.investpro.models.trading.TradePair;
 import org.investpro.exchange.Exchange;
-import org.investpro.exchange.Coinbase;
-import org.investpro.exchange.Oanda;
+import org.investpro.exchange.coinbase.Coinbase;
+import org.investpro.exchange.oanda.Oanda;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;

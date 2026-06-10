@@ -5,14 +5,12 @@
 <h1 align="center">InvestPro</h1>
 
 <p align="center">
-  <strong>
-**InvestPro** is a modern desktop trading and market intelligence platform built with JavaFX. It is designed to help traders, developers, and quantitative researchers build, test, compare, and monitor trading strategies across multiple markets and exchanges.
+  <strong>A modern JavaFX trading workstation for strategy research, backtesting, market intelligence, and risk-controlled automation.</strong><br/>
+  Strategy Builder · Agent Runtime · Local gRPC AI Advisory · Risk Management · Backtesting · Paper Trading · Multi-Exchange Execution
+</p>
 
-The platform includes a strategy builder, technical indicator catalog, candlestick pattern support, backtesting workflow, symbol discovery, market data tools, trading agent architecture, and risk-controlled execution pipeline. InvestPro is designed to support both manual research and automated strategy evaluation while keeping risk management and broker activity as core parts of the system.
-
-InvestPro is not just a trading bot. It is a full trading platform architecture focused on strategy design, market analysis, automation, and disciplined execution.
-</strong><br/>
-  Strategy engine · Agent runtime · Local gRPC AI advisory · Risk management · Backtesting · Paper trading · Multi-exchange execution
+<p align="center">
+  Build strategies · Test ideas · Monitor markets · Control risk · Automate carefully
 </p>
 
 <p align="center">
@@ -45,6 +43,7 @@ InvestPro is not just a trading bot. It is a full trading platform architecture 
 - [Architecture](#architecture)
 - [Signal Execution Pipeline](#signal-execution-pipeline)
 - [Supported Exchanges & Brokers](#supported-exchanges--brokers)
+- [Stellar Workflow](#stellar-workflow)
 - [Installation](#installation)
 - [Running the Application](#running-the-application)
 - [Docker / Browser Desktop Mode](#docker--browser-desktop-mode)
@@ -214,6 +213,8 @@ InvestPro provides:
 - Interactive candlestick charts.
 - Multi-timeframe analysis.
 - Rich `indicators/` package: MA, EMA, RSI, MACD, Bollinger Bands, ATR, ADX, CCI, VWAP, Ichimoku, Stochastic, OBV, Parabolic SAR, Zigzag, Fibonacci, and more.
+- Indicator picker is populated from the catalog so the full supported indicator list is available from the chart UI.
+- Engine-backed indicator fallbacks let catalog indicators render even when they do not have a dedicated chart class yet.
 - Zoom and pan support.
 - Support/resistance and annotation-ready chart structure.
 
@@ -345,11 +346,32 @@ StrategySignal
 | Coinbase | Crypto spot | ✅ | ✅ | ✅ |
 | OANDA | Forex, CFD | ✅ | ✅ | ✅ |
 | Interactive Brokers | Stocks, futures, forex, options | ✅ | ✅ | ✅ |
+| Charles Schwab | US equities and brokerage accounts | ✅ | ✅ | ✅ |
 | Alpaca | US stocks, crypto | ✅ | ✅ | ✅ |
 | Bitfinex | Crypto | ✅ | ✅ | ✅ |
-| Stellar Network | XLM / USDC DEX | ✅ | ✅ | ✅ |
+| Kraken | Crypto spot | ✅ | ✅ | ✅ |
+| Stellar Network | XLM, USDC, and trustline assets on Stellar DEX | ✅ | ✅ | ✅ |
+| Solona Network | On-chain wallet and network-linked assets | ✅ | ✅ | ❌ |
 
 > Live trading requires valid API credentials. Always test with paper trading first.
+
+---
+
+## Stellar Workflow
+
+InvestPro treats Stellar differently from centralized exchanges because the usable symbol universe depends on the account's balances and trustlines.
+
+Current Stellar behavior:
+
+- Market Watch is derived from assets with a positive balance in the connected Stellar account.
+- For each held Stellar asset, InvestPro builds market watch pairs against `USDC` and `XLM` when valid.
+- Bot startup prioritizes Stellar symbols tied to assets already held in the account.
+- Market watch filtering keeps Stellar `USDC` and `XLM` balance pairs visible so they are not hidden by generic tradability filters.
+- Trustline-aware assets can be added from the Trading Desk when Stellar is selected.
+
+Practical implication:
+
+- If your Stellar account holds `AQUA`, `yXLM`, or another trusted asset, the market watch will prefer pairs such as `AQUA/USDC`, `AQUA/XLM`, `yXLM/USDC`, or `yXLM/XLM` instead of showing a broad catalog-first universe.
 
 ---
 
@@ -660,10 +682,12 @@ mvn javafx:run
 
 ### 2. Start With Paper Trading
 
-1. Select an exchange, such as **Binance US**, **Coinbase**, or **OANDA**.
+1. Select an exchange, such as **Binance US**, **Coinbase**, **OANDA**, or **Stellar Network**.
 2. Enable **Paper Trading** mode.
 3. Confirm that a virtual balance is loaded.
 4. Select a symbol from Market Watch.
+
+If you use **Stellar Network**, first confirm the account has the trustlines and balances you expect, because the market watch list is built from those held assets.
 
 ### 3. View Live Market Data
 

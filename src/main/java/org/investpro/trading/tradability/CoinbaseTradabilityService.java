@@ -1,7 +1,7 @@
 package org.investpro.trading.tradability;
 
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.exchange.Coinbase;
+import org.investpro.exchange.coinbase.Coinbase;
 import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
 

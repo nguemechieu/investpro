@@ -2,7 +2,7 @@ package org.investpro.transfer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.investpro.exchange.Coinbase;
+import org.investpro.exchange.coinbase.Coinbase;
 import org.investpro.models.Account;
 
 import java.math.BigDecimal;

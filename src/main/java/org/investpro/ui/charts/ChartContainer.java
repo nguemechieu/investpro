@@ -8,15 +8,18 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.Parent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
-import lombok.Data;
+
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.SystemCore;
 import org.investpro.data.CandleData;
@@ -44,7 +47,8 @@ import java.util.function.Consumer;
 
 @EqualsAndHashCode(callSuper = true)
 @Slf4j
-@Data
+@Getter
+@ToString
 public class ChartContainer extends Region {
     private static final int DEFAULT_SECONDS_PER_CANDLE = 3_600;
     private static final Duration CHART_FADE_DURATION = Duration.millis(220);
@@ -60,6 +64,7 @@ public class ChartContainer extends Region {
     private final ChartToolbar toolbar;
 
     private CandleStickChart candleStickChart;
+    @Setter
     private Consumer<String> onChartError;
     private Consumer<CandleData> candleSelectionCallback;
 
@@ -72,15 +77,16 @@ public class ChartContainer extends Region {
     }
 
     public ChartContainer(Exchange exchange,
-                          TradePair tradePair,
-                          boolean liveSyncing,
-                          String telegramToken,
-                          TradingService tradingService) {
+            TradePair tradePair,
+            boolean liveSyncing,
+            String telegramToken,
+            TradingService tradingService) {
         this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
         this.tradePair = Objects.requireNonNull(tradePair, "tradePair must not be null");
         this.liveSyncing = liveSyncing;
         this.telegramToken = telegramToken == null ? "" : telegramToken;
-        this.tradingService = tradingService == null ? createFallbackTradingService(exchange, this.telegramToken) : tradingService;
+        this.tradingService = tradingService == null ? createFallbackTradingService(exchange, this.telegramToken)
+                : tradingService;
 
         getStyleClass().add("candle-chart-container");
         setMinSize(360, 320);
@@ -94,7 +100,7 @@ public class ChartContainer extends Region {
         CandleDataSupplier initialSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);
         Set<Integer> granularities = (initialSupplier != null)
                 ? initialSupplier.getSupportedGranularities()
-                : Set.of(60, 300, 900, 3600, 14400, 86400);  // sensible defaults when exchange has no candle data
+                : Set.of(60, 300, 900, 3600, 14400, 86400,6*3600,(24*3600*7)); // sensible defaults when exchange has no candle data
         toolbar = new ChartToolbar(widthProperty(), heightProperty(), granularities);
 
         VBox toolbarContainer = getVBox();
@@ -127,7 +133,8 @@ public class ChartContainer extends Region {
         HBox actionBar = new HBox(6);
         actionBar.setAlignment(Pos.CENTER_RIGHT);
         actionBar.getChildren().setAll(
-                chartActionButton("Refresh", "/img/refresh-solid.png", () -> withChart(CandleStickChart::refreshChart)));
+                chartActionButton("Refresh", "/img/refresh-solid.png",
+                        () -> withChart(CandleStickChart::refreshChart)));
 
         HBox header = new HBox(10, toolbar, actionBar);
         header.setAlignment(Pos.CENTER_LEFT);
@@ -211,10 +218,6 @@ public class ChartContainer extends Region {
         }
     }
 
-    public SimpleIntegerProperty secondsPerCandleProperty() {
-        return secondsPerCandle;
-    }
-
     public void setCandleSelectionCallback(Consumer<CandleData> callback) {
         this.candleSelectionCallback = callback;
         if (candleStickChart != null) {
@@ -222,16 +225,16 @@ public class ChartContainer extends Region {
         }
     }
 
-    public void setOnChartError(Consumer<String> onChartError) {
-        this.onChartError = onChartError;
-    }
-
     public void dispose() {
         if (candleStickChart != null) {
             candleStickChart.dispose();
             candleStickChart = null;
         }
-        candleChartContainer.getChildren().clear();
+        Parent parent = candleChartContainer.getParent();
+        if (parent instanceof VBox && parent == candleChartContainer) {
+            candleChartContainer.setVisible(false);
+            candleChartContainer.setManaged(false);
+        }
     }
 
     private void rebuildChart(int durationSeconds, boolean animate) {
@@ -309,6 +312,7 @@ public class ChartContainer extends Region {
         fadeOut.setToValue(0.0);
         fadeOut.setOnFinished(event -> {
             previousChart.dispose();
+            candleChartContainer.getChildren().clear();
             candleChartContainer.getChildren().setAll(nextChart);
             fadeIn(nextChart);
         });

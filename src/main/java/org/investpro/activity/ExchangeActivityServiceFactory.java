@@ -3,10 +3,10 @@ package org.investpro.activity;
 import org.investpro.activity.binanceus.BinanceUsActivityService;
 import org.investpro.activity.coinbase.CoinbaseActivityService;
 import org.investpro.activity.oanda.OandaActivityService;
-import org.investpro.exchange.BinanceUs;
-import org.investpro.exchange.Coinbase;
+import org.investpro.exchange.binanceus.BinanceUs;
+import org.investpro.exchange.coinbase.Coinbase;
 import org.investpro.exchange.Exchange;
-import org.investpro.exchange.Oanda;
+import org.investpro.exchange.oanda.Oanda;
 
 import java.util.Optional;
 

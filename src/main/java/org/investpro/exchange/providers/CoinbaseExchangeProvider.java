@@ -1,6 +1,6 @@
 package org.investpro.exchange.providers;
 
-import org.investpro.exchange.Coinbase;
+import org.investpro.exchange.coinbase.Coinbase;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.spi.ExchangeProvider;

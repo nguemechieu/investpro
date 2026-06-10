@@ -29,7 +29,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -61,7 +60,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Getter
 @Setter
-public class AnalysisPanel extends StackPane{
+public class AnalysisPanel extends VBox{
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -83,11 +82,7 @@ public class AnalysisPanel extends StackPane{
     private final SystemCore systemCore;
     private final AnalysisDataProvider dataProvider;
     private final LiveTradingMetricsTracker liveMetricsTracker = new LiveTradingMetricsTracker();
-    private final ScheduledExecutorService botStatusMonitor = Executors.newSingleThreadScheduledExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "analysis-bot-status-monitor");
-        thread.setDaemon(true);
-        return thread;
-    });
+
 
     private boolean showingLiveMetrics = false;
     private boolean wasBotRunning = false;
@@ -157,26 +152,26 @@ public class AnalysisPanel extends StackPane{
     private GridPane correlationGrid;
     private TextArea analystNotesArea;
 
-    private AnalysisSnapshot currentSnapshot = AnalysisSnapshot.empty();
+    private AnalysisSnapshot currentSnapshot ;
 
     public AnalysisPanel(@NotNull SystemCore systemCore) {
         this.systemCore = Objects.requireNonNull(systemCore, "systemCore must not be null");
         this.dataProvider = new AnalysisDataProvider(systemCore);
+        this.analystNotesArea = new TextArea();
+        this.currentSnapshot = AnalysisSnapshot.empty();
 
+        setSpacing(12);
         setPadding(new Insets(16));
-
+        setFillWidth(true);
         setStyle("-fx-background-color: " + BG + "; -fx-text-fill: " + TEXT + ";");
         getStyleClass().add("analysis-panel");
 
         setupUI();
         loadInitialData();
-
-        // Start monitoring bot status to switch between backtesting and live metrics
         startBotStatusMonitoring();
 
         LocalizationService.applyTranslations(this);
     }
-
     private void setupUI() {
         Label titleLabel = new Label("Institutional Strategy Analysis");
         titleLabel.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: " + TEXT + ";");
@@ -191,20 +186,39 @@ public class AnalysisPanel extends StackPane{
         modeIndicatorLabel.setStyle("-fx-text-fill: " + BLUE + "; -fx-font-weight: bold; -fx-font-size: 12px;");
 
         VBox titleBlock = new VBox(3, titleLabel, generatedAtLabel);
+
         HBox header = new HBox(12, titleBlock, createSpacer(), modeIndicatorLabel, statusLabel);
         header.setAlignment(Pos.CENTER_LEFT);
+        header.setMinHeight(44);
 
         HBox configBox = createConfigurationBar();
+
         TabPane analysisTabs = createAnalysisTabs();
 
         ScrollPane scrollPane = new ScrollPane(analysisTabs);
         scrollPane.setFitToWidth(true);
         scrollPane.setFitToHeight(true);
+        scrollPane.setPannable(true);
         scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
 
-        getChildren().addAll(header, configBox, scrollPane);
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
+
+        getChildren().setAll(header, configBox, scrollPane);
     }
+
+    private final ScheduledExecutorService botStatusMonitor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "analysis-bot-status-monitor");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    private final java.util.concurrent.ExecutorService analysisWorker = Executors.newFixedThreadPool(2, runnable -> {
+        Thread thread = new Thread(runnable, "analysis-panel-worker");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    private volatile boolean disposed = false;
 
     private @NotNull HBox createConfigurationBar() {
         HBox configBox = new HBox(12);
@@ -480,35 +494,53 @@ public class AnalysisPanel extends StackPane{
     }
 
     private void loadInitialData() {
+        if (disposed) {
+            return;
+        }
+
         setStatus("Loading analysis inputs...");
 
         CompletableFuture
-                .supplyAsync(() -> new InitialData(dataProvider.loadStrategies(), dataProvider.loadPairs()))
-                .whenComplete((data, error) -> Platform.runLater(() -> {
-                    if (error != null) {
-                        log.error("Failed to load analysis inputs", error);
-                        setStatus("Failed to load analysis inputs");
-                        showAlert("Error", "Failed to load analysis inputs: " + rootMessage(error));
+                .supplyAsync(() -> new InitialData(dataProvider.loadStrategies(), dataProvider.loadPairs()), analysisWorker)
+                .whenComplete((data, error) -> {
+                    if (disposed) {
                         return;
                     }
 
-                    strategyCombo.setItems(FXCollections.observableArrayList(data.strategies()));
-                    pairCombo.setItems(FXCollections.observableArrayList(data.pairs()));
+                    Platform.runLater(() -> {
+                        if (disposed) {
+                            return;
+                        }
 
-                    if (!strategyCombo.getItems().isEmpty()) {
-                        strategyCombo.getSelectionModel().selectFirst();
-                    }
+                        if (error != null) {
+                            log.error("Failed to load analysis inputs", error);
+                            setStatus("Failed to load analysis inputs");
+                            showAlert("Error", "Failed to load analysis inputs: " + rootMessage(error));
+                            return;
+                        }
 
-                    if (!pairCombo.getItems().isEmpty()) {
-                        pairCombo.getSelectionModel().selectFirst();
-                    }
+                        strategyCombo.setItems(FXCollections.observableArrayList(data.strategies()));
+                        pairCombo.setItems(FXCollections.observableArrayList(data.pairs()));
 
-                    setStatus("Inputs loaded");
-                    updateAnalysis();
-                }));
+                        if (!strategyCombo.getItems().isEmpty()) {
+                            strategyCombo.getSelectionModel().selectFirst();
+                        }
+
+                        if (!pairCombo.getItems().isEmpty()) {
+                            pairCombo.getSelectionModel().selectFirst();
+                        }
+
+                        setStatus("Inputs loaded");
+                        updateAnalysis();
+                    });
+                });
     }
 
     private void updateAnalysis() {
+        if (disposed) {
+            return;
+        }
+
         String strategy = strategyCombo == null ? null : strategyCombo.getValue();
         String pair = pairCombo == null ? null : pairCombo.getValue();
 
@@ -526,33 +558,44 @@ public class AnalysisPanel extends StackPane{
 
         CompletableFuture
                 .supplyAsync(() -> {
-                    // Load live metrics if bot is currently trading, otherwise load backtesting
-                    // results
-                    if (showingLiveMetrics && strategy.equals(currentLiveStrategy) && pair.equals(currentLiveSymbol)) {
+                    if (showingLiveMetrics
+                            && strategy.equals(currentLiveStrategy)
+                            && pair.equals(currentLiveSymbol)) {
                         return liveMetricsToAnalysisSnapshot();
-                    } else {
-                        return dataProvider.loadAnalysis(strategy, pair);
                     }
-                })
-                .whenComplete((snapshot, error) -> Platform.runLater(() -> {
-                    if (error != null) {
-                        log.error("Failed to update analysis", error);
-                        clearAnalysis("Analysis unavailable");
-                        setStatus("Analysis failed");
+
+                    return dataProvider.loadAnalysis(strategy, pair);
+                }, analysisWorker)
+                .whenComplete((snapshot, error) -> {
+                    if (disposed) {
                         return;
                     }
 
-                    currentSnapshot = snapshot == null ? AnalysisSnapshot.empty() : snapshot;
-                    renderSnapshot(currentSnapshot);
-                    setStatus(currentSnapshot.hasRealData()
-                            ? (showingLiveMetrics ? "Live trading metrics loaded" : "Institutional analysis loaded")
-                            : "No completed institutional analysis data found yet");
-                }));
+                    Platform.runLater(() -> {
+                        if (disposed) {
+                            return;
+                        }
+
+                        if (error != null) {
+                            log.error("Failed to update analysis", error);
+                            clearAnalysis("Analysis unavailable");
+                            setStatus("Analysis failed");
+                            return;
+                        }
+
+                        currentSnapshot = snapshot == null ? AnalysisSnapshot.empty() : snapshot;
+                        renderSnapshot(currentSnapshot);
+
+                        setStatus(currentSnapshot.hasRealData()
+                                ? (showingLiveMetrics ? "Live trading metrics loaded" : "Institutional analysis loaded")
+                                : "No completed institutional analysis data found yet");
+                    });
+                });
     }
 
     private void performAnalysis() {
-        String strategy = strategyCombo.getValue();
-        String pair = pairCombo.getValue();
+        String strategy = strategyCombo == null ? null : strategyCombo.getValue();
+        String pair = pairCombo == null ? null : pairCombo.getValue();
 
         if (strategy == null || strategy.isBlank()) {
             showAlert("Missing Strategy", "Please select a strategy.");
@@ -566,7 +609,9 @@ public class AnalysisPanel extends StackPane{
 
         updateAnalysis();
 
-        if (!currentSnapshot.hasRealData()) {
+        AnalysisSnapshot snapshot = currentSnapshot == null ? AnalysisSnapshot.empty() : currentSnapshot;
+
+        if (!snapshot.hasRealData()) {
             showAlert(
                     "Analysis Data Not Found",
                     "No real institutional analysis data was found yet for:\n\nStrategy: "
@@ -1276,102 +1321,176 @@ public class AnalysisPanel extends StackPane{
      * - When bot stops, reverts back to backtesting metrics
      */
     private void startBotStatusMonitoring() {
-        botStatusMonitor.scheduleAtFixedRate(this::updateBotMetricMode, 0, 1, TimeUnit.SECONDS);
+        if (disposed) {
+            return;
+        }
+
+        log.debug("Starting analysis bot status monitor");
+
+        botStatusMonitor.scheduleAtFixedRate(() -> {
+            try {
+                updateBotMetricMode();
+            } catch (Exception exception) {
+                log.debug("Analysis bot status monitor failed", exception);
+            }
+        }, 0, 1, TimeUnit.SECONDS);
     }
 
     private void updateBotMetricMode() {
+        if (disposed) {
+            return;
+        }
+
         boolean isBotRunning = systemCore != null && systemCore.isAutoTradingEnabled();
 
         if (isBotRunning && !wasBotRunning) {
-            Platform.runLater(this::switchToLiveMetrics);
             wasBotRunning = true;
+            Platform.runLater(this::switchToLiveMetrics);
             log.info("Bot started - switching to LIVE trading metrics");
         } else if (!isBotRunning && wasBotRunning) {
-            Platform.runLater(this::switchToBacktestMetrics);
             wasBotRunning = false;
+            Platform.runLater(this::switchToBacktestMetrics);
             log.info("Bot stopped - switching back to BACKTEST metrics");
         }
     }
+
 
     /**
      * Switch to showing LIVE bot trading metrics.
      */
     private void switchToLiveMetrics() {
-        if (showingLiveMetrics)
+        if (disposed || showingLiveMetrics) {
             return;
+        }
+
+        String strategy = strategyCombo == null ? null : strategyCombo.getValue();
+        String symbol = pairCombo == null ? null : pairCombo.getValue();
+
+        if (strategy == null || strategy.isBlank() || symbol == null || symbol.isBlank()) {
+            return;
+        }
 
         showingLiveMetrics = true;
+        currentLiveStrategy = strategy;
+        currentLiveSymbol = symbol;
 
-        // Get currently selected strategy and symbol
-        String strategy = strategyCombo.getValue();
-        String symbol = pairCombo.getValue();
+        modeIndicatorLabel.setText("🤖 LIVE TRADING MODE");
+        modeIndicatorLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-weight: bold; -fx-font-size: 12px;");
+        statusLabel.setText("Live Trading Active");
 
-        if (strategy != null && symbol != null) {
-            currentLiveStrategy = strategy;
-            currentLiveSymbol = symbol;
+        CompletableFuture
+                .supplyAsync(() -> {
+                    try {
+                        if (systemCore == null || systemCore.getExchange() == null) {
+                            return 0.0;
+                        }
 
-            // Initialize live tracking
-            try {
-                liveMetricsTracker.startTracking(
-                        systemCore != null && systemCore.getExchange().fetchAccount()!= null
-                                ? systemCore.getExchange().getUserAccountDetails().getAvailableBalance()
-                                : 0.0);
-            } catch (ExecutionException | InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+                        return systemCore.getExchange()
+                                .getUserAccountDetails()
+                                .getAvailableBalance();
 
-            // Update UI to show live mode
-            modeIndicatorLabel.setText("🤖 LIVE TRADING MODE");
-            modeIndicatorLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-weight: bold; -fx-font-size: 12px;");
-            statusLabel.setText("Live Trading Active");
+                    } catch (Exception exception) {
+                        log.warn("Unable to load live starting balance", exception);
+                        return 0.0;
+                    }
+                }, analysisWorker)
+                .thenAccept(balance -> {
+                    if (disposed) {
+                        return;
+                    }
 
-            // Refresh analysis to show live metrics
-            updateAnalysis();
+                    Platform.runLater(() -> {
+                        if (disposed) {
+                            return;
+                        }
 
-            log.info("Switched to LIVE metrics for {} / {}", strategy, symbol);
-        }
+                        liveMetricsTracker.startTracking(balance);
+                        updateAnalysis();
+
+                        log.info("Switched to LIVE metrics for {} / {}", strategy, symbol);
+                    });
+                });
     }
-
     /**
      * Switch back to showing BACKTEST metrics.
      */
     private void switchToBacktestMetrics() {
-        if (!showingLiveMetrics)
+        if (disposed || !showingLiveMetrics) {
             return;
+        }
 
         showingLiveMetrics = false;
 
-        // Stop live tracking
         liveMetricsTracker.stopTracking();
 
-        // Update UI to show backtest mode
         modeIndicatorLabel.setText("📊 BACKTEST MODE");
         modeIndicatorLabel.setStyle("-fx-text-fill: " + BLUE + "; -fx-font-weight: bold; -fx-font-size: 12px;");
         statusLabel.setText("Ready");
 
-        // Keep the previously selected live strategy/symbol in dropdown
-        // but now display historical backtest results
         if (currentLiveStrategy != null && currentLiveSymbol != null) {
-            strategyCombo.setValue(currentLiveStrategy);
-            pairCombo.setValue(currentLiveSymbol);
+            if (strategyCombo != null) {
+                strategyCombo.setValue(currentLiveStrategy);
+            }
+
+            if (pairCombo != null) {
+                pairCombo.setValue(currentLiveSymbol);
+            }
         }
 
-        // Refresh analysis to show backtest metrics
         updateAnalysis();
 
         log.info("Switched back to BACKTEST metrics");
     }
+    public void dispose() {
+        if (disposed) {
+            return;
+        }
 
+        disposed = true;
+
+        try {
+            liveMetricsTracker.stopTracking();
+        } catch (Exception exception) {
+            log.debug("Failed to stop live metrics tracker", exception);
+        }
+
+        try {
+            botStatusMonitor.shutdownNow();
+            log.debug("Analysis bot status monitor stopped");
+        } catch (Exception exception) {
+            log.debug("Failed to stop analysis bot status monitor", exception);
+        }
+
+        try {
+            analysisWorker.shutdownNow();
+            log.debug("Analysis worker stopped");
+        } catch (Exception exception) {
+            log.debug("Failed to stop analysis worker", exception);
+        }
+
+        clearCharts();
+
+        if (analystNotesArea != null) {
+            analystNotesArea.clear();
+        }
+    }
     /**
      * Set selected strategy and symbol for analysis.
      */
     public void selectStrategyAndSymbol(String strategy, String symbol) {
+        if (disposed) {
+            return;
+        }
+
         if (strategyCombo != null && strategy != null && !strategy.isBlank()) {
             strategyCombo.setValue(strategy);
         }
+
         if (pairCombo != null && symbol != null && !symbol.isBlank()) {
             pairCombo.setValue(symbol);
         }
+
+        updateAnalysis();
     }
 
     /**
@@ -1379,10 +1498,24 @@ public class AnalysisPanel extends StackPane{
      */
     @SuppressWarnings("unused")
     public void recordLiveTrading(String strategy, String symbol, Trade trade) {
-        if (showingLiveMetrics && strategy.equals(currentLiveStrategy) && symbol.equals(currentLiveSymbol)) {
+        if (disposed) {
+            return;
+        }
+
+        if (strategy == null || symbol == null || trade == null) {
+            return;
+        }
+
+        if (showingLiveMetrics
+                && strategy.equals(currentLiveStrategy)
+                && symbol.equals(currentLiveSymbol)) {
             liveMetricsTracker.recordTrade(trade);
-            // Refresh to show updated metrics
-            Platform.runLater(this::updateAnalysis);
+
+            Platform.runLater(() -> {
+                if (!disposed) {
+                    updateAnalysis();
+                }
+            });
         }
     }
 

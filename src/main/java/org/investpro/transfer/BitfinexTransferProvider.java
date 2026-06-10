@@ -1,6 +1,6 @@
 package org.investpro.transfer;
 
-import org.investpro.exchange.Bitfinex;
+import org.investpro.exchange.bitfinex.Bitfinex;
 import org.investpro.models.Account;
 
 import java.math.BigDecimal;

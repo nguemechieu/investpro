@@ -1,6 +1,6 @@
 package org.investpro.transfer;
 
-import org.investpro.exchange.Binance;
+import org.investpro.exchange.binance.Binance;
 import org.investpro.models.Account;
 
 import java.math.BigDecimal;

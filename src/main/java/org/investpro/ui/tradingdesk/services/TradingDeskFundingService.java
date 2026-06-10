@@ -1,8 +1,8 @@
 package org.investpro.ui.tradingdesk.services;
 
-import org.investpro.exchange.Binance;
-import org.investpro.exchange.Bitfinex;
-import org.investpro.exchange.Coinbase;
+import org.investpro.exchange.binance.Binance;
+import org.investpro.exchange.bitfinex.Bitfinex;
+import org.investpro.exchange.coinbase.Coinbase;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
 import org.investpro.transfer.FundingDestinationParser;

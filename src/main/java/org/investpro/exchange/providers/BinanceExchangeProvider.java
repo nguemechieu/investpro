@@ -1,6 +1,6 @@
 package org.investpro.exchange.providers;
 
-import org.investpro.exchange.Binance;
+import org.investpro.exchange.binance.Binance;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.spi.ExchangeProvider;

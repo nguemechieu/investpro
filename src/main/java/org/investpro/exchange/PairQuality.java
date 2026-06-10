@@ -1,5 +1,7 @@
 package org.investpro.exchange;
 
+import org.investpro.exchange.stellar.StellarPairIdentity;
+
 public record PairQuality(
         StellarPairIdentity pair,
         boolean tradeable,

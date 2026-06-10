@@ -2,7 +2,6 @@ package org.investpro.exchange.ibkr;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.exchange.InteractiveBrokers;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.licensing.LicenseManager;

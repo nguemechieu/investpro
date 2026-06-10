@@ -1,9 +1,9 @@
 package org.investpro.transfer;
 
-import org.investpro.exchange.Coinbase;
+import org.investpro.exchange.coinbase.Coinbase;
 import org.investpro.exchange.Exchange;
-import org.investpro.exchange.Binance;
-import org.investpro.exchange.Bitfinex;
+import org.investpro.exchange.binance.Binance;
+import org.investpro.exchange.bitfinex.Bitfinex;
 
 import java.math.BigDecimal;
 import java.time.Instant;

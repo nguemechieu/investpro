@@ -6,10 +6,9 @@ import org.investpro.activity.ActivityCheckpointRepository;
 import org.investpro.activity.ActivityProjectionService;
 import org.investpro.activity.ActivitySyncResult;
 import org.investpro.activity.BrokerActivityRepository;
-import org.investpro.exchange.Coinbase;
+import org.investpro.exchange.coinbase.Coinbase;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j

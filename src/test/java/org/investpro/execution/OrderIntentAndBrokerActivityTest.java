@@ -5,6 +5,7 @@ import org.investpro.broker.events.BrokerActivityType;
 import org.investpro.broker.repository.InMemoryBrokerActivityRepository;
 import org.investpro.decision.BotTradeDecision;
 import org.investpro.decision.BotTradeDecisionEngine;
+import org.investpro.exchange.stellar.OrderIntent;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;

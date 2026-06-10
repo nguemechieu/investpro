@@ -1,9 +1,9 @@
 package org.investpro.terminal.adapter;
 
 import org.investpro.exchange.PairQuality;
-import org.investpro.exchange.StellarAssetIdentity;
-import org.investpro.exchange.StellarNetwork;
-import org.investpro.exchange.StellarPairIdentity;
+import org.investpro.exchange.stellar.StellarAssetIdentity;
+import org.investpro.exchange.stellar.StellarNetwork;
+import org.investpro.exchange.stellar.StellarPairIdentity;
 import org.investpro.models.trading.TradePair;
 import org.investpro.terminal.domain.Asset;
 import org.investpro.terminal.domain.AssetClass;

@@ -2935,11 +2935,16 @@ public class CandleStickChart extends Region {
         if (data.isEmpty())
             return;
 
+        int previousFirstVisibleIndex = firstVisibleIndex;
         firstVisibleIndex = clampInt(firstVisibleIndex + candles, 0, Math.max(0, data.size() - visibleCandles));
 
         // Provide visual feedback when reaching boundaries
         if (candles < 0 && firstVisibleIndex == 0) {
-            showTransientNotice("📍 Reached oldest data");
+            if (previousFirstVisibleIndex == 0) {
+                requestPreviousCandlesPage();
+            } else {
+                showTransientNotice("📍 Reached oldest data");
+            }
         } else if (candles > 0 && firstVisibleIndex >= Math.max(0, data.size() - visibleCandles)) {
             showTransientNotice("📍 Reached latest data");
         }
@@ -2951,6 +2956,58 @@ public class CandleStickChart extends Region {
         updateXAxisBoundsFromVisibleWindow();
         recomputeVisiblePriceRange();
         drawChartContents(true);
+    }
+
+    private void requestPreviousCandlesPage() {
+        if (disposed || paging) {
+            return;
+        }
+
+        paging = true;
+        showLoadingStatus("Loading older candles...");
+
+        CandleDataSupplier supplier = candleDataPager.getCandleDataSupplier();
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                Future<List<CandleData>> previousFuture = supplier.getPrevious();
+                if (previousFuture == null) {
+                    return List.<CandleData>of();
+                }
+                return previousFuture.get(30, TimeUnit.SECONDS);
+            } catch (Exception exception) {
+                log.debug("Failed to load previous candles for {}", tradePair, exception);
+                return List.<CandleData>of();
+            }
+        }, chartLoadingExecutor).whenComplete((candles, throwable) -> runOnFx(() -> {
+            paging = false;
+            hideLoadingIndicator();
+
+            if (disposed) {
+                return;
+            }
+
+            if (throwable != null) {
+                showTransientNotice("Unable to load older candles");
+                return;
+            }
+
+            if (candles == null || candles.isEmpty()) {
+                showTransientNotice("📍 Reached oldest data");
+                return;
+            }
+
+            int beforeSize = data.size();
+            mergeCandles(candles);
+            int added = Math.max(0, data.size() - beforeSize);
+            if (added <= 0) {
+                showTransientNotice("📍 Reached oldest data");
+                return;
+            }
+
+            firstVisibleIndex = 0;
+            updateScrollPositionText();
+            showTransientNotice("Loaded " + added + " older candles");
+        }));
     }
 
     private void updateScrollPositionText() {

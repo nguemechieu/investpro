@@ -2,7 +2,7 @@ package org.investpro.exchange.solona;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.investpro.exchange.StellarNetwork;
+import org.investpro.exchange.stellar.StellarNetwork;
 
 /**
  * Root exception for all Solona network adapter errors.

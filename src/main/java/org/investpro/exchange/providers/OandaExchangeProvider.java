@@ -1,7 +1,7 @@
 package org.investpro.exchange.providers;
 
 import org.investpro.exchange.Exchange;
-import org.investpro.exchange.Oanda;
+import org.investpro.exchange.oanda.Oanda;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.spi.ExchangeProvider;
 import org.investpro.spi.ExchangeProviderContext;

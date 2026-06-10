@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.SystemCore;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.core.agents.symbol.SymbolAgentState;
+import org.investpro.exchange.coinbase.Coinbase;
 import org.investpro.models.market.MarketInstrument;
 import org.investpro.models.trading.TradePair;
 import org.investpro.trading.market.MarketInstrumentService;
@@ -112,7 +113,7 @@ public class MarketWatchPanel extends StackPane {
         }
 
         if (systemCore != null && systemCore.getExchange() != null) {
-            if (systemCore.getExchange() instanceof org.investpro.exchange.Coinbase coinbase) {
+            if (systemCore.getExchange() instanceof Coinbase coinbase) {
                 return new org.investpro.trading.tradability.CoinbaseTradabilityService(coinbase);
             }
             return new ExchangeTradabilityProvider(systemCore.getExchange(),

@@ -9,7 +9,7 @@ import org.investpro.activity.ActivityProjectionService;
 import org.investpro.activity.ActivitySyncResult;
 import org.investpro.activity.BrokerActivityEvent;
 import org.investpro.activity.BrokerActivityRepository;
-import org.investpro.exchange.Oanda;
+import org.investpro.exchange.oanda.Oanda;
 
 import java.net.URI;
 import java.net.http.HttpClient;

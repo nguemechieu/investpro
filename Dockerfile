@@ -1,7 +1,7 @@
 # ============================================================
 # Build stage
 # ============================================================
-FROM maven:3.9.6-eclipse-temurin-21 AS build
+FROM maven:3.9.7-eclipse-temurin-21 AS build
 
 WORKDIR /build
 
@@ -16,7 +16,9 @@ RUN mvn -B -Dmaven.test.skip=true clean package
 # Runtime stage
 # Java 21 + JavaFX desktop runtime + noVNC
 # ============================================================
-FROM eclipse-temurin:21-jdk
+FROM eclipse-temurin:21-jdk-alpine
+
+RUN apk add --no-cache ca-certificates openssl
 
 ENV DEBIAN_FRONTEND=noninteractive \
     APP_HOME=/app \

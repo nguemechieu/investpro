@@ -15,7 +15,6 @@ import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
 
-
 public abstract class CandleDataSupplier implements Supplier<Future<List<CandleData>>> {
     /**
      * The number of candles supplied per call to {@link #get()}.
@@ -35,7 +34,8 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
             throw new IllegalArgumentException("numCandles must be positive but was: %d".formatted(numCandles));
         }
         if (secondsPerCandle <= 0) {
-            throw new IllegalArgumentException("secondsPerCandle must be positive but was: %d".formatted(secondsPerCandle));
+            throw new IllegalArgumentException(
+                    "secondsPerCandle must be positive but was: %d".formatted(secondsPerCandle));
         }
         this.numCandles = numCandles;
         this.secondsPerCandle = secondsPerCandle;
@@ -49,7 +49,8 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
 
     @Override
     public String toString() {
-        return "CandleDataSupplier [numCandles=%d, secondsPerCandle=%d, tradePair=%s, endTime=%s]".formatted(numCandles, secondsPerCandle, tradePair, endTime);
+        return "CandleDataSupplier [numCandles=%d, secondsPerCandle=%d, tradePair=%s, endTime=%s]".formatted(numCandles,
+                secondsPerCandle, tradePair, endTime);
     }
 
     @Override
@@ -73,6 +74,14 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
     }
 
     public abstract List<CandleData> getCandleData();
+
+    public List<CandleData> getPreviousCandleData() {
+        return List.of();
+    }
+
+    public Future<List<CandleData>> getPrevious() {
+        return CompletableFuture.completedFuture(List.of());
+    }
 
     public abstract CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair);
 

@@ -6,7 +6,7 @@ import org.investpro.activity.ActivityCheckpointRepository;
 import org.investpro.activity.ActivityProjectionService;
 import org.investpro.activity.ActivitySyncResult;
 import org.investpro.activity.BrokerActivityRepository;
-import org.investpro.exchange.BinanceUs;
+import org.investpro.exchange.binanceus.BinanceUs;
 
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
