@@ -1,12 +1,13 @@
 package org.investpro.exchange.ibkr;
 
-import java.time.Instant;
-import java.util.List;
+
+import lombok.Setter;
 
 public final class TwsIbkrBrokerConnection implements IbkrBrokerConnection {
 
     private final IbkrConnectionManager connectionManager;
-    private volatile IbkrSessionState sessionState = IbkrSessionState.disconnected(
+    @Setter
+    volatile IbkrSessionState sessionState = IbkrSessionState.disconnected(
             IbkrConnectionProfile.twsPaper(),
             "TWS or IB Gateway is not connected.");
 
@@ -18,22 +19,7 @@ public final class TwsIbkrBrokerConnection implements IbkrBrokerConnection {
     public void connect(IbkrConnectionProfile profile) {
         IbkrConnectionProfile safe = profile == null ? IbkrConnectionProfile.twsPaper() : profile;
         connectionManager.connect(safe);
-        sessionState = new IbkrSessionState(
-                IbkrConnectionMode.TWS_API,
-                safe.host(),
-                safe.port(),
-                safe.clientId(),
-                safe.paper(),
-                true,
-                true,
-                true,
-                true,
-                connectionManager.isMarketDataAvailable(),
-                false,
-                safe.paper(),
-                "Connected to TWS / IB Gateway. Orderbook permission is evaluated separately.",
-                Instant.now(),
-                List.of("IBKR-" + (safe.paper() ? "PAPER" : "LIVE")));
+        sessionState = connectionManager.getTwsSession().state();
     }
 
     @Override
@@ -44,7 +30,7 @@ public final class TwsIbkrBrokerConnection implements IbkrBrokerConnection {
 
     @Override
     public IbkrSessionState getSessionState() {
-        return sessionState;
+        return connectionManager.getTwsSession().state();
     }
 
     @Override
@@ -66,4 +52,5 @@ public final class TwsIbkrBrokerConnection implements IbkrBrokerConnection {
     public boolean supportsOrderPlacement() {
         return true;
     }
+
 }

@@ -1,7 +1,12 @@
 # ============================================================
 # Build stage
 # ============================================================
-FROM maven:3.9.7-eclipse-temurin-21 AS build
+FROM maven:3.9.7-eclipse-temurin-21 AS maven
+FROM eclipse-temurin:27-jdk AS build
+
+COPY --from=maven /usr/share/maven /usr/share/maven
+ENV MAVEN_HOME=/usr/share/maven
+ENV PATH="${MAVEN_HOME}/bin:${PATH}"
 
 WORKDIR /build
 
@@ -14,9 +19,9 @@ RUN mvn -B -Dmaven.test.skip=true clean package
 
 # ============================================================
 # Runtime stage
-# Java 21 + JavaFX desktop runtime + noVNC
+# Java 27 + JavaFX desktop runtime + noVNC
 # ============================================================
-FROM eclipse-temurin:21-jdk
+FROM eclipse-temurin:27-jdk
 
 ENV DEBIAN_FRONTEND=noninteractive \
     APP_HOME=/app \

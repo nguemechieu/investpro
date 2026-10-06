@@ -1,0 +1,8 @@
+[2026-05-04] Forex Analysis - Dollar weakens amid rate cut expectations
+
+ Market snapshot[2026-05-04] Forex Analysis - Dollar weakens amid rate cut expectations:
+Sentiment: Strong Bearish
+Sentiment index: 30
+Trading volume: N/A (24h)
+Active symbol: USD/ZAR
+Data source: live/cache

@@ -1,6 +1,8 @@
 # InvestPro - UML Class Diagrams
 
-**Last Updated**: May 2026  
+> Current documentation baseline (2026-10-05): JDK 27, JavaFX 27 and Maven 3.8.5+. Use the [documentation index](docs/README.md) for current setup, trading-desk behavior, Telegram commands and release limits. Design examples below are not proof of broker support or deployment verification.
+
+**Last Updated**: 2026-10-05
 **Version**: 1.0
 
 ---
@@ -881,6 +883,6 @@ org.investpro
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: May 2026  
+**Version**: 1.0
+**Last Updated**: 2026-10-05
 **Document Status**: Complete & Production Ready

@@ -11,17 +11,17 @@ public final class AssetCatalogRuntime {
     private static final AssetCatalogRuntime INSTANCE = new AssetCatalogRuntime();
 
     private final List<Consumer<AssetCatalogEvent>> listeners = new CopyOnWriteArrayList<>();
-    private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(2, runnable -> {
-        Thread thread = new Thread(runnable, "asset-catalog-refresh");
-        thread.setDaemon(true);
-        return thread;
-    });
-    private final LocalAssetRepository repository = new SqliteLocalAssetRepository(Path.of("data", "asset-catalog.db"));
     private final AssetCatalogService service;
 
     private AssetCatalogRuntime() {
         AssetCatalogMergeService mergeService = new AssetCatalogMergeService();
+        ScheduledExecutorService executor = Executors.newScheduledThreadPool(2, runnable -> {
+            Thread thread = new Thread(runnable, "asset-catalog-refresh");
+            thread.setDaemon(true);
+            return thread;
+        });
         ExchangeAssetDiscoveryService discoveryService = new DefaultExchangeAssetDiscoveryService(executor);
+        LocalAssetRepository repository = new SqliteLocalAssetRepository(Path.of("data", "asset-catalog.db"));
         AssetRefreshScheduler scheduler = new AssetRefreshScheduler(
                 repository,
                 discoveryService,

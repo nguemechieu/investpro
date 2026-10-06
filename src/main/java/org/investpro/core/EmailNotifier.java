@@ -119,10 +119,10 @@ public record EmailNotifier(
         }
     }
 
-    public boolean sendHtml(String subject, String htmlBody) {
+    public void sendHtml(String subject, String htmlBody) {
         if (!isEnabled()) {
             log.debug("HTML email notification skipped because EmailNotifier is not configured.");
-            return false;
+            return;
         }
 
         try {
@@ -132,23 +132,21 @@ public record EmailNotifier(
             Transport.send(email);
 
             log.info("HTML EMAIL notification sent to={} from={} subject={}", toEmail, fromEmail, subject);
-            return true;
         } catch (Exception exception) {
             log.warn("HTML email notification failed: {}", exception.getMessage(), exception);
-            return false;
         }
     }
 
-    public boolean sendSmartBotAlert(String title, String body) {
-        return sendHtml(title, alertHtml("INFO", title, body));
+    public void sendSmartBotAlert(String title, String body) {
+        sendHtml(title, alertHtml("INFO", title, body));
     }
 
-    public boolean sendTradeAlert(String title, String body) {
-        return sendHtml(title, alertHtml("TRADE", title, body));
+    public void sendTradeAlert(String title, String body) {
+        sendHtml(title, alertHtml("TRADE", title, body));
     }
 
-    public boolean sendErrorAlert(String title, String body) {
-        return sendHtml(title, alertHtml("ERROR", title, body));
+    public void sendErrorAlert(String title, String body) {
+        sendHtml(title, alertHtml("ERROR", title, body));
     }
 
     private MimeMessage createBaseMessage(String subject) throws MessagingException {

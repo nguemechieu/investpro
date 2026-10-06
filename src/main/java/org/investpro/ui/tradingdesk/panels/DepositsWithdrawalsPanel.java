@@ -28,7 +28,6 @@ import org.investpro.ui.tradingdesk.services.TradingDeskFundingService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,7 +39,7 @@ public final class DepositsWithdrawalsPanel extends VBox {
 
     private static final DateTimeFormatter REQUEST_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    private final TradingDeskContext context;
+     TradingDeskContext context;
     private final TradingDeskState state;
     private final TradingDeskFundingService fundingService;
     private final Consumer<String> journal;
@@ -337,7 +336,7 @@ public final class DepositsWithdrawalsPanel extends VBox {
                 "Pending",
                 pendingReference);
 
-        fundingRows.add(0, pending);
+        fundingRows.addFirst(pending);
 
         submitButton.disableProperty().unbind();
         submitButton.setDisable(true);

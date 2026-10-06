@@ -45,13 +45,17 @@ public class DepthChart extends VBox {
         
         // Resize canvas when container resizes with a delayed redraw
         this.widthProperty().addListener((obs, oldVal, newVal) -> {
-            double newWidth = Math.max(100, newVal.doubleValue());
+            javafx.stage.Window window = getScene() == null ? null : getScene().getWindow();
+            double newWidth = CanvasSizeLimits.limit(Math.max(100, newVal.doubleValue()), 800,
+                    window == null ? 1 : window.getRenderScaleX());
             canvas.setWidth(newWidth);
             Platform.runLater(this::redraw);
         });
         
         this.heightProperty().addListener((obs, oldVal, newVal) -> {
-            double newHeight = Math.max(100, newVal.doubleValue());
+            javafx.stage.Window window = getScene() == null ? null : getScene().getWindow();
+            double newHeight = CanvasSizeLimits.limit(Math.max(100, newVal.doubleValue()), 400,
+                    window == null ? 1 : window.getRenderScaleY());
             canvas.setHeight(newHeight);
             Platform.runLater(this::redraw);
         });

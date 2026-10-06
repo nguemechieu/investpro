@@ -1,0 +1,22 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.exchange.coinbase.CoinbaseRestDiscoveryTest
+-------------------------------------------------------------------------------
+Tests run: 3, Failures: 0, Errors: 2, Skipped: 0, Time elapsed: 0.941 s <<< FAILURE! -- in org.investpro.exchange.coinbase.CoinbaseRestDiscoveryTest
+org.investpro.exchange.coinbase.CoinbaseRestDiscoveryTest.publicSpotSurvives401 -- Time elapsed: 0.921 s <<< ERROR!
+java.lang.NoSuchMethodException: org.investpro.exchange.coinbase.Coinbase.fetchCoinbaseProductsRoot(boolean)
+	at java.base/java.lang.Class.getDeclaredMethod(Class.java:2426)
+	at org.investpro.exchange.coinbase.CoinbaseRestDiscoveryTest.verifyPrivateDiscoveryDenial(CoinbaseRestDiscoveryTest.java:58)
+	at org.investpro.exchange.coinbase.CoinbaseRestDiscoveryTest.publicSpotSurvives401(CoinbaseRestDiscoveryTest.java:34)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:583)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+
+org.investpro.exchange.coinbase.CoinbaseRestDiscoveryTest.publicSpotSurvives403 -- Time elapsed: 0.013 s <<< ERROR!
+java.lang.NoSuchMethodException: org.investpro.exchange.coinbase.Coinbase.fetchCoinbaseProductsRoot(boolean)
+	at java.base/java.lang.Class.getDeclaredMethod(Class.java:2426)
+	at org.investpro.exchange.coinbase.CoinbaseRestDiscoveryTest.verifyPrivateDiscoveryDenial(CoinbaseRestDiscoveryTest.java:58)
+	at org.investpro.exchange.coinbase.CoinbaseRestDiscoveryTest.publicSpotSurvives403(CoinbaseRestDiscoveryTest.java:37)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:583)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+

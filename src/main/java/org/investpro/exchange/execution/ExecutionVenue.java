@@ -1,5 +1,7 @@
 package org.investpro.exchange.execution;
 
+import lombok.Getter;
+
 /**
  * Categorizes the execution venue for a trade request.
  *
@@ -7,6 +9,7 @@ package org.investpro.exchange.execution;
  * appropriate venue based on the instrument, capability profile, and execution
  * constraints in the {@link ExecutionRequest}.
  */
+@Getter
 public enum ExecutionVenue {
 
     /** Traditional centralized exchange (Coinbase, Binance, Bitfinex, etc.). */
@@ -27,11 +30,20 @@ public enum ExecutionVenue {
     /** Backtesting or simulation mode — purely in-memory, no network calls. */
     SIMULATED(false, false, "Simulation");
 
-    /** True if real funds are involved. */
+    /** True if real funds are involved.
+     * -- GETTER --
+     * Returns true if execution involves real financial risk.
+     */
     public final boolean realFunds;
-    /** True if execution requires on-chain transaction signing. */
+    /** True if execution requires on-chain transaction signing.
+     * -- GETTER --
+     * Returns true if on-chain signing is required.
+     */
     public final boolean onChain;
-    /** Human-readable display name. */
+    /** Human-readable display name.
+     * -- GETTER --
+     * Returns the human-readable display name.
+     */
     public final String displayName;
 
     ExecutionVenue(boolean realFunds, boolean onChain, String displayName) {
@@ -40,12 +52,4 @@ public enum ExecutionVenue {
         this.displayName = displayName;
     }
 
-    /** Returns true if execution involves real financial risk. */
-    public boolean isRealFunds() { return realFunds; }
-
-    /** Returns true if on-chain signing is required. */
-    public boolean isOnChain() { return onChain; }
-
-    /** Returns the human-readable display name. */
-    public String getDisplayName() { return displayName; }
 }

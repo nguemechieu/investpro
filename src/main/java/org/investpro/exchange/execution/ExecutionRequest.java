@@ -1,7 +1,9 @@
 package org.investpro.exchange.execution;
 
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -57,17 +59,10 @@ public record ExecutionRequest(
     /** Returns the limit price if this is a limit order. */
     public Optional<BigDecimal> getLimitPrice() { return Optional.ofNullable(limitPrice); }
 
-    /** Returns true if this is a market order. */
-    public boolean isMarketOrder() { return limitPrice == null; }
 
     /** Returns the preferred exchange name if specified. */
     public Optional<String> getPreferredExchange() { return Optional.ofNullable(preferredExchange); }
 
-    /** Returns the max slippage constraint if specified. */
-    public Optional<BigDecimal> getMaxSlippageBps() { return Optional.ofNullable(maxSlippageBps); }
-
-    /** Returns the max fee constraint if specified. */
-    public Optional<BigDecimal> getMaxFeeBps() { return Optional.ofNullable(maxFeeBps); }
 
     // ── Builder ─────────────────────────────────────────────────────────────────
 
@@ -89,9 +84,9 @@ public record ExecutionRequest(
         private ExecutionVenue preferredVenue = ExecutionVenue.CENTRALIZED;
         private boolean allowFallback = true;
         private String preferredExchange;
-        private BigDecimal maxSlippageBps;
-        private BigDecimal maxFeeBps;
-        private boolean paperMode = false;
+        BigDecimal maxSlippageBps;
+         BigDecimal maxFeeBps;
+         boolean paperMode ;
 
         private Builder(String symbol, Side side, BigDecimal quantity) {
             this.symbol = symbol;
@@ -103,11 +98,9 @@ public record ExecutionRequest(
         public Builder venue(ExecutionVenue v) { this.preferredVenue = v; return this; }
         public Builder allowFallback(boolean allow) { this.allowFallback = allow; return this; }
         public Builder exchange(String name) { this.preferredExchange = name; return this; }
-        public Builder maxSlippageBps(BigDecimal bps) { this.maxSlippageBps = bps; return this; }
-        public Builder maxFeeBps(BigDecimal bps) { this.maxFeeBps = bps; return this; }
-        public Builder paperMode(boolean paper) { this.paperMode = paper; return this; }
 
-        public ExecutionRequest build() {
+        @Contract(" -> new")
+        public @NonNull ExecutionRequest build() {
             return new ExecutionRequest(
                     UUID.randomUUID().toString(),
                     symbol, side, quantity, limitPrice,

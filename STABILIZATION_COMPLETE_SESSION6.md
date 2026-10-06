@@ -1,5 +1,7 @@
 # InvestPro Stabilization & Architecture Consolidation - COMPLETION SUMMARY
 
+> Historical report: retained for its original revision. Java versions, test counts, completion claims and code examples below are historical, not current setup or release evidence. For the JDK 27 / JavaFX 27 baseline, use the [project README](README.md) and [documentation index](docs/README.md). Classified on 2026-10-05.
+
 **Session Date:** May 7, 2026  
 **Project:** InvestPro / InvestPro Trading Platform  
 **Status:** ✅ PHASE 1 & 2 COMPLETE - Foundation Stabilized

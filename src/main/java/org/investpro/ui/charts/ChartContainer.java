@@ -8,7 +8,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.Parent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -16,7 +15,6 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -37,6 +35,7 @@ import org.investpro.service.TradingService;
 import org.investpro.ui.tools.ChartToolbar;
 import org.investpro.ui.utils.CurrencyIconLoader;
 import org.investpro.utils.CandleDataSupplier;
+import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,7 +44,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.function.Consumer;
 
-@EqualsAndHashCode(callSuper = true)
 @Slf4j
 @Getter
 @ToString
@@ -59,11 +57,14 @@ public class ChartContainer extends Region {
     private final String telegramToken;
     private final TradingService tradingService;
     private final SimpleIntegerProperty secondsPerCandle = new SimpleIntegerProperty(DEFAULT_SECONDS_PER_CANDLE);
+    private final javafx.scene.control.ComboBox<Integer> timeframeSelector = new javafx.scene.control.ComboBox<>();
 
     private final VBox candleChartContainer = new VBox();
     private final ChartToolbar toolbar;
 
     private CandleStickChart candleStickChart;
+    private FadeTransition chartFade;
+    private boolean disposed;
     @Setter
     private Consumer<String> onChartError;
     private Consumer<CandleData> candleSelectionCallback;
@@ -90,7 +91,8 @@ public class ChartContainer extends Region {
 
         getStyleClass().add("candle-chart-container");
         setMinSize(360, 320);
-        setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        setPrefSize(1000, 700);
+        setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         setStyle("""
                 -fx-background-color: #060a12;
                 -fx-border-color: rgba(51, 65, 85, 0.85);
@@ -102,6 +104,22 @@ public class ChartContainer extends Region {
                 ? initialSupplier.getSupportedGranularities()
                 : Set.of(60, 300, 900, 3600, 14400, 86400,6*3600,(24*3600*7)); // sensible defaults when exchange has no candle data
         toolbar = new ChartToolbar(widthProperty(), heightProperty(), granularities);
+        timeframeSelector.getItems().setAll(granularities.stream().filter(value -> value != null && value > 0).sorted().toList());
+        if (!timeframeSelector.getItems().isEmpty() && !timeframeSelector.getItems().contains(secondsPerCandle.get())) {
+            secondsPerCandle.set(timeframeSelector.getItems().getFirst());
+        }
+        timeframeSelector.setConverter(new javafx.util.StringConverter<>() {
+            @Override public String toString(Integer seconds) {
+                if (seconds == null) return "";
+                try { return org.investpro.enums.timeframe.Timeframe.fromSeconds(seconds).getDisplayName(); }
+                catch (IllegalArgumentException ignored) { return seconds + " seconds"; }
+            }
+            @Override public Integer fromString(String value) { throw new UnsupportedOperationException(); }
+        });
+        timeframeSelector.setPrefWidth(135);
+        timeframeSelector.setTooltip(new Tooltip("Choose the candle timeframe for this chart"));
+        timeframeSelector.setValue(secondsPerCandle.get());
+        timeframeSelector.setOnAction(event -> setSecondsPerCandle(timeframeSelector.getValue()));
 
         VBox toolbarContainer = getVBox();
         AnchorPane.setTopAnchor(toolbarContainer, 0.0);
@@ -124,6 +142,7 @@ public class ChartContainer extends Region {
         rebuildChart(secondsPerCandle.get(), false);
         secondsPerCandle.addListener((observable, oldValue, newValue) -> {
             if (!Objects.equals(oldValue, newValue)) {
+                timeframeSelector.setValue(newValue.intValue());
                 rebuildChart(newValue.intValue(), true);
             }
         });
@@ -132,7 +151,7 @@ public class ChartContainer extends Region {
     private VBox getVBox() {
         HBox actionBar = new HBox(6);
         actionBar.setAlignment(Pos.CENTER_RIGHT);
-        actionBar.getChildren().setAll(
+        actionBar.getChildren().setAll(timeframeSelector,
                 chartActionButton("Refresh", "/img/refresh-solid.png",
                         () -> withChart(CandleStickChart::refreshChart)));
 
@@ -141,7 +160,7 @@ public class ChartContainer extends Region {
         HBox.setHgrow(toolbar, Priority.ALWAYS);
 
         VBox toolbarContainer = new VBox(header);
-        toolbarContainer.setPadding(new Insets(8, 14, 4, 82));
+        toolbarContainer.setPadding(new Insets(8, 10, 4, 10));
         toolbarContainer.setMinHeight(48);
         toolbarContainer.setPrefHeight(52);
         toolbarContainer.setMaxHeight(60);
@@ -153,8 +172,8 @@ public class ChartContainer extends Region {
         return toolbarContainer;
     }
 
-    private Button chartActionButton(String tooltip, String iconPath, Runnable action) {
-        Button button = new Button();
+    private @NonNull Button chartActionButton(String tooltip, String iconPath, Runnable action) {
+        Button button = new Button("");
         button.setTooltip(new Tooltip(tooltip));
         ImageView icon = loadIcon(iconPath);
         if (icon == null) {
@@ -205,8 +224,16 @@ public class ChartContainer extends Region {
     }
 
     public void setSecondsPerCandle(int seconds) {
+        if (!javafx.application.Platform.isFxApplicationThread()) {
+            javafx.application.Platform.runLater(() -> setSecondsPerCandle(seconds));
+            return;
+        }
         if (seconds <= 0) {
             reportError("Invalid candle duration: " + seconds);
+            return;
+        }
+        if (!timeframeSelector.getItems().isEmpty() && !timeframeSelector.getItems().contains(seconds)) {
+            reportError("This exchange does not support a " + seconds + " second candle timeframe.");
             return;
         }
         secondsPerCandle.set(seconds);
@@ -226,18 +253,26 @@ public class ChartContainer extends Region {
     }
 
     public void dispose() {
+        if (!javafx.application.Platform.isFxApplicationThread()) {
+            javafx.application.Platform.runLater(this::dispose);
+            return;
+        }
+        if (disposed) return;
+        disposed = true;
+        stopChartFade();
+        candleChartContainer.getChildren().clear();
         if (candleStickChart != null) {
             candleStickChart.dispose();
             candleStickChart = null;
         }
-        Parent parent = candleChartContainer.getParent();
-        if (parent instanceof VBox && parent == candleChartContainer) {
-            candleChartContainer.setVisible(false);
-            candleChartContainer.setManaged(false);
-        }
     }
 
     private void rebuildChart(int durationSeconds, boolean animate) {
+        if (disposed) return;
+        if (!exchange.getCapability().isSupportsHistoricalCandles()) {
+            reportError("Historical candle data is not available in the " + exchange.getName() + " adapter.");
+            return;
+        }
         try {
             CandleStickChart nextChart = createChart(durationSeconds);
             applyChartBindings(nextChart);
@@ -295,36 +330,30 @@ public class ChartContainer extends Region {
     }
 
     private void showChart(CandleStickChart nextChart, boolean animate) {
+        stopChartFade();
         CandleStickChart previousChart = candleStickChart;
+        // Remove the old node before disposal can mutate its chart state.
+        candleChartContainer.getChildren().setAll(nextChart);
         candleStickChart = nextChart;
+        if (previousChart != null && previousChart != nextChart) previousChart.dispose();
+        if (animate) fadeIn(nextChart);
+        else nextChart.setOpacity(1.0);
+    }
 
-        if (!animate || previousChart == null) {
-            if (previousChart != null) {
-                previousChart.dispose();
-            }
-            candleChartContainer.getChildren().setAll(nextChart);
-            fadeIn(nextChart);
-            return;
+    private void stopChartFade() {
+        if (chartFade != null) {
+            chartFade.stop();
+            chartFade.setOnFinished(null);
+            chartFade = null;
         }
-
-        FadeTransition fadeOut = new FadeTransition(CHART_FADE_DURATION, previousChart);
-        fadeOut.setFromValue(previousChart.getOpacity());
-        fadeOut.setToValue(0.0);
-        fadeOut.setOnFinished(event -> {
-            previousChart.dispose();
-            candleChartContainer.getChildren().clear();
-            candleChartContainer.getChildren().setAll(nextChart);
-            fadeIn(nextChart);
-        });
-        fadeOut.play();
     }
 
     private void fadeIn(CandleStickChart chart) {
         chart.setOpacity(0.0);
-        FadeTransition fadeIn = new FadeTransition(CHART_FADE_DURATION, chart);
-        fadeIn.setFromValue(0.0);
-        fadeIn.setToValue(1.0);
-        fadeIn.play();
+        chartFade = new FadeTransition(CHART_FADE_DURATION, chart);
+        chartFade.setFromValue(0.0);
+        chartFade.setToValue(1.0);
+        chartFade.play();
     }
 
     private TradingService createFallbackTradingService(Exchange exchange, String telegramToken) {

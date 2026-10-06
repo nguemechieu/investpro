@@ -74,8 +74,6 @@ public class MarketDataNormalizationLayer {
             double last,
             double volume
     ) {
-        double mid = (bid > 0 && ask > 0) ? (bid + ask) / 2.0 : Math.max(bid, ask);
-        double spreadBps = NormalizedMarketSnapshot.computeSpreadBps(bid, ask);
 
         // Build via fromTicker-equivalent using a synthetic Ticker
         Ticker synthetic = new Ticker(last, bid, ask, volume, System.currentTimeMillis());

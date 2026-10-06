@@ -9,22 +9,17 @@ import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.security.AlgorithmParameters;
 import java.security.KeyFactory;
-import java.security.PrivateKey;
-import java.security.Signature;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPrivateKeySpec;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.time.Instant;
 import java.util.Base64;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -55,11 +50,6 @@ public final class CoinbaseAuthProvider {
     private static final Pattern PEM_FOOTER_RE = Pattern.compile("-----END [A-Z ]+-----");
     private static final Pattern BASE64_BODY_RE = Pattern.compile("^[A-Za-z0-9+/=]+$");
 
-    private static final Base64.Encoder BASE64_URL_ENCODER =
-            Base64.getUrlEncoder().withoutPadding();
-
-    private static final String COINBASE_ISSUER = "cdp";
-    private static final long DEFAULT_JWT_TTL_SECONDS = 120L;
 
     private static final String[] API_KEY_FIELDS = {
             "apiKeyName", "api_key_name", "apiKeyId", "api_key_id", "keyId", "key_id",
@@ -69,8 +59,6 @@ public final class CoinbaseAuthProvider {
     private static final String[] SECRET_FIELDS = {
             "privateKey", "private_key", "privatePem", "private_pem", "secret"
     };
-    private static byte[] derSignature;
-    private static int outputLength;
 
     private final @Nullable String apiKeyName;
     private final @Nullable String apiSecret;
@@ -98,17 +86,11 @@ public final class CoinbaseAuthProvider {
         this.apiSecret = credentials.secret();
     }
 
-    public @Nullable String apiKeyName() {
-        return apiKeyName;
-    }
-
     public @Nullable String apiSecret() {
         return apiSecret;
     }
 
-    public @Nullable String maskedKeyId() {
-        return maskedKeyId(apiKeyName);
-    }
+
 
     public static @NotNull Credentials normalize(String apiKeyInput, String secretInput, String auxiliaryInput) {
         Map<String, String> parsed = parsePayloads(apiKeyInput, secretInput, auxiliaryInput);
@@ -179,19 +161,7 @@ public final class CoinbaseAuthProvider {
         );
     }
 
-    public static @Nullable String maskedKeyId(String apiKey) {
-        String text = stripWrappedQuotes(apiKey);
 
-        if (text.isBlank()) {
-            return null;
-        }
-
-        if (text.length() <= 14) {
-            return text;
-        }
-
-        return "%s...%s".formatted(text.substring(0, 8), text.substring(text.length() - 6));
-    }
 
     public static @Nullable String normalizeApiKey(String value) {
         String normalized = stripWrappedQuotes(value);
@@ -257,87 +227,6 @@ public final class CoinbaseAuthProvider {
         return validationError(apiKeyName, apiSecret, null) == null;
     }
 
-    /**
-     * Generates a Coinbase WebSocket JWT.
-     * <p>
-     * WebSocket tokens usually do not require a request URI claim.
-     */
-    public String generateWebSocketToken() {
-        return generateJwt(null);
-    }
-
-    /**
-     * Generates a Coinbase REST JWT with a URI claim.
-     * <p>
-     * Example:
-     * generateRestToken("GET", "api.coinbase.com", "/api/v3/brokerage/accounts")
-     */
-    public String generateRestToken(String method, String host, String path) {
-        String cleanMethod = String.valueOf(method).trim().toUpperCase(Locale.ROOT);
-        String cleanHost = String.valueOf(host).trim();
-        String cleanPath = String.valueOf(path).trim();
-
-        if (cleanMethod.isBlank()) {
-            throw new IllegalArgumentException("Coinbase REST JWT method is required.");
-        }
-
-        if (cleanHost.isBlank()) {
-            throw new IllegalArgumentException("Coinbase REST JWT host is required.");
-        }
-
-        if (cleanPath.isBlank()) {
-            cleanPath = "/";
-        }
-
-        String uri = cleanMethod + " " + cleanHost + cleanPath;
-        return generateJwt(uri);
-    }
-
-    private String generateJwt(@Nullable String uri) {
-        String error = validationError(apiKeyName, apiSecret, null);
-
-        if (error != null) {
-            throw new IllegalStateException(error);
-        }
-
-        try {
-            PrivateKey privateKey = parseEcPrivateKey(apiSecret);
-
-            long now = Instant.now().getEpochSecond();
-            long exp = now + DEFAULT_JWT_TTL_SECONDS;
-
-            Map<String, Object> header = new LinkedHashMap<>();
-            header.put("alg", "ES256");
-            header.put("typ", "JWT");
-            header.put("kid", apiKeyName);
-            header.put("nonce", UUID.randomUUID().toString());
-
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("iss", COINBASE_ISSUER);
-            payload.put("sub", apiKeyName);
-            payload.put("nbf", now);
-            payload.put("exp", exp);
-
-            if (uri != null && !uri.isBlank()) {
-                payload.put("uri", uri);
-            }
-
-            String encodedHeader = base64Url(toJson(header).getBytes(StandardCharsets.UTF_8));
-            String encodedPayload = base64Url(toJson(payload).getBytes(StandardCharsets.UTF_8));
-            String signingInput = encodedHeader + "." + encodedPayload;
-
-            Signature signature = Signature.getInstance("SHA256withECDSA");
-            signature.initSign(privateKey);
-            signature.update(signingInput.getBytes(StandardCharsets.UTF_8));
-
-            byte[] derSignature = signature.sign();
-            byte[] joseSignature = derToJoseSignature(derSignature, 64);
-
-            return signingInput + "." + base64Url(joseSignature);
-        } catch (Exception exception) {
-            throw new IllegalStateException("Unable to generate Coinbase JWT: " + exception.getMessage(), exception);
-        }
-    }
 
     private static boolean looksLikePrivateKeyBody(String value) {
         String text = stripWrappedQuotes(value);
@@ -465,7 +354,7 @@ public final class CoinbaseAuthProvider {
         return text;
     }
 
-    private static @NotNull PrivateKey parseEcPrivateKey(String pem) {
+    private static void parseEcPrivateKey(String pem) {
         String normalized = normalizeSecret(pem);
 
         if (normalized == null || normalized.isBlank()) {
@@ -477,7 +366,8 @@ public final class CoinbaseAuthProvider {
         Exception pkcs8Failure ;
 
         try {
-            return KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(der));
+            KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(der));
+            return;
         } catch (Exception exception) {
             pkcs8Failure = exception;
         }
@@ -487,7 +377,7 @@ public final class CoinbaseAuthProvider {
             ECParameterSpec ecSpec = secp256r1Spec();
 
             ECPrivateKeySpec privateKeySpec = new ECPrivateKeySpec(privateScalar, ecSpec);
-            return KeyFactory.getInstance("EC").generatePrivate(privateKeySpec);
+            KeyFactory.getInstance("EC").generatePrivate(privateKeySpec);
         } catch (Exception sec1Failure) {
             throw new IllegalArgumentException(
                     "Unsupported EC private key format. PKCS8 error: "
@@ -550,118 +440,6 @@ public final class CoinbaseAuthProvider {
         return parameters.getParameterSpec(ECParameterSpec.class);
     }
 
-    private static byte @NonNull [] derToJoseSignature(byte[] derSignature, int outputLength) {
-
-        Asn1Reader reader = new Asn1Reader(derSignature);
-
-        reader.expectTag(0x30);
-        int sequenceLength = reader.readLength();
-        int sequenceEnd = reader.position() + sequenceLength;
-
-        reader.expectTag(0x02);
-        byte[] r = reader.readBytes(reader.readLength());
-
-        reader.expectTag(0x02);
-        byte[] s = reader.readBytes(reader.readLength());
-
-        if (reader.position() != sequenceEnd) {
-            throw new IllegalArgumentException("Invalid DER ECDSA signature.");
-        }
-
-        int partLength = outputLength / 2;
-
-        byte[] jose = new byte[outputLength];
-        copyUnsignedInteger(r, jose, 0, partLength);
-        copyUnsignedInteger(s, jose, partLength, partLength);
-
-        return jose;
-    }
-
-    private static void copyUnsignedInteger(byte @NotNull [] source, byte[] destination, int destinationOffset, int length) {
-        int sourceOffset = 0;
-
-        while (sourceOffset < source.length - 1 && source[sourceOffset] == 0) {
-            sourceOffset++;
-        }
-
-        int sourceLength = source.length - sourceOffset;
-
-        if (sourceLength > length) {
-            throw new IllegalArgumentException("ECDSA integer is larger than expected.");
-        }
-
-        int padding = length - sourceLength;
-
-        System.arraycopy(source, sourceOffset, destination, destinationOffset + padding, sourceLength);
-    }
-
-    private static String base64Url(byte[] value) {
-        return BASE64_URL_ENCODER.encodeToString(value);
-    }
-
-    private static String toJson(Map<String, Object> values) {
-        StringBuilder builder = new StringBuilder();
-        builder.append('{');
-
-        boolean first = true;
-
-        for (Map.Entry<String, Object> entry : values.entrySet()) {
-            if (!first) {
-                builder.append(',');
-            }
-
-            first = false;
-
-            builder
-                    .append('"')
-                    .append(jsonEscape(entry.getKey()))
-                    .append('"')
-                    .append(':');
-
-            Object value = entry.getValue();
-
-            if (value == null) {
-                builder.append("null");
-            } else if (value instanceof Number || value instanceof Boolean) {
-                builder.append(value);
-            } else {
-                builder
-                        .append('"')
-                        .append(jsonEscape(String.valueOf(value)))
-                        .append('"');
-            }
-        }
-
-        builder.append('}');
-        return builder.toString();
-    }
-
-    private static String jsonEscape(String value) {
-        StringBuilder builder = new StringBuilder();
-
-        for (int i = 0; i < value.length(); i++) {
-            char ch = value.charAt(i);
-
-            switch (ch) {
-                case '"' -> builder.append("\\\"");
-                case '\\' -> builder.append("\\\\");
-                case '\b' -> builder.append("\\b");
-                case '\f' -> builder.append("\\f");
-                case '\n' -> builder.append("\\n");
-                case '\r' -> builder.append("\\r");
-                case '\t' -> builder.append("\\t");
-                default -> {
-                    if (ch < 0x20) {
-                        builder.append(String.format("\\u%04x", (int) ch));
-                    } else {
-                        builder.append(ch);
-                    }
-                }
-            }
-        }
-
-        return builder.toString();
-    }
 
     private static final class Asn1Reader {
 
@@ -747,5 +525,7 @@ public final class CoinbaseAuthProvider {
     }
 
     public record Credentials(String apiKey, String secret) {
+        @Override
+        public @NonNull String toString() { return "Credentials[<redacted>]"; }
     }
 }

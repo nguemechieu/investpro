@@ -15,7 +15,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.ai.local.grpc.LocalAiRuntimeLauncher;
+import org.investpro.ai.AiAuditLogger;
 import org.investpro.config.AppConfig;
 import org.investpro.config.AppConfigKeys;
 import org.investpro.config.ProductionStartupValidator;
@@ -130,7 +130,7 @@ public class InvestPro extends Application {
 
         try {
             StrategyBootstrapper.initialize();
-            LocalAiRuntimeLauncher.startIfConfigured();
+            AiAuditLogger.LocalAiRuntimeLauncher.startIfConfigured();
 
             configurePrimaryStage();
             showOnboarding();
@@ -199,7 +199,7 @@ public class InvestPro extends Application {
 
             primaryStage.setTitle(buildWindowTitle("Trading Desk"));
 
-            log.info("Trading desk opened. configuration={}", configuration);
+            log.info("Trading desk opened. configuration={}", configuration.redactedSummary());
 
         } catch (Exception exception) {
             log.error("Failed to open trading terminal", exception);
@@ -305,7 +305,7 @@ public class InvestPro extends Application {
             if (screenManager != null) {
                 screenManager.shutdown();
             }
-            LocalAiRuntimeLauncher.stopManagedProcess();
+            AiAuditLogger.LocalAiRuntimeLauncher.stopManagedProcess();
             log.info("InvestPro shutdown completed.");
 
         } catch (Exception exception) {
@@ -354,7 +354,7 @@ public class InvestPro extends Application {
             details.setPrefRowCount(22);
             alert.getDialogPane().setExpandableContent(details);
             alert.getDialogPane().setExpanded(false);
-            alert.setOnHidden(event -> ERROR_DIALOG_SHOWING.set(false));
+            alert.setOnHidden(_ -> ERROR_DIALOG_SHOWING.set(false));
             alert.show();
         };
 

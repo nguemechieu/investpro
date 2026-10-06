@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.core.TelegramRemoteDeskTest
+-------------------------------------------------------------------------------
+Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.751 s -- in org.investpro.core.TelegramRemoteDeskTest

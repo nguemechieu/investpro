@@ -274,25 +274,16 @@ public record AssetCatalogEntry(
         if (contractType != null && contractType.isDerivative()) {
             return AssetType.FUTURE;
         }
-        if (marketType != null && marketType.isFx()) {
-            return AssetType.FOREX;
-        }
+
         if (marketType == MarketType.FUTURE
                 || marketType == MarketType.PERPETUAL
-                || marketType == MarketType.OPTION
-                || marketType == MarketType.CRYPTO_SWAP) {
+               ) {
             return AssetType.FUTURE;
         }
         if (marketType == MarketType.CFD) {
             return AssetType.CFD;
         }
-        if (marketType == MarketType.STOCK
-                || marketType == MarketType.ETF
-                || marketType == MarketType.INDEX
-                || marketType == MarketType.FUND
-                || marketType == MarketType.WARRANT) {
-            return AssetType.EQUITY;
-        }
+
         if (assetClass == null || assetClass == AssetClass.UNKNOWN) {
             return inferType(exchangeId, base, quote);
         }

@@ -24,7 +24,32 @@ public record MarketConfiguration(
         String openaiApiKey,
         String openaiModel,
         String openaiOrgId,
-        String tradingMode) {
+        String tradingMode,
+        java.util.Map<String, String> params) {
+    public MarketConfiguration {
+        params = params == null ? java.util.Map.of() : java.util.Map.copyOf(params);
+    }
+
+    public MarketConfiguration(String username, String marketType, String venue, String exchange,
+            String apiKey, String apiSecret, String accountId, String telegramToken, String openaiApiKey,
+            String openaiModel, String openaiOrgId, String tradingMode) {
+        this(username, marketType, venue, exchange, apiKey, apiSecret, accountId, telegramToken,
+                openaiApiKey, openaiModel, openaiOrgId, tradingMode, java.util.Map.of());
+    }
+    public static String maskSecret(String value) {
+        return value == null || value.isBlank() ? "<unset>" : "<redacted>";
+    }
+
+    public String redactedSummary() {
+        return "MarketConfiguration[market=" + normalizedMarketType() + ", venue=" + normalizedVenue()
+                + ", mode=" + tradingMode() + ", apiKey=" + maskSecret(apiKey)
+                + ", apiSecret=" + maskSecret(apiSecret) + ", telegramToken=" + maskSecret(telegramToken)
+                + ", openaiApiKey=" + maskSecret(openaiApiKey) + "]";
+    }
+
+    @Override
+    public String toString() { return redactedSummary(); }
+
     public String telegramToken() {
         return telegramToken;
 
@@ -67,11 +92,10 @@ public record MarketConfiguration(
         return switch (normalized) {
             case "CRYPTO", "CRYPTO_SPOT", "SPOT" ->
                     MarketType.SPOT;
-            case "STOCK", "STOCKS", "EQUITY", "EQUITIES", "ETF", "ETFS", "BOND", "BONDS" ->
-                    MarketType.SECURITIES;
+
             case "PERPETUAL", "PERPETUALS", "PERP", "PERPS", "FUTURE", "FUTURES", "US_FUTURES", "OPTION", "OPTIONS",
                     "INDEX", "INDICES", "COMMODITY", "COMMODITIES" -> MarketType.DERIVATIVES;
-            case "FOREX", "FX" -> MarketType.FOREX;
+            case "FOREX", "FX" -> MarketType.DERIVATIVE;
             default -> MarketType.UNKNOWN;
         };
     }
@@ -206,7 +230,7 @@ public record MarketConfiguration(
         }
 
         if (exchangeKey.contains("INTERACTIVE_BROKERS") || exchangeKey.contains("IBKR")) {
-            if (normalizedMarketType().isFx()) {
+            if (normalizedInstrumentType() == InstrumentType.FOREX) {
                 return ProductVenue.IBKR_IDEALPRO;
             }
             if (normalizedContractType() == ContractType.FUTURE || normalizedAssetClass() == AssetClass.COMMODITY) {

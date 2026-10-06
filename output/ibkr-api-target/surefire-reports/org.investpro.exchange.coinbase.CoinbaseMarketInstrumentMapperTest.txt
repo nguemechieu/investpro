@@ -1,0 +1,56 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.exchange.coinbase.CoinbaseMarketInstrumentMapperTest
+-------------------------------------------------------------------------------
+Tests run: 7, Failures: 4, Errors: 0, Skipped: 0, Time elapsed: 0.190 s <<< FAILURE! -- in org.investpro.exchange.coinbase.CoinbaseMarketInstrumentMapperTest
+org.investpro.exchange.coinbase.CoinbaseMarketInstrumentMapperTest.usDerivativesVenueMapsToCoinbaseDerivatives -- Time elapsed: 0.129 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <DERIVATIVES> but was: <DERIVATIVE>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:177)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1145)
+	at org.investpro.exchange.coinbase.CoinbaseMarketInstrumentMapperTest.usDerivativesVenueMapsToCoinbaseDerivatives(CoinbaseMarketInstrumentMapperTest.java:63)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:583)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+
+org.investpro.exchange.coinbase.CoinbaseMarketInstrumentMapperTest.cdeContractPreservesNativeSymbolWithoutTradePair -- Time elapsed: 0.004 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <DERIVATIVES> but was: <DERIVATIVE>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:177)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1145)
+	at org.investpro.exchange.coinbase.CoinbaseMarketInstrumentMapperTest.cdeContractPreservesNativeSymbolWithoutTradePair(CoinbaseMarketInstrumentMapperTest.java:87)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:583)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+
+org.investpro.exchange.coinbase.CoinbaseMarketInstrumentMapperTest.futurePerpetualMapsToPerpetual -- Time elapsed: 0.003 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <DERIVATIVES> but was: <PERPETUAL>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:177)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1145)
+	at org.investpro.exchange.coinbase.CoinbaseMarketInstrumentMapperTest.futurePerpetualMapsToPerpetual(CoinbaseMarketInstrumentMapperTest.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:583)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+
+org.investpro.exchange.coinbase.CoinbaseMarketInstrumentMapperTest.futureUnderlyingTypesMapToAssetClasses -- Time elapsed: 0.006 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <DERIVATIVES> but was: <DERIVATIVE>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:177)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1145)
+	at org.investpro.exchange.coinbase.CoinbaseMarketInstrumentMapperTest.futureUnderlyingTypesMapToAssetClasses(CoinbaseMarketInstrumentMapperTest.java:105)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:583)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+

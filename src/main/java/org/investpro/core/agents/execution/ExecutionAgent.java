@@ -62,14 +62,14 @@ public class ExecutionAgent implements Agent {
         }
 
         boolean connected = Boolean.TRUE.equals(context.getExchange().isConnected());
-        boolean paperMode = context.getExchange().isPaperTrading();
+        boolean paperMode = context.getExchange().isBotPaperTrading();
         if (!connected && !paperMode) {
             context.getEventBus().publishAsync(
                     AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), "Exchange is not connected."));
             return;
         }
 
-        if (!context.getExchange().canSubmitOrders()) {
+        if (!context.getExchange().canSubmitBotOrders()) {
             context.getEventBus().publishAsync(AgentEvent.execution(
                     AgentEvent.ORDER_REJECTED,
                     name(),
@@ -91,7 +91,7 @@ public class ExecutionAgent implements Agent {
             // Extract strategy signal direction instead of converting action string
             Side strategyDirection = signal.getSide() != null ? signal.getSide() : Side.HOLD;
 
-            Order order = context.getExchange().createOrder(
+            Order order = context.getExchange().botOrderExecution().createOrder(
                     0,
                     signal.getTradePair(),
                     "MARKET",
@@ -102,7 +102,7 @@ public class ExecutionAgent implements Agent {
                     0.0,
                     0.0);
 
-            context.getExchange().createOrder(order)
+            context.getExchange().botOrderExecution().createOrder(order)
                     .thenAccept(response -> context.getEventBus()
                             .publishAsync(AgentEvent.execution(AgentEvent.ORDER_SUBMITTED, name(), response)))
                     .exceptionally(exception -> {

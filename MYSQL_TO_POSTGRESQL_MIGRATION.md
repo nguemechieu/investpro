@@ -1,5 +1,7 @@
 # MySQL to PostgreSQL Migration Guide for InvestPro
 
+> Historical report: retained for its original revision. Java versions, test counts, completion claims and code examples below are historical, not current setup or release evidence. For the JDK 27 / JavaFX 27 baseline, use the [project README](README.md) and [documentation index](docs/README.md). Classified on 2026-10-05.
+
 ## Overview
 
 This guide helps you migrate from MySQL to PostgreSQL for the InvestPro application running in Docker.

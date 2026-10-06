@@ -7,6 +7,8 @@ import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.contracts.*;
 import org.investpro.exchange.credentials.ExchangeCredentials;
+import org.investpro.exchange.models.ExchangeAccessMode;
+import org.investpro.exchange.models.ExchangeFeature;
 import org.investpro.models.Account;
 import org.investpro.models.market.MarketInstrument;
 import org.investpro.models.trading.*;
@@ -41,11 +43,57 @@ public abstract class Exchange implements
         StreamingProvider,
         ExchangeCapabilities,
         PrecisionProvider {
+    @Override
+    public String toString() { return "Exchange[credentials=<redacted>]"; }
 
     private String telegramToken;
     private String emailNotification;
     private String userSelectedTradingMode;
     private ExchangeCredentials credentials;
+    private final LocalPaperExecution localPaperExecution = new LocalPaperExecution();
+    private volatile boolean authenticatedSessionConnected;
+    @EqualsAndHashCode.Exclude
+    private String botTradingMode;
+
+    /** Manual desk execution follows validated authentication, independently of bot mode. */
+    public boolean isDeskPaperTrading() {
+        return !authenticatedSessionConnected || isPaperTrading() || !supportsLiveTrading();
+    }
+
+    public OrderExecutionProvider deskOrderExecution() {
+        return isDeskPaperTrading() ? localPaperExecution.provider() : this;
+    }
+
+    public CompletableFuture<Account> deskTradingAccount() {
+        return isDeskPaperTrading() ? CompletableFuture.completedFuture(localPaperAccount()) : fetchAccount();
+    }
+
+    public boolean isBotPaperTrading() {
+        if (botTradingMode == null || botTradingMode.isBlank()) return isPaperTrading();
+        return !"LIVE".equalsIgnoreCase(botTradingMode);
+    }
+
+    public boolean canSubmitBotOrders() {
+        return isBotPaperTrading() || (authenticatedSessionConnected && canSubmitLiveOrders());
+    }
+
+    public OrderExecutionProvider botOrderExecution() {
+        if (isBotPaperTrading()) return localPaperExecution.provider();
+        if (!canSubmitBotOrders()) throw new IllegalStateException("Bot live trading requires an authenticated exchange.");
+        return this;
+    }
+
+    public OrderExecutionProvider orderExecution() {
+        return isPaperTrading() ? localPaperExecution.provider() : this;
+    }
+
+    public Account localPaperAccount() {
+        return localPaperExecution.account(getExchangeId());
+    }
+
+    public CompletableFuture<Account> tradingAccount() {
+        return isPaperTrading() ? CompletableFuture.completedFuture(localPaperAccount()) : fetchAccount();
+    }
 
     protected MarketDataEngine marketDataEngine;
     protected ExchangeMarketDataAdapter marketDataAdapter;
@@ -53,7 +101,7 @@ public abstract class Exchange implements
     protected Exchange(@NotNull ExchangeCredentials credentials) {
         this.credentials = credentials;
 
-        this.userSelectedTradingMode = credentials.sandbox() ? "PAPER" : "LIVE";
+        this.userSelectedTradingMode = credentials.paramOrDefault("tradingMode", credentials.sandbox() ? "PAPER" : "LIVE");
         log.debug("{} {} created ", this.getClass().getSimpleName(), this);
     }
 
@@ -73,6 +121,43 @@ public abstract class Exchange implements
             return "PAPER";
         }
         return "LIVE";
+    }
+
+    /** Current adapter authentication state; implementations must not perform network I/O. */
+    public boolean hasPrivateAuthentication() {
+        var result = checkAuthentication();
+        return result != null && result.isSuccess();
+    }
+
+    public ExchangeAccessMode getAccessMode() {
+        return hasPrivateAuthentication()
+                ? ExchangeAccessMode.AUTHENTICATED
+                : ExchangeAccessMode.PUBLIC_DATA_ONLY;
+    }
+
+    /** Combines the existing static feature profile with current authentication state. */
+    public boolean canUseCapability(ExchangeFeature feature) {
+        var capability = getCapability();
+        if (feature == null || capability == null || !capability.supports(feature)) {
+            return false;
+        }
+        boolean privateFeature = switch (feature) {
+            case ACCOUNT_INFO, BALANCES, POSITIONS, OPEN_ORDERS, ORDER_HISTORY,
+                    ACCOUNT_TRADES, FILLS, ORDER_VALIDATION, LIVE_TRADING,
+                    MARKET_ORDERS, LIMIT_ORDERS, STOP_ORDERS, STOP_LIMIT_ORDERS,
+                    TRAILING_STOP_ORDERS, BRACKET_ORDERS, STOP_LOSS_TAKE_PROFIT,
+                    STREAMING_ACCOUNT, STREAMING_BALANCES, STREAMING_POSITIONS,
+                    STREAMING_ORDERS, STREAMING_FILLS -> true;
+            default -> false;
+        };
+        boolean authenticatedMarketData = switch (feature) {
+            case TICKER, TICKERS, RECENT_TRADES, HISTORICAL_CANDLES, STREAMING_PRICES,
+                    ORDER_BOOK, FULL_ORDER_BOOK, TOP_OF_BOOK, DISTRIBUTION_BOOK,
+                    STREAMING_TICKER, STREAMING_ORDER_BOOK, STREAMING_TRADES, STREAMING_CANDLES ->
+                    capability.isRequiresAuthenticationForMarketData();
+            default -> false;
+        };
+        return !(privateFeature || authenticatedMarketData) || hasPrivateAuthentication();
     }
 
     protected boolean modeRequestsPaperNetwork() {
@@ -150,7 +235,7 @@ public abstract class Exchange implements
 
     public boolean canSubmitLiveOrders() {
         return supportsLiveTrading()
-                && Boolean.TRUE.equals(isConnected())
+                && (authenticatedSessionConnected || Boolean.TRUE.equals(isConnected()))
                 && !isPaperTrading();
     }
 

@@ -1,49 +1,44 @@
-# InvestPro Local AI Runtime
+# Local AI integration
 
-This document describes the local advisory runtime that runs alongside InvestPro and provides AI-assisted trade review through gRPC.
+Updated: 2026-10-05. Detailed server setup is maintained in the
+[AI service README](ai-service/README.md).
 
-## Purpose
+Python supplies rule-based advisory reviews. Java owns risk decisions and execution.
+This service is independent of Telegram's OpenAI conversation integration.
 
-- Python is advisory only.
-- Java remains the execution authority and final risk gate.
-- The shared contract is protobuf-based so both runtimes evolve together.
+## Contract and ownership
 
-## Runtime Layout
+- Java client: `src/main/java/org/investpro/ai/local/grpc/PythonAiGrpcClient.java`.
+- Java advisory service: `LocalAiRuntimeService.java` in the same package.
+- Java proto: `src/main/proto/investpro_ai.proto`; Maven generates client sources.
+- Python server: `ai-service/app/server.py`.
+- Python proto: `ai-service/proto/investpro_ai.proto`; regenerate Python stubs after changes.
 
-- Java client: `src/main/java/org/investpro/ai/local/grpc/LocalAiRuntimeService.java`
-- Java proto generation: `src/main/proto/investpro_ai.proto`
-- Python service: `ai-service/app/server.py`
-- Python proto: `ai-service/proto/investpro_ai.proto`
-- Default config: `src/main/resources/config.properties`
+Start Python separately; the Java launcher does not start it automatically.
+Set Java environment/JVM configuration to `AI_LOCAL_GRPC_ENABLED=true`,
+`AI_LOCAL_GRPC_HOST=127.0.0.1`, `AI_LOCAL_GRPC_PORT=8010`, and
+`AI_LOCAL_GRPC_TIMEOUT_MS=1500`. Do not use the obsolete dotted `ai.local.grpc.*`
+examples for these AppConfig keys.
 
-## Startup
+Python uses `AI_LOCAL_HOST` and `AI_LOCAL_PORT` instead. If its preferred port is
+busy, it scans nearby ports then falls back to an ephemeral port. Read its startup
+log and update the Java client's port; no discovery mechanism synchronizes them.
 
-1. Start the Python service from `ai-service/` or `ai-service/app/` alongside InvestPro launch.
-2. Java connects to the configured gRPC host and port.
-3. Java calls the advisory RPCs when it needs a signal review, strategy review, backtest review, or health check.
-4. If the Python service is unavailable, Java switches to conservative fallback behavior.
+## Behavior and limits
 
-## Supported Advisory RPCs
+Eight unary RPCs are implemented: Health, AnalyzeSignal, DetectRegime,
+ReviewStrategy, RankStrategies, ReviewBacktest, ScoreRisk and DetectAnomaly.
+Streaming proto methods are extension points and are not implemented in Python.
 
-- `Health`
-- `AnalyzeSignal`
-- `DetectRegime`
-- `ReviewStrategy`
-- `RankStrategies`
-- `ReviewBacktest`
-- `ScoreRisk`
-- `DetectAnomaly`
+The Java adapter uses a circuit breaker and a local reasoning fallback when a
+request fails. A fallback is not proof of a healthy Python service or an approval
+to trade. Final trading gates still apply. The gRPC transport is plaintext and
+unauthenticated; restrict it to loopback or a trusted private network.
 
-## Behavioral Rules
+The implementation's `isGrpcAdvisoryEnabled()` currently returns the negation of
+its configuration flag. Do not infer enabled-state semantics from that method's
+name; verify review/backtest behavior when testing the integration. This is an
+identified implementation concern, not a documentation claim that it is fixed.
 
-- The runtime can recommend approve, reject, wait, or manual review outcomes.
-- The runtime does not place orders.
-- The final execution decision stays in Java.
-- Conservative mode is preferred over silent failure when the gRPC service is unhealthy.
-
-## Related Docs
-
-- [SEQUENCE_DIAGRAMS.md](SEQUENCE_DIAGRAMS.md)
-- [README.md](README.md)
-- [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)
-- [ai-service/README.md](ai-service/README.md)
+See [release checklist](PRODUCTION_RELEASE_CHECKLIST.md) and
+[documentation index](docs/README.md).

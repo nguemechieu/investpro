@@ -205,7 +205,7 @@ public class AIReasoningPanel extends VBox {
     }
 
     private void appendLog(String message) {
-        eventLog.add(0, FORMATTER.format(java.time.Instant.now()) + "  " + message);
+        eventLog.addFirst(FORMATTER.format(java.time.Instant.now()) + "  " + message);
         if (eventLog.size() > MAX_LOG_ENTRIES) eventLog.subList(MAX_LOG_ENTRIES, eventLog.size()).clear();
     }
 

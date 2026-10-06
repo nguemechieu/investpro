@@ -133,7 +133,7 @@ class IbkrAuthModeTest {
                     Map.of(
                             "authMode", "client-portal",
                             "clientPortalUrl", gateway.baseUrl()));
-            IbkrExchange exchange = new IbkrExchange(credentials);
+            IbkrExchange exchange = new IbkrExchange(credentials, new StubIbkrTwsSession());
             exchange.setUserSelectedTradingMode("LIVE");
             exchange.connect();
 
@@ -273,7 +273,7 @@ class IbkrAuthModeTest {
                 null,
                 IbkrAuthModeTest.TEST_ACCOUNT_ID,
                 false);
-        IbkrExchange exchange = new IbkrExchange(credentials);
+        IbkrExchange exchange = new IbkrExchange(credentials, new StubIbkrTwsSession());
         exchange.setUserSelectedTradingMode("LIVE");
         return exchange;
     }

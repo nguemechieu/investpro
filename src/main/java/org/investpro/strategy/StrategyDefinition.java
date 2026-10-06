@@ -97,15 +97,12 @@ public class StrategyDefinition {
             MarketType marketType,
             Set<StrategyMarketCompatibility> compatibility) {
         return switch (marketType == null ? MarketType.UNKNOWN : marketType) {
-            case SPOT, CRYPTO -> compatibility.contains(StrategyMarketCompatibility.SPOT);
-            case DERIVATIVE, DERIVATIVES, FUTURE, PERPETUAL, OPTION, CFD, CRYPTO_SWAP, SYNTHETIC ->
-                    compatibility.contains(StrategyMarketCompatibility.DERIVATIVE);
-            case MARGIN -> compatibility.contains(StrategyMarketCompatibility.SPOT);
-            case FX, FOREX -> compatibility.contains(StrategyMarketCompatibility.FX);
-            case SECURITIES, STOCK, ETF, FUND, WARRANT -> compatibility.contains(StrategyMarketCompatibility.EQUITY);
-            case INDEX -> compatibility.contains(StrategyMarketCompatibility.INDEX);
-            case BOND -> compatibility.contains(StrategyMarketCompatibility.COMMODITY);
-            case OTC, UNKNOWN -> false;
+            case SPOT -> compatibility.contains(StrategyMarketCompatibility.SPOT);
+
+             case MARGIN, DERIVATIVE, FUTURE, PERPETUAL, CFD -> compatibility.contains(StrategyMarketCompatibility.ALL);
+            case DERIVATIVES -> compatibility.contains(StrategyMarketCompatibility.DERIVATIVE);
+
+            case UNKNOWN ->compatibility.contains(StrategyMarketCompatibility.ALL);
         };
     }
 }

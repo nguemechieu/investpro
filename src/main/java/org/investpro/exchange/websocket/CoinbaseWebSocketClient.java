@@ -60,6 +60,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
+    @ToString.Exclude
     private final String jwt;
 
     /**
@@ -147,7 +148,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         try {
             messageJson = OBJECT_MAPPER.readTree(message);
         } catch (JsonProcessingException exception) {
-            log.error("Failed to parse Coinbase WebSocket message: {}", exception.getMessage(), exception);
+            log.error("Failed to parse Coinbase WebSocket message; payload omitted");
             return;
         }
 
@@ -205,7 +206,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         JsonNode events = messageJson.path("events");
 
         if (!events.isArray()) {
-            log.debug("Coinbase market_trades message had no events array: {}", messageJson);
+            log.debug("Coinbase market_trades message had no events array");
             return;
         }
 
@@ -275,7 +276,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
                     // Nothing else needed.
                 }
 
-                case "subscriptions" -> log.info("Coinbase legacy subscription acknowledged: {}", messageJson);
+                case "subscriptions" -> log.info("Coinbase legacy subscription acknowledged");
 
                 case "match" -> {
                     TradePair selectedPair = defaultTradePair;
@@ -567,7 +568,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
         String payload = message.toString();
 
-        log.debug("Sending Coinbase WS payload: {}", payload);
+        log.debug("Sending Coinbase WS subscription message");
         send(payload);
     }
 
@@ -674,7 +675,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
         long now = System.currentTimeMillis();
         if (errorMessage.equals(lastErrorMessage) && now - lastErrorLoggedAtMs < 5_000L) {
-            log.debug("Coinbase WebSocket repeated error suppressed: {}", errorMessage);
+            log.debug("Coinbase WebSocket repeated error suppressed");
             return;
         }
 
@@ -688,7 +689,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             return;
         }
 
-        log.warn("Coinbase WebSocket error: {}", errorMessage);
+        log.warn("Coinbase WebSocket error received; response omitted");
     }
 
     public static @NotNull String formatSubscriptionAcknowledgement(@NotNull JsonNode messageJson) {

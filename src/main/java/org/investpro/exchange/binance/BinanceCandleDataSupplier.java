@@ -24,15 +24,31 @@ public class BinanceCandleDataSupplier extends CandleDataSupplier {
     private static final Logger logger = LoggerFactory.getLogger(BinanceCandleDataSupplier.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String DEFAULT_API_BASE = "https://api.binance.com/api/v3";
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(java.time.Duration.ofSeconds(10))
+            .build();
     private final String apiBase;
     private final String symbol;
+    @FunctionalInterface
+    public interface RequestSender {
+        HttpResponse<String> send(HttpRequest request) throws java.io.IOException, InterruptedException;
+    }
+    private final RequestSender requestSender;
+    private final java.util.concurrent.Executor requestExecutor;
 
     public BinanceCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
         this(secondsPerCandle, tradePair, DEFAULT_API_BASE);
     }
 
     public BinanceCandleDataSupplier(int secondsPerCandle, TradePair tradePair, String apiBase) {
+        this(secondsPerCandle, tradePair, apiBase, null, null);
+    }
+
+    public BinanceCandleDataSupplier(int secondsPerCandle, TradePair tradePair, String apiBase,
+                                   RequestSender requestSender, java.util.concurrent.Executor requestExecutor) {
         super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+        this.requestSender = requestSender;
+        this.requestExecutor = requestExecutor;
         this.apiBase = apiBase == null || apiBase.isBlank() ? DEFAULT_API_BASE : apiBase;
         this.symbol = tradePair.toCompactSymbol().toUpperCase(Locale.ROOT);
     }
@@ -51,7 +67,7 @@ public class BinanceCandleDataSupplier extends CandleDataSupplier {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return new BinanceCandleDataSupplier(secondsPerCandle, tradePair);
+        return new BinanceCandleDataSupplier(secondsPerCandle, tradePair, apiBase, requestSender, requestExecutor);
     }
 
     @Override
@@ -80,11 +96,34 @@ public class BinanceCandleDataSupplier extends CandleDataSupplier {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
+                .timeout(java.time.Duration.ofSeconds(15))
                 .GET()
                 .build();
 
-        return HttpClient.newBuilder().build().sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(HttpResponse::body)
+        CompletableFuture<HttpResponse<String>> responseFuture;
+        if (requestSender == null) {
+            responseFuture = HTTP_CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        } else {
+            try {
+                responseFuture = CompletableFuture.supplyAsync(() -> {
+                    try { return requestSender.send(request); }
+                    catch (InterruptedException exception) {
+                        Thread.currentThread().interrupt();
+                        throw new java.util.concurrent.CompletionException(exception);
+                    } catch (java.io.IOException exception) { throw new java.util.concurrent.CompletionException(exception); }
+                }, requestExecutor);
+            } catch (java.util.concurrent.RejectedExecutionException exception) {
+                responseFuture = CompletableFuture.failedFuture(exception);
+            }
+        }
+        return responseFuture
+                .thenApply(response -> {
+                    if (response.statusCode() != 200) {
+                        throw new java.util.concurrent.CompletionException(new java.io.IOException(
+                                "Binance candles returned HTTP " + response.statusCode()));
+                    }
+                    return response.body();
+                })
                 .thenApply(this::parseCandleData)
                 .toCompletableFuture();
     }

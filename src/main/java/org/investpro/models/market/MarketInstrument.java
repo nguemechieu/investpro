@@ -215,19 +215,12 @@ public record MarketInstrument(
         return switch (market) {
             case FUTURE -> InstrumentType.FUTURE;
             case PERPETUAL -> InstrumentType.PERPETUAL;
-            case OPTION -> InstrumentType.OPTION;
+
             case CFD -> InstrumentType.CFD;
-            case CRYPTO_SWAP -> InstrumentType.CRYPTO_SWAP;
-            case STOCK -> InstrumentType.STOCK;
-            case ETF -> InstrumentType.ETF;
-            case INDEX -> InstrumentType.INDEX;
-            case BOND -> InstrumentType.BOND;
-            case FUND -> InstrumentType.FUND;
-            case WARRANT -> InstrumentType.WARRANT;
-            case FX, FOREX -> InstrumentType.FOREX;
-            case SPOT, MARGIN, CRYPTO -> InstrumentType.SPOT;
-            case SECURITIES -> inferSecurityInstrument(assetClass);
-            case DERIVATIVE, DERIVATIVES, OTC, SYNTHETIC, UNKNOWN -> InstrumentType.UNKNOWN;
+
+            case SPOT, MARGIN-> InstrumentType.SPOT;
+
+            case DERIVATIVE, DERIVATIVES, UNKNOWN -> InstrumentType.UNKNOWN;
         };
     }
 

@@ -33,6 +33,7 @@ import org.investpro.trading.tradability.UniversalTradabilityService;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.HistoricalDataPrefetcher;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.sql.SQLException;
 import java.time.LocalDateTime;
@@ -162,7 +163,7 @@ public class StrategyLabPanel extends BorderPane {
         }
     }
 
-    private VBox createControlsSection() throws SQLException, ClassNotFoundException {
+    private @NonNull VBox createControlsSection() throws SQLException, ClassNotFoundException {
         VBox box = new VBox(8);
         box.setPadding(new Insets(10));
         box.setStyle(
@@ -460,10 +461,10 @@ public class StrategyLabPanel extends BorderPane {
                 }));
     }
 
-    private List<String> loadStrategyChoices() {
+    private @NonNull List<String> loadStrategyChoices() {
         List<String> names = new ArrayList<>(StrategyCatalog.availableStrategyNames());
         if (names.stream().noneMatch(StrategyCatalog.defaultStrategyName()::equalsIgnoreCase)) {
-            names.add(0, StrategyCatalog.defaultStrategyName());
+            names.addFirst(StrategyCatalog.defaultStrategyName());
         }
         return names;
     }
@@ -1104,7 +1105,7 @@ public class StrategyLabPanel extends BorderPane {
             strategyName = StrategyCatalog.defaultStrategyName();
             if (strategyCombo != null) {
                 if (!strategyCombo.getItems().contains(strategyName)) {
-                    strategyCombo.getItems().add(0, strategyName);
+                    strategyCombo.getItems().addFirst(strategyName);
                 }
                 strategyCombo.setValue(strategyName);
             }
@@ -1218,6 +1219,7 @@ public class StrategyLabPanel extends BorderPane {
 
     private void openManualAssignDialog() {
         Dialog<String> dialog = new Dialog<>();
+        org.investpro.ui.theme.DialogStyles.apply(dialog);
         dialog.setTitle("Manual Strategy Assignment");
         dialog.setHeaderText("Select a strategy to assign");
 
@@ -1286,6 +1288,7 @@ public class StrategyLabPanel extends BorderPane {
 
     private void openDisableDialog() {
         Dialog<String> dialog = new Dialog<>();
+        org.investpro.ui.theme.DialogStyles.apply(dialog);
         dialog.setTitle("Disable Assignment");
         dialog.setHeaderText("Disable strategy assignment");
 
@@ -1411,7 +1414,7 @@ public class StrategyLabPanel extends BorderPane {
 
     private LocalDateTime historicalWindowStart(LocalDateTime end, Timeframe timeframe) {
         long seconds = Math.max(60L, timeframe.getSeconds());
-        long days = Math.max(30L, Math.min(730L, (seconds * 1_000L) / 86_400L + 14L));
+        long days = Math.clamp((seconds * 1_000L) / 86_400L + 14L, 30L, 730L);
         return end.minusDays(days);
     }
 

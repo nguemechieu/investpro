@@ -1,8 +1,8 @@
 package org.investpro.agent.symbol;
 
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.activity.BrokerActivityEvent;
-import org.investpro.activity.BrokerActivityType;
+import org.investpro.activities.BrokerActivityEvent;
+import org.investpro.activities.BrokerActivityType;
 import org.investpro.data.CandleData;
 import org.investpro.models.trading.TradePair;
 import org.investpro.news.NewsContext;
@@ -16,7 +16,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;

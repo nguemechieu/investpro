@@ -3,8 +3,9 @@ package org.investpro.exchange.ibkr;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.credentials.ExchangeCredentials;
+import org.investpro.exchange.models.AuthCheckResult;
+import org.investpro.service.AuthResult;
 import org.investpro.enums.timeframe.Timeframe;
-import org.investpro.licensing.LicenseManager;
 import org.investpro.models.Account;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.Order;
@@ -56,10 +57,36 @@ public class IbkrExchange extends InteractiveBrokers {
 
     private volatile BooleanSupplier liveTradingLicenseGate = () -> true;
     private volatile BooleanSupplier liveRiskApprovalGate = () -> false;
+    private volatile IbkrConnectionProfile activeConnectionProfile;
+    private volatile CompletableFuture<Void> gatewayDiscovery = CompletableFuture.completedFuture(null);
+
+    public CompletableFuture<Void> gatewayContractDiscovery() { return gatewayDiscovery; }
+    private final ThreadLocal<Boolean> approvedRisk = ThreadLocal.withInitial(() -> false);
+
+    public CompletableFuture<String> executeRiskApproved(boolean approved,
+            java.util.function.Supplier<CompletableFuture<String>> submission) {
+        if (!approved) return CompletableFuture.failedFuture(new IllegalStateException("Risk approval required."));
+        approvedRisk.set(true);
+        try { return submission.get(); }
+        finally { approvedRisk.remove(); }
+    }
+
+    private CompletableFuture<String> submitBrokerOrder(TradePair pair, Side side, double amount,
+            String type, double price, double stopPrice) {
+        if (!connectionManager.getTwsSession().state().connectionSuccessful())
+            return CompletableFuture.failedFuture(new IllegalStateException("IBKR API handshake or managed accounts unavailable."));
+        if (!liveTradingLicenseGate.getAsBoolean() || (!approvedRisk.get() && !liveRiskApprovalGate.getAsBoolean()))
+            return CompletableFuture.failedFuture(new IllegalStateException("IBKR risk or license approval required."));
+        return connectionManager.getTwsSession().submit(contractResolver.requireResolved(pair), side, amount, type, price, stopPrice);
+    }
 
     public IbkrExchange(ExchangeCredentials credentials) {
+        this(credentials, new IbkrTwsSession());
+    }
+
+    IbkrExchange(ExchangeCredentials credentials, IbkrTwsSession twsSession) {
         super(credentials);
-        this.connectionManager = new IbkrConnectionManager();
+        this.connectionManager = new IbkrConnectionManager(twsSession, credentials == null ? "" : credentials.accountId());
         this.clientPortalClient = new IbkrClientPortalClient(credentials);
         this.contractMapper = new IbkrContractMapper();
         this.persistenceStore = new IbkrPersistenceStore();
@@ -99,13 +126,6 @@ public class IbkrExchange extends InteractiveBrokers {
         this(new ExchangeCredentials("interactive_brokers", apiKey, apiSecret, null, null, null, null, true));
     }
 
-    public void setLicenseManager(LicenseManager licenseManager) {
-        this.liveTradingLicenseGate = () -> licenseManager != null
-                && licenseManager.isLicenseValid()
-                && (licenseManager.isFeatureEnabled("ADVANCED_TRADING")
-                        || licenseManager.isFeatureEnabled("BASIC_TRADING"));
-    }
-
     public void setLiveTradingLicenseGate(BooleanSupplier licenseGate) {
         this.liveTradingLicenseGate = licenseGate == null ? () -> true : licenseGate;
     }
@@ -131,18 +151,64 @@ public class IbkrExchange extends InteractiveBrokers {
     public void connect() {
         IbkrConnectionProfile profile = connectionProfileFromCredentials();
         if (profile == null) {
-            connectionManager.connect(
-                    modeRequestsPaperNetwork() ? IbkrConnectionManager.Mode.PAPER : IbkrConnectionManager.Mode.LIVE);
-        } else {
-            connectionManager.connect(profile);
+            boolean paper = getCredentials() == null ? modeRequestsPaperNetwork() : getCredentials().sandbox();
+            profile = new IbkrConnectionProfile(IbkrConnectionMode.TWS_API,
+                    IbkrConnectionProfile.DEFAULT_HOST,
+                    paper ? IbkrConnectionProfile.GATEWAY_PAPER_PORT : IbkrConnectionProfile.GATEWAY_LIVE_PORT,
+                    1, paper, false, null, null);
         }
-        accountService.refreshFromBrokerIfAvailable();
+        connect(profile);
+    }
+
+    @Override
+    public AuthResult AuthCheckResult(String selectedExchange) {
+        try {
+            if (!Boolean.TRUE.equals(isConnected())) connect();
+            IbkrSessionState state = ibkrSessionState();
+            return state.connectionSuccessful()
+                    ? AuthResult.success(state.message())
+                    : AuthResult.failure(state.message());
+        } catch (RuntimeException error) {
+            return AuthResult.failure(error.getMessage());
+        }
+    }
+    @Override
+    public AuthCheckResult checkAuthentication() {
+        AuthResult result = AuthCheckResult(getName());
+        return AuthCheckResult.builder().exchangeName(getName()).success(result.success())
+                .credentialSource("IBKR_SESSION").message(result.message()).checkedAt(Instant.now()).build();
     }
 
     public IbkrSessionState connect(IbkrConnectionProfile profile) {
         IbkrSessionState state = connectionService.connect(profile);
-        accountService.refreshFromBrokerIfAvailable();
+        activeConnectionProfile = profile;
+        if (state.connectionSuccessful()) {
+            if (!connectionManager.isConnected()) connectionManager.connect(profile);
+        } else {
+            connectionManager.disconnect();
+        }
+        if (state.mode() != IbkrConnectionMode.TWS_API) accountService.refreshFromBrokerIfAvailable();
+        if (state.connectionSuccessful() && state.mode() == IbkrConnectionMode.TWS_API) {
+            seedGatewayContracts();
+        }
         return state;
+    }
+
+    private void seedGatewayContracts() {
+        List<CompletableFuture<?>> requests = new ArrayList<>();
+        String symbols = getCredentials().paramOrDefault("watchlist",
+                "AAPL,MSFT,NVDA,AMZN,GOOGL,META,TSLA,SPY");
+        for (String symbol : symbols.split(",")) {
+            String normalized = symbol.trim().toUpperCase(Locale.ROOT);
+            if (normalized.isBlank() || contractResolver.cached(normalized).isPresent()) continue;
+            IbkrContractCandidate candidate = new IbkrContractCandidate(null, normalized, normalized,
+                    IbkrSecurityType.STOCK, "STK", "SMART", "", "USD", "", "", "", "", "", "TWS_API", "");
+            requests.add(contractResolver.resolve(candidate).exceptionally(error -> {
+                log.warn("IBKR contract discovery failed for {}: {}", normalized, error.getMessage());
+                return null;
+            }));
+        }
+        gatewayDiscovery = CompletableFuture.allOf(requests.toArray(CompletableFuture[]::new));
     }
 
     @Override
@@ -153,7 +219,9 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public void reconnect() {
-        connectionManager.reconnect();
+        IbkrConnectionProfile profile = activeConnectionProfile;
+        if (profile == null) connect();
+        else connect(profile);
     }
 
     @Override
@@ -163,6 +231,8 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return submitBrokerOrder(tradePair, side, amount, "MKT", 0, 0);
         ensureResolvedContract(tradePair);
         if (canTradeNow()) {
             return CompletableFuture
@@ -174,6 +244,8 @@ public class IbkrExchange extends InteractiveBrokers {
     @Override
     public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
             double limitPrice) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return submitBrokerOrder(tradePair, side, amount, "LMT", limitPrice, 0);
         ensureResolvedContract(tradePair);
         if (canTradeNow()) {
             return CompletableFuture
@@ -184,6 +256,8 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return submitBrokerOrder(tradePair, side, amount, "STP", 0, stopPrice);
         ensureResolvedContract(tradePair);
         if (canTradeNow()) {
             return CompletableFuture
@@ -199,6 +273,9 @@ public class IbkrExchange extends InteractiveBrokers {
             double entryPrice,
             double stopLoss,
             double takeProfit) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return CompletableFuture.failedFuture(new UnsupportedOperationException(
+                    "IBKR native bracket transmission is not implemented; no orders were submitted."));
         ensureResolvedContract(tradePair);
         if (canTradeNow()) {
             return CompletableFuture
@@ -210,52 +287,74 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return fetchAllOpenOrders().thenApply(orders -> orders.stream().filter(order -> order.getTradePair().equals(tradePair)).toList());
         return CompletableFuture.completedFuture(orderService.fetchOpenOrders(tradePair));
     }
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return connectionManager.getTwsSession().openOrders();
         return CompletableFuture.completedFuture(orderService.fetchAllOpenOrders());
     }
 
     @Override
     public CompletableFuture<String> cancelOrder(String orderId) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return connectionManager.getTwsSession().cancel(orderId);
         return CompletableFuture.completedFuture(orderService.cancelOrder(orderId));
     }
 
     @Override
     public CompletableFuture<List<String>> cancelOrders(List<String> orderIds) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API) {
+            List<CompletableFuture<String>> cancellations = orderIds.stream().map(this::cancelOrder).toList();
+            return CompletableFuture.allOf(cancellations.toArray(CompletableFuture[]::new)).thenApply(_ -> cancellations.stream().map(CompletableFuture::join).toList());
+        }
         return CompletableFuture.completedFuture(orderService.cancelOrders(orderIds));
     }
 
     @Override
     public CompletableFuture<String> cancelAllOrders() {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return fetchAllOpenOrders().thenCompose(orders -> cancelOrders(orders.stream().map(OpenOrder::getOrderId).toList())).thenApply(ids -> String.valueOf(ids.size()));
         return CompletableFuture.completedFuture(orderService.cancelAll());
     }
 
     @Override
     public CompletableFuture<List<Position>> fetchPositions(TradePair tradePair) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return fetchAllPositions().thenApply(positions -> positions.stream().filter(position -> position.getTradePair().equals(tradePair)).toList());
         return CompletableFuture.completedFuture(positionService.fetchFor(tradePair));
     }
 
     @Override
     public CompletableFuture<List<Position>> fetchAllPositions() {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return connectionManager.getTwsSession().positions();
         return CompletableFuture.completedFuture(positionService.fetchAll());
     }
 
     @Override
     public CompletableFuture<Optional<Position>> fetchPosition(TradePair tradePair) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return fetchPositions(tradePair).thenApply(positions -> positions.stream().findFirst());
         return CompletableFuture.completedFuture(positionService.fetchOne(tradePair));
     }
 
     @Override
     public CompletableFuture<String> closePosition(TradePair tradePair) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return CompletableFuture.failedFuture(new UnsupportedOperationException("Native IBKR portfolio modification is not implemented; no broker action was sent."));
         positionService.close(tradePair);
         return CompletableFuture.completedFuture("CLOSED");
     }
 
     @Override
     public CompletableFuture<String> closeAllPositions() {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return CompletableFuture.failedFuture(new UnsupportedOperationException("Native IBKR portfolio modification is not implemented; no broker action was sent."));
         positionService.closeAll();
         return CompletableFuture.completedFuture("CLOSED_ALL");
     }
@@ -267,6 +366,8 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return CompletableFuture.failedFuture(new UnsupportedOperationException("Native IBKR portfolio modification is not implemented; no broker action was sent."));
         if (symbol == null || quantity <= 0.0) {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("Trade pair and quantity must be provided"));
@@ -286,18 +387,24 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return CompletableFuture.failedFuture(new UnsupportedOperationException("Native IBKR portfolio modification is not implemented; no broker action was sent."));
         positionService.setStopLoss(symbol, stopLoss);
         return CompletableFuture.completedFuture("STOP_UPDATED");
     }
 
     @Override
     public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return CompletableFuture.failedFuture(new UnsupportedOperationException("Native IBKR portfolio modification is not implemented; no broker action was sent."));
         positionService.setTakeProfit(symbol, takeProfit);
         return CompletableFuture.completedFuture("TAKE_PROFIT_UPDATED");
     }
 
     @Override
     public CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return CompletableFuture.failedFuture(new UnsupportedOperationException("Native IBKR portfolio modification is not implemented; no broker action was sent."));
         return CompletableFuture.completedFuture(
                 orderService.submitTrailingStop(symbol, Side.SELL, Math.max(1.0, quantityFor(symbol)),
                         trailingDistance));
@@ -370,6 +477,12 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API && Boolean.TRUE.equals(isConnected())) {
+            return connectionManager.getTwsSession().accountSnapshot()
+                    .thenApply(snapshot -> accountService.toAccount(this, snapshot));
+        }
+        if (connectionProfileFromCredentials().mode() == IbkrConnectionMode.TWS_API)
+            return CompletableFuture.failedFuture(new IllegalStateException(ibkrSessionState().message()));
         if (shouldRequireClientPortalAuth() && !clientPortalClient.isAuthenticated()) {
             return CompletableFuture.failedFuture(
                     new SecurityException("IBKR access denied: " + clientPortalClient.authenticationFailureReason()));
@@ -459,6 +572,12 @@ public class IbkrExchange extends InteractiveBrokers {
     }
 
     public void synchronizePortfolio() {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API) {
+            persistenceStore.persistAccount(currentSnapshot());
+            persistenceStore.persistPositions(fetchAllPositions().join());
+            persistenceStore.persistOrders(fetchAllOpenOrders().join());
+            return;
+        }
         portfolioSynchronizer.synchronize(
                 accountService.snapshot(),
                 positionService.fetchAll(),
@@ -518,6 +637,8 @@ public class IbkrExchange extends InteractiveBrokers {
 
     private IbkrAccountSnapshot currentSnapshot() {
         ensureAuthenticatedSessionForAccountAccess();
+        if (connectionProfileFromCredentials().mode() == IbkrConnectionMode.TWS_API)
+            return connectionManager.getTwsSession().accountSnapshot().join();
         if (modeRequestsPaperNetwork()) {
             return accountService.snapshot();
         }
@@ -544,23 +665,27 @@ public class IbkrExchange extends InteractiveBrokers {
 
         return switch (normalized) {
             case "client-portal", "client_portal", "portal", "webapi", "web-api" -> true;
-            case "gateway", "tws", "socket", "ib-gateway", "ib_gateway" -> false;
+
             default -> false;
         };
     }
 
     private IbkrConnectionProfile connectionProfileFromCredentials() {
         ExchangeCredentials credentials = getCredentials();
-        if (credentials == null || !hasIbkrConnectionParams(credentials)) {
+        if (credentials == null) {
             return null;
         }
 
-        boolean paper = modeRequestsPaperNetwork();
-        IbkrConnectionMode connectionMode = ibkrConnectionMode(credentials.param("authMode"));
+        boolean paper = credentials.booleanParamOrDefault("paper", credentials.sandbox());
+        IbkrConnectionMode connectionMode = ibkrConnectionMode(firstNonBlank(credentials.param("authMode"), System.getProperty("investpro.ibkr.authMode"), System.getenv("IBKR_AUTH_MODE")));
+        int defaultPort = connectionMode == IbkrConnectionMode.CLIENT_PORTAL_GATEWAY
+                ? IbkrConnectionProfile.CLIENT_PORTAL_PORT
+                : credentials.intParamOrDefault(paper ? "paperPort" : "livePort",
+                        paper ? IbkrConnectionProfile.GATEWAY_PAPER_PORT : IbkrConnectionProfile.GATEWAY_LIVE_PORT);
         return new IbkrConnectionProfile(
                 connectionMode,
                 credentials.param("host"),
-                credentials.intParamOrDefault("port", 0),
+                credentials.intParamOrDefault("port", defaultPort),
                 credentials.intParamOrDefault("clientId", 1),
                 paper,
                 credentials.booleanParamOrDefault("autoDetect", true),

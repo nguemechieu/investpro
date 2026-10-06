@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 /**
  * Immutable audit record for every AI trade review.
  * Used for logging, tracing, and feedback collection.
- *
+ * <p>
  * Each review request/response pair is logged to enable:
  * - Audit trail for compliance
  * - Performance metrics (AI accuracy, confidence calibration)

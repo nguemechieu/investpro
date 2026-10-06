@@ -53,6 +53,7 @@ import org.investpro.ui.panels.SettingsPanel;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.lang.reflect.Method;
 import java.nio.file.Files;
@@ -183,7 +184,11 @@ public class SystemCore {
             savePropertiesToFile();
         }
 
-        this.telegramToken = this.config.getProperty("telegram_token", "").trim();
+        this.telegramToken = this.config.getProperty("telegram_token",
+                Objects.toString(System.getenv("TELEGRAM_BOT_TOKEN"), "")).trim();
+        if (this.telegramToken.isBlank()) {
+            this.telegramToken = Objects.toString(System.getenv("TELEGRAM_BOT_TOKEN"), "").trim();
+        }
 
         // Build AgentRuntime with all trading agents before creating SmartBot
         AgentRuntime agentRuntime = new AgentRuntime();
@@ -254,7 +259,9 @@ public class SystemCore {
         this.symbolAgentUpdater = new SymbolAgentUpdater(smartBot.getEventBus(), getSymbolAgentManager());
 
         if (!telegramToken.isBlank()) {
+
             this.telegramNotifier = new TelegramNotifier(telegramToken);
+            this.telegramNotifier.configureRemoteAccess(this.config);
             // Initialize command handler for Telegram commands
             this.telegramCommandHandler = new TelegramCommandHandler(this, telegramNotifier);
             this.telegramNotifier.setCommandHandler(telegramCommandHandler);
@@ -486,7 +493,8 @@ public class SystemCore {
         }
 
         // Auto-detect and set Telegram chat ID
-        if (telegramNotifier != null && !telegramNotifier.hasTargetChat()) {
+        if (telegramNotifier != null && !telegramNotifier.hasTargetChat()
+                && !telegramNotifier.getAllowedUsers().isEmpty()) {
             telegramNotifier.detectAndUseLatestChatId()
                     .ifPresentOrElse(
                             chatId -> log.info("\uD83D\uDCF1 Telegram chat auto-detected: {}", chatId),
@@ -1084,7 +1092,7 @@ public class SystemCore {
         return buildSubscription(tradePair == null ? Set.of() : Set.of(tradePair), mode);
     }
 
-    private ExchangeStreamSubscription buildSubscription(
+    private @NonNull ExchangeStreamSubscription buildSubscription(
             Set<TradePair> tradePairs,
             StreamingMode mode) {
         ExchangeStreamSubscription subscription = new ExchangeStreamSubscription();
@@ -1719,7 +1727,7 @@ public class SystemCore {
      * paper trading.
      */
     public boolean canSubmitOrders() {
-        return exchange != null && exchange.canSubmitOrders();
+        return exchange != null && exchange.canSubmitBotOrders();
     }
 
     /**

@@ -1,5 +1,7 @@
 # Java Strategy Architecture - Implementation Guide
 
+> Current documentation baseline (2026-10-05): JDK 27, JavaFX 27 and Maven 3.8.5+. Use the [documentation index](docs/README.md) for current setup, trading-desk behavior, Telegram commands and release limits. Design examples below are not proof of broker support or deployment verification.
+
 ## Overview
 
 A comprehensive catalog-driven strategy architecture for the InvestPro trading platform, inspired by Python strategy patterns but implemented as a unified Java engine. Instead of creating hundreds of individual strategy classes, this architecture uses:

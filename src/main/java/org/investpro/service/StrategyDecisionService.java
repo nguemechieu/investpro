@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * StrategyDecisionService bridges the trading engine to the strategy framework.
- *
+ * <p>
  * Responsibilities:
  * - Accept market context (symbol, timeframe, candles, prices, volatility)
  * - Query assigned strategy via StrategySelectionService
@@ -25,9 +25,9 @@ import java.util.List;
  * - Invoke strategy.generateSignal()
  * - Return wrapped StrategyDecisionResult with signal or rejection reason
  * - Log all decisions and errors
- *
+ * <p>
  * Thread-safe for concurrent access.
- *
+ * <p>
  * Usage:
  * 
  * <pre>
@@ -160,7 +160,7 @@ public class StrategyDecisionService {
                 return StrategyDecisionResult.rejected(reason, warnings);
             }
 
-            if (market.bid() <= 0 || market.ask() <= 0 || market.currentPrice() <= 0) {
+            if (market.bid() <= 0 || market.currentPrice() <= 0) {
                 String reason = "Invalid price values (must be > 0)";
                 log.warn(reason);
                 return StrategyDecisionResult.rejected(reason, warnings);
@@ -302,7 +302,7 @@ public class StrategyDecisionService {
             double currentPrice,
             double volatility,
             double averageVolume) {
-        CandleData latest = candles == null || candles.isEmpty() ? null : candles.get(candles.size() - 1);
+        CandleData latest = candles == null || candles.isEmpty() ? null : candles.getLast();
         double resolvedCurrent = currentPrice > 0.0
                 ? currentPrice
                 : latest == null ? 0.0 : latest.closePrice();
@@ -335,22 +335,4 @@ public class StrategyDecisionService {
             double averageVolume) {
     }
 
-    /**
-     * Simplified overload: Generate decision with minimal parameters.
-     * MarketBehavior and tradePair are assumed null.
-     */
-    public StrategyDecisionResult generateDecision(
-            String symbol,
-            String timeframe,
-            List<CandleData> candles,
-            double bid,
-            double ask,
-            double currentPrice,
-            double volatility,
-            double averageVolume) {
-
-        return generateDecision(
-                symbol, timeframe, candles, bid, ask, currentPrice,
-                volatility, averageVolume, null, null);
-    }
 }

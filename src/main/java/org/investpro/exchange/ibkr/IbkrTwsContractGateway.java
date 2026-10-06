@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class IbkrTwsContractGateway {
 
     private final IbkrConnectionManager connectionManager;
-    private final AtomicInteger requestIds = new AtomicInteger(20_000);
+    private static final AtomicInteger requestIds = new AtomicInteger(20_000);
     private final Map<Integer, CopyOnWriteArrayList<IbkrContractCandidate>> matchingSymbolRequests = new ConcurrentHashMap<>();
     private final Map<Integer, CopyOnWriteArrayList<IbkrResolvedContract>> contractDetailRequests = new ConcurrentHashMap<>();
     private final Map<Integer, CompletableFuture<List<IbkrContractCandidate>>> matchingSymbolFutures = new ConcurrentHashMap<>();
@@ -34,10 +34,17 @@ public final class IbkrTwsContractGateway {
         return thread;
     });
 
-    private volatile Object clientSocket;
 
     public IbkrTwsContractGateway(IbkrConnectionManager connectionManager) {
         this.connectionManager = connectionManager;
+        connectionManager.getTwsSession().addListener((name, args) -> {
+            try {
+                if (name.equals("symbolSamples")) handleSymbolSamples((Integer) args[0], args[1]);
+                else if (name.equals("contractDetails")) handleContractDetails((Integer) args[0], args[1]);
+                else if (name.equals("contractDetailsEnd")) completeContractDetails((Integer) args[0]);
+                else if (name.equals("error")) handleError(args);
+            } catch (Exception error) { log.debug("IBKR contract callback failed", error); }
+        });
     }
 
     public CompletableFuture<List<IbkrContractCandidate>> reqMatchingSymbols(String pattern, Duration timeout) {
@@ -82,7 +89,7 @@ public final class IbkrTwsContractGateway {
             Object contract = buildContract(candidate);
             Object client = ensureClient();
             Method reqContractDetails = client.getClass().getMethod("reqContractDetails", int.class,
-                    Class.forName("com.ib.client.Contract"));
+                    IbkrApiRuntime.type("com.ib.client.Contract"));
             reqContractDetails.invoke(client, requestId, contract);
         } catch (Exception exception) {
             cleanupDetails(requestId);
@@ -99,29 +106,10 @@ public final class IbkrTwsContractGateway {
                 && classExists("com.ib.client.ContractDetails");
     }
 
-    private Object ensureClient() throws Exception {
-        Object existing = clientSocket;
-        if (existing != null && isConnected(existing)) {
-            return existing;
-        }
-
-        Class<?> wrapperType = Class.forName("com.ib.client.EWrapper");
-        Object wrapper = Proxy.newProxyInstance(
-                wrapperType.getClassLoader(),
-                new Class<?>[] { wrapperType },
-                new TwsCallbackHandler());
-        Object signal = Class.forName("com.ib.client.EJavaSignal").getConstructor().newInstance();
-        Object client = Class.forName("com.ib.client.EClientSocket")
-                .getConstructor(wrapperType, Class.forName("com.ib.client.EReaderSignal"))
-                .newInstance(wrapper, signal);
-        Method eConnect = client.getClass().getMethod("eConnect", String.class, int.class, int.class);
-        eConnect.invoke(client, connectionManager.getHost(), connectionManager.getPort(), connectionManager.getClientId());
-        clientSocket = client;
-        return client;
-    }
+    private Object ensureClient() { return connectionManager.getTwsSession().client(); }
 
     private Object buildContract(IbkrContractCandidate candidate) throws Exception {
-        Object contract = Class.forName("com.ib.client.Contract").getConstructor().newInstance();
+        Object contract = IbkrApiRuntime.type("com.ib.client.Contract").getConstructor().newInstance();
         invokeIfPresent(contract, "conid", candidate.conId() == null ? null : candidate.conId().intValue());
         invokeIfPresent(contract, "symbol", candidate.symbol());
         invokeIfPresent(contract, "secType", firstNonBlank(candidate.secType(), candidate.securityType().ibkrCode()));
@@ -133,27 +121,6 @@ public final class IbkrTwsContractGateway {
         invokeIfPresent(contract, "lastTradeDateOrContractMonth", candidate.lastTradeDateOrContractMonth());
         invokeIfPresent(contract, "multiplier", candidate.multiplier());
         return contract;
-    }
-
-    private final class TwsCallbackHandler implements InvocationHandler {
-        @Override
-        public Object invoke(Object proxy, Method method, Object[] args) {
-            String name = method.getName();
-            try {
-                if ("symbolSamples".equals(name) && args != null && args.length >= 2) {
-                    handleSymbolSamples((Integer) args[0], args[1]);
-                } else if ("contractDetails".equals(name) && args != null && args.length >= 2) {
-                    handleContractDetails((Integer) args[0], args[1]);
-                } else if ("contractDetailsEnd".equals(name) && args != null && args.length >= 1) {
-                    completeContractDetails((Integer) args[0]);
-                } else if ("error".equals(name) && args != null && args.length >= 2) {
-                    handleError(args);
-                }
-            } catch (Exception exception) {
-                log.debug("Unable to handle IBKR TWS callback {}: {}", name, exception.getMessage());
-            }
-            return defaultValue(method.getReturnType());
-        }
     }
 
     private void handleSymbolSamples(int requestId, Object descriptions) throws Exception {
@@ -367,7 +334,7 @@ public final class IbkrTwsContractGateway {
 
     private boolean classExists(String className) {
         try {
-            Class.forName(className);
+            IbkrApiRuntime.type(className);
             return true;
         } catch (ClassNotFoundException exception) {
             return false;

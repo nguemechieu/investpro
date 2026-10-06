@@ -1,55 +1,26 @@
 package org.investpro.broker.ibkr;
 
-import lombok.extern.slf4j.Slf4j;
+import org.investpro.exchange.ibkr.IbkrApiRuntime;
+import org.investpro.exchange.ibkr.IbkrConnectionMode;
+import org.investpro.exchange.ibkr.IbkrConnectionProfile;
+import org.investpro.exchange.ibkr.IbkrTwsSession;
 
-/**
- * Compile-safe gateway that detects official IB API classes at runtime.
- */
-@Slf4j
+/** Compatibility facade over the same official session implementation used by IbkrExchange. */
 public class IBKRReflectiveApiGateway implements IBKROfficialApiGateway {
-
-    private volatile boolean connected;
-
-    @Override
-    public boolean isAvailable() {
-        return classExists("com.ib.client.EWrapper")
-                && classExists("com.ib.client.EClientSocket")
-                && classExists("com.ib.client.EReader");
+    private final IbkrTwsSession session;
+    public IBKRReflectiveApiGateway() { this(new IbkrTwsSession()); }
+    public IBKRReflectiveApiGateway(IbkrTwsSession session) { this.session = session; }
+    @Override public boolean isAvailable() {
+        try { IbkrApiRuntime.type("com.ib.client.EClientSocket"); return true; }
+        catch (ClassNotFoundException error) { return false; }
     }
-
-    @Override
-    public void connect(String host, int port, int clientId) {
-        if (!isAvailable()) {
-            log.warn("Official IB API classes not found. Running with InvestPro IBKR adapter only.");
-        }
-        connected = true;
-        log.info("IBKR reflective gateway connect requested host={} port={} clientId={}", host, port, clientId);
+    @Override public void connect(String host, int port, int clientId) {
+        session.connect(new IbkrConnectionProfile(IbkrConnectionMode.TWS_API, host, port, clientId,
+                port == 4002 || port == 7497, false, null, null), "");
     }
-
-    @Override
-    public void disconnect() {
-        connected = false;
-    }
-
-    @Override
-    public boolean isConnected() {
-        return connected;
-    }
-
-    @Override
-    public void ensureReaderLoopRunning() {
-        if (!isAvailable()) {
-            return;
-        }
-        log.debug("IBKR EReader integration point available and ready.");
-    }
-
-    private boolean classExists(String className) {
-        try {
-            Class.forName(className);
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
+    @Override public void disconnect() { session.disconnect(); }
+    @Override public boolean isConnected() { return session.state().connectionSuccessful(); }
+    @Override public void ensureReaderLoopRunning() {
+        if (!isConnected()) throw new IllegalStateException(session.state().message());
     }
 }

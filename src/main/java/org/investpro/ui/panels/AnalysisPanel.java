@@ -908,7 +908,7 @@ public class AnalysisPanel extends VBox{
         Random random = new Random(42);
         List<List<Double>> paths = new ArrayList<>();
         int pathCount = 10;
-        int points = Math.min(120, Math.max(30, cleanReturns.size()));
+        int points = Math.clamp(cleanReturns.size(), 30, 120);
 
         for (int p = 0; p < pathCount; p++) {
             List<Double> path = new ArrayList<>();

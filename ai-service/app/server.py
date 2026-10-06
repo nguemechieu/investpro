@@ -5,7 +5,12 @@ import sys
 from concurrent import futures
 from pathlib import Path
 
-import grpc
+try:
+    import grpc  # type: ignore[import-not-found]
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "The 'grpcio' package is required to run the AI service. Install project dependencies first."
+    ) from exc
 
 # gRPC service method names must match proto RPC names (PascalCase).
 # pylint: disable=invalid-name,unused-argument

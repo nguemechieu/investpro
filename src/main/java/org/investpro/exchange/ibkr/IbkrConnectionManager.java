@@ -14,6 +14,17 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 public final class IbkrConnectionManager {
+    @Getter
+    private final IbkrTwsSession twsSession;
+    @Getter
+    private final String requestedAccountId;
+
+    public IbkrConnectionManager() { this(new IbkrTwsSession(), ""); }
+
+    public IbkrConnectionManager(IbkrTwsSession session, String accountId) {
+        twsSession = Objects.requireNonNull(session);
+        requestedAccountId = accountId == null ? "" : accountId;
+    }
 
     public static final String DEFAULT_HOST = "127.0.0.1";
     public static final int PAPER_PORT = IbkrConnectionProfile.GATEWAY_PAPER_PORT;
@@ -41,22 +52,18 @@ public final class IbkrConnectionManager {
     private final AtomicLong lastHeartbeatEpochMs = new AtomicLong(0L);
     private final AtomicLong latencyMs = new AtomicLong(0L);
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
+    private final AtomicBoolean heartbeatMonitorStarted = new AtomicBoolean(false);
 
     public synchronized void connect(Mode mode) {
-        this.mode = Objects.requireNonNull(mode, "mode must not be null");
-        this.host = DEFAULT_HOST;
-        this.port = mode == Mode.PAPER ? PAPER_PORT : LIVE_PORT;
-        this.clientId = 1;
-        this.connectionMode = IbkrConnectionMode.TWS_API;
-        this.connected.set(true);
-        this.lastHeartbeatEpochMs.set(System.currentTimeMillis());
-        this.reconnectAttempts.set(0);
-        startHeartbeatMonitor();
-        log.info("IBKR connected to IB Gateway {}:{} ({})", host, port, mode);
+        Objects.requireNonNull(mode, "mode must not be null");
+        connect(new IbkrConnectionProfile(IbkrConnectionMode.TWS_API, DEFAULT_HOST,
+                mode == Mode.PAPER ? PAPER_PORT : LIVE_PORT, 1, mode == Mode.PAPER, false, null, null));
     }
-
     public synchronized void connect(IbkrConnectionProfile profile) {
         IbkrConnectionProfile safeProfile = profile == null ? IbkrConnectionProfile.twsPaper() : profile;
+        if (safeProfile.mode() == IbkrConnectionMode.TWS_API) {
+            twsSession.connect(safeProfile, requestedAccountId);
+        }
         this.connectionMode = safeProfile.mode();
         this.mode = safeProfile.paper() ? Mode.PAPER : Mode.LIVE;
         this.host = safeProfile.host();
@@ -75,6 +82,7 @@ public final class IbkrConnectionManager {
     }
 
     public synchronized void disconnect() {
+        twsSession.disconnect();
         connected.set(false);
         marketDataAvailable.set(false);
         log.info("IBKR disconnected from IB Gateway");
@@ -83,11 +91,13 @@ public final class IbkrConnectionManager {
     public synchronized void reconnect() {
         int attempt = reconnectAttempts.incrementAndGet();
         log.warn("IBKR reconnect attempt {}", attempt);
-        connect(mode);
+        IbkrConnectionProfile profile = new IbkrConnectionProfile(connectionMode, host, port, clientId,
+                mode == Mode.PAPER, false, null, null);
+        connect(profile);
     }
 
     public boolean isConnected() {
-        return connected.get();
+        return connected.get() && (connectionMode != IbkrConnectionMode.TWS_API || twsSession.state().connectionSuccessful());
     }
 
     public void markMarketDataAvailable(boolean available) {
@@ -107,7 +117,7 @@ public final class IbkrConnectionManager {
         long lastHeartbeat = lastHeartbeatEpochMs.get();
         boolean staleHeartbeat = lastHeartbeat == 0L || (System.currentTimeMillis() - lastHeartbeat) > 15000L;
         return new ConnectionHealth(
-                connected.get(),
+                isConnected(),
                 marketDataAvailable.get(),
                 staleHeartbeat,
                 latencyMs.get(),
@@ -121,6 +131,7 @@ public final class IbkrConnectionManager {
     }
 
     private void startHeartbeatMonitor() {
+        if (!heartbeatMonitorStarted.compareAndSet(false, true)) return;
         scheduler.scheduleAtFixedRate(this::heartbeatTick, 0, 5, TimeUnit.SECONDS);
     }
 
@@ -129,20 +140,13 @@ public final class IbkrConnectionManager {
             return;
         }
 
-        long start = System.nanoTime();
-        long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-        latencyMs.set(Math.max(1L, elapsedMs));
-
-        long now = System.currentTimeMillis();
-        long last = lastHeartbeatEpochMs.get();
-        if (last > 0L && now - last > 15000L) {
-            reconnect();
+        // Readiness is driven by the SDK reader and connectivity callbacks, not a local timer.
+        if (!isConnected()) {
+            marketDataAvailable.set(false);
             return;
         }
-
-        lastHeartbeatEpochMs.set(now);
+        lastHeartbeatEpochMs.set(System.currentTimeMillis());
     }
-
     public enum Mode {
         PAPER,
         LIVE

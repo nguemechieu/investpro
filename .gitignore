@@ -57,3 +57,8 @@ investpro.log
 data/historical/*_*_*_*_*.json
 
 .fake
+
+# Independently installed official IBKR SDK and its installation downloads
+/lib/ibkr/
+/output/ibkr-sdk/
+/output/ibkr-sdk-install/

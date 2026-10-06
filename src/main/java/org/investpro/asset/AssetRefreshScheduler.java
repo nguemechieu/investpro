@@ -75,7 +75,7 @@ public final class AssetRefreshScheduler {
 
     private CompletableFuture<AssetCatalogMergeResult> attempt(
             Exchange exchange,
-            ExchangeId exchangeId,
+            @NonNull ExchangeId exchangeId,
             boolean manual,
             int attempt) {
         Instant startedAt = Instant.now();

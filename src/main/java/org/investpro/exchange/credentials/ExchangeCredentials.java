@@ -1,5 +1,7 @@
 package org.investpro.exchange.credentials;
 
+import org.jspecify.annotations.NonNull;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
@@ -37,12 +39,13 @@ public record ExchangeCredentials(
         return notBlank(apiKey) && notBlank(apiSecret);
     }
 
-    public boolean hasCoinbaseAdvancedTradeCredentials() {
-        return notBlank(keyName) && notBlank(privateKey);
+    @Override
+    public @NonNull String toString() {
+        return "ExchangeCredentials[credentials=<redacted>, sandbox=" + sandbox + "]";
     }
 
-    public boolean hasOandaCredentials() {
-        return notBlank(apiKey) && notBlank(accountId);
+    public boolean hasCoinbaseAdvancedTradeCredentials() {
+        return notBlank(keyName) && notBlank(privateKey);
     }
 
     public String param(String key) {

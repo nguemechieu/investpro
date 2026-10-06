@@ -6,8 +6,6 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.market.NewsEvent;
 import org.investpro.service.NewsDataProvider;

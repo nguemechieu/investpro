@@ -12,8 +12,11 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>27</maven.compiler.release>
+        <lombok.version>1.18.48</lombok.version>
+        <bytebuddy.version>1.18.3</bytebuddy.version>
         <junit.version>5.12.1</junit.version>
-        <javafx.version>21.0.8</javafx.version>
+        <javafx.version>27</javafx.version>
         <grpc.version>1.75.0</grpc.version>
         <protobuf.version>3.25.5</protobuf.version>
         <kotlin.version>1.9.10</kotlin.version>
@@ -26,6 +29,17 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- Keep Hibernate and Mockito on the same Java 27-capable bytecode library. -->
+            <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy</artifactId>
+                <version>${bytebuddy.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy-agent</artifactId>
+                <version>${bytebuddy.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-stdlib-jdk8</artifactId>
@@ -180,7 +194,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.44</version>
+            <version>${lombok.version}</version>
             <scope>provided</scope>
         </dependency>
 
@@ -353,12 +367,12 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
-                    <release>21</release>
+                    <release>${maven.compiler.release}</release>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
-                            <version>1.18.44</version>
+                            <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
@@ -470,7 +484,7 @@
                                 <configuration>
                                     <rules>
                                         <requireJavaVersion>
-                                            <version>[21,)</version>
+                                            <version>[27,)</version>
                                         </requireJavaVersion>
                                         <requireMavenVersion>
                                             <version>[3.8.5,)</version>
@@ -527,7 +541,7 @@
                                 </goals>
                                 <configuration>
                                     <target>
-                                        <echo level="warning">SpotBugs skipped: active JDK is unsupported by current SpotBugs ASM parser. Run production profile with JDK 21-23 to enforce SpotBugs checks.</echo>
+                                        <echo level="warning">SpotBugs skipped: the configured SpotBugs version cannot parse Java 27 class files. Upgrade SpotBugs to a version supporting Java 27 before enabling this check.</echo>
                                     </target>
                                 </configuration>
                             </execution>

@@ -41,15 +41,15 @@ public class IBKROrderService {
         }
 
         return switch (orderType) {
-            case MARKET -> exchange.createMarketOrder(pair, side, quantity).join();
-            case LIMIT -> exchange.createLimitOrder(pair, side, quantity, order.getPrice()).join();
-            case STOP_LIMIT -> exchange.createStopOrder(pair, side, quantity, order.getPrice()).join();
-            case TRAILING_STOP -> exchange.createTrailingStopOrder(pair, side, quantity,quantity/2, true).join();
+            case MARKET -> exchange.orderExecution().createMarketOrder(pair, side, quantity).join();
+            case LIMIT -> exchange.orderExecution().createLimitOrder(pair, side, quantity, order.getPrice()).join();
+            case STOP_LIMIT -> exchange.orderExecution().createStopOrder(pair, side, quantity, order.getPrice()).join();
+            case TRAILING_STOP -> exchange.orderExecution().createTrailingStopOrder(pair, side, quantity,quantity/2, true).join();
         };
     }
 
     public boolean cancelOrder(String orderId) {
-        String result = exchange.cancelOrder(orderId).join();
+        String result = exchange.orderExecution().cancelOrder(orderId).join();
         return result != null && !result.isBlank() && !"NOT_FOUND".equalsIgnoreCase(result);
     }
 

@@ -3259,6 +3259,398 @@
       } ],
       "marketCompatibility" : [ "ALL" ]
     }
+  }, {
+    "id" : "cefe04f0-7e43-4b59-83a3-ab740de93a1c",
+    "name" : "RSI Mean Reversion GBP/CHF 1h",
+    "symbol" : "GBP/CHF",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 74.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1791248533.047623600,
+    "strategyDefinition" : {
+      "name" : "RSI Mean Reversion GBP/CHF 1h",
+      "baseName" : "RSI Mean Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "90af4b4a-042a-4d20-93d2-3ae3b1dd7047",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "fed52020-d1d3-4750-b78f-e00dc06b7d34",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "crossoverMode" : "REGION_EXIT",
+          "period" : "14",
+          "oversold" : "30",
+          "overbought" : "70"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "8a2448a3-f70b-4c5d-bf8c-ae76ce7cf916",
+    "name" : "MACD Trend Expansion GBP/CHF 1h",
+    "symbol" : "GBP/CHF",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 72.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1791248533.047623600,
+    "strategyDefinition" : {
+      "name" : "MACD Trend Expansion GBP/CHF 1h",
+      "baseName" : "MACD Trend Expansion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "1d8c2cdc-d699-4a83-9c43-1500fd19fa67",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "0e69b877-d69d-4df1-81a9-283cede93de2",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "MACD_SIGNAL",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "signalPeriod" : "9"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "e1d4e493-1bf4-4db8-92b1-121754c9608e",
+    "name" : "Bollinger Range Reversion GBP/CHF 1h",
+    "symbol" : "GBP/CHF",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 69.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1791248533.047623600,
+    "strategyDefinition" : {
+      "name" : "Bollinger Range Reversion GBP/CHF 1h",
+      "baseName" : "Bollinger Range Reversion",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "e4dd2cb4-254d-4fe8-809a-3579f2c8c726",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20",
+          "stdDevMult" : "2.0"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "e680a287-dd46-4da9-8478-86f5f0b1f944",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "BOLLINGER_BANDS",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20",
+          "stdDevMult" : "2.0"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "b552b413-cf5d-44f7-be41-c8f408856a52",
+    "name" : "EMA Momentum Cross GBP/CHF 1h",
+    "symbol" : "GBP/CHF",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 67.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1791248533.047623600,
+    "strategyDefinition" : {
+      "name" : "EMA Momentum Cross GBP/CHF 1h",
+      "baseName" : "EMA Momentum Cross",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "ef3b07c4-148f-41d3-8c38-e1b03b43a07b",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "4c59ff8b-9198-486a-83bf-384fd644cc97",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "EMA",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "20"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "53eac30d-d8cf-4a31-93a2-bc1b4aed17d8",
+    "name" : "Stochastic Reversal GBP/CHF 1h",
+    "symbol" : "GBP/CHF",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 65.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1791248533.047623600,
+    "strategyDefinition" : {
+      "name" : "Stochastic Reversal GBP/CHF 1h",
+      "baseName" : "Stochastic Reversal",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "531a4705-d0a3-4085-b898-c9af9a852e3b",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "c57db94a-34c6-4abe-8172-91f2207cc7b2",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "STOCHASTIC_REGION_CROSSOVER",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "oversold" : "20",
+          "crossoverMode" : "REGION_EXIT",
+          "smooth" : "3",
+          "overbought" : "80",
+          "dPeriod" : "3",
+          "kPeriod" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "cd793c8f-2ae3-437f-b6a8-40885ab354e1",
+    "name" : "ATR Volatility Breakout GBP/CHF 1h",
+    "symbol" : "GBP/CHF",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 63.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1791248533.047623600,
+    "strategyDefinition" : {
+      "name" : "ATR Volatility Breakout GBP/CHF 1h",
+      "baseName" : "ATR Volatility Breakout",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "dd65f320-81a8-40f6-a95f-2664ad524fad",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "429d8cf0-fc51-407d-8cd3-c21e2defc02c",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "ATR",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
+  }, {
+    "id" : "9156019f-e7d4-47ba-8582-9513cfeac25b",
+    "name" : "Candle Confirmation Swing GBP/CHF 1h",
+    "symbol" : "GBP/CHF",
+    "source" : "RULE_BASED",
+    "marketRegime" : "UNKNOWN",
+    "generationScore" : 61.0,
+    "rationale" : [ "Generated from InvestPro rule templates for UNKNOWN" ],
+    "generatedAt" : 1791248533.047623600,
+    "strategyDefinition" : {
+      "name" : "Candle Confirmation Swing GBP/CHF 1h",
+      "baseName" : "Candle Confirmation Swing",
+      "parameters" : {
+        "rsiPeriod" : 14,
+        "emaFast" : 20,
+        "emaSlow" : 50,
+        "atrPeriod" : 14,
+        "breakoutLookback" : 20,
+        "oversoldThreshold" : 35.0,
+        "overboughtThreshold" : 65.0,
+        "minConfidence" : 0.55,
+        "signalAmount" : 1.0
+      },
+      "rules" : [ {
+        "id" : "3754a146-21c2-44ad-9276-c4f91fa1c448",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "BUY",
+        "indicator" : null,
+        "candlePattern" : "HAMMER",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "dcc6b8fb-7618-4fc1-8500-f801ffa1d251",
+        "ruleSource" : "CANDLE_PATTERN",
+        "signalType" : "SELL",
+        "indicator" : null,
+        "candlePattern" : "ENGULFING_BEARISH",
+        "timeframe" : "H1",
+        "parameters" : { },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "6ab57b03-e6e8-4005-8a50-becce6bb7979",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "BUY",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14",
+          "overbought" : "70",
+          "oversold" : "30"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      }, {
+        "id" : "42784766-5338-4417-a921-06096ca95171",
+        "ruleSource" : "INDICATOR",
+        "signalType" : "SELL",
+        "indicator" : "RSI",
+        "candlePattern" : null,
+        "timeframe" : "H1",
+        "parameters" : {
+          "period" : "14",
+          "overbought" : "70",
+          "oversold" : "30"
+        },
+        "conditions" : [ ],
+        "enabled" : true
+      } ],
+      "marketCompatibility" : [ "ALL" ]
+    }
   } ],
   "evaluations" : [ {
     "symbol" : "00/USD",

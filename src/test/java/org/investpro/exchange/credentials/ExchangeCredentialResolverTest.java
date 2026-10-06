@@ -9,6 +9,40 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ExchangeCredentialResolverTest {
+    @Test
+    void carriesDashboardModeThroughPluginCredentialResolution() {
+        Map<String, String> values = Map.of("TRADING_MODE", "PAPER", "IBKR_HOST", "localhost", "IBKR_PORT", "4002");
+        ExchangeCredentials credentials = new ExchangeCredentialResolver(key -> Optional.ofNullable(values.get(key))).resolve("ibkr");
+        assertThat(credentials.param("tradingMode")).isEqualTo("PAPER");
+        assertThat(credentials.param("host")).isEqualTo("localhost");
+        assertThat(credentials.param("port")).isEqualTo("4002");
+    }
+
+    @Test
+    void mapsCoinbaseNamedCredentialsToAdapterFields() {
+        Map<String, String> values = Map.of(
+                "COINBASE_KEY_NAME", "organizations/test/apiKeys/test",
+                "COINBASE_PRIVATE_KEY", "test-private-key",
+                "COINBASE_API_KEY", "old-key",
+                "COINBASE_API_SECRET", "old-secret");
+        CredentialProvider provider = key -> Optional.ofNullable(values.get(key));
+        ExchangeCredentials credentials = new ExchangeCredentialResolver(provider).resolve("coinbase");
+        assertThat(credentials.apiKey()).isEqualTo(credentials.keyName());
+        assertThat(credentials.apiSecret()).isEqualTo(credentials.privateKey());
+        assertThat(credentials.apiKey()).isEqualTo("organizations/test/apiKeys/test");
+        assertThat(credentials.apiSecret()).isEqualTo("test-private-key");
+    }
+
+    @Test
+    void keepsGenericCoinbaseCredentialsAsFallback() {
+        Map<String, String> values = Map.of(
+                "COINBASE_KEY_NAME", " ", "COINBASE_PRIVATE_KEY", " ",
+                "COINBASE_API_KEY", "test-key", "COINBASE_API_SECRET", "test-secret");
+        CredentialProvider provider = key -> Optional.ofNullable(values.get(key));
+        ExchangeCredentials credentials = new ExchangeCredentialResolver(provider).resolve("coinbase");
+        assertThat(credentials.apiKey()).isEqualTo("test-key");
+        assertThat(credentials.apiSecret()).isEqualTo("test-secret");
+    }
 
     @Test
     void resolvesIbkrParamsIntoExchangeCredentials() {

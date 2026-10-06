@@ -1,5 +1,7 @@
 # InvestPro User Strategy Development Guide
 
+> Current documentation baseline (2026-10-05): JDK 27, JavaFX 27 and Maven 3.8.5+. Use the [documentation index](../docs/README.md) for current setup, trading-desk behavior, Telegram commands and release limits. Design examples below are not proof of broker support or deployment verification.
+
 ## Table of Contents
 
 1. [Overview](#overview)
@@ -39,22 +41,21 @@ This means:
 ### 1. Set Up Your Development Environment
 
 **Requirements**:
-- Java 21+ (Eclipse Temurin or OpenJDK)
-- Maven 3.8+ (Apache Maven)
+- Java 27 (Eclipse Temurin or OpenJDK)
+- Maven 3.8.5+ (Apache Maven)
 - IDE: IntelliJ IDEA, VS Code, or Eclipse
 
-**Install Java 21**:
+**Install Java 27**:
 
 ```bash
-# macOS/Linux with Homebrew
-brew install openjdk@21
+# Install a JDK 27 distribution and set JAVA_HOME to its installation
 
 # Windows - Download from:
-# https://www.eclipse.org/downloads/packages/release/temurin-21
+# Confirm the installed compiler is JDK 27
 
 # Verify installation
 java --version
-# openjdk 21.x.x
+# openjdk 27
 ```
 
 **Install Maven**:

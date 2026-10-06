@@ -14,7 +14,7 @@ import javafx.scene.control.TableColumnBase;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
-import javafx.scene.layout.Pane;
+import lombok.Getter;
 
 import java.text.MessageFormat;
 import java.util.HashMap;
@@ -30,6 +30,7 @@ public final class LocalizationService {
     private static final String PREF_KEY_LANGUAGE = "app.language";
     private static final Preferences PREFS = Preferences.userNodeForPackage(LocalizationService.class);
 
+    @Getter
     private static SupportedLanguage currentLanguage = SupportedLanguage.fromCode(
             PREFS.get(PREF_KEY_LANGUAGE, Locale.getDefault().getLanguage()));
     private static ResourceBundle bundle = loadBundle(currentLanguage);
@@ -37,10 +38,6 @@ public final class LocalizationService {
     private static final Map<String, String> ENGLISH_TEXT_TO_KEY = buildEnglishTextIndex();
 
     private LocalizationService() {
-    }
-
-    public static SupportedLanguage getCurrentLanguage() {
-        return currentLanguage;
     }
 
     public static void setCurrentLanguage(SupportedLanguage language) {
@@ -120,8 +117,6 @@ public final class LocalizationService {
 
         if (node instanceof Parent parent) {
             parent.getChildrenUnmodifiable().forEach(LocalizationService::applyToNode);
-        } else if (node instanceof Pane pane) {
-            pane.getChildren().forEach(LocalizationService::applyToNode);
         }
     }
 

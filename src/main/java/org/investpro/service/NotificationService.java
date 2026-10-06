@@ -15,15 +15,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Central notification service for InvestPro / InvestPro.
- *
+ * <p>
  * Converts important agent/runtime events into user-facing notifications.
- *
+ * <p>
  * Supports:
  * - Telegram
  * - Email
  * - Both
  * - None
- *
+ * <p>
  * Also supports channel-specific email subscriptions, for example:
  * - OANDA ORDER_FILLED
  * - OANDA ORDER_REJECTED
@@ -67,7 +67,7 @@ public class NotificationService {
 
     /**
      * Channel/exchange -> email recipient.
-     *
+     * <p>
      * Example:
      * OANDA -> trader@example.com
      */
@@ -75,7 +75,7 @@ public class NotificationService {
 
     /**
      * Channel/exchange -> subscribed event types.
-     *
+     * <p>
      * Example:
      * OANDA -> ORDER_FILLED, ORDER_REJECTED, RISK_REJECTED
      */
@@ -136,7 +136,7 @@ public class NotificationService {
 
     /**
      * Notify from an agent event.
-     *
+     * <p>
      * This supports:
      * - default important events
      * - channel-specific email subscriptions such as OANDA events
@@ -273,7 +273,7 @@ public class NotificationService {
 
     /**
      * Register an email recipient for a notification channel/exchange.
-     *
+     * <p>
      * Example:
      * registerEmailRecipient("OANDA", "trader@example.com");
      */
@@ -306,7 +306,7 @@ public class NotificationService {
 
     /**
      * Subscribe a channel/exchange to receive email notifications for an event.
-     *
+     * <p>
      * Example:
      * subscribeEmail("OANDA", AgentEvent.ORDER_FILLED);
      */
@@ -391,12 +391,12 @@ public class NotificationService {
 
     /**
      * Extract channel/exchange from event metadata.
-     *
+     * <p>
      * Supports metadata keys:
      * - exchange
      * - broker
      * - channel
-     *
+     * <p>
      * Falls back to source when source contains OANDA.
      */
     private String extractChannel(AgentEvent event) {

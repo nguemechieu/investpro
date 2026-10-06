@@ -1,130 +1,79 @@
 package org.investpro.utils;
 
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.exchange.coinbase.CoinbaseCredentialInput;
 import org.investpro.exchange.coinbase.CoinbaseJwtSigner;
+import java.net.URI;
+import java.net.http.*;
+import java.time.Duration;
+import java.util.*;
 
-/**
- * Diagnostic tool to validate Coinbase API credentials before authentication.
- * Run this before trying to connect to Coinbase.
- */
+/** Read-only Coinbase REST diagnostic. Never prints credentials, JWTs or response bodies. */
 @Slf4j
-public class CoinbaseCredentialDiagnostic {
+public final class CoinbaseCredentialDiagnostic {
+    private static final String BASE = "https://api.coinbase.com/api/v3/brokerage";
+    private CoinbaseCredentialDiagnostic() {}
+
+    public record EndpointResult(String step, int statusCode, boolean passed) {}
 
     public static void main(String[] args) {
-        String keyName = System.getenv("COINBASE_KEY_NAME");
-        String privateKey = System.getenv("COINBASE_PRIVATE_KEY");
+        validateCredentials(setting("COINBASE_KEY_NAME"), setting("COINBASE_PRIVATE_KEY"));
+    }
 
-        log.info("========== COINBASE CREDENTIAL DIAGNOSTIC ==========");
-        validateCredentials(keyName, privateKey);
+    private static String setting(String name) {
+        String value = System.getProperty(name);
+        return value == null || value.isBlank() ? System.getenv(name) : value;
     }
 
     public static void validateCredentials(String keyName, String privateKey) {
-        log.info("\n1. Checking API Key Name Format...");
-        validateKeyNameFormat(keyName);
-
-        log.info("\n2. Checking Private Key Format...");
-        validatePrivateKeyFormat(privateKey);
-
-        log.info("\n3. Checking JWT Generation...");
-        validateJwtGeneration(keyName, privateKey);
-
-        log.info("\n========== DIAGNOSTIC COMPLETE ==========");
-        log.info("If all checks pass but you still get 401:");
-        log.info("  - Log into Coinbase Advanced Trade dashboard");
-        log.info("  - Go to API → API Keys");
-        log.info("  - Verify the key name matches: {}", keyName);
-        log.info("  - Verify the key is ENABLED (not disabled)");
-        log.info("  - Verify it has 'View accounts' permission");
-        log.info("  - If still failing, REGENERATE the API key pair");
+        diagnose(keyName, privateKey, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build());
     }
 
-    private static void validateKeyNameFormat(String keyName) {
-        if (keyName == null || keyName.isBlank()) {
-            log.error("❌ API Key Name is NULL or EMPTY");
-            log.error("   Set COINBASE_KEY_NAME environment variable");
-            return;
-        }
-
-        log.info("✓ API Key Name provided: {}", maskSensitive(keyName));
-
-        if (!keyName.contains("organizations/") || !keyName.contains("/apiKeys/")) {
-            log.warn("⚠ API Key Name format looks suspicious");
-            log.warn("   Expected format: organizations/{{org_id}}/apiKeys/{{key_id}}");
-            log.warn("   Got: {}", maskSensitive(keyName));
-            return;
-        }
-
-        log.info("✓ API Key Name format is correct");
-    }
-
-    private static void validatePrivateKeyFormat(String privateKey) {
-        if (privateKey == null || privateKey.isBlank()) {
-            log.error("❌ Private Key is NULL or EMPTY");
-            log.error("   Set COINBASE_PRIVATE_KEY environment variable");
-            return;
-        }
-
-        log.info("✓ Private Key provided: {} characters", privateKey.length());
-
-        if (!privateKey.contains("BEGIN") || !privateKey.contains("PRIVATE KEY")) {
-            log.error("❌ Private Key does NOT contain PEM markers");
-            log.error("   Expected to find: BEGIN ... PRIVATE KEY");
-            log.error("   Got: {}", privateKey.substring(0, Math.min(50, privateKey.length())));
-            return;
-        }
-
-        log.info("✓ Private Key contains PEM markers");
-
-        if (!privateKey.contains("-----BEGIN EC PRIVATE KEY-----") &&
-                !privateKey.contains("-----BEGIN PRIVATE KEY-----")) {
-            log.warn("⚠ Private Key format not recognized");
-            log.warn("   Expected: -----BEGIN EC PRIVATE KEY----- or -----BEGIN PRIVATE KEY-----");
-            return;
-        }
-
-        log.info("✓ Private Key is in EC format");
-
-        if (!privateKey.contains("-----END") || !privateKey.contains("PRIVATE KEY-----")) {
-            log.error("❌ Private Key is missing END marker");
-            log.error("   Expected: -----END ... PRIVATE KEY-----");
-            return;
-        }
-
-        log.info("✓ Private Key has proper end marker");
-    }
-
-    private static void validateJwtGeneration(String keyName, String privateKey) {
-        if (keyName == null || keyName.isBlank() || privateKey == null || privateKey.isBlank()) {
-            log.warn("⚠ Skipping JWT validation - credentials are missing");
-            return;
-        }
-
+    public static List<EndpointResult> diagnose(String keyName, String privateKey, HttpClient client) {
+        CoinbaseJwtSigner signer = null;
         try {
-            CoinbaseJwtSigner signer = new CoinbaseJwtSigner(keyName, privateKey);
-
-            String restJwt = signer.buildRestJwt("GET", "/api/v3/brokerage/accounts");
-            log.info("✓ REST JWT generated successfully: {} characters", restJwt.length());
-
-            String wsJwt = signer.buildWebSocketJwt();
-            log.info("✓ WebSocket JWT generated successfully: {} characters", wsJwt.length());
-
-            log.info("✓ JWT generation works - credentials look valid");
-        } catch (IllegalArgumentException e) {
-            log.error("❌ JWT generation failed: {}", e.getMessage());
-            log.error("   This likely means the private key format is invalid");
-            log.error("   Regenerate the API key pair in Coinbase dashboard");
-        } catch (Exception e) {
-            log.error("❌ Unexpected error during JWT generation: {}", e.getMessage());
-            log.error("   {}", e.getClass().getSimpleName());
+            var normalized = CoinbaseCredentialInput.normalize(keyName, privateKey);
+            signer = new CoinbaseJwtSigner(normalized.keyName(), normalized.privateKey());
+            log.info("Coinbase credentials parsed; local JWT generation is not proof of REST authentication.");
+        } catch (IllegalArgumentException invalidCredentials) {
+            log.warn("Coinbase credential parsing failed. Use a complete ECDSA/ES256 PEM key and CDP key name; raw Ed25519 keys are unsupported.");
         }
+        List<EndpointResult> results = new ArrayList<>();
+        results.add(test(client, null, BASE + "/market/products", "public products"));
+        if (signer == null) {
+            results.add(new EndpointResult("credential parsing", 0, false));
+            return List.copyOf(results);
+        }
+        String[] paths = {"/accounts", "/products", "/products?product_type=SPOT&get_tradability_status=true"};
+        String[] steps = {"accounts without query", "products without query", "products with query"};
+        for (int i = 0; i < paths.length; i++) {
+            EndpointResult result = test(client, signer, BASE + paths[i], steps[i]);
+            results.add(result);
+            if (!result.passed()) break;
+        }
+        return List.copyOf(results);
     }
 
-    private static String maskSensitive(String value) {
-        if (value == null || value.length() < 10) {
-            return value;
+    private static EndpointResult test(HttpClient client, CoinbaseJwtSigner signer, String url, String step) {
+        try {
+            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(Duration.ofSeconds(20)).header("Accept", "application/json")
+                    .header("User-Agent", "InvestPro/1.0").GET();
+            if (signer != null) builder.header("Authorization", signer.buildAuthorizationHeaderForUrl("GET", url));
+            int status = client.send(builder.build(), HttpResponse.BodyHandlers.discarding()).statusCode();
+            boolean passed = status >= 200 && status < 300;
+            log.info("Coinbase REST diagnostic {}: {} (HTTP {})", step, passed ? "PASS" : "FAIL", status);
+            if (status == 401 || status == 403) {
+                log.warn("Check REST JWT URI, Authorization header, permissions, key activation/revocation, secret loading and derivative region/eligibility. WebSocket success does not prove REST JWT correctness.");
+            }
+            return new EndpointResult(step, status, passed);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            log.warn("Coinbase REST diagnostic {}: interrupted", step);
+            return new EndpointResult(step, 0, false);
+        } catch (Exception failure) {
+            log.warn("Coinbase REST diagnostic {}: request failed; sensitive details omitted", step);
+            return new EndpointResult(step, 0, false);
         }
-        String start = value.substring(0, 10);
-        String end = value.substring(Math.max(0, value.length() - 5));
-        return start + "..." + end;
     }
 }

@@ -1,7 +1,7 @@
 package org.investpro.agent.symbol;
 
-import org.investpro.activity.BrokerActivityEvent;
-import org.investpro.activity.BrokerActivityType;
+import org.investpro.activities.BrokerActivityEvent;
+import org.investpro.activities.BrokerActivityType;
 import org.investpro.data.CandleData;
 import org.investpro.news.CryptoNewsItem;
 import org.investpro.news.InMemoryNewsRepository;
@@ -24,7 +24,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;

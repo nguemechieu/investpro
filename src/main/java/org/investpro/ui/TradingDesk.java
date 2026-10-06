@@ -27,7 +27,6 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.stage.FileChooser;
-import lombok.Data;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -215,7 +214,6 @@ public class TradingDesk extends BorderPane {
     private static final String DOCK_LEFT_SIDEBAR_ID = "dock.left.sidebar";
     private static final String DOCK_CENTER_CHARTS_ID = "dock.center.charts";
     private static final String DOCK_RIGHT_ORDERBOOK_ID = "dock.right.orderbook";
-    private static final String DOCK_BOTTOM_CONSOLE_ID = "dock.bottom.console";
     private static final String DOCK_LAYOUT_PREF_PREFIX = "dock.layout.";
     private static final String PEM_EC_BEGIN = "-----BEGIN EC PRIVATE " + "KEY-----";
     private static final String PEM_EC_END = "-----END EC PRIVATE " + "KEY-----";
@@ -257,7 +255,7 @@ public class TradingDesk extends BorderPane {
     private final ComboBox<Timeframe> timeframeSelector = new ComboBox<>();
     private final ComboBox<String> botSymbolScopeSelector = new ComboBox<>();
     private final ComboBox<String> orderTypeSelector = new ComboBox<>();
-    private final ComboBox<String> tradingModeSelector = new ComboBox<>();
+    private final ComboBox<String> botTradingModeSelector = new ComboBox<>();
     private final ComboBox<MarketWatchTradabilityFilter> marketWatchFilterSelector = new ComboBox<>();
     private final Label exchangeVenueLabel = new Label(t("label.venue"));
 
@@ -410,6 +408,7 @@ public class TradingDesk extends BorderPane {
     private StrategyStats cachedStrategyStats = StrategyStats.empty();
     private Instant cachedStrategyStatsAt = Instant.EPOCH;
     private final Map<String, BrokerSession> brokerSessions = new HashMap<>();
+    private final Map<Exchange, SystemCore> connectedDeskCores = new IdentityHashMap<>();
     private final Map<String, SystemCore> botSystemCores = new java.util.concurrent.ConcurrentHashMap<>();
     private SystemCore systemCore;
     private boolean systemCoreEventsSubscribed;
@@ -431,7 +430,10 @@ public class TradingDesk extends BorderPane {
     private String configuredApiKey = "";
     private String configuredApiSecret = "";
     private String configuredAccountId = "";
-    private String configuredTradingMode = "LIVE";
+    private String configuredBotTradingMode = "PAPER";
+    private Map<String, String> configuredConnectionParams = Map.of();
+    private final Map<String, Map<String, String>> connectionParamsByExchange = new HashMap<>();
+    private String configuredCredentialExchange = "";
     private InstrumentType configuredInstrumentType = InstrumentType.UNKNOWN;
     private ContractType configuredContractType = ContractType.UNKNOWN;
     private String telegramToken = "";
@@ -472,7 +474,7 @@ public class TradingDesk extends BorderPane {
 
     // Track open independent windows to prevent duplicate Scene root assignments
     private final Map<String, Stage> openIndependentWindows = new java.util.HashMap<>();
-    private final Map<String, DetachedChartWindow> detachedChartWindows = new java.util.HashMap<>();
+    private final Map<String, DetachedChartState> detachedChartWindows = new java.util.HashMap<>();
 
     private record BrokerSession(Exchange exchange, boolean accessGranted, Account account) {
     }
@@ -499,20 +501,28 @@ public class TradingDesk extends BorderPane {
             List<Order> orderHistory) {
     }
 
-    @Data
-    private static final class DetachedChartWindow {
-        private String title;
+    private final Map<Tab, DetachedChartState> detachedCharts = new java.util.HashMap<>();
+
+    private static final class DetachedChartState {
+        private final String title;
         private final Tab originalTab;
-        private final Tab floatingTab;
+        private final Node chartContent;
         private final Stage stage;
-        private boolean closingForReattach;
+        private final BorderPane detachedRoot;
+        Node placeholder;
+        private final int originalIndex;
+        private boolean reattaching;
         private boolean closingForDispose;
 
-        private DetachedChartWindow(String title, Tab originalTab, Tab floatingTab, Stage stage) {
+        private DetachedChartState(String title, Tab tab, Node content, Stage stage,
+                BorderPane root, Node placeholder, int index) {
             this.title = title;
-            this.originalTab = originalTab;
-            this.floatingTab = floatingTab;
+            this.originalTab = tab;
+            this.chartContent = content;
             this.stage = stage;
+            this.detachedRoot = root;
+            this.placeholder = placeholder;
+            this.originalIndex = index;
         }
     }
 
@@ -576,7 +586,7 @@ public class TradingDesk extends BorderPane {
         tradingDeskState.setSelectedExchange(exchangeSelector.getValue());
         tradingDeskState.setSelectedTradePair(symbolSelector.getValue());
         tradingDeskState.setSelectedTimeframe(timeframeSelector.getValue());
-        tradingDeskState.setPaperMode("PAPER".equalsIgnoreCase(safe(tradingModeSelector.getValue())));
+        tradingDeskState.setPaperMode(isPaperTradingMode());
 
         exchangeSelector.valueProperty()
                 .addListener((obs, oldValue, newValue) -> tradingDeskState.setSelectedExchange(newValue));
@@ -584,18 +594,13 @@ public class TradingDesk extends BorderPane {
                 .addListener((obs, oldValue, newValue) -> tradingDeskState.setSelectedTradePair(newValue));
         timeframeSelector.valueProperty()
                 .addListener((obs, oldValue, newValue) -> tradingDeskState.setSelectedTimeframe(newValue));
-        tradingModeSelector.valueProperty().addListener((obs, oldValue, newValue) -> {
-            boolean paper = "PAPER".equalsIgnoreCase(safe(newValue))
-                    || "SANDBOX".equalsIgnoreCase(safe(newValue))
-                    || "PRACTICE".equalsIgnoreCase(safe(newValue))
-                    || "TESTNET".equalsIgnoreCase(safe(newValue));
-            tradingDeskState.setPaperMode(paper);
-        });
+
     }
 
     private void setupUI() {
         root.getChildren().setAll(this);
         VBox.setVgrow(this, Priority.ALWAYS);
+
 
         scrollPane.setFitToWidth(true);
         scrollPane.setFitToHeight(true);
@@ -625,16 +630,20 @@ public class TradingDesk extends BorderPane {
                 ? javafx.geometry.NodeOrientation.RIGHT_TO_LEFT
                 : javafx.geometry.NodeOrientation.LEFT_TO_RIGHT);
 
+        configuredConnectionParams = configuration == null ? Map.of() : configuration.params();
         configuredApiKey = configuration == null ? "" : safe(configuration.apiKey());
+        configuredCredentialExchange = configuration == null ? "" : normalizeExchangeName(configuration.exchange());
         configuredApiSecret = configuration == null ? "" : safe(configuration.apiSecret());
         configuredAccountId = configuration == null ? "" : safe(configuration.accountId());
-        configuredTradingMode = configuration == null ? "LIVE" : safe(configuration.tradingMode());
+        configuredBotTradingMode = preferences.get("bot_trading_mode", "PAPER");
         configuredInstrumentType = configuration == null ? InstrumentType.UNKNOWN
                 : configuration.normalizedInstrumentType();
         configuredContractType = configuration == null ? ContractType.UNKNOWN : configuration.normalizedContractType();
-        if (configuredTradingMode.isBlank()) {
-            configuredTradingMode = "LIVE";
+        if (configuredBotTradingMode.isBlank()) {
+            configuredBotTradingMode = "PAPER";
         }
+
+        tradingDeskState.setPaperMode(isPaperTradingMode());
         telegramToken = resolveTelegramToken(configuration);
         configuredOpenAiApiKey = preferences.get("openai_api_key", safe(System.getenv("OPENAI_API_KEY")));
 
@@ -666,11 +675,16 @@ public class TradingDesk extends BorderPane {
         }
         // Candlestick charts now open only on user request, not automatically
 
-        if (!ibkrDeskBlocked
-                && (hasExchangeCredentials(exchangeSelector.getSelectionModel().getSelectedItem())
-                        || hasConfiguredCredentials())) {
-            proceedWithConnection();
-        }
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (oldScene == null && newScene != null) {
+                Platform.runLater(() -> {
+                    if (!hasBrokerAccess()) {
+                        loadExchangeCredentials(safe(exchangeSelector.getValue()));
+                        showExchangeCredentialDialog(safe(exchangeSelector.getValue()));
+                    }
+                });
+            }
+        });
 
         newsDataProvider.addNewsEventListener((event, action) -> runOnFx(this::refreshOpenChartsNewsEvents));
 
@@ -1127,7 +1141,7 @@ public class TradingDesk extends BorderPane {
         createCompactCombo(exchangeSelector, 170, "Broker");
         createCompactCombo(symbolSelector, 190, "Symbol");
         createCompactCombo(timeframeSelector, 82, "Timeframe");
-        createCompactCombo(tradingModeSelector, 92, "Mode");
+
         createCompactCombo(orderTypeSelector, 92, "Order Type");
 
         Label brand = new Label("InvestPro Terminal");
@@ -1146,8 +1160,8 @@ public class TradingDesk extends BorderPane {
         closeAllButton.getStyleClass().add("danger-button");
         closeAllButton.setOnAction(event -> showInfo("Close All", "Close-all positions command is not wired yet."));
 
-        Label modeLabel = new Label("Mode");
-        modeLabel.getStyleClass().add("toolbar-chip-label");
+
+
         Label brokerLabel = new Label("Broker");
         brokerLabel.getStyleClass().add("toolbar-chip-label");
         Label symbolLabel = new Label("Symbol");
@@ -1158,7 +1172,7 @@ public class TradingDesk extends BorderPane {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox modeGroup = createToolbarGroup("toolbar-group-mode", modeLabel, tradingModeSelector);
+
         HBox venueGroup = createToolbarGroup("toolbar-group-venue", brokerLabel, exchangeSelector, connectControl);
         HBox marketGroup = createToolbarGroup("toolbar-group-market", symbolLabel, symbolSelector, timeframeSelector,
                 createTimeframeStrip());
@@ -1175,8 +1189,7 @@ public class TradingDesk extends BorderPane {
         ToolBar toolBar = new ToolBar(
                 brand,
                 createVerticalSeparator(),
-                modeGroup,
-                createVerticalSeparator(),
+
                 venueGroup,
                 createVerticalSeparator(),
                 marketGroup,
@@ -1251,7 +1264,7 @@ public class TradingDesk extends BorderPane {
                 orderTicketButton,
                 createVerticalSeparator(),
                 botLabel,
-                botSymbolScopeSelector,
+                botSymbolScopeSelector, new Label("Bot mode"), botTradingModeSelector,
                 botTradeButton);
         actionCluster.setAlignment(Pos.CENTER_LEFT);
         actionCluster.getStyleClass().add("desk-action-cluster");
@@ -2257,6 +2270,7 @@ public class TradingDesk extends BorderPane {
         Stage stage = new Stage();
         stage.setTitle("Order Book");
         stage.setScene(new Scene(root, 800, 600));
+        addCoreStylesheets(stage.getScene());
         stage.show();
     }
 
@@ -2328,9 +2342,9 @@ public class TradingDesk extends BorderPane {
         }
 
         if (!(exchange instanceof IbkrExchange) || !Objects.equals(activeExchangeName(), normalizedExchange)) {
-            exchange = createExchange(normalizedExchange, "", "", "", configuredTradingMode);
-            if (configuredTradingMode != null && !configuredTradingMode.isBlank()) {
-                exchange.setUserSelectedTradingMode(configuredTradingMode);
+            exchange = createExchange(normalizedExchange, "", "", "", configuredBotTradingMode);
+            if (configuredBotTradingMode != null && !configuredBotTradingMode.isBlank()) {
+                exchange.setBotTradingMode(configuredBotTradingMode);
             }
         }
 
@@ -2362,10 +2376,16 @@ public class TradingDesk extends BorderPane {
 
         connectButton.setDisable(true);
         connectButton.setText(t("toolbar.validating"));
+
         ibkrExchange.fetchAccount()
-                .thenAccept(account -> runOnFx(() -> completeConnectionValidation(account)))
+                .thenAccept(account -> runOnFx(() -> {
+                    if (exchange == ibkrExchange) {
+                        completeConnectionValidation(account);
+                    }
+                }))
                 .exceptionally(error -> {
                     runOnFx(() -> {
+                        if (exchange != ibkrExchange) return;
                         refreshIbkrDeskGate();
                         rejectConnectionValidation(error);
                     });
@@ -2658,7 +2678,7 @@ public class TradingDesk extends BorderPane {
 
     private void updateAccountBalance() {
         Exchange currentExchange = exchange;
-        if (!hasBrokerAccess() || currentExchange == null) {
+        if (currentExchange == null) {
             balanceValueLabel.setText("$" + 0.00);
             availableValueLabel.setText("$0.00");
             equityValueLabel.setText("$0.00");
@@ -2668,8 +2688,19 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
+        if (currentExchange.isDeskPaperTrading()) {
+            Account account = currentExchange.localPaperAccount();
+            accountBalanceRows.setAll(toAssetBalanceRows(account));
+            balanceValueLabel.setText("$%s".formatted(money(account.getTotalBalance())));
+            availableValueLabel.setText("$%s".formatted(money(account.getAvailableBalance())));
+            equityValueLabel.setText("$%s".formatted(money(account.getTotalBalance())));
+            marginUsedValueLabel.setText("$0.00");
+            freeMarginValueLabel.setText("$%s".formatted(money(account.getAvailableBalance())));
+            return;
+        }
+
         try {
-            currentExchange.fetchAccount()
+            currentExchange.deskTradingAccount()
                     .thenAccept(account -> runOnFx(() -> accountBalanceRows.setAll(toAssetBalanceRows(account))))
                     .exceptionally(exception -> {
                         log.debug("Asset balances unavailable from account snapshot", exception);
@@ -3435,6 +3466,7 @@ public class TradingDesk extends BorderPane {
         Stage stage = new Stage();
         stage.setTitle("System Console");
         stage.setScene(new Scene(systemConsole, 980, 540));
+        addCoreStylesheets(stage.getScene());
         detachedSystemConsoleStage = stage;
 
         if (getScene() != null && getScene().getWindow() != null) {
@@ -3542,7 +3574,8 @@ public class TradingDesk extends BorderPane {
 
     private @NotNull Scene getScene(Node content, double width, double height) {
         javafx.scene.Parent sceneContent;
-        if (content instanceof BorderPane || content instanceof ScrollPane || content instanceof StackPane) {
+        if (content instanceof ScrollPane || content instanceof Navigation
+                || content instanceof MarketWatchPanel || content instanceof ChartContainer) {
             sceneContent = (javafx.scene.Parent) content;
         } else {
             ScrollPane scrollPane = new ScrollPane(content);
@@ -3557,12 +3590,23 @@ public class TradingDesk extends BorderPane {
         return scene;
     }
 
+    private void styleDialog(Dialog<?> dialog) {
+        org.investpro.ui.theme.DialogStyles.apply(dialog);
+    }
+
     private void addCoreStylesheets(@Nullable Scene scene) {
         if (scene == null) {
             return;
         }
         addStylesheetIfPresent(scene, "css/components.css");
         addStylesheetIfPresent(scene, "css/app.css");
+        scene.windowProperty().addListener((observable, oldWindow, newWindow) -> {
+            if (newWindow instanceof Stage window && !window.getProperties().containsKey("investpro.screenFit")) {
+                window.getProperties().put("investpro.screenFit", true);
+                window.addEventHandler(javafx.stage.WindowEvent.WINDOW_SHOWN,
+                        event -> org.investpro.ui.utils.WindowSizing.fitToScreen(window));
+            }
+        });
     }
 
     private void addStylesheetIfPresent(@NotNull Scene scene, @NotNull String resourcePath) {
@@ -3655,6 +3699,10 @@ public class TradingDesk extends BorderPane {
     }
 
     private void openSymbolAgentMarketWatch() {
+        if (symbolAgentMarketWatch != null && symbolAgentMarketWatch.getSystemCore() != systemCore) {
+            symbolAgentMarketWatch.shutdown();
+            symbolAgentMarketWatch = null;
+        }
         if (symbolAgentMarketWatch == null && systemCore != null) {
             symbolAgentMarketWatch = new MarketWatchPanel(systemCore);
         }
@@ -3670,6 +3718,8 @@ public class TradingDesk extends BorderPane {
         stage = new Stage();
         stage.setTitle("Trading Desk Navigation");
         stage.setScene(new Scene(detachedNavigation, 420, 720));
+        addCoreStylesheets(stage.getScene());
+        stage.setOnShown(event -> org.investpro.ui.utils.WindowSizing.fitToScreen(stage));
         stage.show();
     }
 
@@ -3698,8 +3748,15 @@ public class TradingDesk extends BorderPane {
                 }
             }
         });
-        panel.setOnConnectRequested(selectedExchange -> connectSelectedExchange());
-        panel.setOnDisconnectRequested(selectedExchange -> disconnectSelectedExchange());
+        panel.setOnConnectRequested(selectedExchange -> {
+            String target = normalizeExchangeName(selectedExchange);
+            if (!Objects.equals(exchangeSelector.getValue(), target)) {
+                exchangeSelector.setValue(target);
+            } else {
+                connectSelectedExchange();
+            }
+        });
+        panel.setOnDisconnectRequested(this::disconnectExchange);
         panel.setOnNavigationRequested(this::openRegisteredPanel);
     }
 
@@ -4244,6 +4301,7 @@ public class TradingDesk extends BorderPane {
         Stage stage = new Stage();
         stage.setTitle("Market Watch");
         stage.setScene(new Scene(root, 980, 560));
+        addCoreStylesheets(stage.getScene());
         stage.show();
     }
 
@@ -4446,6 +4504,12 @@ public class TradingDesk extends BorderPane {
     }
 
     private void handleEditSL(Trade trade) {
+        if (exchange != null && exchange.isDeskPaperTrading()) {
+            showWarning("Paper Trading", "Broker position changes are disabled in local paper mode.");
+            return;
+        }
+
+
         if (trade == null || trade.getTradePair() == null)
             return;
         double current = trade.getStopLoss();
@@ -4478,6 +4542,10 @@ public class TradingDesk extends BorderPane {
     }
 
     private void handleEditTP(Trade trade) {
+        if (exchange != null && exchange.isDeskPaperTrading()) {
+            showWarning("Paper Trading", "Broker position changes are disabled in local paper mode.");
+            return;
+        }
         if (trade == null || trade.getTradePair() == null)
             return;
         double current = trade.getTakeProfit();
@@ -4520,7 +4588,7 @@ public class TradingDesk extends BorderPane {
     private void handleTradeReduce(Trade trade) {
         if (trade == null || trade.getTradePair() == null)
             return;
-        if (!hasBrokerAccess()) {
+        if (exchange == null) {
             showWarning("Reduce", "Not connected to a broker.");
             return;
         }
@@ -4540,7 +4608,7 @@ public class TradingDesk extends BorderPane {
                 boolean isBuy = trade.getTransactionType() != null &&
                         trade.getTransactionType().toString().equalsIgnoreCase("BUY");
                 org.investpro.utils.Side closeSide = isBuy ? SELL : BUY;
-                exchange.createMarketOrder(trade.getTradePair(), closeSide, units)
+                exchange.deskOrderExecution().createMarketOrder(trade.getTradePair(), closeSide, units)
                         .thenRun(() -> runOnFx(() -> journal(
                                 "Reduce sent: " + trade.getTradePair().toString('/') + " × " + number(units))))
                         .exceptionally(ex -> {
@@ -4556,7 +4624,7 @@ public class TradingDesk extends BorderPane {
     private void handleTradeIncrease(Trade trade) {
         if (trade == null || trade.getTradePair() == null)
             return;
-        if (!hasBrokerAccess()) {
+        if (exchange == null) {
             showWarning("Increase", "Not connected to a broker.");
             return;
         }
@@ -4575,7 +4643,7 @@ public class TradingDesk extends BorderPane {
                 boolean isBuy = trade.getTransactionType() != null &&
                         trade.getTransactionType().toString().equalsIgnoreCase("BUY");
                 org.investpro.utils.Side sameSide = isBuy ? BUY : SELL;
-                exchange.createMarketOrder(trade.getTradePair(), sameSide, units)
+                exchange.deskOrderExecution().createMarketOrder(trade.getTradePair(), sameSide, units)
                         .thenRun(() -> runOnFx(() -> journal(
                                 "Increase sent: " + trade.getTradePair().toString('/') + " × " + number(units))))
                         .exceptionally(ex -> {
@@ -4591,7 +4659,7 @@ public class TradingDesk extends BorderPane {
     private void handleTradeClose(Trade trade) {
         if (trade == null || trade.getTradePair() == null)
             return;
-        if (!hasBrokerAccess()) {
+        if (exchange == null) {
             showWarning("Close", "Not connected to a broker.");
             return;
         }
@@ -4605,7 +4673,7 @@ public class TradingDesk extends BorderPane {
                 boolean isBuy = trade.getTransactionType() != null &&
                         trade.getTransactionType().toString().equalsIgnoreCase("BUY");
                 org.investpro.utils.Side closeSide = isBuy ? SELL : BUY;
-                exchange.createMarketOrder(trade.getTradePair(), closeSide, trade.getAmount())
+                exchange.deskOrderExecution().createMarketOrder(trade.getTradePair(), closeSide, trade.getAmount())
                         .thenRun(() -> runOnFx(() -> {
                             accountTradeItems.remove(trade);
                             journal("Close sent: " + trade.getTradePair().toString('/') + " × "
@@ -5079,7 +5147,8 @@ public class TradingDesk extends BorderPane {
     private void updateStatusBarValues() {
         TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
         statusBrokerLabel.setText("Broker: " + safe(exchangeSelector.getValue()));
-        statusModeLabel.setText("Mode: " + safe(tradingModeSelector.getValue()));
+        tradingDeskState.setPaperMode(isPaperTradingMode());
+        statusModeLabel.setText("Execution: " + (isPaperTradingMode() ? "Local paper" : "Live"));
         statusActiveSymbolLabel.setText("Symbol: " + (selected == null ? "-" : selected.toString('/')));
         statusLatencyLabel.setText("Latency: -- ms");
         statusMarketDataLabel.setText("Data: " + (marketDataEngine == null ? "idle" : "cache"));
@@ -5095,6 +5164,7 @@ public class TradingDesk extends BorderPane {
             connected = false;
             log.debug("Unable to determine connection status.", exception);
         }
+        tradingDeskState.setConnected(connected);
         connectionIndicator.setFill(connected ? Color.LIMEGREEN : Color.ORANGERED);
         connectionStatusLabel.setText(connected ? t("status.connected") : t("status.disconnected"));
         updateConnectControl(connected);
@@ -5279,9 +5349,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private boolean hasBrokerAccess() {
-        return brokerAccessGranted
-                && exchange != null
-                && (Boolean.TRUE.equals(exchange.isConnected()) || exchange.isPaperTrading());
+        return exchange != null && (brokerAccessGranted || exchange.isAuthenticatedSessionConnected());
     }
 
     private String activeExchangeName() {
@@ -5306,7 +5374,7 @@ public class TradingDesk extends BorderPane {
         }
 
         if (exchange != null
-                && (Boolean.TRUE.equals(exchange.isConnected()) || exchange.isPaperTrading())
+                && (exchange.isAuthenticatedSessionConnected() || Boolean.TRUE.equals(exchange.isConnected()) || exchange.isDeskPaperTrading())
                 && Objects.equals(normalizeExchangeName(firstNonBlank(
                         exchange.getName(),
                         exchange.getExchangeId(),
@@ -5319,7 +5387,7 @@ public class TradingDesk extends BorderPane {
         return session != null
                 && session.accessGranted()
                 && session.exchange() != null
-                && (Boolean.TRUE.equals(session.exchange().isConnected()) || session.exchange().isPaperTrading());
+                && (session.exchange().isAuthenticatedSessionConnected() || Boolean.TRUE.equals(session.exchange().isConnected()) || session.exchange().isDeskPaperTrading());
     }
 
     private @NotNull String brokerSessionKey(String exchangeName) {
@@ -5359,7 +5427,7 @@ public class TradingDesk extends BorderPane {
 
     private boolean lacksOrderSubmissionAccess() {
         try {
-            return !hasBrokerAccess() || exchange == null || !exchange.canSubmitOrders();
+            return exchange == null;
         } catch (Exception exception) {
             log.debug("Unable to check order submission access", exception);
             return true;
@@ -5412,62 +5480,23 @@ public class TradingDesk extends BorderPane {
             }
         });
 
-        configureTradingModeSelector();
+        configureBotTradingModeSelector();
         configureOrderTypeSelector();
         configureTimeframeSelector();
     }
 
-    private void configureTradingModeSelector() {
-        tradingModeSelector.getItems().setAll("PAPER", "LIVE");
-        tradingModeSelector.getSelectionModel().select(configuredTradingMode);
-
-        tradingModeSelector.setOnAction(event -> {
-            String selectedMode = tradingModeSelector.getSelectionModel().getSelectedItem();
-            if (selectedMode != null && exchange != null) {
-                configuredTradingMode = selectedMode;
-                saveExchangeCredentials(safe(exchangeSelector.getValue()));
-                exchange.setUserSelectedTradingMode(selectedMode);
-                System.setProperty("investpro.trading.mode", selectedMode);
-                log.info("Trading mode switched to: {}", selectedMode);
-                appendAgentActivity("Trading mode: " + selectedMode);
-                updateStatusBarValues();
-
-                if ("PAPER".equalsIgnoreCase(selectedMode)) {
-                    loadSymbolsForSelectedExchange();
-                    refreshAccountWorkspace();
-                } else if (hasBrokerAccess()) {
-                    reconnectCurrentExchangeForTradingMode();
-                }
-            }
+    private void configureBotTradingModeSelector() {
+        botTradingModeSelector.getItems().setAll("PAPER", "LIVE");
+        botTradingModeSelector.getSelectionModel().select(configuredBotTradingMode);
+        botTradingModeSelector.setPrefWidth(92);
+        botTradingModeSelector.setTooltip(new Tooltip("Execution mode for bot trading only"));
+        botTradingModeSelector.setOnAction(event -> {
+            configuredBotTradingMode = botTradingModeSelector.getValue();
+            if (exchange != null) exchange.setBotTradingMode(configuredBotTradingMode);
+            connectedDeskCores.keySet().forEach(venue -> venue.setBotTradingMode(configuredBotTradingMode));
+            preferences.put("bot_trading_mode", configuredBotTradingMode);
+            saveAppState();
         });
-    }
-
-    private void reconnectCurrentExchangeForTradingMode() {
-        String selectedExchange = safe(exchangeSelector.getSelectionModel().getSelectedItem());
-        if (selectedExchange.isBlank()) {
-            return;
-        }
-
-        if (!hasExchangeCredentials(selectedExchange)) {
-            return;
-        }
-
-        loadExchangeCredentials(selectedExchange);
-        exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId,
-                configuredTradingMode);
-
-        setTelegramToken(telegramToken);
-
-        new Thread(() -> {
-            try {
-                exchange.connectStream();
-            } catch (Exception streamException) {
-                log.debug("Unable to reconnect stream while switching trading mode", streamException);
-            }
-        }, "WebSocketConnector-ModeSwitch-" + selectedExchange).start();
-
-        journal("Switching %s to %s mode".formatted(selectedExchange, configuredTradingMode));
-        proceedWithConnection();
     }
 
     private void configureOrderTypeSelector() {
@@ -5573,12 +5602,12 @@ public class TradingDesk extends BorderPane {
             }
         });
         detachedChartWindows.values().forEach(window -> {
-            if (window.floatingTab.getContent() instanceof ChartContainer container) {
+            if (window.chartContent instanceof ChartContainer container) {
                 Integer seconds = org.investpro.utils.CandleAggregator.TIMEFRAME_SECONDS.get(timeframe);
                 if (seconds != null && seconds > 0) {
                     container.setSecondsPerCandle(seconds);
                 }
-            } else if (window.floatingTab.getContent() instanceof CandleStickChart chart) {
+            } else if (window.chartContent instanceof CandleStickChart chart) {
                 chart.refreshChart();
             }
         });
@@ -5635,9 +5664,7 @@ public class TradingDesk extends BorderPane {
 
         BrokerSession existingSession = findBrokerSession(selectedExchange);
         if (existingSession != null
-                && existingSession.accessGranted()
-                && existingSession.exchange() != null
-                && Boolean.TRUE.equals(existingSession.exchange().isConnected())) {
+                && canReuseBrokerSession(existingSession.exchange(), existingSession.accessGranted())) {
             exchange = existingSession.exchange();
             brokerAccessGranted = true;
             setTelegramToken(telegramToken);
@@ -5657,15 +5684,16 @@ public class TradingDesk extends BorderPane {
                 configuration == null ? configuredApiKey : safe(configuration.apiKey()),
                 configuration == null ? configuredApiSecret : safe(configuration.apiSecret()),
                 configuration == null ? configuredAccountId : safe(configuration.accountId()),
-                configuration == null ? configuredTradingMode : safe(configuration.tradingMode()));
+                configuration == null ? configuredBotTradingMode : safe(configuration.tradingMode()));
 
         if (!Boolean.TRUE.equals(exchange.isConnected())) {
-            new Thread(() -> exchange.connectStream(), "WebSocketConnector-" + selectedExchange).start();
+            Exchange streamingExchange = exchange;
+            new Thread(streamingExchange::connectStream, "WebSocketConnector-" + selectedExchange).start();
         }
 
         // Set trading mode from configuration
         if (configuration != null) {
-            exchange.setUserSelectedTradingMode(configuration.tradingMode());
+            exchange.setBotTradingMode(configuredBotTradingMode);
         }
 
         setTelegramToken(telegramToken);
@@ -5674,6 +5702,11 @@ public class TradingDesk extends BorderPane {
         updateConnectionStatus();
         updateExchangeVenueLabel();
         refreshOrderTypeOptions();
+        if (!safe(exchange.getCredentials().apiKey()).isBlank()
+                || !safe(exchange.getCredentials().accessToken()).isBlank()
+                || !safe(exchange.getCredentials().keyName()).isBlank()) {
+            proceedWithConnection();
+        }
     }
 
     public void setTelegramToken(String telegramToken) {
@@ -5688,27 +5721,19 @@ public class TradingDesk extends BorderPane {
     }
 
     private void onExchangeChanged() {
-        String selectedExchange = normalizeExchangeName(exchangeSelector.getSelectionModel().getSelectedItem());
+        String selectedExchange = normalizeExchangeName(exchangeSelector.getValue());
         if (selectedExchange.isBlank()) {
             return;
         }
-
-        if (isExchangeConnected(selectedExchange)) {
-            BrokerSession existingSession = findBrokerSession(selectedExchange);
-            if (existingSession != null && existingSession.exchange() != null) {
-                exchange = existingSession.exchange();
-            }
-            brokerAccessGranted = true;
-            setTelegramToken(telegramToken);
-            updateConnectionStatus();
-            updateExchangeVenueLabel();
-            refreshOrderTypeOptions();
-            journal("Using active %s connection".formatted(selectedExchange));
-            saveAppState();
-            return;
-        }
-
+        if (exchange != null && Objects.equals(activeExchangeName(), selectedExchange)) return;
+        if (exchange != null && systemCore != null) connectedDeskCores.put(exchange, systemCore);
+        tradingDeskState.setConnected(false);
         brokerAccessGranted = false;
+        disablePositionAutoRefresh();
+        stopDesktopStream();
+        systemCore = null;
+        systemCoreEventsSubscribed = false;
+        botTradingEnabled = false;
         if (universalTradabilityService != null) {
             universalTradabilityService.invalidateAll();
         }
@@ -5716,115 +5741,43 @@ public class TradingDesk extends BorderPane {
         marketWatchUniverse.clear();
         tradabilityServiceExchangeId = "";
         universalTradabilityService = null;
-
-        // DO NOT stop the bot - it should continue trading across exchanges
-        // Instead, just update the exchange connection in the existing bot
-        if (systemCore != null) {
-            try {
-                // Update bot context with new exchange instead of stopping
-                if (systemCore.getSmartBot() != null && systemCore.getSmartBot().isStarted()) {
-                    log.info("Updating bot to use new exchange: {}", selectedExchange);
-                    // Bot will be updated with new exchange below
-                } else {
-                    // Bot wasn't running, proceed normally
-                    systemCoreEventsSubscribed = false;
-                }
-            } catch (Exception exception) {
-                log.warn("Failed to update SystemCore bot during exchange change. Continuing with UI exchange switch.",
-                        exception);
-                systemCoreEventsSubscribed = false;
-            }
-        }
-
-        disablePositionAutoRefresh();
-
-        BrokerSession existingSession = findBrokerSession(selectedExchange);
-
-        if (existingSession != null && existingSession.accessGranted()) {
-            // Already connected to this exchange — reuse the active session
-            exchange = existingSession.exchange();
-            brokerAccessGranted = true;
-        } else {
-            // Not connected — load any stored credentials so the dialog is pre-filled,
-            // then create a provisional exchange for symbol loading only.
-            loadExchangeCredentials(selectedExchange);
-            exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId,
-                    configuredTradingMode);
-        }
-
-        setTelegramToken(telegramToken);
-        if (marketInfoPanel != null) {
-            marketInfoPanel.setExchange(exchange);
-        }
-
         accountPositionItems.clear();
         accountOpenOrderItems.clear();
         accountTradeItems.clear();
         accountHistoryItems.clear();
         positionHealthItems.clear();
         accountSummaryArea.clear();
+        BrokerSession savedSession = findBrokerSession(selectedExchange);
+        if (savedSession != null && canReuseBrokerSession(savedSession.exchange(), savedSession.accessGranted())) {
+            exchange = savedSession.exchange();
+            loadExchangeCredentials(selectedExchange);
+            exchange.setBotTradingMode(configuredBotTradingMode);
+            tradingDeskState.setPaperMode(isPaperTradingMode());
 
-        refreshIbkrDeskGate();
-        if (ibkrDeskBlocked) {
-            updateConnectionStatus();
-            updateExchangeVenueLabel();
-            refreshOrderTypeOptions();
-            journal("Exchange changed to %s. IBKR Control Panel must connect before Trading Desk opens."
-                    .formatted(selectedExchange));
+            botTradingModeSelector.getSelectionModel().select(configuredBotTradingMode);
+            if (marketInfoPanel != null) marketInfoPanel.setExchange(exchange);
+            SystemCore savedCore = connectedDeskCores.get(exchange);
+            botTradingEnabled = savedCore != null && savedCore.isAutoTradingEnabled();
+            completeConnectionValidation(savedSession.account());
             saveAppState();
             return;
         }
-
-        loadSymbolsForSelectedExchange();
+        loadExchangeCredentials(selectedExchange);
+        exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret,
+                configuredAccountId, configuredBotTradingMode);
+        if (marketInfoPanel != null) {
+            marketInfoPanel.setExchange(exchange);
+        }
         updateConnectionStatus();
         updateExchangeVenueLabel();
         refreshOrderTypeOptions();
-        journal("Exchange changed to %s".formatted(selectedExchange));
         saveAppState();
+        showExchangeCredentialDialog(selectedExchange);
+    }
 
-        if (brokerAccessGranted) {
-            if (existingSession != null && existingSession.account() != null) {
-                updateAccountSummary(existingSession.account());
-            }
-
-            // Update existing bot with new exchange instead of recreating SystemCore
-            if (systemCore != null && systemCore.getSmartBot() != null && systemCore.getSmartBot().isStarted()) {
-                try {
-                    log.info("Updating running bot with new exchange: {}", selectedExchange);
-                    systemCore.getSmartBot().updateExchange(exchange);
-                } catch (Exception e) {
-                    log.warn("Failed to update bot exchange, recreating SystemCore: {}", e.getMessage());
-                    try {
-                        systemCore = createSystemCore(exchange);
-                    } catch (SQLException | ClassNotFoundException ex) {
-                        log.error("Failed to create SystemCore", ex);
-                        showAlert("Failed to initialize trading system: " + ex.getMessage());
-                    }
-                }
-            } else {
-                try {
-                    systemCore = createSystemCore(exchange);
-                    if (systemCore.getTelegramCommandHandler() != null && getScene() != null
-                            && getScene().getWindow() instanceof Stage) {
-                        systemCore.getTelegramCommandHandler().setPrimaryStage((Stage) getScene().getWindow());
-                    }
-                } catch (SQLException | ClassNotFoundException e) {
-                    log.error("Failed to create SystemCore", e);
-                    showAlert("Failed to initialize trading system: " + e.getMessage());
-                }
-            }
-            systemCoreEventsSubscribed = false;
-            enablePositionAutoRefresh();
-            initializeSymbolAgentPanels();
-            refreshAccountWorkspace();
-        } else {
-            // Exchange not connected — always prompt for credentials and trading venue
-            if (isInteractiveBrokersExchange(selectedExchange)) {
-                openIbkrSetupWizardForSelection(selectedExchange);
-            } else {
-                showExchangeCredentialDialog(selectedExchange);
-            }
-        }
+    static boolean canReuseBrokerSession(Exchange candidate, boolean accessGranted) {
+        return candidate != null && (candidate.isAuthenticatedSessionConnected()
+                || (accessGranted && (candidate.isDeskPaperTrading() || Boolean.TRUE.equals(candidate.isConnected()))));
     }
 
     private void connectSelectedExchange() {
@@ -5832,6 +5785,12 @@ public class TradingDesk extends BorderPane {
 
         if (selectedExchange.isBlank()) {
             showWarning("Connection", "No exchange selected.");
+            return;
+        }
+
+        if (exchange != null && exchange.isAuthenticatedSessionConnected()
+                && Objects.equals(activeExchangeName(), selectedExchange)) {
+            updateConnectionStatus();
             return;
         }
 
@@ -5844,84 +5803,19 @@ public class TradingDesk extends BorderPane {
                 && Boolean.TRUE.equals(exchange.isConnected())
                 && Objects.equals(activeExchangeName(), selectedExchange)) {
             brokerAccessGranted = true;
-            BrokerSession existingSession = findBrokerSession(selectedExchange);
-            if (existingSession != null && existingSession.account() != null) {
-                updateAccountSummary(existingSession.account());
-            }
             updateConnectionStatus();
-            updateExchangeVenueLabel();
-            refreshOrderTypeOptions();
-            refreshAccountWorkspace();
-            journal("Already connected to %s".formatted(selectedExchange));
             return;
         }
-
-        BrokerSession existingSession = findBrokerSession(selectedExchange);
-        if (existingSession != null
-                && existingSession.accessGranted()
-                && existingSession.exchange() != null
-                && Boolean.TRUE.equals(existingSession.exchange().isConnected())) {
-            exchange = existingSession.exchange();
-            brokerAccessGranted = true;
-
-            if (configuredTradingMode != null && !configuredTradingMode.isBlank()) {
-                exchange.setUserSelectedTradingMode(configuredTradingMode);
-            }
-
-            if (existingSession.account() != null) {
-                updateAccountSummary(existingSession.account());
-            }
-
-            updateConnectionStatus();
-            updateExchangeVenueLabel();
-            refreshOrderTypeOptions();
-            refreshAccountWorkspace();
-            journal("Reusing active %s connection".formatted(selectedExchange));
-            return;
-        }
-
-        if (!hasExchangeCredentials(selectedExchange)) {
-            showExchangeCredentialDialog(selectedExchange);
-            return;
-        }
-
         loadExchangeCredentials(selectedExchange);
-
-        exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId,
-                configuredTradingMode);
-
-        // Record exchange connection event
-        SystemOperationsService.getInstance().recordEvent(
-                SystemActivityEvent.Component.EXCHANGE,
-                SystemActivityEvent.Severity.INFO,
-                "CONNECTION_INITIATED",
-                "Connecting to " + selectedExchange);
-
-        // Connect WebSocket stream on background thread to avoid blocking JavaFX thread
-        new Thread(() -> {
-            try {
-                exchange.connectStream();
-                SystemOperationsService.getInstance().recordEvent(
-                        SystemActivityEvent.Component.EXCHANGE,
-                        SystemActivityEvent.Severity.INFO,
-                        "CONNECTION_SUCCESS",
-                        "Successfully connected to " + selectedExchange);
-            } catch (Exception e) {
-                log.error("Failed to connect to {}", selectedExchange, e);
-                SystemOperationsService.getInstance().recordEvent(
-                        SystemActivityEvent.Component.EXCHANGE,
-                        SystemActivityEvent.Severity.ERROR,
-                        "CONNECTION_FAILED",
-                        "Failed to connect to " + selectedExchange);
-            }
-        }, "WebSocketConnector-" + selectedExchange).start();
-
-        setTelegramToken(telegramToken);
-        proceedWithConnection();
+        showExchangeCredentialDialog(selectedExchange);
     }
 
     private void disconnectSelectedExchange() {
-        String selectedExchange = normalizeExchangeName(exchangeSelector.getSelectionModel().getSelectedItem());
+        disconnectExchange(safe(exchangeSelector.getValue()));
+    }
+
+    private void disconnectExchange(String exchangeName) {
+        String selectedExchange = normalizeExchangeName(exchangeName);
         if (selectedExchange.isBlank()) {
             return;
         }
@@ -5929,9 +5823,15 @@ public class TradingDesk extends BorderPane {
         BrokerSession existingSession = brokerSessions.remove(brokerSessionKey(selectedExchange));
         Exchange exchangeToDisconnect = existingSession != null && existingSession.exchange() != null
                 ? existingSession.exchange()
-                : exchange;
+                : Objects.equals(activeExchangeName(), selectedExchange) ? exchange : null;
 
         if (exchangeToDisconnect != null) {
+            SystemCore retainedCore = connectedDeskCores.remove(exchangeToDisconnect);
+            if (retainedCore != null) {
+                try { retainedCore.stop(); }
+                catch (Exception error) { log.debug("Failed to stop disconnected desk runtime", error); }
+            }
+            exchangeToDisconnect.setAuthenticatedSessionConnected(false);
             try {
                 exchangeToDisconnect.disconnectStream();
                 exchangeToDisconnect.disconnect();
@@ -5964,24 +5864,51 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
+        if (validatingExchange == exchange) return;
+        validatingExchange = exchange;
         brokerAccessGranted = false;
         updateConnectionStatus();
         connectButton.setDisable(true);
         connectButton.setText(t("toolbar.validating"));
 
+        Exchange connectingExchange = exchange;
+
         CompletableFuture
                 .supplyAsync(() -> {
-                    exchange.connect();
-                    CompletableFuture<Account> accountFuture = exchange.fetchAccount();
+                    if (connectingExchange instanceof IbkrExchange ibkr) {
+                        var gatewayCheck = ibkr.AuthCheckResult(ibkr.getName());
+                        if (!gatewayCheck.success()) throw new IllegalStateException(gatewayCheck.message());
+                        if (!Boolean.TRUE.equals(ibkr.isConnected())) ibkr.connect();
+                        return ibkr.fetchAccount().thenCombine(ibkr.gatewayContractDiscovery(), (account, _) -> account)
+                                .orTimeout(30, TimeUnit.SECONDS);
+                    }
+                    var credentials = connectingExchange.getCredentials();
+                    if (credentials == null || (safe(credentials.apiKey()).isBlank()
+                            && safe(credentials.keyName()).isBlank()
+                            && safe(credentials.accessToken()).isBlank()
+                            && safe(credentials.accountId()).isBlank())) {
+                        return CompletableFuture.completedFuture(connectingExchange.localPaperAccount());
+                    }
+                    CompletableFuture<Account> accountFuture = connectingExchange.fetchAccount();
                     if (accountFuture == null) {
                         throw new IllegalStateException("This broker adapter cannot validate credentials yet.");
                     }
-                    return accountFuture;
+                    return accountFuture.orTimeout(30, TimeUnit.SECONDS);
                 })
                 .thenCompose(Function.identity())
-                .thenAccept(account -> runOnFx(() -> completeConnectionValidation(account)))
+                .thenAccept(account -> runOnFx(() -> {
+                    if (exchange == connectingExchange) {
+                        validatingExchange = null;
+                        completeConnectionValidation(account);
+                    }
+                }))
                 .exceptionally(exception -> {
-                    runOnFx(() -> rejectConnectionValidation(exception));
+                    runOnFx(() -> {
+                        if (exchange == connectingExchange) {
+                            validatingExchange = null;
+                            rejectConnectionValidation(exception);
+                        }
+                    });
                     return null;
                 });
     }
@@ -5998,13 +5925,18 @@ public class TradingDesk extends BorderPane {
 
         brokerAccessGranted = true;
         brokerSessions.put(brokerSessionKey(exchangeSelector.getValue()), new BrokerSession(exchange, true, account));
+        exchange.setAuthenticatedSessionConnected(!account.isPaperTrading());
         refreshIbkrDeskGate();
 
         // Bootstrap instruments into MarketDataEngine
         bootstrapInstrumentsForExchange();
 
         try {
-            systemCore = createSystemCore(exchange);
+            systemCore = connectedDeskCores.get(exchange);
+            if (systemCore == null) {
+                systemCore = createSystemCore(exchange);
+                connectedDeskCores.put(exchange, systemCore);
+            }
             // Wire up the primary stage to the Telegram command handler for screenshot
             // capability
             if (systemCore.getTelegramCommandHandler() != null && getScene() != null
@@ -6023,10 +5955,10 @@ public class TradingDesk extends BorderPane {
         journal("Credentials validated for %s".formatted(exchangeSelector.getValue()));
 
         // Sync trading mode selector with configured trading mode from credentials
-        if (configuredTradingMode != null) {
-            tradingModeSelector.getSelectionModel().select(configuredTradingMode);
+        if (configuredBotTradingMode != null) {
+            botTradingModeSelector.getSelectionModel().select(configuredBotTradingMode);
             if (exchange != null) {
-                exchange.setUserSelectedTradingMode(configuredTradingMode);
+                exchange.setBotTradingMode(configuredBotTradingMode);
             }
         }
 
@@ -6142,6 +6074,9 @@ public class TradingDesk extends BorderPane {
 
     private void rejectConnectionValidation(Throwable throwable) {
         brokerAccessGranted = false;
+        if (exchange != null) {
+            exchange.setAuthenticatedSessionConnected(false);
+        }
         brokerSessions.remove(brokerSessionKey(exchangeSelector.getValue()));
 
         if (systemCore != null) {
@@ -6178,7 +6113,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private void submitMarketOrder(org.investpro.utils.Side side) {
-        if (!hasBrokerAccess()) {
+        if (exchange == null) {
             showWarning("Order", "Connect to an exchange before submitting orders.");
             return;
         }
@@ -6249,7 +6184,7 @@ public class TradingDesk extends BorderPane {
     private void submitOrderByType(String orderType, TradePair tradePair, org.investpro.utils.Side side,
             double amount) {
         // Check if pair is tradable now using MarketDataEngine
-        if (marketDataEngine != null && !marketDataEngine.isTradableNow(tradePair)) {
+        if (!isPaperTradingMode() && marketDataEngine != null && !marketDataEngine.isTradableNow(tradePair)) {
             String hours = marketDataEngine.getTradingHours(tradePair);
             showWarning("Trading Unavailable", "%s is not tradable now. Trading hours: %s".formatted(
                     tradePair.toString('/'), hours));
@@ -6298,7 +6233,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private void submitMarketOrderInternal(TradePair tradePair, org.investpro.utils.Side side, double amount) {
-        exchange.createMarketOrder(tradePair, side, amount)
+        exchange.deskOrderExecution().createMarketOrder(tradePair, side, amount)
                 .thenAccept(orderId -> runOnFx(() -> {
                     journal("%s market order submitted for %s: %s".formatted(side, tradePair.toString('/'), orderId));
                     refreshAccountWorkspace();
@@ -6328,7 +6263,7 @@ public class TradingDesk extends BorderPane {
                 return;
             }
 
-            exchange.createLimitOrder(tradePair, side, amount, price)
+            exchange.deskOrderExecution().createLimitOrder(tradePair, side, amount, price)
                     .thenAccept(orderId -> runOnFx(() -> {
                         journal("%s limit order submitted for %s at $%.2f: %s".formatted(side, tradePair.toString('/'),
                                 price, orderId));
@@ -6361,7 +6296,7 @@ public class TradingDesk extends BorderPane {
                 return;
             }
 
-            exchange.createStopOrder(tradePair, side, amount, stopPrice)
+            exchange.deskOrderExecution().createStopOrder(tradePair, side, amount, stopPrice)
                     .thenAccept(orderId -> runOnFx(() -> {
                         journal("%s stop order submitted for %s at $%.2f: %s".formatted(side, tradePair.toString('/'),
                                 stopPrice, orderId));
@@ -6402,7 +6337,7 @@ public class TradingDesk extends BorderPane {
                     return;
                 }
 
-                exchange.createTrailingStopOrder(tradePair, side, amount, trailingAmount, trailingPercent)
+                exchange.deskOrderExecution().createTrailingStopOrder(tradePair, side, amount, trailingAmount, trailingPercent)
                         .thenAccept(orderId -> runOnFx(() -> {
                             journal("%s trailing stop order submitted for %s amount=%.8f trail=%s%s: %s"
                                     .formatted(side, tradePair.toString('/'), amount,
@@ -6462,7 +6397,7 @@ public class TradingDesk extends BorderPane {
                     return;
                 }
 
-                exchange.createBracketOrder(tradePair, side, amount, entryPrice, stopLossPrice, takeProfitPrice)
+                exchange.deskOrderExecution().createBracketOrder(tradePair, side, amount, entryPrice, stopLossPrice, takeProfitPrice)
                         .thenAccept(orderId -> runOnFx(() -> {
                             journal("%s bracket order submitted for %s - Entry: $%.2f, TP: $%.2f, SL: $%.2f: %s"
                                     .formatted(side, tradePair.toString('/'), entryPrice, takeProfitPrice,
@@ -6479,7 +6414,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private void loadOrderBook(TradePair tradePair) {
-        if (!hasBrokerAccess() || exchange == null || tradePair == null) {
+        if (exchange == null || tradePair == null) {
             return;
         }
 
@@ -7406,6 +7341,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private void refreshBotTradeButton() {
+        botTradingModeSelector.setDisable(botTradingEnabled);
         botTradeButton.setText(botTradingEnabled ? t("toolbar.stopBot") : t("toolbar.botTrade"));
         botTradeButton.setStyle(botTradingEnabled
                 ? "-fx-padding: 6 12; -fx-background-color: #16a34a; -fx-text-fill: white; -fx-font-weight: bold;"
@@ -7696,6 +7632,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private boolean canSubmitOrderByTradability(TradePair pair, OpenOrder.OrderType orderType, double amount) {
+        if (isPaperTradingMode()) return exchange != null && pair != null;
         SymbolTradability status = fetchTradabilityForOrder(pair);
         if (status == null) {
             showWarning("Order Blocked", "Tradability could not be verified for %s."
@@ -7735,7 +7672,7 @@ public class TradingDesk extends BorderPane {
                         pair == null ? "" : pair.toString('/'),
                         orderType,
                         java.math.BigDecimal.valueOf(amount),
-                        exchange != null && !exchange.isPaperTrading(),
+                        exchange != null && !exchange.isDeskPaperTrading(),
                         exchange != null && Boolean.TRUE.equals(exchange.isConnected()),
                         Boolean.parseBoolean(String.valueOf(metadataValue(status, "session.orderSubmissionOpen",
                                 status.orderSubmissionAllowed())))),
@@ -7866,7 +7803,7 @@ public class TradingDesk extends BorderPane {
                 + ", assetClass=" + inferTradabilityAssetClass(pair, status)
                 + ", connected=" + (exchange != null && Boolean.TRUE.equals(exchange.isConnected()))
                 + ", mode=" + (exchange == null ? "-" : exchange.getResolvedTradingMode())
-                + ", paper=" + (exchange != null && exchange.isPaperTrading())
+                + ", paper=" + (exchange != null && exchange.isDeskPaperTrading())
                 + ", supportsLive=" + (exchange != null && exchange.supportsLiveTrading())
                 + ", supportsPaper=" + (exchange != null && exchange.supportsPaperTradingMode())
                 + ", canSubmitLiveOrders=" + (exchange != null && exchange.canSubmitLiveOrders())
@@ -7956,6 +7893,14 @@ public class TradingDesk extends BorderPane {
     }
 
     private void updateOrderActionAvailability(TradePair selected) {
+        if (isPaperTradingMode()) {
+            boolean blocked = exchange == null || selected == null;
+            buyButton.setDisable(blocked);
+            sellButton.setDisable(blocked);
+            Tooltip.install(buyButton, new Tooltip("Buy using local paper execution"));
+            Tooltip.install(sellButton, new Tooltip("Sell using local paper execution"));
+            return;
+        }
         if (!hasBrokerAccess() || selected == null || universalTradabilityService == null) {
             boolean blocked = !hasBrokerAccess();
             buyButton.setDisable(blocked);
@@ -8178,11 +8123,7 @@ public class TradingDesk extends BorderPane {
         return filtered;
     }
 
-    private boolean isPaperTradingMode() {
-        String selectedMode = tradingModeSelector.getValue();
-        String mode = safe(selectedMode).isBlank() ? safe(configuredTradingMode) : safe(selectedMode);
-        return "PAPER".equalsIgnoreCase(mode);
-    }
+    private boolean isPaperTradingMode() { return exchange == null || exchange.isDeskPaperTrading(); }
 
     private boolean isOandaExchangeSelectedOrActive() {
         String selectedExchange = safe(exchangeSelector.getValue());
@@ -8262,6 +8203,8 @@ public class TradingDesk extends BorderPane {
         }
 
         Dialog<ButtonType> dialog = new Dialog<>();
+
+        styleDialog(dialog);
         dialog.setTitle("Add Trustline Asset");
         dialog.setHeaderText("Add Trustline Asset");
         dialog.getDialogPane().getButtonTypes().setAll(ButtonType.CANCEL, ButtonType.OK);
@@ -8476,6 +8419,11 @@ public class TradingDesk extends BorderPane {
             showWarning("Chart", "No exchange is available.");
             return;
         }
+        if (!exchange.getCapability().isSupportsHistoricalCandles()) {
+            showWarning("Chart", "Historical candle data is not available in the "
+                    + exchange.getDisplayName() + " adapter. Select an exchange with chart support.");
+            return;
+        }
 
         // Build tab title with symbol name
         String exchangeDisplayName = exchange.getDisplayName();
@@ -8492,7 +8440,7 @@ public class TradingDesk extends BorderPane {
                 return;
             }
         }
-        DetachedChartWindow detachedWindow = detachedChartWindows.get(tabTitle);
+        DetachedChartState detachedWindow = detachedChartWindows.get(tabTitle);
         if (detachedWindow != null && detachedWindow.stage.isShowing()) {
             detachedWindow.stage.toFront();
             detachedWindow.stage.requestFocus();
@@ -8513,8 +8461,11 @@ public class TradingDesk extends BorderPane {
         Tab tab = new Tab(title, container);
         tab.setClosable(true);
         tab.setOnClosed(event -> {
-            detachedChartWindows.remove(title);
-            container.dispose();
+            if (detachedCharts.containsKey(tab)) {
+                disposeDetachedChart(title);
+            } else {
+                container.dispose();
+            }
         });
         tab.setContextMenu(createChartTabContextMenu(tab));
         return tab;
@@ -8526,6 +8477,11 @@ public class TradingDesk extends BorderPane {
 
         MenuItem closeItem = new MenuItem("Close");
         closeItem.setOnAction(event -> {
+            DetachedChartState detached = detachedCharts.get(tab);
+            if (detached != null) {
+                disposeDetachedChart(detached.title);
+                return;
+            }
             if (tab != null && tab.getTabPane() != null) {
                 tab.getTabPane().getTabs().remove(tab);
             }
@@ -8542,148 +8498,118 @@ public class TradingDesk extends BorderPane {
     }
 
     private void detachChartTab(Tab tab) {
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(() -> detachChartTab(tab));
+            return;
+        }
         if (tab == null) {
             showWarning("Charts", "Select a chart tab to detach.");
             return;
         }
-
-        Node content = tab.getContent();
-        if (content == null) {
-            showWarning("Charts", "The selected chart tab has no content to detach.");
-            return;
-        }
-
-        String title = safe(tab.getText());
-
-        DetachedChartWindow existing = detachedChartWindows.get(title);
-        if (existing != null && existing.stage.isShowing()) {
+        DetachedChartState existing = detachedCharts.get(tab);
+        if (existing != null) {
             existing.stage.toFront();
             existing.stage.requestFocus();
             return;
         }
-
-        /*
-         * Important:
-         * A JavaFX Node can only have one parent.
-         * Remove it from the original tab before adding it to the floating tab.
-         */
-        tab.setContent(null);
-
-        if (chartTabPane.getTabs().contains(tab)) {
-            chartTabPane.getTabs().remove(tab);
+        Node content = tab.getContent();
+        if (content == null) {
+            return;
         }
+        String title = safe(tab.getText());
+        int index = chartTabPane.getTabs().indexOf(tab);
+        Button placeholderReattach = new Button("Reattach");
+        placeholderReattach.getStyleClass().add("terminal-button");
+        VBox placeholder = new VBox(12, new Label("Chart is open in a detached window."), placeholderReattach);
+        placeholder.setAlignment(Pos.CENTER);
+        tab.setContent(null);
+        tab.setContent(placeholder);
 
-        Tab floatingTab = new Tab(title);
-        floatingTab.setClosable(false);
-        floatingTab.setContent(content);
-
-        TabPane floatingTabs = new TabPane(floatingTab);
-        floatingTabs.setSide(Side.TOP);
-        floatingTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        floatingTabs.getStyleClass().addAll("chart-tabs", "mt5-chart-tabs");
-
-        Button reattachButton = new Button("Reattach");
-        reattachButton.getStyleClass().add("terminal-button");
-
-        Button closeChartButton = new Button("Close Chart");
-        closeChartButton.getStyleClass().add("terminal-button");
-
-        Label titleLabel = new Label(title);
-        titleLabel.getStyleClass().add("terminal-title");
-
+        Button reattach = new Button("Reattach");
+        reattach.getStyleClass().add("terminal-button");
+        Button closeChart = new Button("Close Chart");
+        closeChart.getStyleClass().add("terminal-button");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        HBox header = new HBox(8, titleLabel, spacer, reattachButton, closeChartButton);
-        header.setAlignment(Pos.CENTER_LEFT);
-        header.setPadding(new Insets(8));
-        header.getStyleClass().add("workspace-header");
-
+        HBox toolbar = new HBox(8, new Label(title), spacer, reattach, closeChart);
+        toolbar.setPadding(new Insets(8));
+        toolbar.setAlignment(Pos.CENTER_LEFT);
+        toolbar.getStyleClass().add("workspace-header");
         BorderPane root = new BorderPane();
-        root.setTop(header);
-        root.setCenter(floatingTabs);
+        root.setTop(toolbar);
+        root.setCenter(content);
         root.getStyleClass().add("workspace-pane");
-
         Stage stage = new Stage();
         stage.setTitle(title);
-
         Scene scene = new Scene(root, 1100, 720);
         addCoreStylesheets(scene);
         stage.setScene(scene);
-
-        DetachedChartWindow window = new DetachedChartWindow(title, tab, floatingTab, stage);
-        detachedChartWindows.put(title, window);
-
-        reattachButton.setOnAction(event -> reattachDetachedChart(title));
-        closeChartButton.setOnAction(event -> disposeDetachedChart(title));
-
+        DetachedChartState state = new DetachedChartState(title, tab, content, stage, root, placeholder, index);
+        detachedCharts.put(tab, state);
+        detachedChartWindows.put(title, state);
+        reattach.setOnAction(event -> reattachChartTab(tab));
+        placeholderReattach.setOnAction(event -> reattachChartTab(tab));
+        closeChart.setOnAction(event -> disposeDetachedChart(title));
         stage.setOnCloseRequest(event -> {
             event.consume();
-            reattachDetachedChart(title);
+            reattachChartTab(tab);
         });
-
         stage.setOnHidden(event -> {
-            DetachedChartWindow current = detachedChartWindows.get(title);
-            if (current == window && !window.closingForReattach && !window.closingForDispose) {
-                detachedChartWindows.remove(title);
+            if (!state.reattaching && !state.closingForDispose) {
+                reattachChartTab(tab);
             }
         });
-
         stage.show();
-
         journal("Chart detached: " + title);
         saveAppState();
     }
 
-    private void reattachDetachedChart(String title) {
-        DetachedChartWindow window = detachedChartWindows.remove(safe(title));
-        if (window == null) {
+    public void reattachChartTab(Tab tab) {
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(() -> reattachChartTab(tab));
             return;
         }
-        Node content = window.floatingTab.getContent();
-        window.floatingTab.setContent(null);
-        window.closingForReattach = true;
-        if (window.stage.getScene() != null) {
-            window.stage.getScene().setRoot(new Pane());
+        DetachedChartState state = detachedCharts.get(tab);
+        if (state == null || state.reattaching || state.closingForDispose) {
+            return;
         }
-        window.stage.close();
-
-        if (content != null) {
-            window.originalTab.setContent(content);
-            window.originalTab.setContextMenu(createChartTabContextMenu(window.originalTab));
-            if (!chartTabPane.getTabs().contains(window.originalTab)) {
-                chartTabPane.getTabs().add(window.originalTab);
-            }
-            chartTabPane.getSelectionModel().select(window.originalTab);
-            updateOrderBookForChartTab(window.originalTab);
+        state.reattaching = true;
+        // Release the detached parent before restoring the original tab content.
+        state.detachedRoot.setCenter(null);
+        tab.setContent(null);
+        tab.setContent(state.chartContent);
+        if (!chartTabPane.getTabs().contains(tab)) {
+            chartTabPane.getTabs().add(Math.max(0, Math.min(state.originalIndex, chartTabPane.getTabs().size())), tab);
         }
-        journal("Chart reattached: " + title);
+        state.stage.close();
+        detachedCharts.remove(tab);
+        detachedChartWindows.remove(state.title, state);
+        chartTabPane.getSelectionModel().select(tab);
+        state.chartContent.requestFocus();
+        updateOrderBookForChartTab(tab);
+        journal("Chart reattached: " + state.title);
         saveAppState();
     }
 
     private void disposeDetachedChart(String title) {
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(() -> disposeDetachedChart(title));
+            return;
+        }
         String safeTitle = safe(title);
 
-        DetachedChartWindow window = detachedChartWindows.remove(safeTitle);
+        DetachedChartState window = detachedChartWindows.remove(safeTitle);
         if (window == null) {
             return;
         }
 
         window.closingForDispose = true;
 
-        Node content = null;
-
-        if (window.floatingTab != null) {
-            content = window.floatingTab.getContent();
-
-            // Important: remove chart node from floating tab first.
-            window.floatingTab.setContent(null);
-        }
-
-        // Also make sure original tab does not still reference the same content.
-        if (window.originalTab != null && window.originalTab.getContent() == content) {
-            window.originalTab.setContent(null);
-        }
+        detachedCharts.remove(window.originalTab);
+        Node content = window.chartContent;
+        window.detachedRoot.setCenter(null);
+        window.originalTab.setContent(null);
+        chartTabPane.getTabs().remove(window.originalTab);
 
         // Dispose chart resources after detaching from JavaFX parents.
         if (content instanceof ChartContainer container) {
@@ -8913,7 +8839,7 @@ public class TradingDesk extends BorderPane {
     }
 
     protected void refreshAccountWorkspace() {
-        if (!hasBrokerAccess() || exchange == null) {
+        if (exchange == null) {
             return;
         }
         if (!accountWorkspaceRefreshInFlight.compareAndSet(false, true)) {
@@ -8952,7 +8878,7 @@ public class TradingDesk extends BorderPane {
     private List<ConnectedExchangeView> connectedPortfolioExchanges() {
         LinkedHashMap<String, ConnectedExchangeView> connected = new LinkedHashMap<>();
 
-        if (hasBrokerAccess() && exchange != null) {
+        if (exchange != null) {
             String exchangeName = activeExchangeName();
             connected.put(brokerSessionKey(exchangeName), new ConnectedExchangeView(exchangeName, exchange));
         }
@@ -8962,7 +8888,7 @@ public class TradingDesk extends BorderPane {
                 continue;
             }
             Exchange sessionExchange = session.exchange();
-            if (!Boolean.TRUE.equals(sessionExchange.isConnected()) && !sessionExchange.isPaperTrading()) {
+            if (!sessionExchange.isAuthenticatedSessionConnected() && !Boolean.TRUE.equals(sessionExchange.isConnected()) && !sessionExchange.isDeskPaperTrading()) {
                 continue;
             }
 
@@ -8990,14 +8916,16 @@ public class TradingDesk extends BorderPane {
                 return null;
             }
 
-            Account account = fetchWithTimeoutSafely(target::fetchAccount);
-            List<Position> positions = normalizeList(fetchWithTimeoutSafely(target::fetchAllPositions));
-            List<Trade> trades = normalizeList(fetchWithTimeoutSafely(() -> target.fetchAccountTrades(null)));
+            Account account = fetchWithTimeoutSafely(target::deskTradingAccount);
+            List<Position> positions = target.isDeskPaperTrading() ? List.of()
+                    : normalizeList(fetchWithTimeoutSafely(target::fetchAllPositions));
+            List<Trade> trades = target.isDeskPaperTrading() ? List.of()
+                    : normalizeList(fetchWithTimeoutSafely(() -> target.fetchAccountTrades(null)));
             List<OpenOrder> openOrders = normalizeList(
                     fetchWithTimeoutSafely(() -> fetchOpenOrdersForWorkspace(target)));
             List<Order> orderHistory = includeHistory
                     ? normalizeList(fetchWithTimeoutSafely(
-                            () -> target.fetchOrderHistory(null, Instant.now().minus(90, ChronoUnit.DAYS))))
+                            () -> target.deskOrderExecution().fetchOrderHistory(null, Instant.now().minus(90, ChronoUnit.DAYS))))
                     : List.of();
 
             return new PortfolioExchangeSnapshot(view.exchangeName(), account, positions, trades, openOrders,
@@ -9149,7 +9077,7 @@ public class TradingDesk extends BorderPane {
                 return CompletableFuture.completedFuture(List.of());
             }
 
-            return current.fetchOpenOrders(fallbackPair)
+            return current.deskOrderExecution().fetchOpenOrders(fallbackPair)
                     .thenApply(this::normalizeOpenOrdersTyped)
                     .exceptionally(ex -> {
                         log.debug("IBKR open orders refresh failed", ex);
@@ -9158,13 +9086,13 @@ public class TradingDesk extends BorderPane {
         }
 
         if (fallbackPair != null) {
-            return current.fetchOpenOrders(fallbackPair).thenCompose(initialOrders -> {
+            return current.deskOrderExecution().fetchOpenOrders(fallbackPair).thenCompose(initialOrders -> {
                 List<OpenOrder> openOrders = normalizeOpenOrdersTyped(initialOrders);
                 if (!openOrders.isEmpty()) {
                     return CompletableFuture.completedFuture(openOrders);
                 }
 
-                return current.fetchOpenOrders(null)
+                return current.deskOrderExecution().fetchOpenOrders(null)
                         .thenApply(this::normalizeOpenOrdersTyped)
                         .thenApply(globalOrders -> globalOrders.isEmpty() ? openOrders : globalOrders);
             }).exceptionally(ex -> {
@@ -9173,7 +9101,7 @@ public class TradingDesk extends BorderPane {
             });
         }
 
-        return current.fetchOpenOrders(null).thenCompose(initialOrders -> {
+        return current.deskOrderExecution().fetchOpenOrders(null).thenCompose(initialOrders -> {
             List<OpenOrder> openOrders = normalizeOpenOrdersTyped(initialOrders);
             if (!openOrders.isEmpty()) {
                 return CompletableFuture.completedFuture(openOrders);
@@ -9184,7 +9112,7 @@ public class TradingDesk extends BorderPane {
                 return CompletableFuture.completedFuture(openOrders);
             }
 
-            return current.fetchOpenOrders(selected).thenApply(selectedOrders -> {
+            return current.deskOrderExecution().fetchOpenOrders(selected).thenApply(selectedOrders -> {
                 List<OpenOrder> normalizedSelectedOrders = normalizeOpenOrdersTyped(selectedOrders);
                 return normalizedSelectedOrders.isEmpty() ? openOrders : normalizedSelectedOrders;
             });
@@ -9514,12 +9442,12 @@ public class TradingDesk extends BorderPane {
     }
 
     private void cancelAllOrders() {
-        if (!hasBrokerAccess()) {
+        if (exchange == null) {
             showWarning("Orders", "Connect to an exchange first.");
             return;
         }
         try {
-            exchange.cancelAllOrders()
+            exchange.deskOrderExecution().cancelAllOrders()
                     .thenRun(() -> runOnFx(() -> {
                         journal("Cancel-all orders request sent.");
                         refreshAccountWorkspace();
@@ -9655,6 +9583,7 @@ public class TradingDesk extends BorderPane {
 
     private void showTradingProfileSettings() {
         Dialog<Void> dialog = new Dialog<>();
+        styleDialog(dialog);
         dialog.setTitle("Trader Profile Settings");
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
 
@@ -9669,6 +9598,7 @@ public class TradingDesk extends BorderPane {
 
     private void showStrategyAssignmentPanel() throws SQLException, ClassNotFoundException {
         Dialog<Void> dialog = new Dialog<>();
+        styleDialog(dialog);
         dialog.setTitle("Strategy Assignment");
         dialog.setHeaderText("Assign and configure trading strategies for symbols");
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
@@ -10236,7 +10166,7 @@ public class TradingDesk extends BorderPane {
             showInfo("Report", selected + "\n\nSummary\n" + buildResearchReportSummary(selected));
         });
 
-        Button downloadBtn = new Button("Download PDF");
+        Button downloadBtn = new Button("Download Report");
         downloadBtn.setStyle("-fx-padding: 6 16; -fx-background-color: #10b981; -fx-text-fill: white;");
         downloadBtn.setOnAction(e -> {
             String selected = reportsList.getSelectionModel().getSelectedItem();
@@ -10245,10 +10175,17 @@ public class TradingDesk extends BorderPane {
                 return;
             }
             try {
-                Path outputDir = Path.of("output", "reports");
-                Files.createDirectories(outputDir);
-                Path reportPath = outputDir
-                        .resolve("research-report-%s.txt".formatted(SNAPSHOT_FORMAT.format(LocalDateTime.now())));
+                FileChooser fileChooser = new FileChooser();
+                fileChooser.setTitle("Save Research Report");
+                fileChooser.setInitialFileName("research-report-%s.txt"
+                        .formatted(SNAPSHOT_FORMAT.format(LocalDateTime.now())));
+                fileChooser.getExtensionFilters().add(
+                        new FileChooser.ExtensionFilter("Text Reports (*.txt)", "*.txt"));
+                java.io.File selectedFile = fileChooser.showSaveDialog(panel.getScene().getWindow());
+                if (selectedFile == null) {
+                    return;
+                }
+                Path reportPath = selectedFile.toPath();
                 Files.writeString(reportPath, selected + "\n\n" + buildResearchReportSummary(selected),
                         StandardCharsets.UTF_8);
                 showInfo("Download", "Report exported to:\n" + reportPath.toAbsolutePath());
@@ -10326,7 +10263,7 @@ public class TradingDesk extends BorderPane {
         java.util.LinkedHashMap<String, String> connectedExchanges = new java.util.LinkedHashMap<>();
 
         // Add current active exchange if connected
-        if (exchange != null && (Boolean.TRUE.equals(exchange.isConnected()) || exchange.isPaperTrading())) {
+        if (exchange != null && (exchange.isAuthenticatedSessionConnected() || Boolean.TRUE.equals(exchange.isConnected()) || exchange.isDeskPaperTrading())) {
             String displayName = firstNonBlank(
                     exchange.getDisplayName(),
                     exchange.getName(),
@@ -10339,7 +10276,7 @@ public class TradingDesk extends BorderPane {
         // Add all connected broker sessions
         for (BrokerSession session : brokerSessions.values()) {
             if (session != null && session.accessGranted() && session.exchange() != null
-                    && (Boolean.TRUE.equals(session.exchange().isConnected()) || session.exchange().isPaperTrading())) {
+                    && (session.exchange().isAuthenticatedSessionConnected() || Boolean.TRUE.equals(session.exchange().isConnected()) || session.exchange().isDeskPaperTrading())) {
                 String displayName = firstNonBlank(
                         session.exchange().getDisplayName(),
                         session.exchange().getName(),
@@ -11432,6 +11369,7 @@ public class TradingDesk extends BorderPane {
 
     private void showSettingsDialog() {
         Dialog<Void> dialog = new Dialog<>();
+        styleDialog(dialog);
         dialog.setTitle("Settings");
         dialog.setHeaderText("Application and broker settings");
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
@@ -11487,6 +11425,7 @@ public class TradingDesk extends BorderPane {
      */
     private void showThemeSettingsDialog() {
         Dialog<Void> dialog = new Dialog<>();
+        styleDialog(dialog);
         dialog.setTitle("Theme Settings");
         dialog.setHeaderText("Customize application appearance and theme");
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -11576,6 +11515,7 @@ public class TradingDesk extends BorderPane {
      */
     private void showVisibilitySettingsDialog() {
         Dialog<Void> dialog = new Dialog<>();
+        styleDialog(dialog);
         dialog.setTitle("Visibility & Layout Settings");
         dialog.setHeaderText("Configure panel visibility and layout preferences");
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -11697,7 +11637,26 @@ public class TradingDesk extends BorderPane {
         journal("Font size changed to " + fontSize + "px");
     }
 
+    private boolean credentialDialogOpen;
+    private Exchange validatingExchange;
+
+    static boolean shouldPromptForCredentials(Exchange candidate, boolean validating) {
+        return !validating && (candidate == null || !candidate.isAuthenticatedSessionConnected());
+    }
+
     private void showExchangeCredentialDialog(String selectedExchange) {
+        if (credentialDialogOpen || !shouldPromptForCredentials(exchange, exchange != null && validatingExchange == exchange)) {
+            return;
+        }
+        credentialDialogOpen = true;
+        try {
+            showExchangeCredentialDialogContent(selectedExchange);
+        } finally {
+            credentialDialogOpen = false;
+        }
+    }
+
+    private void showExchangeCredentialDialogContent(String selectedExchange) {
         if (selectedExchange == null || selectedExchange.isBlank()) {
             showWarning("Credentials", "No exchange selected.");
             return;
@@ -11715,6 +11674,7 @@ public class TradingDesk extends BorderPane {
 
         // ── Dialog shell ──────────────────────────────────────────────────────
         Dialog<Boolean> dialog = new Dialog<>();
+        styleDialog(dialog);
         dialog.setTitle("Connect to " + selectedExchange);
         dialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
 
@@ -11806,48 +11766,8 @@ public class TradingDesk extends BorderPane {
         styleDialogField(secretField, secretPrompt);
 
         // ── Venue toggle (LIVE / PAPER) ────────────────────────────────────────
-        ToggleGroup venueGroup = new ToggleGroup();
-        ToggleButton liveToggle = new ToggleButton("LIVE");
-        ToggleButton paperToggle = new ToggleButton("PAPER");
-        liveToggle.setToggleGroup(venueGroup);
-        paperToggle.setToggleGroup(venueGroup);
-        liveToggle.setPrefWidth(110);
-        paperToggle.setPrefWidth(110);
-
-        boolean isLive = !"PAPER".equalsIgnoreCase(configuredTradingMode);
-        liveToggle.setSelected(isLive);
-        paperToggle.setSelected(!isLive);
-
-        String toggleBase = """
-                -fx-font-weight: bold;
-                -fx-font-size: 12px;
-                -fx-cursor: hand;
-                -fx-background-radius: 4;
-                -fx-border-radius: 4;
-                """;
-        Runnable applyVenueStyles = () -> {
-            if (liveToggle.isSelected()) {
-                liveToggle.setStyle(
-                        toggleBase + "-fx-background-color: #ef4444; -fx-text-fill: white; -fx-border-color: #dc2626;");
-                paperToggle.setStyle(toggleBase
-                        + "-fx-background-color: #1e293b; -fx-text-fill: #94a3b8; -fx-border-color: #334155;");
-            } else {
-                liveToggle.setStyle(toggleBase
-                        + "-fx-background-color: #1e293b; -fx-text-fill: #94a3b8; -fx-border-color: #334155;");
-                paperToggle.setStyle(
-                        toggleBase + "-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-border-color: #2563eb;");
-            }
-        };
-        applyVenueStyles.run();
-        liveToggle.selectedProperty().addListener((obs, o, n) -> applyVenueStyles.run());
-        paperToggle.selectedProperty().addListener((obs, o, n) -> applyVenueStyles.run());
-
-        Label liveWarning = new Label("⚠  LIVE mode executes real trades with real funds.");
-        liveWarning.setStyle("-fx-text-fill: #f87171; -fx-font-size: 11px;");
-        liveWarning.visibleProperty().bind(liveToggle.selectedProperty());
-        liveWarning.managedProperty().bind(liveToggle.selectedProperty());
-
-        HBox venueButtons = new HBox(8, liveToggle, paperToggle);
+        Label venueButtons = new Label("Authenticated exchange: live execution. Otherwise: local paper execution.");
+        Label liveWarning = new Label("");
 
         // ── Optional notifications section ────────────────────────────────────
         TextField telegramField = new TextField(telegramToken);
@@ -11940,6 +11860,16 @@ public class TradingDesk extends BorderPane {
                         : safe(secretField.getText());
 
                 if ("Coinbase".equalsIgnoreCase(selectedExchange)) {
+                    try {
+                        var normalized = org.investpro.exchange.coinbase.CoinbaseCredentialInput.normalize(apiKey, apiSecret);
+                        apiKey = normalized.keyName();
+                        apiSecret = normalized.privateKey();
+                        apiKeyField.setText(apiKey);
+                        finalPemArea.setText(apiSecret);
+                    } catch (IllegalArgumentException invalidInput) {
+                        showWarning("Invalid Credentials", invalidInput.getMessage());
+                        return false;
+                    }
                     String validationError = validateCoinbaseCredentials(apiKey, apiSecret);
                     if (validationError != null && !validationError.isBlank()) {
                         showWarning("Invalid Credentials", validationError);
@@ -11948,7 +11878,7 @@ public class TradingDesk extends BorderPane {
                 }
 
                 if (stellar) {
-                    String validationError = validateStellarCredentials(apiKey, apiSecret, liveToggle.isSelected());
+                    String validationError = validateStellarCredentials(apiKey, apiSecret, true);
                     if (validationError != null && !validationError.isBlank()) {
                         showWarning("Invalid Stellar Credentials", validationError);
                         return false;
@@ -11960,7 +11890,9 @@ public class TradingDesk extends BorderPane {
                 if (stellar) {
                     configuredAccountId = apiKey;
                 }
-                configuredTradingMode = liveToggle.isSelected() ? "LIVE" : "PAPER";
+
+
+                tradingDeskState.setPaperMode(isPaperTradingMode());
                 telegramToken = safe(telegramField.getText());
                 configuredOpenAiApiKey = safe(openAiField.getText());
                 if (oanda) {
@@ -11978,8 +11910,10 @@ public class TradingDesk extends BorderPane {
         dialog.showAndWait().ifPresent(saved -> {
             if (saved) {
                 exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret,
-                        configuredAccountId, configuredTradingMode);
-                new Thread(() -> exchange.connectStream(), "WebSocketConnector-" + selectedExchange).start();
+                        configuredAccountId, configuredBotTradingMode);
+                botTradingModeSelector.getSelectionModel().select(configuredBotTradingMode);
+                Exchange streamingExchange = exchange;
+                new Thread(streamingExchange::connectStream, "WebSocketConnector-" + selectedExchange).start();
                 setTelegramToken(telegramToken);
                 proceedWithConnection();
             }
@@ -12171,15 +12105,21 @@ public class TradingDesk extends BorderPane {
 
     private void loadExchangeCredentials(String exchangeName) {
         String key = safe(exchangeName);
-        configuredApiKey = preferences.get("exchange_api_key_" + key, configuredApiKey);
-        configuredApiSecret = preferences.get("exchange_api_secret_" + key, configuredApiSecret);
-        configuredAccountId = preferences.get("exchange_account_id_" + key, configuredAccountId);
+        boolean sameExchange = Objects.equals(configuredCredentialExchange, normalizeExchangeName(key));
+        if (!sameExchange) {
+            connectionParamsByExchange.put(configuredCredentialExchange, configuredConnectionParams);
+            configuredConnectionParams = connectionParamsByExchange.getOrDefault(normalizeExchangeName(key), Map.of());
+        }
+        configuredApiKey = preferences.get("exchange_api_key_" + key, sameExchange ? configuredApiKey : "");
+        configuredApiSecret = preferences.get("exchange_api_secret_" + key, sameExchange ? configuredApiSecret : "");
+        configuredAccountId = preferences.get("exchange_account_id_" + key, sameExchange ? configuredAccountId : "");
+        configuredCredentialExchange = normalizeExchangeName(key);
         if ("STELLAR NETWORK".equalsIgnoreCase(exchangeName)
                 && configuredAccountId != null
                 && configuredAccountId.isBlank()) {
             configuredAccountId = configuredApiKey;
         }
-        configuredTradingMode = preferences.get("exchange_trading_mode_" + key, configuredTradingMode);
+        // Trading mode belongs to the current setup/dashboard selection, not credentials.
         telegramToken = preferences.get("telegram_token_" + key, telegramToken);
         configuredOpenAiApiKey = preferences.get("openai_api_key", configuredOpenAiApiKey);
         if ("OANDA".equalsIgnoreCase(exchangeName)) {
@@ -12195,7 +12135,7 @@ public class TradingDesk extends BorderPane {
         preferences.put("exchange_api_key_" + key, configuredApiKey);
         preferences.put("exchange_api_secret_" + key, configuredApiSecret);
         preferences.put("exchange_account_id_" + key, configuredAccountId);
-        preferences.put("exchange_trading_mode_" + key, configuredTradingMode);
+        preferences.put("bot_trading_mode", configuredBotTradingMode);
         preferences.put("telegram_token_" + key, telegramToken);
         preferences.put("openai_api_key", configuredOpenAiApiKey);
         if ("OANDA".equalsIgnoreCase(exchangeName)) {
@@ -12346,10 +12286,9 @@ public class TradingDesk extends BorderPane {
             String accountId,
             String tradingMode) {
         String normalizedName = normalizeExchangeName(exchangeName);
-        boolean sandboxMode = "SANDBOX".equalsIgnoreCase(safe(tradingMode))
-                || "PRACTICE".equalsIgnoreCase(safe(tradingMode))
-                || "DEMO".equalsIgnoreCase(safe(tradingMode))
-                || "TESTNET".equalsIgnoreCase(safe(tradingMode));
+        boolean sandboxMode = "INTERACTIVE BROKERS".equals(normalizedName)
+                && ("true".equalsIgnoreCase(configuredConnectionParams.get("IBKR_SANDBOX"))
+                || "paper".equalsIgnoreCase(configuredConnectionParams.get("IBKR_ENVIRONMENT")));
         boolean walletAddressBroker = "STELLAR NETWORK".equals(normalizedName)
                 || "SOLONA NETWORK".equals(normalizedName);
         String normalizedAccountId = walletAddressBroker ? safe(apiKey) : safe(accountId);
@@ -12362,7 +12301,7 @@ public class TradingDesk extends BorderPane {
                 normalizedName.equals("COINBASE") ? safe(apiSecret) : null,
                 null,
                 normalizedAccountId,
-                sandboxMode);
+                sandboxMode, connectionParamsForMode(configuredConnectionParams, "LIVE"));
 
         Exchange createdExchange;
         try {
@@ -12395,7 +12334,8 @@ public class TradingDesk extends BorderPane {
             };
         }
 
-        createdExchange.setUserSelectedTradingMode(safe(tradingMode).isBlank() ? "LIVE" : safe(tradingMode));
+        createdExchange.setUserSelectedTradingMode("LIVE");
+        createdExchange.setBotTradingMode(configuredBotTradingMode);
 
         // Wire the exchange to the central MarketDataEngine
         if (marketDataEngine != null) {
@@ -12428,9 +12368,25 @@ public class TradingDesk extends BorderPane {
         return new ArrayList<>(exchanges);
     }
 
-    private Optional<String> credentialValueForPluginFactory(String key, ExchangeCredentials credentials) {
+    static Map<String, String> connectionParamsForMode(Map<String, String> params, String mode) {
+        Map<String, String> result = new HashMap<>(params);
+        result.put("tradingMode", mode == null || mode.isBlank() ? "PAPER" : mode);
+        return Map.copyOf(result);
+    }
+
+    private static Optional<String> credentialValueForPluginFactory(String key, ExchangeCredentials credentials) {
         if (key == null || credentials == null) {
             return Optional.empty();
+        }
+        if (key.equals("TRADING_MODE")) return Optional.ofNullable(credentials.param("tradingMode"));
+
+        String parameter = credentials.params().get(key);
+        if (parameter != null && !parameter.isBlank()) return Optional.of(parameter);
+        if (key.equals("IBKR_ENVIRONMENT")) return Optional.of(credentials.sandbox() ? "paper" : "live");
+        if (key.equals("IBKR_SANDBOX")) return Optional.of(String.valueOf(credentials.sandbox()));
+        if (key.equals("IBKR_PORT") || key.equals("IBK_PORT")) {
+            String port = credentials.params().get(credentials.sandbox() ? "IBKR_PAPER_PORT" : "IBKR_LIVE_PORT");
+            if (port != null && !port.isBlank()) return Optional.of(port);
         }
 
         return switch (key) {
@@ -12441,7 +12397,8 @@ public class TradingDesk extends BorderPane {
                 Optional.ofNullable(credentials.apiKey());
             case "STELLAR_PUBLIC_KEY", "STELLAR_NETWORK_API_KEY", "STELLAR_NETWORK_ACCOUNT_ID" ->
                 Optional.ofNullable(
-                        safe(credentials.accountId()).isBlank() ? credentials.apiKey() : credentials.accountId());
+                        Objects.toString(credentials.accountId(), "").trim().isBlank()
+                                ? credentials.apiKey() : credentials.accountId());
             case "COINBASE_API_SECRET", "COINBASE_PRIVATE_KEY", "BINANCE_API_SECRET", "BINANCE_US_API_SECRET",
                     "BITFINEX_API_SECRET", "OANDA_API_SECRET", "ALPACA_API_SECRET", "KRAKEN_API_SECRET",
                     "SCHWAB_API_SECRET", "SCHWAB_CLIENT_SECRET", "IBKR_API_SECRET", "IBKR_PASSWORD",
@@ -13001,7 +12958,7 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        if (lacksOrderSubmissionAccess()) {
+        if (exchange == null || !exchange.canSubmitBotOrders()) {
             showWarning(
                     "Bot Trading",
                     "%s is connected, but this adapter cannot submit orders."
@@ -13525,9 +13482,9 @@ public class TradingDesk extends BorderPane {
                 .filter(session -> session.exchange() != null)
                 .filter(session -> {
                     Exchange sessionExchange = session.exchange();
-                    return Boolean.TRUE.equals(sessionExchange.isConnected()) || sessionExchange.isPaperTrading();
+                    return Boolean.TRUE.equals(sessionExchange.isConnected()) || sessionExchange.isDeskPaperTrading();
                 })
-                .filter(session -> session.exchange().canSubmitOrders())
+                .filter(session -> session.exchange().canSubmitBotOrders())
                 .toList();
     }
 
@@ -13942,9 +13899,23 @@ public class TradingDesk extends BorderPane {
 
     public void shutdown() {
         journal("Shutting down TradingWindow.");
+        if (symbolAgentMarketWatch != null) {
+            symbolAgentMarketWatch.shutdown();
+        }
 
         stopDesktopStream();
         stopActiveStreaming();
+
+        for (SystemCore retainedCore : List.copyOf(connectedDeskCores.values())) {
+            if (retainedCore == systemCore) continue;
+            try {
+                retainedCore.stop();
+                retainedCore.disconnect();
+            } catch (Exception error) {
+                log.debug("Failed to close retained desk connection", error);
+            }
+        }
+        connectedDeskCores.clear();
 
         if (blockchainEventBus != null) {
             blockchainEventBus.stop();
@@ -14409,6 +14380,7 @@ public class TradingDesk extends BorderPane {
     private void importStrategy() {
         log.info("Import strategy dialog opened");
         Dialog<Void> dialog = new Dialog<>();
+        styleDialog(dialog);
         dialog.setTitle("Import Strategy");
         dialog.setHeaderText("Import trading strategy from file");
 
@@ -14463,6 +14435,7 @@ public class TradingDesk extends BorderPane {
     private void exportStrategy() {
         log.info("Export strategy dialog opened");
         Dialog<Void> dialog = new Dialog<>();
+        styleDialog(dialog);
         dialog.setTitle("Export Strategy");
         dialog.setHeaderText("Export active trading strategy");
 
@@ -14552,6 +14525,7 @@ public class TradingDesk extends BorderPane {
         Stage orderStage = new Stage();
         orderStage.setTitle("Order Manager - " + (selectedSymbol != null ? selectedSymbol.getSymbol() : "Trading"));
         orderStage.setScene(new Scene(orderPanel, 460, 760));
+        addCoreStylesheets(orderStage.getScene());
         orderStage.setWidth(460);
         orderStage.setHeight(760);
         orderStage.setMinWidth(420);
@@ -15224,7 +15198,7 @@ public class TradingDesk extends BorderPane {
                     // System State
                     .systemState(SystemState.READY)
                     .brokerName(exchange != null ? exchange.getName() : "Unknown")
-                    .tradingMode(configuredTradingMode != null ? configuredTradingMode : "LIVE")
+                    .tradingMode(configuredBotTradingMode != null ? configuredBotTradingMode : "LIVE")
                     .autoTradingEnabled(isAutoTrading)
                     .killSwitchArmed(false)
                     .activeVenue(exchange != null ? exchange.getName() : "N/A")
@@ -15417,7 +15391,7 @@ public class TradingDesk extends BorderPane {
         return TradingSystemStatusSnapshot.builder()
                 .systemState(SystemState.READY)
                 .brokerName(exchange != null ? exchange.getName() : "Unknown")
-                .tradingMode(configuredTradingMode != null ? configuredTradingMode : "LIVE")
+                .tradingMode(configuredBotTradingMode != null ? configuredBotTradingMode : "LIVE")
                 .autoTradingEnabled(isAutoTrading)
                 .killSwitchArmed(false)
                 .activeVenue(exchange != null ? exchange.getName() : "N/A")

@@ -110,9 +110,7 @@ class TradeExecutionCoordinatorTest {
     private static void setField(Object target, String fieldName, Object value) throws Exception {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
-        Unsafe unsafe = unsafe();
-        long offset = unsafe.getLong(field,0);
-        unsafe.putObject(target, offset, value);
+        field.set(target, value);
     }
 
     private static Unsafe unsafe() throws Exception {

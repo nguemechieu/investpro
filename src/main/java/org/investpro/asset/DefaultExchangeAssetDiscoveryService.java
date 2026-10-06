@@ -8,6 +8,7 @@ import org.investpro.trading.tradability.ExchangeInstrumentService;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
@@ -30,7 +31,7 @@ public final class DefaultExchangeAssetDiscoveryService implements ExchangeAsset
         }
         return CompletableFuture.supplyAsync(() -> fetchInstruments(exchange), executor)
                 .thenApply(instruments -> instruments.stream()
-                        .filter(instrument -> instrument != null)
+                        .filter(Objects::nonNull)
                         .map(instrument -> AssetCatalogEntry.fromMarketInstrument(exchangeId, instrument, Instant.now()))
                         .toList());
     }

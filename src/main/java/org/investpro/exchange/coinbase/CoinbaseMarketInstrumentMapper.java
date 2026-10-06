@@ -149,15 +149,26 @@ public class CoinbaseMarketInstrumentMapper {
         return instruments;
     }
 
-    MarketType classifyMarketType(String productType, String contractExpiryType, String futuresUnderlyingType) {
+    MarketType classifyMarketType(
+            String productType,
+            String contractExpiryType,
+            String futuresUnderlyingType
+    ) {
         String product = normalize(productType);
+        String expiry = normalize(contractExpiryType);
 
         if ("SPOT".equals(product)) {
             return MarketType.SPOT;
         }
-        if ("FUTURE".equals(product) || "PERPETUAL".equals(normalize(contractExpiryType))) {
-            return MarketType.DERIVATIVES;
+
+        if ("PERPETUAL".equals(product) || "PERPETUAL".equals(expiry)) {
+            return MarketType.PERPETUAL;
         }
+
+        if ("FUTURE".equals(product)) {
+            return MarketType.DERIVATIVE;
+        }
+
         return MarketType.UNKNOWN;
     }
 
@@ -165,15 +176,19 @@ public class CoinbaseMarketInstrumentMapper {
         String product = normalize(productType);
         String expiry = normalize(contractExpiryType);
         String underlying = normalize(futuresUnderlyingType);
+
         if ("SPOT".equals(product)) {
             return InstrumentType.SPOT;
         }
+
+        if ("PERPETUAL".equals(product) || "PERPETUAL".equals(expiry)) {
+            return InstrumentType.PERPETUAL;
+        }
+
         if (!"FUTURE".equals(product)) {
             return InstrumentType.UNKNOWN;
         }
-        if ("PERPETUAL".equals(expiry)) {
-            return InstrumentType.PERPETUAL;
-        }
+
         return switch (underlying) {
             case "INDEX" -> InstrumentType.INDEX;
             case "EQUITY" -> InstrumentType.STOCK;
@@ -182,42 +197,58 @@ public class CoinbaseMarketInstrumentMapper {
             default -> InstrumentType.FUTURE;
         };
     }
-
     LeverageMode classifyLeverageMode(
             MarketType marketType,
             InstrumentType instrumentType,
-            ContractType contractType) {
-        if ((instrumentType != null && instrumentType.isDerivative())
-                || (contractType != null && contractType.isDerivative())
-                || marketType == MarketType.DERIVATIVES
-                || marketType == MarketType.DERIVATIVE) {
-            return LeverageMode.DERIVATIVE_LEVERAGE;
+            ContractType contractType
+    ) {
+        if (marketType == MarketType.PERPETUAL
+                || contractType == ContractType.PERPETUAL
+                || instrumentType == InstrumentType.PERPETUAL) {
+            return LeverageMode.PERPETUAL;
         }
+
         if (marketType == MarketType.MARGIN || contractType == ContractType.MARGIN) {
             return LeverageMode.MARGIN;
         }
+
+        if ((instrumentType != null && instrumentType.isDerivative())
+                || (contractType != null && contractType.isDerivative())
+                || marketType == MarketType.DERIVATIVE) {
+            return LeverageMode.DERIVATIVE_LEVERAGE;
+        }
+
         return LeverageMode.NONE;
     }
-
     ContractType classifyContractType(String productType, String contractExpiryType) {
         String product = normalize(productType);
         String expiry = normalize(contractExpiryType);
+
         if ("SPOT".equals(product)) {
             return ContractType.CASH;
         }
-        if (!"FUTURE".equals(product)) {
-            return ContractType.UNKNOWN;
+
+        if ("PERPETUAL".equals(product) || "PERPETUAL".equals(expiry)) {
+            return ContractType.PERPETUAL;
         }
-        return "PERPETUAL".equals(expiry) ? ContractType.PERPETUAL : ContractType.FUTURE;
+
+        if ("FUTURE".equals(product)) {
+            return ContractType.FUTURE;
+        }
+
+        return ContractType.UNKNOWN;
     }
 
     AssetClass classifyAssetClass(String productType, String futuresUnderlyingType) {
         String product = normalize(productType);
         String underlying = normalize(futuresUnderlyingType);
-        if ("SPOT".equals(product) || underlying.isBlank() || "SPOT".equals(underlying)) {
+
+        if ("SPOT".equals(product)) {
             return AssetClass.CRYPTO;
         }
+
         return switch (underlying) {
+            case "SPOT" -> AssetClass.CRYPTO;
             case "INDEX" -> AssetClass.INDEX;
             case "EQUITY" -> AssetClass.EQUITY;
             case "COMMODITY" -> AssetClass.COMMODITY;
@@ -245,9 +276,7 @@ public class CoinbaseMarketInstrumentMapper {
         };
     }
 
-    String parseRoutingExchange(JsonNode product) {
-        return parseRoutingExchange(product, isDerivativeProductId(firstText(product, "product_id", "id", "symbol")));
-    }
+
 
     String parseRoutingExchange(JsonNode product, boolean derivativeSymbol) {
         if (derivativeSymbol) {
@@ -260,24 +289,42 @@ public class CoinbaseMarketInstrumentMapper {
         return "";
     }
 
-    TradePair tryCreateTradePair(JsonNode product, String nativeSymbol, String base, String quote, ContractType contractType) {
-        if (isDerivativeProductId(nativeSymbol)) {
+    TradePair tryCreateTradePair(
+            JsonNode product,
+            String nativeSymbol,
+            String base,
+            String quote,
+            ContractType contractType
+    ) {
+        boolean derivative = isDerivativeProductId(nativeSymbol)
+                || (contractType != null && contractType.isDerivative());
+
+        if (derivative) {
             try {
                 return productSymbolParser.parseProduct(nativeSymbol, product);
             } catch (SQLException | ClassNotFoundException | RuntimeException exception) {
                 return null;
             }
         }
+
         if (base == null || base.isBlank() || quote == null || quote.isBlank()) {
             return null;
         }
+
         String baseCode = normalize(base);
         String quoteCode = normalize(quote);
+
+        if (baseCode.isBlank() || quoteCode.isBlank()) {
+            return null;
+        }
+
         if (baseCode.equals(quoteCode)) {
             return null;
         }
+
         try {
-            return productSymbolParser.parseProduct(firstNonBlank(nativeSymbol, baseCode + "-" + quoteCode), product);
+            String symbol = firstNonBlank(nativeSymbol, baseCode + "-" + quoteCode);
+            return productSymbolParser.parseProduct(symbol, product);
         } catch (SQLException | ClassNotFoundException | RuntimeException exception) {
             return null;
         }
@@ -366,11 +413,11 @@ public class CoinbaseMarketInstrumentMapper {
         }
         return "";
     }
-
-    private static Instant parseInstant(String value) {
+    Instant parseInstant(String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
+
         try {
             return Instant.parse(value);
         } catch (Exception exception) {
@@ -380,24 +427,30 @@ public class CoinbaseMarketInstrumentMapper {
 
     private static Map<String, Object> rawMetadata(JsonNode node) {
         Map<String, Object> metadata = new LinkedHashMap<>();
+
         if (node == null || !node.isObject()) {
             return metadata;
         }
+
         Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> entry = fields.next();
             JsonNode value = entry.getValue();
+
             if (value == null || value.isNull()) {
                 continue;
-            } else if (value.isValueNode()) {
+            }
+
+            if (value.isValueNode()) {
                 metadata.put(entry.getKey(), value.asText());
             } else {
                 metadata.put(entry.getKey(), value.toString());
             }
         }
+
         return metadata;
     }
-
     private static String normalize(String value) {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }

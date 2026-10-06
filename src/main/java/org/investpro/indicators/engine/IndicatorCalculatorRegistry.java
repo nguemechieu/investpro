@@ -864,7 +864,7 @@ public final class IndicatorCalculatorRegistry {
     private record UnsupportedCalculator(INDICATORS indicator) implements IndicatorCalculator {
         @Override
         public IndicatorResult calculate(List<CandleData> candles, Map<String, String> parameters) {
-            return fallbackResult(indicator, candles == null ? List.of() : candles);
+            throw new UnsupportedOperationException("No calculator is available for indicator " + indicator);
         }
     }
 }

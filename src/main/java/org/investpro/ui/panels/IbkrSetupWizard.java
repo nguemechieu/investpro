@@ -13,6 +13,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.ibkr.IbkrConnectionDiagnosticsService;
 import org.investpro.exchange.ibkr.IbkrConnectionMode;
 import org.investpro.exchange.ibkr.IbkrConnectionProfile;
@@ -20,12 +21,14 @@ import org.investpro.exchange.ibkr.IbkrConnectionService;
 import org.investpro.exchange.ibkr.IbkrFeatureAvailabilityService;
 import org.investpro.exchange.ibkr.IbkrLocalServiceDetector;
 import org.investpro.exchange.ibkr.IbkrSessionState;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.prefs.Preferences;
-
+@Slf4j
 public class IbkrSetupWizard extends VBox {
 
     private static final String PREF_NODE = "org.investpro.ibkr.connection";
@@ -128,21 +131,7 @@ public class IbkrSetupWizard extends VBox {
         GridPane.setHgrow(connectionNameField, Priority.ALWAYS);
         GridPane.setHgrow(hostField, Priority.ALWAYS);
 
-        Button detectButton = new Button("Auto-detect");
-        Button connectButton = new Button("Connect");
-        Button saveButton = new Button("Save profile");
-        Button disconnectButton = new Button("Disconnect");
-        detectButton.setOnAction(event -> refreshDetection());
-        connectButton.setOnAction(event -> connect());
-        saveButton.setOnAction(event -> saveProfile(currentProfile()));
-        disconnectButton.setOnAction(event -> {
-            connectionService.disconnect();
-            sessionState = IbkrSessionState.disconnected(currentProfile(), "Disconnected.");
-            refreshDiagnostics();
-            notifySessionStateChanged();
-        });
-        HBox actions = new HBox(8, detectButton, connectButton, saveButton, disconnectButton);
-        actions.setAlignment(Pos.CENTER_LEFT);
+        HBox actions = getActions();
 
         detectionList.setPrefHeight(110);
         diagnosticsList.setPrefHeight(190);
@@ -161,6 +150,25 @@ public class IbkrSetupWizard extends VBox {
                 featureList,
                 statusLabel,
                 actions);
+    }
+
+    private @NonNull HBox getActions() {
+        Button detectButton = new Button("Auto-detect");
+        Button connectButton = new Button("Connect");
+        Button saveButton = new Button("Save profile");
+        Button disconnectButton = new Button("Disconnect");
+        detectButton.setOnAction(event -> refreshDetection());
+        connectButton.setOnAction(event -> connect());
+        saveButton.setOnAction(event -> saveProfile(currentProfile()));
+        disconnectButton.setOnAction(event -> {
+            connectionService.disconnect();
+            sessionState = IbkrSessionState.disconnected(currentProfile(), "Disconnected.");
+            refreshDiagnostics();
+            notifySessionStateChanged();
+        });
+        HBox actions = new HBox(8, detectButton, connectButton, saveButton, disconnectButton);
+        actions.setAlignment(Pos.CENTER_LEFT);
+        return actions;
     }
 
     private Label stepLabel(String text) {
@@ -270,7 +278,7 @@ public class IbkrSetupWizard extends VBox {
             try {
                 lastSuccess = Instant.parse(lastSuccessText);
             } catch (Exception ignored) {
-                lastSuccess = null;
+                log.info("ERROR Ignored...skipping lastSuccessfulConnectionAt");
             }
         }
         return new IbkrConnectionProfile(
@@ -315,7 +323,8 @@ public class IbkrSetupWizard extends VBox {
         return message;
     }
 
-    private String yesNo(boolean value) {
+    @Contract(pure = true)
+    private @NonNull String yesNo(boolean value) {
         return value ? "yes" : "no";
     }
 }

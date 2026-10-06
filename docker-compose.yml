@@ -76,6 +76,7 @@ services:
       - ./logs:/app/logs
       - ./data:/app/data
       - ./output:/app/output
+      - ./lib/ibkr:/app/lib/ibkr:ro
 
     networks:
       - investpro-network

@@ -14,7 +14,7 @@ public final class InvestProLauncher {
     private InvestProLauncher() {
     }
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         InvestPro.initializeGlobalExceptionHandling();
         Application.launch(InvestPro.class, args);
     }

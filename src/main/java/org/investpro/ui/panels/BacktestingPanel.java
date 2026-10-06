@@ -156,14 +156,14 @@ public class BacktestingPanel extends StackPane {
         Platform.runLater(() -> {
             if (strategyName != null && !strategyName.isBlank()) {
                 if (!strategyCombo.getItems().contains(strategyName)) {
-                    strategyCombo.getItems().add(0, strategyName);
+                    strategyCombo.getItems().addFirst(strategyName);
                 }
                 strategyCombo.setValue(strategyName);
             }
 
             if (pair != null) {
                 if (!symbolCombo.getItems().contains(pair)) {
-                    symbolCombo.getItems().add(0, pair);
+                    symbolCombo.getItems().addFirst(pair);
                 }
                 symbolCombo.setDisable(false);
                 symbolCombo.setValue(pair);
@@ -1305,14 +1305,12 @@ public class BacktestingPanel extends StackPane {
         }
 
         return report.getTrades().stream()
-                .map(trade -> toBacktestTrade(trade))
+                .map(this::toBacktestTrade)
                 .toList();
     }
 
     private BacktestTrade toBacktestTrade(StrategyBacktestTrade trade) {
-        LocalDate entryDate = trade.getEntryTime() == null
-                ? LocalDate.now()
-                : LocalDateTime.ofInstant(trade.getEntryTime(), ZoneId.systemDefault()).toLocalDate();
+        LocalDate entryDate = LocalDateTime.ofInstant(trade.getEntryTime(), ZoneId.systemDefault()).toLocalDate();
         return new BacktestTrade(
                 entryDate,
                 trade.getSide(),

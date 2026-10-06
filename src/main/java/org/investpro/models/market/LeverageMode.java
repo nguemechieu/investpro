@@ -4,7 +4,7 @@ public enum LeverageMode {
     NONE,
     MARGIN,
     DERIVATIVE_LEVERAGE,
-    UNKNOWN;
+    UNKNOWN, PERPETUAL;
 
     public boolean isLeveraged() {
         return this == MARGIN || this == DERIVATIVE_LEVERAGE;

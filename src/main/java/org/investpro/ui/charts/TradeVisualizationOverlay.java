@@ -7,8 +7,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.TextAlignment;
 import lombok.Builder;
 import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.jetbrains.annotations.NotNull;
@@ -164,31 +162,10 @@ public class TradeVisualizationOverlay {
     }
 
     /**
-     * Updates only the visible candle window.
-     */
-    public void updateVisibleRange(int visibleStartIndex, int visibleEndIndex) {
-        this.visibleStartIndex = clampIndex(visibleStartIndex, candles.size());
-        this.visibleEndIndex = clampIndex(resolveVisibleEndIndex(visibleEndIndex), candles.size());
-
-        if (!candles.isEmpty() && this.visibleEndIndex < this.visibleStartIndex) {
-            this.visibleEndIndex = this.visibleStartIndex;
-        }
-
-        recalculateCandleWidth();
-    }
-
-    /**
      * Adds a trade marker.
      */
     public void addTradeMarker(@NotNull TradeMarker marker) {
         tradeMarkers.add(marker);
-    }
-
-    /**
-     * Adds an order level.
-     */
-    public void addOrderLevel(@NotNull OrderLevel level) {
-        orderLevels.add(level);
     }
 
     /**
@@ -392,7 +369,7 @@ public class TradeVisualizationOverlay {
             }
         }
 
-        int nearest = Math.max(0, Math.min(low, candles.size() - 1));
+        int nearest = Math.clamp(candles.size() - 1, 0, low);
 
         if (nearest > 0) {
             long previousTime = normalizeTimestampMillis(candles.get(nearest - 1).getOpenTime());
@@ -452,8 +429,8 @@ public class TradeVisualizationOverlay {
             return String.format("%.4f", value);
         }
 
-        int precision = Math.min(12, Math.max(2, (int) Math.ceil(-Math.log10(abs)) + 2));
-        return String.format("%." + precision + "f", value);
+        int precision = Math.clamp((int) Math.ceil(-Math.log10(abs)) + 2, 2, 12);
+        return String.format("%" + precision + "f", value);
     }
 
     private void recalculateCandleWidth() {
@@ -498,7 +475,7 @@ public class TradeVisualizationOverlay {
         if (size <= 0) {
             return 0;
         }
-        return Math.max(0, Math.min(index, size - 1));
+        return Math.clamp(size - 1, 0, index);
     }
 
     private long normalizeTimestampMillis(long timestamp) {

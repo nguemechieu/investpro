@@ -1,6 +1,6 @@
 package org.investpro.agent;
 
-import org.investpro.activity.BrokerActivityEvent;
+import org.investpro.activities.BrokerActivityEvent;
 import org.investpro.agent.symbol.SymbolAgent;
 import org.investpro.agent.symbol.SymbolAgentMode;
 import org.investpro.agent.symbol.SymbolAgentState;

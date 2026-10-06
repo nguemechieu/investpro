@@ -45,6 +45,12 @@ public final class IbkrMarketDataProvider {
 
     public CompletableFuture<Ticker> fetchTicker(TradePair pair) {
         return CompletableFuture.supplyAsync(() -> {
+            if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API) {
+                Ticker ticker = connectionManager.getTwsSession().ticker(
+                        resolvedContract(pair).orElseThrow(() -> new IllegalStateException("Resolve the IBKR contract first."))).join();
+                connectionManager.markMarketDataAvailable(true);
+                return ticker;
+            }
             if (connectionManager.getMode() == IbkrConnectionManager.Mode.LIVE && clientPortalClient != null) {
                 Optional<Ticker> liveTicker = resolvedContract(pair)
                         .flatMap(clientPortalClient::fetchTicker);
@@ -100,6 +106,8 @@ public final class IbkrMarketDataProvider {
 
             @Override
             public List<CandleData> getCandleData() {
+                if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+                    return connectionManager.getTwsSession().history(resolvedContract(pair).orElseThrow(), secondsPerCandle).join();
                 return syntheticCandles(pair, secondsPerCandle, 300);
             }
 
@@ -142,6 +150,9 @@ public final class IbkrMarketDataProvider {
     }
 
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair pair, Instant stopAt) {
+        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
+            return CompletableFuture.failedFuture(new UnsupportedOperationException(
+                    "IBKR historical executions are not available through this market-data request."));
         return CompletableFuture.supplyAsync(() -> {
             if (pair == null) {
                 return List.of();

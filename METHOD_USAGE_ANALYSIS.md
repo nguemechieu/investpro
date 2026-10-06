@@ -1,5 +1,7 @@
 # Method Usage Analysis - InvestPro Exchange Interface
 
+> Historical report: retained for its original revision. Java versions, test counts, completion claims and code examples below are historical, not current setup or release evidence. For the JDK 27 / JavaFX 27 baseline, use the [project README](README.md) and [documentation index](docs/README.md). Classified on 2026-10-05.
+
 ## Summary
 Analysis of 40 methods from the Exchange interface to identify which are actually called/used in src/main/java (excluding test files).
 
@@ -14,8 +16,8 @@ Analysis of 40 methods from the Exchange interface to identify which are actuall
 ### 1. **submitOrder()**
 - **Status:** ✅ USED
 - **Called from:**
-  - [ManualTradePanel.java](ManualTradePanel.java#L340) line 340
-  - [ManualTradePanel.java](ManualTradePanel.java#L341) line 341
+  - ManualTradePanel.java (historical file: `ManualTradePanel.java`) line 340
+  - ManualTradePanel.java (historical file: `ManualTradePanel.java`) line 341
 - **Context:** 
   ```java
   buyButton.setOnAction(event -> submitOrder(Side.BUY));
@@ -25,21 +27,21 @@ Analysis of 40 methods from the Exchange interface to identify which are actuall
 ### 2. **getLivePrice(TradePair tradePair)**
 - **Status:** ✅ USED
 - **Called from:**
-  - [SignalProcessor.java](SignalProcessor.java#L149) line 149 - `ticker = exchange.getLivePrice(symbol);`
-  - [PollingExchangeStreamer.java](PollingExchangeStreamer.java#L47) line 47 - `exchange.getLivePrice(pair)`
+  - [SignalProcessor.java](src/main/java/org/investpro/exchange/infrastructure/SignalProcessor.java) line 149 - `ticker = exchange.getLivePrice(symbol);`
+  - [PollingExchangeStreamer.java](src/main/java/org/investpro/exchange/infrastructure/PollingExchangeStreamer.java) line 47 - `exchange.getLivePrice(pair)`
 - **Context:** Used for fetching current ticker data for trading signals and streaming
 
 ### 3. **fetchAccountTrades(TradePair)**
 - **Status:** ✅ USED (partially)
 - **Called from:**
-  - [TradingWindow.java](TradingWindow.java#L3096) line 3096 - `exchange.fetchAccountTrades(null)`
+  - TradingWindow.java (historical file: `TradingWindow.java`) line 3096 - `exchange.fetchAccountTrades(null)`
 - **Note:** Called with null parameter
 
 ### 4. **fetchPositions(TradePair)**
 - **Status:** ⚠️ USED (internally only)
 - **Called from:**
-  - [Coinbase.java](Coinbase.java#L1630) line 1630 - Internal call within `fetchPosition()` method
-  - [Oanda.java](Oanda.java#L1361) line 1361 - Internal call within another method
+  - [Coinbase.java](src/main/java/org/investpro/exchange/coinbase/Coinbase.java) line 1630 - Internal call within `fetchPosition()` method
+  - [Oanda.java](src/main/java/org/investpro/exchange/oanda/Oanda.java) line 1361 - Internal call within another method
 - **Context:** Called within exchange implementations, not from external UI/service code
 
 ---
@@ -102,7 +104,7 @@ Analysis of 40 methods from the Exchange interface to identify which are actuall
 
 ## Code Locations of Actual Usage
 
-### [SignalProcessor.java](SignalProcessor.java#L149)
+### [SignalProcessor.java](src/main/java/org/investpro/exchange/infrastructure/SignalProcessor.java)
 ```java
 try {
     ticker = exchange.getLivePrice(symbol);  // LINE 149
@@ -113,7 +115,7 @@ try {
 }
 ```
 
-### [PollingExchangeStreamer.java](PollingExchangeStreamer.java#L47)
+### [PollingExchangeStreamer.java](src/main/java/org/investpro/exchange/infrastructure/PollingExchangeStreamer.java)
 ```java
 public void streamTicker(TradePair tradePair, ExchangeStreamConsumer consumer) {
     tickerTasks.computeIfAbsent(tradePair, pair -> scheduleAtFixedRate(() -> {
@@ -126,12 +128,12 @@ public void streamTicker(TradePair tradePair, ExchangeStreamConsumer consumer) {
 }
 ```
 
-### [TradingWindow.java](TradingWindow.java#L3096)
+### TradingWindow.java (historical file: `TradingWindow.java`)
 ```java
 exchange.fetchAccountTrades(null)  // LINE 3096
 ```
 
-### [ManualTradePanel.java](ManualTradePanel.java#L340)
+### ManualTradePanel.java (historical file: `ManualTradePanel.java`)
 ```java
 buyButton.setOnAction(event -> submitOrder(Side.BUY));      // LINE 340
 sellButton.setOnAction(event -> submitOrder(Side.SELL));    // LINE 341

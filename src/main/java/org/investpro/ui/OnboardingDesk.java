@@ -1,5 +1,7 @@
 package org.investpro.ui;
 
+import org.investpro.exchange.ibkr.IbkrExchange;
+
 import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -124,7 +126,6 @@ public class OnboardingDesk extends StackPane {
     private final ComboBox<String> marketTypeBox = new ComboBox<>();
     private final ComboBox<String> venueBox = new ComboBox<>();
     private final ComboBox<String> exchangeBox = new ComboBox<>();
-    private final ChoiceBox<String> selectedTradingModeChoiceBox = new ChoiceBox<>();
 
     private final Label statusLabel = new Label();
     private final ProgressBar progressBar = new ProgressBar(0);
@@ -625,9 +626,6 @@ public class OnboardingDesk extends StackPane {
         String selectedExchangeName = exchangeBox.getValue();
         SupportedExchange selectedExchange = SupportedExchange.fromDisplayName(selectedExchangeName);
 
-        selectedTradingModeChoiceBox.getItems().setAll("PAPER TRADING", "LIVE");
-        selectedTradingModeChoiceBox.setValue(toTradingModeDisplay(loadSavedTradingMode()));
-        styleChoiceBox(selectedTradingModeChoiceBox);
         boolean isIbkr = selectedExchange == SupportedExchange.INTERACTIVE_BROKERS;
         if (isIbkr) {
             showIbkrControlPanelCredentialsStep(selectedExchange, selectedExchangeName);
@@ -703,7 +701,7 @@ public class OnboardingDesk extends StackPane {
 
         credGrid.addRow(row++, createLabel("Telegram"), telegramToken);
         credGrid.addRow(row++, createLabel("OpenAI"), openAiField);
-        credGrid.addRow(row, createLabel("Trading Mode"), selectedTradingModeChoiceBox);
+
 
         CheckBox rememberCredentialsCheckBox = new CheckBox("Remember credentials");
         rememberCredentialsCheckBox.setStyle(checkBoxStyle());
@@ -766,7 +764,7 @@ public class OnboardingDesk extends StackPane {
             SupportedExchange selectedExchange,
             String selectedExchangeName) {
         TextField accountIdField = new TextField();
-        styleInputField(accountIdField, "IBKR Account ID (optional for paper)");
+        styleInputField(accountIdField, "IBKR Account ID (optional for connection)");
 
         TextField clientPortalUrlField = new TextField();
         styleInputField(clientPortalUrlField, "Client Portal URL (optional)");
@@ -788,19 +786,26 @@ public class OnboardingDesk extends StackPane {
         authModeChoiceBox.setValue(loadSavedIbkrAuthModeDisplay());
         styleChoiceBox(authModeChoiceBox);
 
+        ChoiceBox<String> gatewaySessionChoiceBox = new ChoiceBox<>();
+        gatewaySessionChoiceBox.getItems().setAll("Paper account", "Live account");
+        gatewaySessionChoiceBox.setValue(Preferences.userNodeForPackage(OnboardingDesk.class)
+                .get("ibkr_gateway_session", "Paper account"));
+        styleChoiceBox(gatewaySessionChoiceBox);
+
         loadRememberedIbkrAccount(selectedExchangeName, accountIdField);
         loadSavedIbkrSettings(clientPortalUrlField, hostField, paperPortField, livePortField, clientIdField);
 
         GridPane controlGrid = formGrid();
         int row = 0;
         controlGrid.addRow(row++, createLabel("Auth mode"), authModeChoiceBox);
+        controlGrid.addRow(row++, createLabel("Gateway session"), gatewaySessionChoiceBox);
         controlGrid.addRow(row++, createLabel("Account ID"), accountIdField);
         controlGrid.addRow(row++, createLabel("Client Portal URL"), clientPortalUrlField);
         controlGrid.addRow(row++, createLabel("Host"), hostField);
         controlGrid.addRow(row++, createLabel("Paper port"), paperPortField);
         controlGrid.addRow(row++, createLabel("Live port"), livePortField);
         controlGrid.addRow(row++, createLabel("Client ID"), clientIdField);
-        controlGrid.addRow(row, createLabel("Trading Mode"), selectedTradingModeChoiceBox);
+
 
         Label title = new Label("Exchange Credentials");
         title.setStyle(titleStyle(30));
@@ -822,6 +827,7 @@ public class OnboardingDesk extends StackPane {
                 selectedExchange,
                 selectedExchangeName,
                 authModeChoiceBox,
+                gatewaySessionChoiceBox,
                 accountIdField,
                 clientPortalUrlField,
                 hostField,
@@ -903,13 +909,21 @@ public class OnboardingDesk extends StackPane {
             Label validation) {
         String apiKey = apiKeyField.getText().trim();
         String apiSecret = apiSecretField.getText().trim();
+        if (selectedExchange == SupportedExchange.COINBASE) {
+            try {
+                var normalized = org.investpro.exchange.coinbase.CoinbaseCredentialInput.normalize(apiKey, apiSecret);
+                apiKey = normalized.keyName();
+                apiSecret = normalized.privateKey();
+                apiKeyField.setText(apiKey);
+                apiSecretField.setText(apiSecret);
+            } catch (IllegalArgumentException invalidInput) {
+                validation.setText(invalidInput.getMessage());
+                return;
+            }
+        }
         String accountId = accountIdField.getText().trim();
         String ibkrTwoFactorCode = ibkrTwoFactorCodeField.getText().trim();
-        String tradingMode = normalizeTradingMode(selectedTradingModeChoiceBox.getValue());
-
-        if (tradingMode == null || tradingMode.isBlank()) {
-            tradingMode = "PAPER";
-        }
+        String tradingMode = "PAPER";
 
         if (selectedExchange == SupportedExchange.OANDA) {
             if (apiKey.isBlank()) {
@@ -993,6 +1007,7 @@ public class OnboardingDesk extends StackPane {
             SupportedExchange selectedExchange,
             String selectedExchangeName,
             ChoiceBox<String> authModeChoiceBox,
+            ChoiceBox<String> gatewaySessionChoiceBox,
             TextField accountIdField,
             TextField clientPortalUrlField,
             TextField hostField,
@@ -1000,18 +1015,10 @@ public class OnboardingDesk extends StackPane {
             TextField livePortField,
             TextField clientIdField,
             Label validation) {
-        String tradingMode = normalizeTradingMode(selectedTradingModeChoiceBox.getValue());
-        if (tradingMode == null || tradingMode.isBlank()) {
-            tradingMode = "PAPER";
-        }
+        String tradingMode = "Live account".equals(gatewaySessionChoiceBox.getValue()) ? "LIVE" : "PAPER";
 
         String normalizedTradingMode = safe(tradingMode).toUpperCase(Locale.ROOT);
         String accountId = accountIdField.getText().trim();
-        if ("LIVE".equals(normalizedTradingMode) && accountId.isBlank()) {
-            validation.setText("IBKR Account ID is required for live trading mode.");
-            return;
-        }
-
         String authMode = ibkrAuthModeValue(authModeChoiceBox.getValue());
         String selectedPort = normalizedTradingMode.startsWith("LIVE")
                 ? parseIntOrDefault(livePortField.getText(), 4001)
@@ -1049,7 +1056,7 @@ public class OnboardingDesk extends StackPane {
                 "",
                 null,
                 null,
-                tradingMode);
+                tradingMode, ibkrParams);
 
         validation.setStyle("-fx-text-fill: " + WARNING + "; -fx-font-size: 11;");
         validation.setText("Connecting to IBKR session...");
@@ -1074,6 +1081,9 @@ public class OnboardingDesk extends StackPane {
         validation.setText("IBKR session connected.");
 
         saveRememberedIbkrAccount(selectedExchangeName, accountId);
+        Preferences gatewayPreferences = Preferences.userNodeForPackage(OnboardingDesk.class);
+        gatewayPreferences.put("ibkr_gateway_session", gatewaySessionChoiceBox.getValue());
+        flushPreferences(gatewayPreferences);
         saveIbkrSettings(sanitizedClientPortalUrl, hostField.getText(), paperPortField.getText(),
                 livePortField.getText(), clientIdField.getText(), authModeChoiceBox.getValue());
         saveConfiguration(configuration);
@@ -1119,22 +1129,23 @@ public class OnboardingDesk extends StackPane {
         if (selectedExchange == SupportedExchange.BITFINEX) {
             return """
                     Bitfinex
-                    API Key: public key from Settings → API
-                    API Secret: secret key from Settings → API""";
+                    API Key: public key from Settings â†’ API
+                    API Secret: secret key from Settings â†’ API""";
         }
         if (selectedExchange == SupportedExchange.ALPACA) {
             return """
                     Alpaca
-                    API Key: from Dashboard → API Keys
-                    API Secret: from Dashboard → API Keys
+                    API Key: from Dashboard â†’ API Keys
+                    API Secret: from Dashboard â†’ API Keys
                     Tip: use Alpaca paper account first.""";
         }
         if (selectedExchange == SupportedExchange.INTERACTIVE_BROKERS) {
             return """
                     Interactive Brokers
-                    Username and Password: used for your profile and runtime settings
-                    Authentication flow: sign in through the local Gateway browser page and complete 2FA there
-                    Brokerage session: initialized through /iserver/auth/ssodh/init after browser login
+                    TWS / IB Gateway: log in and complete 2FA in IBKR software, then enable API socket clients
+                    InvestPro connects using host, socket port and a unique client ID; no API key or password is needed
+                    Gateway session: select the paper/live account already logged in to IBKR software
+                    Client Portal mode: sign in through the local Gateway browser page and complete 2FA there
                     Account ID: required for live order routing
                     Client Portal URL: defaults to https://localhost:5000/v1/api
                     Gateway Host/Ports/Client ID: configure TWS or IB Gateway socket session
@@ -1694,8 +1705,9 @@ public class OnboardingDesk extends StackPane {
             String twoFactorCode,
             String tradingMode,
             Map<String, String> exchangeParams) {
+        Exchange exchange = null;
         try {
-            Exchange exchange = createExchange(selectedExchange, apiKey, apiSecret, accountId, twoFactorCode,
+            exchange = createExchange(selectedExchange, apiKey, apiSecret, accountId, twoFactorCode,
                     tradingMode, exchangeParams);
             AuthResult authResult = exchange.AuthCheckResult(selectedExchange);
             if (authResult != null && !authResult.success()) {
@@ -1719,6 +1731,8 @@ public class OnboardingDesk extends StackPane {
             log.warn("Broker authentication failed for {}", selectedExchange, throwable);
             return AuthResult
                     .failure("Authentication failed for %s: %s".formatted(selectedExchange, rootMessage(throwable)));
+        } finally {
+            if (exchange instanceof IbkrExchange ibkr) ibkr.disconnect();
         }
     }
 

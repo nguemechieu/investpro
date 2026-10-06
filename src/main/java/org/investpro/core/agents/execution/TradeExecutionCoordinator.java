@@ -416,8 +416,8 @@ public class TradeExecutionCoordinator {
 
         boolean aiEnabled = systemCore != null && systemCore.isAiReasoningEnabled();
         boolean liveTrading = systemCore == null
-                ? executionEngine.getExchange() != null && !executionEngine.getExchange().isPaperTrading()
-                : systemCore.getExchange() != null && !systemCore.getExchange().isPaperTrading();
+                ? executionEngine.getExchange() != null && !executionEngine.getExchange().isBotPaperTrading()
+                : systemCore.getExchange() != null && !systemCore.getExchange().isBotPaperTrading();
 
         return new PreTradeValidationEngine.TradeRequest(
                 symbolText,
@@ -503,7 +503,7 @@ public class TradeExecutionCoordinator {
             @Override
             public boolean brokerConnected() {
                 return exchange != null
-                        && (Boolean.TRUE.equals(exchange.isConnected()) || exchange.isPaperTrading());
+                        && (Boolean.TRUE.equals(exchange.isConnected()) || exchange.isBotPaperTrading());
             }
 
             @Override
@@ -536,7 +536,7 @@ public class TradeExecutionCoordinator {
 
             @Override
             public boolean liveTrading() {
-                return exchange != null && !exchange.isPaperTrading();
+                return exchange != null && !exchange.isBotPaperTrading();
             }
 
             @Override
@@ -606,6 +606,9 @@ public class TradeExecutionCoordinator {
                 positionId,
                 intent);
 
+        if (exchange.isBotPaperTrading()) {
+            return completed(TradeExecutionResult.rejected("Broker position closing is disabled in local paper mode."));
+        }
         CompletableFuture<String> closeFuture = positionId == null || positionId.isBlank()
                 ? exchange.closePosition(symbol)
                 : exchange.closePosition(symbol, positionId);
@@ -627,7 +630,7 @@ public class TradeExecutionCoordinator {
             return CompletableFuture.completedFuture(false);
         }
 
-        return exchange.fetchOpenOrders(symbol)
+        return exchange.botOrderExecution().fetchOpenOrders(symbol)
                 .thenApply(orders -> hasActiveOrderForSymbol(orders, symbol))
                 .exceptionally(exception -> {
                     log.warn(
@@ -696,7 +699,7 @@ public class TradeExecutionCoordinator {
         }
 
         try {
-            Account account = exchange.fetchAccount().get();
+            Account account = exchange.isBotPaperTrading() ? exchange.localPaperAccount() : exchange.fetchAccount().get();
             if (account == null) {
                 return riskContext;
             }

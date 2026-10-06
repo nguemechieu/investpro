@@ -112,15 +112,15 @@ public class SystemOperationsBoard extends BorderPane {
 
         Button refreshBtn = new Button("🔄 Refresh");
         refreshBtn.getStyleClass().add("operations-button");
-        refreshBtn.setOnAction(e -> refreshAllData());
+        refreshBtn.setOnAction(_ -> refreshAllData());
 
         Button exportBtn = new Button("💾 Export Snapshot");
         exportBtn.getStyleClass().add("operations-button");
-        exportBtn.setOnAction(e -> exportSnapshot());
+        exportBtn.setOnAction(_ -> exportSnapshot());
 
         Button clearLogsBtn = new Button("🗑️ Clear Logs");
         clearLogsBtn.getStyleClass().add("operations-button");
-        clearLogsBtn.setOnAction(e -> clearActivityLogs());
+        clearLogsBtn.setOnAction(_ -> clearActivityLogs());
 
         Separator sep = new Separator();
         sep.getStyleClass().add("operations-separator");
@@ -669,7 +669,7 @@ public class SystemOperationsBoard extends BorderPane {
     private void setupAutoRefresh() {
         refreshTimeline = new Timeline(new KeyFrame(
                 javafx.util.Duration.millis(REFRESH_INTERVAL_MS),
-                e -> refreshAllData()));
+                _ -> refreshAllData()));
         refreshTimeline.setCycleCount(Animation.INDEFINITE);
         refreshTimeline.play();
     }
@@ -696,7 +696,7 @@ public class SystemOperationsBoard extends BorderPane {
             notificationLabel.setText(message == null ? "" : message);
             Timeline clearTimeline = new Timeline(new KeyFrame(
                     javafx.util.Duration.seconds(5),
-                    event -> notificationLabel.setText("")));
+                    _ -> notificationLabel.setText("")));
             clearTimeline.setCycleCount(1);
             clearTimeline.play();
         });

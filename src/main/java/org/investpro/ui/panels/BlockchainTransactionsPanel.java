@@ -16,6 +16,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import org.investpro.exchange.blockchain.BlockchainTransactionResult;
 import org.investpro.exchange.blockchain.execution.BlockchainTransactionRepository;
+import org.jspecify.annotations.NonNull;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -139,9 +140,9 @@ public class BlockchainTransactionsPanel extends VBox {
 
         private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_INSTANT;
 
-        static Row from(BlockchainTransactionResult result) {
+        static @NonNull Row from(@NonNull BlockchainTransactionResult result) {
             String feeText = result.feeUnitsConsumed() == null ? "" : String.valueOf(result.feeUnitsConsumed());
-            String submittedText = result.submittedAt() == null ? "" : FORMATTER.format(result.submittedAt());
+            String submittedText = FORMATTER.format(result.submittedAt());
             String confirmedText = result.confirmedAt() == null ? "" : FORMATTER.format(result.confirmedAt());
             String errorText = result.errorMessage() == null ? "" : result.errorMessage();
 

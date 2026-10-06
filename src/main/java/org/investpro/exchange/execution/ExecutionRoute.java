@@ -35,18 +35,6 @@ public record ExecutionRoute(
         Objects.requireNonNull(selectedAt, "selectedAt");
     }
 
-    /** Returns estimated spread in bps if available. */
-    public Optional<BigDecimal> getEstimatedSpreadBps() { return Optional.ofNullable(estimatedSpreadBps); }
-
-    /** Returns estimated fee in bps if available. */
-    public Optional<BigDecimal> getEstimatedFeeBps() { return Optional.ofNullable(estimatedFeeBps); }
-
-    /** Returns estimated slippage in bps if available. */
-    public Optional<BigDecimal> getEstimatedSlippageBps() { return Optional.ofNullable(estimatedSlippageBps); }
-
-    /** Returns estimated latency in ms if available. */
-    public Optional<Long> getEstimatedLatencyMs() { return Optional.ofNullable(estimatedLatencyMs); }
-
     /** Returns available liquidity at the time of routing. */
     public Optional<BigDecimal> getAvailableLiquidity() { return Optional.ofNullable(availableLiquidity); }
 

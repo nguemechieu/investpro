@@ -48,7 +48,7 @@ class StrategyInstrumentCompatibilityServiceTest {
                 AssetClass.INDEX,
                 MarketType.DERIVATIVE,
                 ContractType.FUTURE)));
-        assertFalse(service.supports(strategy, instrument(MarketType.FX)));
+        assertFalse(service.supports(strategy, instrument(MarketType.DERIVATIVE)));
     }
 
     @Test
@@ -62,7 +62,7 @@ class StrategyInstrumentCompatibilityServiceTest {
                 .marketCompatibility(Set.of(StrategyMarketCompatibility.COMMODITY))
                 .build();
 
-        assertTrue(service.supports(carry, instrument(MarketType.FX)));
+        assertTrue(service.supports(carry, instrument(MarketType.DERIVATIVE)));
         assertTrue(service.supports(commodity, instrument(
                 AssetClass.COMMODITY,
                 MarketType.DERIVATIVE,

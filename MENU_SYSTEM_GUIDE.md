@@ -1,5 +1,7 @@
 # Comprehensive Menu System for InvestPro
 
+> Current documentation baseline (2026-10-05): JDK 27, JavaFX 27 and Maven 3.8.5+. Use the [documentation index](docs/README.md) for current setup, trading-desk behavior, Telegram commands and release limits. Design examples below are not proof of broker support or deployment verification.
+
 ## Overview
 
 A complete, well-organized menu system has been created to provide centralized access to all 15+ UI panels and system features. This system consists of:

@@ -4,9 +4,10 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.investpro.data.CandleData;
 import org.investpro.models.trading.Trade;
+import org.jspecify.annotations.NonNull;
+
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Aggregates individual trades into candlestick data for various timeframes.
@@ -19,7 +20,7 @@ import java.util.stream.Collectors;
 public class CandleAggregator {
     // Standard trading timeframes in seconds
     public static final Map<String, Integer> TIMEFRAME_SECONDS = Collections
-            .unmodifiableMap(new LinkedHashMap<String, Integer>() {
+            .unmodifiableMap(new LinkedHashMap<>() {
                 {
                     put("1m", 60);
                     put("5m", 300);
@@ -74,7 +75,7 @@ public class CandleAggregator {
 
         for (Trade trade : trades) {
             long bucketTime = getBucketTime(trade.getTimestamp(), secondsPerCandle);
-            candleBuckets.computeIfAbsent(bucketTime, k -> new ArrayList<>()).add(trade);
+            candleBuckets.computeIfAbsent(bucketTime, _ -> new ArrayList<>()).add(trade);
         }
 
         // Convert each bucket into a CandleData
@@ -100,7 +101,7 @@ public class CandleAggregator {
      *                              40-100)
      * @return a map of timeframe -> aggregated CandleData list
      */
-    public static Map<String, List<CandleData>> aggregateCandlesAllTimeframes(
+    public static @NonNull Map<String, List<CandleData>> aggregateCandlesAllTimeframes(
             List<Trade> trades, int desiredVisibleCandles) {
 
         Map<String, List<CandleData>> result = new LinkedHashMap<>();
@@ -172,23 +173,23 @@ public class CandleAggregator {
         // Sort by timestamp to get proper OHLC
         List<Trade> sortedTrades = trades.stream()
                 .sorted(Comparator.comparing(Trade::getTimestamp))
-                .collect(Collectors.toList());
+                .toList();
 
-        double open = sortedTrades.get(0).getPrice();
-        double close = sortedTrades.get(sortedTrades.size() - 1).getPrice();
+        double open = sortedTrades.getFirst().getPrice();
+        double close = sortedTrades.getLast().getPrice();
 
         double high = sortedTrades.stream()
-                .mapToDouble(t -> t.getPrice())
+                .mapToDouble(Trade::getPrice)
                 .max()
                 .orElse(open);
 
         double low = sortedTrades.stream()
-                .mapToDouble(t -> t.getPrice())
+                .mapToDouble(Trade::getPrice)
                 .min()
                 .orElse(open);
 
         double volume = sortedTrades.stream()
-                .mapToDouble(t -> t.getAmount())
+                .mapToDouble(Trade::getAmount)
                 .sum();
 
         double volumeWeightedPrice = sortedTrades.stream()

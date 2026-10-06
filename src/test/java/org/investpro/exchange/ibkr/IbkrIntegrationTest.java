@@ -42,19 +42,19 @@ class IbkrIntegrationTest {
     }
 
     @Test
-    void orderSubmissionSupportsMarketAndBracketAndPersists() throws Exception {
+    void localSimulatorSupportsMarketAndBracketAndPersists() throws Exception {
         IbkrExchange exchange = paperExchange();
         exchange.connect();
 
         TradePair pair = new TradePair("EUR", "USD");
 
-        String marketExecutionId = exchange.createMarketOrder(pair, Side.BUY, 10_000).join();
-        String bracketOrderId = exchange.createBracketOrder(pair, Side.BUY, 1_000, 1.10, 1.08, 1.12).join();
+        String marketExecutionId = exchange.getOrderService().submitMarket(pair, Side.BUY, 10_000);
+        String bracketOrderId = exchange.getOrderService().submitBracket(pair, Side.BUY, 1_000, 1.10, 1.08, 1.12);
 
         assertThat(marketExecutionId).isNotBlank();
         assertThat(bracketOrderId).isNotBlank();
-        assertThat(exchange.fetchAllPositions().join()).isNotEmpty();
-        assertThat(exchange.fetchAllOpenOrders().join()).hasSizeGreaterThanOrEqualTo(3);
+        assertThat(exchange.getPositionService().fetchAll()).isNotEmpty();
+        assertThat(exchange.getOrderService().fetchAllOpenOrders()).hasSizeGreaterThanOrEqualTo(3);
 
         assertThat(Files.exists(Path.of("data", "ibkr", "orders.json"))).isTrue();
         assertThat(Files.exists(Path.of("data", "ibkr", "executions.json"))).isTrue();
@@ -66,7 +66,7 @@ class IbkrIntegrationTest {
         exchange.connect();
 
         TradePair pair = new TradePair("EUR", "USD");
-        exchange.createMarketOrder(pair, Side.BUY, 5_000).join();
+        exchange.getOrderService().submitMarket(pair, Side.BUY, 5_000);
         exchange.synchronizePortfolio();
 
         assertThat(Files.exists(Path.of("data", "ibkr", "positions.json"))).isTrue();
@@ -111,9 +111,9 @@ class IbkrIntegrationTest {
                 Map.of(
                         "host", "192.0.2.10",
                         "port", "7497",
-                        "clientId", "42"));
+                        "clientId", "42", "watchlist", ""));
 
-        IbkrExchange exchange = new IbkrExchange(credentials);
+        IbkrExchange exchange = new IbkrExchange(credentials, new StubIbkrTwsSession());
         exchange.connect();
 
         assertThat(exchange.getConnectionManager().getHost()).isEqualTo("192.0.2.10");
@@ -122,17 +122,17 @@ class IbkrIntegrationTest {
     }
 
     @Test
-    void paperTradingWorkflowAllowsTradingWithoutLiveLicenseGate() throws Exception {
+    void localSimulatorAllowsTradingWithoutLiveLicenseGate() throws Exception {
         IbkrExchange exchange = paperExchange();
         exchange.setLiveTradingLicenseGate(() -> false);
         exchange.setUserSelectedTradingMode("PAPER");
         exchange.connect();
 
         TradePair pair = new TradePair("EUR", "USD");
-        String id = exchange.createLimitOrder(pair, Side.BUY, 1_000, 1.10).join();
+        String id = exchange.getOrderService().submitLimit(pair, Side.BUY, 1_000, 1.10);
 
         assertThat(id).isNotBlank();
-        assertThat(exchange.fetchOpenOrders(pair).join())
+        assertThat(exchange.getOrderService().fetchOpenOrders(pair))
                 .extracting(OpenOrder::getOrderId)
                 .contains(id);
     }
@@ -146,10 +146,14 @@ class IbkrIntegrationTest {
                 null,
                 null,
                 "DU123456",
-                true);
+                true, Map.of("watchlist", ""));
 
-        IbkrExchange exchange = new IbkrExchange(credentials);
+        IbkrExchange exchange = new IbkrExchange(credentials, new StubIbkrTwsSession());
         exchange.setUserSelectedTradingMode("PAPER");
+        // Seed resolved contract metadata for this offline integration fixture.
+        exchange.getContractCache().put(new IbkrResolvedContract(
+                12087792L, "EUR", "EUR.USD", "CASH", "USD", "IDEALPRO", "", "", "", "",
+                null, "", null, 0.00005, "", "Euro / US Dollar", "Forex", "", "test", null, null, "{}"));
         return exchange;
     }
 }

@@ -1,5 +1,6 @@
 package org.investpro.exchange.migration_bridge;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.models.ExchangeCapability;
@@ -35,7 +36,17 @@ import org.jetbrains.annotations.NotNull;
 @Slf4j
 public final class ExchangeAdapterMigrationBridge {
 
+    /**
+     * -- GETTER --
+     * Returns the underlying legacy exchange instance.
+     */
+    @Getter
     private final Exchange delegate;
+    /**
+     * -- GETTER --
+     * Returns the capability profile derived or provided at construction.
+     */
+    @Getter
     private final ExchangeCapability capability;
 
     /** Per-exchange stale snapshot holder for normalization layer integration. */
@@ -93,12 +104,6 @@ public final class ExchangeAdapterMigrationBridge {
         log.info("[MigrationBridge] Registered legacy exchange '{}' with capability registry",
                 capability.getExchangeName());
     }
-
-    /** Returns the underlying legacy exchange instance. */
-    public Exchange getDelegate() { return delegate; }
-
-    /** Returns the capability profile derived or provided at construction. */
-    public ExchangeCapability getCapability() { return capability; }
 
     /**
      * Caches the latest normalized snapshot for integration with

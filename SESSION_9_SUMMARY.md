@@ -1,5 +1,7 @@
 # Session 9 Summary - Theme Customization System
 
+> Historical report: retained for its original revision. Java versions, test counts, completion claims and code examples below are historical, not current setup or release evidence. For the JDK 27 / JavaFX 27 baseline, use the [project README](README.md) and [documentation index](docs/README.md). Classified on 2026-10-05.
+
 **Date**: May 11, 2026  
 **Duration**: Continuation from Session 8  
 **Commits**: 3 major commits  
@@ -400,5 +402,5 @@ The system is extensible, maintainable, and ready for future enhancements like t
 
 **Status**: ✅ **COMPLETE**  
 **Ready for**: Production use, user testing, further theme development  
-**Last Updated**: May 11, 2026  
+**Last Updated**: May 11, 2026
 **Next Session**: Focus on removing remaining inline styles from UI files

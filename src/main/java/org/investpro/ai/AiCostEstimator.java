@@ -15,7 +15,7 @@ public final class AiCostEstimator {
     }
 
     public static int estimateOutputTokens(String prompt) {
-        return Math.max(500, Math.min(2500, estimatePromptTokens(prompt)));
+        return Math.clamp(estimatePromptTokens(prompt), 500, 2500);
     }
 
     public static BigDecimal estimateTotalCredits(AiModelDefinition model, String prompt) {

@@ -63,33 +63,6 @@ public class ChartEvent {
                 .build();
     }
 
-    public static ChartEvent ofTrade(EventType type, Instant timestamp, double price, String description) {
-        return ChartEvent.builder()
-                .id(java.util.UUID.randomUUID().toString())
-                .timestamp(timestamp)
-                .type(type)
-                .label(type.label)
-                .description(description)
-                .value(price)
-                .hexColor(type.hexColor)
-                .visible(true)
-                .lineWidth(2)
-                .build();
-    }
-
-    public static ChartEvent ofNews(String newsTitle, Instant timestamp, String impact) {
-        return ChartEvent.builder()
-                .id(java.util.UUID.randomUUID().toString())
-                .timestamp(timestamp)
-                .type(EventType.NEWS)
-                .label("📰 " + newsTitle)
-                .description(impact)
-                .hexColor(EventType.NEWS.hexColor)
-                .visible(true)
-                .lineWidth(1)
-                .build();
-    }
-
     public Color getColor() {
         return Color.web(hexColor);
     }

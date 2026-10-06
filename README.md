@@ -4,6 +4,8 @@
 
 <h1 align="center">InvestPro</h1>
 
+Updated: 2026-10-05. [Documentation index](docs/README.md) · [Trading Desk guide](docs/trading-desk.md) · [Telegram remote desk](docs/telegram-remote-desk.md).
+
 <p align="center">
   <strong>A modern JavaFX trading workstation for strategy research, backtesting, market intelligence, and risk-controlled automation.</strong><br/>
   Strategy Builder · Agent Runtime · Local gRPC AI Advisory · Risk Management · Backtesting · Paper Trading · Multi-Exchange Execution
@@ -26,8 +28,8 @@
   <a href="https://opensource.org/licenses/Apache-2.0">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" />
   </a>
-  <img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java 21" />
-  <img src="https://img.shields.io/badge/JavaFX-21.0.6-blue.svg" alt="JavaFX" />
+  <img src="https://img.shields.io/badge/Java-27-orange.svg" alt="Java 27" />
+  <img src="https://img.shields.io/badge/JavaFX-27-blue.svg" alt="JavaFX" />
   <img src="https://img.shields.io/badge/status-active%20development-yellow.svg" alt="Status" />
 </p>
 
@@ -86,7 +88,7 @@ The goal is to provide a complete research-to-execution environment:
 
 | Area | Status |
 |---|---:|
-| Java 21 + JavaFX desktop workstation | ✅ Working |
+| Java 27 + JavaFX desktop workstation | ✅ Working |
 | Exchange adapters | ✅ Implemented |
 | Real-time WebSocket streaming | ✅ Working |
 | Strategy engine + signal pipeline | ✅ Working |
@@ -152,7 +154,7 @@ InvestPro provides:
 
 ### Trading Capabilities
 
-- Paper trading with configurable virtual balance.
+- Session-local paper trading with an initial USD 10,000 balance; market fills are simulated locally.
 - Live trading through authenticated exchange APIs.
 - Market, limit, stop-loss, take-profit, and bracket-style order support where available.
 - Order lifecycle management: create, cancel, track fills, and review status.
@@ -221,7 +223,7 @@ InvestPro provides:
 ### Notifications
 
 - Telegram bot integration.
-- Telegram commands such as `/status` and `/setapikey` when enabled.
+- Authorized private-chat commands for account reports, quotes, watchlists, confirmed orders and OpenAI questions; configure keys in the desktop environment.
 - Email notifications through SMTP.
 - Signal monitoring logs for every stage of the signal pipeline.
 
@@ -332,7 +334,7 @@ StrategySignal
 | `BotTradeDecisionEngine` | Scores the trade idea and decides whether it deserves review. |
 | `RiskManagementSystem` | Enforces risk limits, exposure, sizing, and daily loss controls. |
 | `AiReasoningService` | Optional second review layer for reasoning and explanation. |
-| `TradeExecutionCoordinator` | Final authority before any order reaches the exchange. |
+| `TradeExecutionCoordinator` | Coordinates final checks for reviewed strategy orders. |
 | `ExecutionEngine` | Places, tracks, and manages orders. |
 
 ---
@@ -353,7 +355,7 @@ StrategySignal
 | Stellar Network | XLM, USDC, and trustline assets on Stellar DEX | ✅ | ✅ | ✅ |
 | Solona Network | On-chain wallet and network-linked assets | ✅ | ✅ | ❌ |
 
-> Live trading requires valid API credentials. Always test with paper trading first.
+> This table lists adapters and intended capabilities, not completed live verification for every venue or asset class. Live trading requires valid credentials, account permissions and supported products. Test PAPER first.
 
 ---
 
@@ -381,13 +383,13 @@ Practical implication:
 
 | Requirement | Version |
 |---|---:|
-| Java JDK | 21 LTS |
-| JavaFX | 21.0.6 |
-| Maven | 3.6+ |
+| Java JDK | 27 |
+| JavaFX | 27 |
+| Maven | 3.8.5+ |
 | Git | Recent version |
 | Docker | Optional, 20+ recommended |
 
-Recommended JDK: **Eclipse Temurin 21**.
+Recommended JDK: **JDK 27**.
 
 Check your local environment:
 
@@ -396,282 +398,93 @@ java -version
 mvn -version
 ```
 
-Java must show version `21` or newer.
+Java must show version `27`.
 
 ---
 
 ## Running the Application
 
-### Clone the Repository
+Set `JAVA_HOME` to JDK 27 and check `java -version` and `./mvnw -version`.
+From the repository root:
 
 ```bash
-git clone https://github.com/nguemechieu/investpro.git
-cd investpro
+./mvnw clean package
+./mvnw javafx:run
 ```
 
-### Build
+On Windows, use `.\mvnw.cmd clean package`, then `.\mvnw.cmd javafx:run`,
+or the repository's `run-app.bat`. The launcher is `org.investpro.InvestProLauncher`.
+JavaFX comes from Maven; do not mix in an older JavaFX SDK. A bare application
+JAR is not a standalone runtime: its JavaFX and other dependencies are required.
 
-```bash
-mvn clean package -DskipTests
-```
+The installer profile invokes jpackage, but installer creation is not a verified
+release path. Its current arguments use the SNAPSHOT project version; platform
+version requirements must be addressed before producing an installer.
 
-### Recommended Development Run Command
-
-Use the JavaFX Maven plugin:
-
-```bash
-mvn javafx:run
-```
-
-This is the safest way to run the app during development because JavaFX is not bundled inside Java 21.
-
-> Do **not** rely on plain `java -jar` during development unless JavaFX modules are provided manually.
-
-### Manual JAR Run With JavaFX Modules
-
-If you want to run the built JAR directly, you must provide the JavaFX module path.
-
-#### Windows
-
-```bash
-java ^
-  --module-path "C:\path\to\javafx-sdk-21.0.6\lib" ^
-  --add-modules javafx.controls,javafx.fxml,javafx.graphics,javafx.web,javafx.swing ^
-  -jar target/investpro-1.0.0-SNAPSHOT.jar
-```
-
-#### Linux
-
-```bash
-java \
-  --module-path /usr/share/openjfx/lib \
-  --add-modules javafx.controls,javafx.fxml,javafx.graphics,javafx.web,javafx.swing \
-  -jar target/investpro-1.0.0-SNAPSHOT.jar
-```
-
-### Recommended Production Packaging
-
-For production releases, use `jlink` or `jpackage` so users do not need to install JavaFX separately.
-
-Recommended production targets:
-
-- Windows `.exe` installer
-- Linux `.deb` / `.rpm` package
-- macOS `.dmg` bundle
-- Docker/noVNC remote desktop image
-
-Build an installer/app image with Maven profile:
-
-```bash
-./mvnw -Pinstaller -Dinstaller.type=app-image package
-```
-
----
-
+See [developer setup](DEVELOPER_GUIDE.md), [Trading Desk usage](docs/trading-desk.md),
+and [release readiness](PRODUCTION_READY.md).
 ## Required Maven JavaFX Setup
 
-Make sure your `pom.xml` contains JavaFX dependencies and the JavaFX Maven plugin.
+The repository POM is authoritative. It sets `maven.compiler.release=27` and
+`javafx.version=27`, configures Lombok annotation processing, generates protobuf
+and gRPC sources, and uses `org.investpro.InvestProLauncher` as the main class.
+The JavaFX Maven plugin version is `0.0.8`.
 
-```xml
-<properties>
-    <java.version>21</java.version>
-    <javafx.version>21.0.6</javafx.version>
-</properties>
-
-<dependencies>
-    <dependency>
-        <groupId>org.openjfx</groupId>
-        <artifactId>javafx-controls</artifactId>
-        <version>${javafx.version}</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.openjfx</groupId>
-        <artifactId>javafx-fxml</artifactId>
-        <version>${javafx.version}</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.openjfx</groupId>
-        <artifactId>javafx-web</artifactId>
-        <version>${javafx.version}</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.openjfx</groupId>
-        <artifactId>javafx-swing</artifactId>
-        <version>${javafx.version}</version>
-    </dependency>
-</dependencies>
-```
-
-```xml
-<build>
-    <plugins>
-        <plugin>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-maven-plugin</artifactId>
-            <version>0.0.8</version>
-            <configuration>
-                <mainClass>org.investpro.Main</mainClass>
-            </configuration>
-        </plugin>
-    </plugins>
-</build>
-```
-
-Replace `org.investpro.Main` with your actual JavaFX launcher class.
-
----
-
+Import the existing Maven project instead of replacing the POM with a partial
+example. A separate JavaFX SDK is unnecessary when running through Maven.
+Packaging copies runtime dependencies into `target/lib`.
 ## Docker / Browser Desktop Mode
 
-InvestPro can run in Docker with a browser-accessible Linux desktop using Xvfb, Fluxbox, x11vnc, and noVNC.
-
-### Start With Docker Compose
-
 ```bash
-docker-compose up -d
+docker compose up -d --build
+docker compose logs -f investpro-app
 ```
 
-Open the desktop in your browser:
+Open `http://localhost:6080/vnc.html?autoconnect=1&resize=scale`.
+Root Compose starts PostgreSQL 16 and the JDK 27/JavaFX 27 desktop container.
+noVNC runs inside `investpro-app`; it is not a separate service. The Python AI
+service is optional and starts separately.
 
-```text
-http://localhost:6080/vnc.html?autoconnect=1&resize=scale
-```
-
-Or connect with a native VNC client:
-
-```text
-localhost:5900
-```
-
-Default VNC password:
-
-```text
-investpro
-```
-
-### Exposed Ports
-
-| Port | Service |
-|---:|---|
-| `6080` | noVNC web client |
-| `5900` | Native VNC |
-| `8080` | Application HTTP / future REST API |
-| `5432` | PostgreSQL |
-
-### Docker JavaFX Runtime Notes
-
-Docker images that run JavaFX must include JavaFX modules and native GUI libraries. A typical Debian/Ubuntu runtime needs packages such as:
-
-```dockerfile
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    openjfx \
-    xvfb \
-    x11vnc \
-    novnc \
-    websockify \
-    fluxbox \
-    supervisor \
-    libgtk-3-0 \
-    libxtst6 \
-    libxrender1 \
-    libxi6 \
-    libxext6 \
-    libgl1 \
-    libasound2t64 \
-    && rm -rf /var/lib/apt/lists/*
-```
-
-A Docker JavaFX run command should include:
-
-```bash
-java \
-  --module-path /usr/share/openjfx/lib \
-  --add-modules javafx.controls,javafx.fxml,javafx.graphics,javafx.web,javafx.swing \
-  -jar /app/investpro.jar
-```
-
----
-
+Use the [Docker setup guide](DOCKER_SETUP.md) for port bindings, persistent data,
+development credentials and troubleshooting. Docker runtime behavior still needs
+verification for the chosen deployment.
 ## Configuration
 
-Create a local configuration file:
+Use the Trading Desk credential dialog for the selected exchange. SystemCore also
+loads user properties from `~/.investpro/config.properties`. AppConfig-backed keys
+resolve JVM properties first, then OS environment, `.env`, and defaults; not every
+subsystem uses that same reader. The following local AI keys should be set in the
+Java process environment or JVM configuration, not assumed to work as dotted aliases:
 
 ```text
-~/.investpro/config.properties
+AI_LOCAL_GRPC_ENABLED=true
+AI_LOCAL_GRPC_HOST=127.0.0.1
+AI_LOCAL_GRPC_PORT=8010
+AI_LOCAL_GRPC_TIMEOUT_MS=1500
 ```
 
-Example:
+Start Python separately using the [AI service guide](ai-service/README.md). Its
+server bind keys are `AI_LOCAL_HOST` and `AI_LOCAL_PORT`, not the client keys above.
 
-```properties
-# --- Binance US ---
-binance.us.key=YOUR_API_KEY
-binance.us.secret=YOUR_API_SECRET
+Coinbase uses `COINBASE_KEY_NAME` and `COINBASE_PRIVATE_KEY`, with the CDP key name
+and matching PEM private key. Supported JSON, quoted values and escaped newlines
+are normalized by credential input handling. Missing key data cannot be repaired.
 
-# --- Binance Global ---
-binance.key=YOUR_API_KEY
-binance.secret=YOUR_API_SECRET
+For Telegram, set the Java process environment:
 
-# --- Coinbase ---
-coinbase.key=YOUR_API_KEY
-coinbase.secret=YOUR_API_SECRET
-
-# --- OANDA ---
-oanda.token=YOUR_BEARER_TOKEN
-oanda.account_id=YOUR_ACCOUNT_ID
-
-# --- Alpaca ---
-alpaca.key=YOUR_API_KEY
-alpaca.secret=YOUR_API_SECRET
-
-# --- Telegram Bot optional ---
-telegram_token=YOUR_BOT_TOKEN
-
-# --- Email notifications optional ---
-from_email=you@example.com
-to_email=alerts@example.com
-
-# --- Local Python gRPC advisory runtime ---
-ai.local.grpc.enabled=true
-ai.local.grpc.host=127.0.0.1
-ai.local.grpc.port=8010
-ai.local.grpc.timeout.ms=1500
-
-# --- OpenAI optional fallback ---
-openai.api_key=YOUR_OPENAI_KEY
-
-# --- Risk limits ---
-risk.small_account.enabled=true
-risk.small_account.threshold=100.0
-risk.small_account.oanda_units=1.0
-risk.max_risk_per_trade=0.01
-risk.max_daily_loss=0.03
+```text
+TELEGRAM_BOT_TOKEN=<bot token>
+TELEGRAM_ALLOWED_USER_IDS=<numeric user IDs, comma separated>
+TELEGRAM_CHAT_ID=<notification chat ID>
+OPENAI_API_KEY=<OpenAI API key>
 ```
 
-> **Security:** Never commit API keys, tokens, passwords, or account IDs to Git.
+Telegram also supports documented `telegram.*` user properties. Configure authorized
+private-chat users before accepting remote requests; `/setapikey` does not accept
+credentials. See the [full remote desk guide](docs/telegram-remote-desk.md).
 
-Start the local Python AI runtime from the `ai-service/` directory with:
-
-```bash
-python app/server.py
-```
-
-The OpenAI API key may also be provided with:
-
-```bash
-export OPENAI_API_KEY="YOUR_OPENAI_KEY"
-```
-
-On Windows PowerShell:
-
-```powershell
-$env:OPENAI_API_KEY="YOUR_OPENAI_KEY"
-```
-
----
-
+Never commit real API keys, tokens, account exports or private keys. Root Compose
+contains development database/VNC credentials; review them before deployment.
 ## Quick Start
 
 ### 1. Launch InvestPro
@@ -936,7 +749,7 @@ Important system events are persisted for review and debugging. Logs should help
 
 ### v1.0 — Current Active Development
 
-- [x] Java 21 + JavaFX trading workstation
+- [x] Java 27 + JavaFX trading workstation
 - [x] Multi-exchange adapter structure
 - [x] WebSocket-first market data streaming
 - [x] Strategy engine
@@ -951,7 +764,7 @@ Important system events are persisted for review and debugging. Logs should help
 - [x] User strategy builder UI
 - [x] AI-assisted strategy draft workflow, disabled by default
 - [x] Better automated tests
-- [x] Production installer packaging
+- [ ] Production installer packaging (platform validation required)
 
 ### v1.5 — Planned
 
@@ -1000,7 +813,7 @@ mvn clean package
 
 ### Code Standards
 
-- Java 21.
+- Java 27.
 - Maven build.
 - JavaFX UI conventions.
 - SLF4J/Logback for logging.
@@ -1037,7 +850,7 @@ Or run manually with JavaFX modules:
 
 ```bash
 java \
-  --module-path /path/to/javafx-sdk-21.0.6/lib \
+  --module-path /path/to/javafx-sdk-27/lib \
   --add-modules javafx.controls,javafx.fxml,javafx.graphics,javafx.web,javafx.swing \
   -jar target/investpro-1.0.0-SNAPSHOT.jar
 ```
@@ -1050,7 +863,7 @@ Your Java version is too old.
 java -version
 ```
 
-Install Java 21 or newer.
+Install Java 27 or newer.
 
 ### Maven cannot find JavaFX plugin
 
@@ -1205,5 +1018,5 @@ You may obtain a copy of the License at
 ---
 
 <p align="center">
-  <sub>Built with Java 21 · JavaFX 21.0.6 · Apache Maven · Open source under Apache 2.0</sub>
+  <sub>Built with Java 27 · JavaFX 27 · Apache Maven · Open source under Apache 2.0</sub>
 </p>

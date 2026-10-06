@@ -1,5 +1,7 @@
 # DefaultMoneyFormatter Refactoring Summary
 
+> Historical report: retained for its original revision. Java versions, test counts, completion claims and code examples below are historical, not current setup or release evidence. For the JDK 27 / JavaFX 27 baseline, use the [project README](README.md) and [documentation index](docs/README.md). Classified on 2026-10-05.
+
 ## Overview
 Refactored `DefaultMoneyFormatter.java` to be reliable for fiat, crypto, forex, stocks, futures, and trading P&L display with comprehensive improvements in digit grouping, negative handling, and configurability.
 

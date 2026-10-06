@@ -1,5 +1,7 @@
 # Currency Registry In InvestPro
 
+> Current documentation baseline (2026-10-05): JDK 27, JavaFX 27 and Maven 3.8.5+. Use the [documentation index](../docs/README.md) for current setup, trading-desk behavior, Telegram commands and release limits. Design examples below are not proof of broker support or deployment verification.
+
 ## Why This Exists
 
 InvestPro consumes symbols from many exchanges and asset classes (forex, crypto, metals, indices, stocks).

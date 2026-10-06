@@ -1,8 +1,10 @@
 # Production Release Checklist
 
+> Current documentation baseline (2026-10-05): JDK 27, JavaFX 27 and Maven 3.8.5+. Use the [documentation index](docs/README.md) for current setup, trading-desk behavior, Telegram commands and release limits. Design examples below are not proof of broker support or deployment verification.
+
 Use this checklist before any production release.
 
-Last updated: 2026-06-03
+Last updated: 2026-10-05
 
 ## 1. Build and Quality Gates
 
@@ -14,7 +16,7 @@ Last updated: 2026-06-03
 
 - [ ] Confirm no failing tests.
 - [ ] Confirm enforcer checks pass (Java/Maven/dependency convergence).
-- [ ] Confirm SpotBugs check passes.
+- [ ] Record that the configured SpotBugs check is skipped on JDK 27; require a compatible parser before claiming static-analysis coverage.
 - [ ] Run compile smoke check from a clean terminal:
 
 ```powershell
@@ -41,7 +43,7 @@ Last updated: 2026-06-03
 - [ ] If `ENABLE_COINBASE=true`, set `COINBASE_KEY_NAME` and `COINBASE_PRIVATE_KEY`.
 - [ ] If `ENABLE_BINANCE=true`, set `BINANCE_API_KEY` and `BINANCE_API_SECRET`.
 - [ ] If `ENABLE_OANDA=true`, set `OANDA_API_KEY` and `OANDA_ACCOUNT_ID`.
-- [ ] If `ENABLE_TELEGRAM=true`, set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+- [ ] If `ENABLE_TELEGRAM=true`, set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_USER_IDS` and `TELEGRAM_CHAT_ID`.
 - [ ] If `ENABLE_OPENAI=true`, set `OPENAI_API_KEY`.
 
 ## 3. Runtime and Monitoring
@@ -71,3 +73,13 @@ Last updated: 2026-06-03
 - [ ] Validate IBKR paper connectivity (host, paper port, account sync).
 - [ ] Validate IBKR live-trading safety gates remain enforced.
 - [ ] Verify IBKR workspace panels load (connection, account, portfolio, positions, orders).
+
+## Current integration checks
+
+- [ ] Verify paper orders remain local, including when a broker is authenticated.
+- [ ] Test timeframe changes and both chart reattach buttons plus stage close.
+- [ ] Test Telegram allowlists, confirmation expiry, user isolation and mode changes.
+- [ ] Verify the Python AI bound port matches the Java client port.
+- [ ] Verify Docker/noVNC and the AI image entrypoint workaround on the target host.
+
+See [current readiness](PRODUCTION_READY.md) and [documentation index](docs/README.md).

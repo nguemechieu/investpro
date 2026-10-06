@@ -7,21 +7,19 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
-import lombok.Getter;
-import lombok.Setter;
+
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.backtesting.InstitutionalBacktestMetrics;
 import org.investpro.i18n.LocalizationService;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
+import java.util.Objects;
 
 /**
  * Professional backtesting report panel displaying institutional-grade metrics.
  * Shows comprehensive performance analysis with color-coded indicators.
  */
 @Slf4j
-@Getter
-@Setter
 public class BacktestReportPanel extends ScrollPane {
 
     private final VBox reportContent;
@@ -44,12 +42,11 @@ public class BacktestReportPanel extends ScrollPane {
         LocalizationService.applyTranslations(this);
     }
 
-    public void displayReport(InstitutionalBacktestMetrics metrics) {
-        this.metrics = metrics;
-        reportContent.getChildren().clear();
+    public void displayReport(@NonNull InstitutionalBacktestMetrics metrics) {
+        this.metrics = Objects.requireNonNull(metrics, "metrics");
 
         // Add all sections
-        reportContent.getChildren().addAll(
+        reportContent.getChildren().setAll(
                 createHeader(),
                 createPerformanceSection(),
                 createTradeStatisticsSection(),
@@ -87,19 +84,15 @@ public class BacktestReportPanel extends ScrollPane {
         grid.setStyle("-fx-padding: 8;");
 
         int row = 0;
-        grid.add(createMetricLabel("Initial Balance"), 0, row);
-        grid.add(createMetricValue(formatCurrency(metrics.getInitialBalance())), 1, row++);
+        addMetricRow(grid, row++, "Initial Balance", createMetricValue(formatCurrency(metrics.getInitialBalance())));
 
-        grid.add(createMetricLabel("Final Balance"), 0, row);
-        grid.add(createMetricValue(formatCurrency(metrics.getFinalBalance())), 1, row++);
+        addMetricRow(grid, row++, "Final Balance", createMetricValue(formatCurrency(metrics.getFinalBalance())));
 
-        grid.add(createMetricLabel("Total Return"), 0, row);
         String returnStr = formatCurrency(metrics.getTotalReturn()) + " (" +
                 String.format("%.2f%%", metrics.getTotalReturnPercent()) + ")";
-        grid.add(createMetricValueColored(returnStr, metrics.getTotalReturn() >= 0), 1, row++);
+        addMetricRow(grid, row++, "Total Return", createMetricValueColored(returnStr, metrics.getTotalReturn() >= 0));
 
-        grid.add(createMetricLabel("Annualized Return"), 0, row);
-        grid.add(createMetricValue(String.format("%.2f%%", metrics.getAnnualizedReturn())), 1, row++);
+        addMetricRow(grid, row++, "Annualized Return", createMetricValue(String.format("%.2f%%", metrics.getAnnualizedReturn())));
 
         section.getChildren().addAll(title, grid);
         return section;
@@ -116,27 +109,21 @@ public class BacktestReportPanel extends ScrollPane {
         grid.setStyle("-fx-padding: 8;");
 
         int row = 0;
-        grid.add(createMetricLabel("Total Trades"), 0, row);
-        grid.add(createMetricValue(String.valueOf(metrics.getTotalTrades())), 1, row++);
+        addMetricRow(grid, row++, "Total Trades", createMetricValue(String.valueOf(metrics.getTotalTrades())));
 
-        grid.add(createMetricLabel("Winning Trades"), 0, row);
-        grid.add(createMetricValue(metrics.getWinningTrades() + " (" +
-                String.format("%.1f%%", metrics.getWinRate()) + ")"), 1, row++);
+        addMetricRow(grid, row++, "Winning Trades", createMetricValue(metrics.getWinningTrades() + " (" +
+                String.format("%.1f%%", metrics.getWinRate()) + ")"));
 
-        grid.add(createMetricLabel("Losing Trades"), 0, row);
-        grid.add(createMetricValue(String.valueOf(metrics.getLosingTrades())), 1, row++);
+        addMetricRow(grid, row++, "Losing Trades", createMetricValue(String.valueOf(metrics.getLosingTrades())));
 
-        grid.add(createMetricLabel("Avg Win / Loss"), 0, row);
         String avgStr = formatCurrency(metrics.getAvgWinSize()) + " / " +
                 formatCurrency(metrics.getAvgLossSize());
-        grid.add(createMetricValue(avgStr), 1, row++);
+        addMetricRow(grid, row++, "Avg Win / Loss", createMetricValue(avgStr));
 
-        grid.add(createMetricLabel("Profit Factor"), 0, row);
-        grid.add(createMetricValueColored(String.format("%.2f", metrics.getProfitFactor()),
-                metrics.getProfitFactor() >= 1.5), 1, row++);
+        addMetricRow(grid, row++, "Profit Factor", createMetricValueColored(String.format("%.2f", metrics.getProfitFactor()),
+                metrics.getProfitFactor() >= 1.5));
 
-        grid.add(createMetricLabel("Expectancy / Trade"), 0, row);
-        grid.add(createMetricValue(formatCurrency(metrics.getExpectancy())), 1, row++);
+        addMetricRow(grid, row++, "Expectancy / Trade", createMetricValue(formatCurrency(metrics.getExpectancy())));
 
         section.getChildren().addAll(title, grid);
         return section;
@@ -153,28 +140,22 @@ public class BacktestReportPanel extends ScrollPane {
         grid.setStyle("-fx-padding: 8;");
 
         int row = 0;
-        grid.add(createMetricLabel("Max Drawdown"), 0, row);
         String ddStr = String.format("%.2f%%", metrics.getMaxDrawdownPercent()) + " (" +
                 formatCurrency(metrics.getMaxDrawdown()) + ")";
-        grid.add(createMetricValueColored(ddStr, metrics.getMaxDrawdownPercent() <= 20), 1, row++);
+        addMetricRow(grid, row++, "Max Drawdown", createMetricValueColored(ddStr, metrics.getMaxDrawdownPercent() <= 20));
 
-        grid.add(createMetricLabel("Avg Drawdown"), 0, row);
-        grid.add(createMetricValue(String.format("%.2f%%", metrics.getAvgDrawdown())), 1, row++);
+        addMetricRow(grid, row++, "Avg Drawdown", createMetricValue(String.format("%.2f%%", metrics.getAvgDrawdown())));
 
-        grid.add(createMetricLabel("Sharpe Ratio"), 0, row);
-        grid.add(createMetricValueColored(String.format("%.2f", metrics.getSharpeRatio()),
-                metrics.getSharpeRatio() >= 1.0), 1, row++);
+        addMetricRow(grid, row++, "Sharpe Ratio", createMetricValueColored(String.format("%.2f", metrics.getSharpeRatio()),
+                metrics.getSharpeRatio() >= 1.0));
 
-        grid.add(createMetricLabel("Sortino Ratio"), 0, row);
-        grid.add(createMetricValueColored(String.format("%.2f", metrics.getSortinoRatio()),
-                metrics.getSortinoRatio() >= 1.5), 1, row++);
+        addMetricRow(grid, row++, "Sortino Ratio", createMetricValueColored(String.format("%.2f", metrics.getSortinoRatio()),
+                metrics.getSortinoRatio() >= 1.5));
 
-        grid.add(createMetricLabel("Calmar Ratio"), 0, row);
-        grid.add(createMetricValue(String.format("%.2f", metrics.getCalmarRatio())), 1, row++);
+        addMetricRow(grid, row++, "Calmar Ratio", createMetricValue(String.format("%.2f", metrics.getCalmarRatio())));
 
-        grid.add(createMetricLabel("Recovery Factor"), 0, row);
-        grid.add(createMetricValueColored(String.format("%.2f", metrics.getRecoveryFactor()),
-                metrics.getRecoveryFactor() >= 2.0), 1, row++);
+        addMetricRow(grid, row++, "Recovery Factor", createMetricValueColored(String.format("%.2f", metrics.getRecoveryFactor()),
+                metrics.getRecoveryFactor() >= 2.0));
 
         section.getChildren().addAll(title, grid);
         return section;
@@ -191,30 +172,24 @@ public class BacktestReportPanel extends ScrollPane {
         grid.setStyle("-fx-padding: 8;");
 
         int row = 0;
-        grid.add(createMetricLabel("Max Consecutive Wins"), 0, row);
-        grid.add(createMetricValue(String.valueOf(metrics.getMaxConsecutiveWins())), 1, row++);
+        addMetricRow(grid, row++, "Max Consecutive Wins", createMetricValue(String.valueOf(metrics.getMaxConsecutiveWins())));
 
-        grid.add(createMetricLabel("Max Consecutive Losses"), 0, row);
-        grid.add(createMetricValueColored(String.valueOf(metrics.getMaxConsecutiveLosses()),
-                metrics.getMaxConsecutiveLosses() <= 5), 1, row++);
+        addMetricRow(grid, row++, "Max Consecutive Losses", createMetricValueColored(String.valueOf(metrics.getMaxConsecutiveLosses()),
+                metrics.getMaxConsecutiveLosses() <= 5));
 
-        grid.add(createMetricLabel("Profit Std Dev"), 0, row);
-        grid.add(createMetricValue(formatCurrency(metrics.getProfitStdDev())), 1, row++);
+        addMetricRow(grid, row++, "Profit Std Dev", createMetricValue(formatCurrency(metrics.getProfitStdDev())));
 
-        grid.add(createMetricLabel("Skewness"), 0, row);
-        grid.add(createMetricValueColored(String.format("%.2f", metrics.getSkewness()),
-                metrics.getSkewness() > 0), 1, row++);
+        addMetricRow(grid, row++, "Skewness", createMetricValueColored(String.format("%.2f", metrics.getSkewness()),
+                metrics.getSkewness() > 0));
 
-        grid.add(createMetricLabel("Kurtosis"), 0, row);
-        grid.add(createMetricValue(String.format("%.2f", metrics.getKurtosis())), 1, row++);
+        addMetricRow(grid, row++, "Kurtosis", createMetricValue(String.format("%.2f", metrics.getKurtosis())));
 
-        grid.add(createMetricLabel("VaR (95%)"), 0, row);
-        grid.add(createMetricValueColored(formatCurrency(metrics.getVar95()),
-                metrics.getVar95() >= 0), 1, row++);
+        // The model returns signed lower-tail trade P/L, so negative values indicate losses.
+        addMetricRow(grid, row++, "VaR (95%)", createMetricValueColored(formatCurrency(metrics.getVar95()),
+                metrics.getVar95() >= 0));
 
-        grid.add(createMetricLabel("CVaR (95%)"), 0, row);
-        grid.add(createMetricValueColored(formatCurrency(metrics.getCvar95()),
-                metrics.getCvar95() >= 0), 1, row++);
+        addMetricRow(grid, row++, "CVaR (95%)", createMetricValueColored(formatCurrency(metrics.getCvar95()),
+                metrics.getCvar95() >= 0));
 
         section.getChildren().addAll(title, grid);
         return section;
@@ -226,7 +201,7 @@ public class BacktestReportPanel extends ScrollPane {
 
         Label title = createSectionTitle("STRATEGY CONFIDENCE SCORE");
 
-        double confidenceScore = metrics.getConfidenceScore();
+        double confidenceScore = Math.clamp(metrics.getConfidenceScore(), 0.0, 100.0);
         ProgressBar progressBar = new ProgressBar(confidenceScore / 100.0);
         progressBar.setStyle("-fx-padding: 8; -fx-min-height: 30;");
         progressBar.setPrefWidth(300);
@@ -247,7 +222,7 @@ public class BacktestReportPanel extends ScrollPane {
     private VBox createSummarySection() {
         VBox section = new VBox(12);
         section.setStyle(
-                "-fx-border-color: #3b82f6; -fx-border-width: 2 0 0 0; -fx-padding: 12 0 0 0; -fx-margin: 12 0 0 0;");
+                "-fx-border-color: #3b82f6; -fx-border-width: 2 0 0 0; -fx-padding: 12 0 0 0;");
 
         Label title = new Label("ANALYSIS SUMMARY");
         title.setFont(Font.font("Monospace", FontWeight.BOLD, 14));
@@ -270,6 +245,10 @@ public class BacktestReportPanel extends ScrollPane {
         label.setFont(Font.font("Monospace", FontWeight.BOLD, 13));
         label.setTextFill(Color.web("#3b82f6"));
         return label;
+    }
+
+    private void addMetricRow(GridPane grid, int row, String label, Label value) {
+        grid.addRow(row, createMetricLabel(label), value);
     }
 
     private Label createMetricLabel(String text) {

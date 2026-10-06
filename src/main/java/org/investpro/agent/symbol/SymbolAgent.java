@@ -1,6 +1,6 @@
 package org.investpro.agent.symbol;
 
-import org.investpro.activity.BrokerActivityEvent;
+import org.investpro.activities.BrokerActivityEvent;
 import org.investpro.data.CandleData;
 import org.investpro.models.trading.TradePair;
 import org.investpro.strategy.StrategyDefinition;

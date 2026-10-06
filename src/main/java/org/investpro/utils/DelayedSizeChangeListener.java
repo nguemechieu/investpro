@@ -61,6 +61,14 @@ public abstract class DelayedSizeChangeListener implements ChangeListener<Number
     public abstract void resize()
             throws IOException, ParseException, InterruptedException, SQLException, ClassNotFoundException;
 
+    /** Call on the FX thread when the owning view is removed. */
+    public void dispose() {
+        timeline.stop();
+        timeline.getKeyFrames().clear();
+        containerWidth.removeListener(this);
+        containerHeight.removeListener(this);
+    }
+
     @Override
     public void changed(ObservableValue<? extends Number> observable, Number oldValue, final Number newValue) {
         if (timeline.getStatus() == Animation.Status.RUNNING) {

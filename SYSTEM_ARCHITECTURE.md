@@ -1,9 +1,11 @@
 # InvestPro System Architecture
 
-**Last Updated**: May 2026  
-**Version**: 1.0 - Production Ready  
-**Java Version**: Java 21+  
-**Build System**: Maven 3.6+
+> Current documentation baseline (2026-10-05): JDK 27, JavaFX 27 and Maven 3.8.5+. Use the [documentation index](docs/README.md) for current setup, trading-desk behavior, Telegram commands and release limits. Design examples below are not proof of broker support or deployment verification.
+
+**Last Updated**: 2026-10-05
+**Version**: 1.0.0-SNAPSHOT - active development
+**Java Version**: Java 27
+**Build System**: Maven 3.8.5+
 
 ---
 
@@ -466,8 +468,8 @@ BotTradeDecisionEngine.evaluateSignal()
 ### 6.1 Development Environment
 ```
 Local Machine
-├── JDK 21+
-├── Maven 3.6+
+├── JDK 27
+├── Maven 3.8.5+
 ├── SQLite (local.db)
 ├── JavaFX UI
 └── Telegram Bot Token (optional)
@@ -476,7 +478,7 @@ Local Machine
 ### 6.2 Docker Deployment
 ```
 Docker Container
-├── OpenJDK 21 Base Image
+├── OpenJDK 27 Base Image
 ├── Maven build cached layers
 ├── PostgreSQL (external database)
 ├── Telegram Bot API (external)
@@ -592,5 +594,5 @@ Kubernetes Cluster (Optional)
 ---
 
 **Document Version**: 1.0  
-**Last Updated**: May 2026  
+**Last Updated**: 2026-10-05
 **Maintainer**: InvestPro Development Team

@@ -157,7 +157,7 @@ public class RiskManager {
      * Set risk percentage per trade
      */
     public void setRiskPercentage(double percentage) {
-        this.riskPercentage = Math.max(0.1, Math.min(5.0, percentage));
+        this.riskPercentage = Math.clamp(percentage, 0.1, 5.0);
         log.info("Risk percentage set to: {}%", this.riskPercentage);
     }
     
@@ -165,7 +165,7 @@ public class RiskManager {
      * Set risk-reward ratio
      */
     public void setRewardRiskRatio(double ratio) {
-        this.rewardRiskRatio = Math.max(1.0, Math.min(5.0, ratio));
+        this.rewardRiskRatio = Math.clamp(ratio, 1.0, 5.0);
         log.info("Reward-Risk ratio set to: 1:{}", this.rewardRiskRatio);
     }
     

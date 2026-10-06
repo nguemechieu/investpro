@@ -193,8 +193,8 @@ public class ExchangeTerminalProviderAdapter implements
         double quantity = TerminalExchangeMapper.doubleValue(request.quantity());
 
         CompletableFuture<String> submittedOrder = "LIMIT".equalsIgnoreCase(request.orderType())
-                ? exchange.createLimitOrder(pair, side, quantity, TerminalExchangeMapper.doubleValue(request.limitPrice()))
-                : exchange.createMarketOrder(pair, side, quantity);
+                ? exchange.orderExecution().createLimitOrder(pair, side, quantity, TerminalExchangeMapper.doubleValue(request.limitPrice()))
+                : exchange.orderExecution().createMarketOrder(pair, side, quantity);
 
         return submittedOrder.thenApply(externalId -> new OrderId(
                 providerId(),
@@ -208,7 +208,7 @@ public class ExchangeTerminalProviderAdapter implements
         if (orderId == null) {
             return CompletableFuture.completedFuture(OrderState.UNKNOWN);
         }
-        return exchange.fetchOpenOrders(null)
+        return exchange.orderExecution().fetchOpenOrders(null)
                 .thenApply(openOrders -> openOrders == null ? List.<OpenOrder>of() : openOrders)
                 .thenApply(openOrders -> openOrders.stream()
                         .filter(order -> TerminalExchangeMapper.sameOrder(

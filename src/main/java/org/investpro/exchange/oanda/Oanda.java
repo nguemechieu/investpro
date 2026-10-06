@@ -2636,7 +2636,7 @@ public class Oanda extends Exchange {
 
     @Override
     public void streamBalances(ExchangeStreamConsumer consumer) {
-        pollingStreamer.streamAccount(consumer);
+        pollingStreamer.streamBalances(consumer);
     }
 
     @Override

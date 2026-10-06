@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.licensing.LicenseManager;
 import org.investpro.licensing.LicenseStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Objects;
 
@@ -122,7 +123,7 @@ public final class LicensePanel extends VBox {
         return card;
     }
 
-    private VBox createDetailsSection() {
+    private @NonNull VBox createDetailsSection() {
         VBox section = new VBox(10);
         section.getStyleClass().add("license-details-section");
         section.setPadding(new Insets(16));

@@ -1,5 +1,7 @@
 # User Strategy System - Implementation Complete
 
+> Historical report: retained for its original revision. Java versions, test counts, completion claims and code examples below are historical, not current setup or release evidence. For the JDK 27 / JavaFX 27 baseline, use the [project README](README.md) and [documentation index](docs/README.md). Classified on 2026-10-05.
+
 ## Summary
 
 A comprehensive user-developed strategy system has been successfully implemented for InvestPro, enabling traders to build, validate, test, and deploy custom trading strategies without modifying platform code.

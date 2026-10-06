@@ -27,9 +27,6 @@ public final class IbkrAdaptiveContractSearchService implements IbkrContractSear
                 && connectionManager.getConnectionMode() == IbkrConnectionMode.CLIENT_PORTAL_GATEWAY) {
             return clientPortalSearchService.search(userSearchTerm, timeout);
         }
-        if (clientPortalClient != null && clientPortalClient.isAuthenticated()) {
-            return clientPortalSearchService.search(userSearchTerm, timeout);
-        }
         return twsSearchService.search(userSearchTerm, timeout);
     }
 }

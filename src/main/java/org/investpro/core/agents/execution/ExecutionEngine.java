@@ -229,6 +229,10 @@ public class ExecutionEngine {
     }
 
     private CompletableFuture<String> executeInternal(@NotNull PositionActionIntent intent) {
+        if (exchange != null && exchange.isBotPaperTrading()) {
+            return CompletableFuture.failedFuture(new UnsupportedOperationException(
+                    "Broker position management is disabled in local paper mode."));
+        }
         return switch (intent.getAction()) {
             case HOLD -> hold(intent);
             case REDUCE_SIZE -> reduceSize(intent);
@@ -524,7 +528,11 @@ public class ExecutionEngine {
                     strategyId,
                     finalDecision.getRecommendedExecutionStrategy());
 
-            return executeNewOrder(side, symbol, entryPrice, riskContext, finalDecision)
+            CompletableFuture<String> submission = exchange instanceof org.investpro.exchange.ibkr.IbkrExchange ibkr
+                    ? ibkr.executeRiskApproved(finalDecision.isApproved(),
+                            () -> executeNewOrder(side, symbol, entryPrice, riskContext, finalDecision))
+                    : executeNewOrder(side, symbol, entryPrice, riskContext, finalDecision);
+            return submission
                     .thenApply(orderId -> {
                         log.info("ExecutionEngine: New order executed successfully. orderId={}", orderId);
                         return PositionExecutionResult.success(orderId);
@@ -620,7 +628,7 @@ public class ExecutionEngine {
                     "Order blocked by tradability policy for " + symbol + ": " + reason));
         }
 
-        return exchange.placeMarketOrder(symbol, side, positionSize);
+        return exchange.botOrderExecution().placeMarketOrder(symbol, side, positionSize);
     }
 
     private CompletableFuture<String> placeLimitOrder(
@@ -647,7 +655,7 @@ public class ExecutionEngine {
                     "Order blocked by tradability policy for " + symbol + ": " + reason));
         }
 
-        return exchange.placeLimitOrder(symbol, side, positionSize, limitPrice);
+        return exchange.botOrderExecution().placeLimitOrder(symbol, side, positionSize, limitPrice);
     }
 
     private SymbolTradability recheckOrderTradability(@NotNull TradePair symbol,

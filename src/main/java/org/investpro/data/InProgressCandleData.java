@@ -34,20 +34,6 @@ public record InProgressCandleData(int openTime, double openPrice, double highPr
                 highPriceSoFar, lowPriceSoFar, currentTill, lastPrice, volumeSoFar);
     }
 
-    public double getHighPriceSoFar() {
-        return highPriceSoFar;
-    }
-
-
-    public double getLowPriceSoFar() {
-        return lowPriceSoFar;
-
-    }
-
-    public double getVolumeSoFar() {
-        return volumeSoFar;
-
-    }
 
     public long getCurrentTill() {
         return currentTill;

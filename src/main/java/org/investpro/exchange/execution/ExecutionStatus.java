@@ -1,5 +1,7 @@
 package org.investpro.exchange.execution;
 
+import lombok.Getter;
+
 /**
  * Lifecycle status of a trade execution request.
  *
@@ -11,6 +13,7 @@ package org.investpro.exchange.execution;
  *                              ↘ ERROR
  * </pre>
  */
+@Getter
 public enum ExecutionStatus {
 
     /** Request has been created but routing has not started. */
@@ -37,15 +40,15 @@ public enum ExecutionStatus {
     /** Unexpected error during submission or confirmation. Terminal state. */
     ERROR(true);
 
-    /** True if no further state transitions are expected. */
+    /** True if no further state transitions are expected.
+     * -- GETTER --
+     * Returns true if this is a terminal status.
+     */
     public final boolean terminal;
 
     ExecutionStatus(boolean terminal) {
         this.terminal = terminal;
     }
-
-    /** Returns true if this is a terminal status. */
-    public boolean isTerminal() { return terminal; }
 
     /** Returns true if the execution completed successfully (fully or partially). */
     public boolean isSuccessful() { return this == FILLED || this == PARTIAL_FILL; }

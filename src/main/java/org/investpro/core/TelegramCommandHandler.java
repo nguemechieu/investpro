@@ -25,8 +25,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Telegram Command Handler for executing trading commands from Telegram.
@@ -58,9 +56,10 @@ public class TelegramCommandHandler {
 
     private final TelegramNotifier telegramNotifier;
     private final SystemCore systemCore;
+    private final TelegramTradingCommands tradingCommands;
 
     private final HttpClient httpClient;
-    private Stage primaryStage = null;
+    private volatile Stage primaryStage = null;
 
     private final long lastUpdateId = -1L;
     private final boolean polling = false;
@@ -68,6 +67,7 @@ public class TelegramCommandHandler {
     public TelegramCommandHandler(@NotNull SystemCore systemCore, @NotNull TelegramNotifier telegramNotifier) {
         this.systemCore = systemCore;
         this.telegramNotifier = telegramNotifier;
+        this.tradingCommands = new TelegramTradingCommands(systemCore);
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(15))
                 .build();
@@ -83,10 +83,7 @@ public class TelegramCommandHandler {
         log.debug("Primary stage set for Telegram screenshot commands");
     }
 
-    /**
-     * Process a Telegram command and return response text
-     */
-    public String handleCommand(@NotNull String command, String chatId) {
+    public String handleCommand(@NotNull String command, String user) {
         if (command.isBlank()) {
             return "❌ No command provided";
         }
@@ -95,22 +92,24 @@ public class TelegramCommandHandler {
         String cleanCommand = command.trim().replaceAll("^/+", "");
 
         // Debug logging to track command parsing
-        log.debug("Original command: '{}' | Cleaned command: '{}'", command, cleanCommand);
 
         String[] parts = cleanCommand.split("\\s+");
-        String cmd = parts[0].toLowerCase();
+        String cmd = parts[0].split("@", 2)[0].toLowerCase(Locale.ROOT);
 
         log.debug("Parsed command: '{}' | Parts count: {}", cmd, parts.length);
 
         try {
+            String tradingReply = tradingCommands.handle(user, cmd, parts);
+            if (tradingReply != null) return tradingReply;
             return switch (cmd) {
                 case "start", "help" -> getHelpText();
                 case "status" -> getStatusReport();
                 case "balance" -> getBalanceReport();
                 case "positions" -> getPositionsReport();
                 case "orders" -> getOrdersReport();
-                case "screenshot" -> captureAndSendScreenshot(chatId);
-                case "market" -> {
+                case "screenshot" -> user.startsWith(Objects.toString(telegramNotifier.getChatId(), "") + ":")
+                        ? captureAndSendScreenshot() : "Screenshots are available only in the configured notification chat.";
+                case "market", "quote" -> {
                     // Parse symbol for market command (e.g., "market BTC/USD" or "market EUR/USD")
                     if (parts.length > 1) {
                         String symbol = parts[1].trim();
@@ -140,52 +139,58 @@ public class TelegramCommandHandler {
                 case "risk" -> getRiskReport();
                 case "strategy" -> getStrategyReport();
                 case "health" -> getHealthReport();
-                case "setapikey" -> {
-                    if (parts.length > 1) {
-                        String apiKey = String.join(" ", Arrays.copyOfRange(parts, 1, parts.length));
-                        systemCore.setOpenAiApiKey(apiKey);
-                        yield "✅ OpenAI API key configured successfully";
-                    } else {
-                        yield "❌ Usage: /setapikey YOUR_API_KEY_HERE";
-                    }
+                case "ask", "analyze", "compare", "learn", "invest", "news" -> {
+                    if (parts.length < 2) yield "Usage: /" + cmd + " YOUR_QUESTION_OR_TOPIC";
+                    String question = cleanCommand.substring(parts[0].length()).trim();
+                    String context = "Current desktop exchange: " + systemCore.getExchange().getName()
+                            + "; mode: " + systemCore.getExchange().getResolvedTradingMode() + ".\n";
+                    if (cmd.equals("analyze")) context += getMarketReport(parsePair(parts[1])) + "\n";
+                    yield telegramNotifier.askAI(user, context + cmd + ": " + question);
                 }
+                case "reset" -> { telegramNotifier.resetConversation(user); yield "AI conversation cleared."; }
+                case "setapikey" ->
+                        "Configure OPENAI_API_KEY in the desktop environment. Do not send keys through Telegram.";
                 default -> "❌ Unknown command: /" + cmd + "\nType /help for available commands.";
             };
         } catch (Exception e) {
-            log.error("Error handling Telegram command: {}", command, e);
-            return "❌ Error executing command: " + e.getMessage();
+            log.warn("Telegram command {} failed ({})", cmd, e.getClass().getSimpleName());
+            if (e instanceof IllegalArgumentException) return "Invalid arguments. Use /help for command syntax.";
+            return "Command could not complete. Check /orders or /history before retrying a trading action.";
         }
     }
 
     private String getHelpText() {
         return """
-                *InvestPro Telegram Commands*
+                InvestPro Remote Desk
 
-                📊 *Account & Trading*
-                /status - Account balance and margin info
-                /balance - Detailed balance breakdown
-                /positions - Current open positions
-                /orders - Pending open orders
+                ACCOUNT: /status /balance /portfolio /positions /orders /history
+                MARKET: /quote BTC/USD /analyze BTC/USD /strategy /risk
+                WATCHLIST: /watch BTC/USD /unwatch BTC/USD /watchlist
+                TRADING: /buy BTC/USD QUANTITY /sell BTC/USD QUANTITY
+                /limit buy|sell BTC/USD QUANTITY PRICE
+                /cancel ORDER_ID /confirm CODE /abort
+                CONTROL: /pause /resume /mode /exchange /health /screenshot
+                INVESTMENT: /invest TOPIC /compare ASSETS /learn TOPIC /news TOPIC
+                AI: /ask QUESTION or send a normal message; /reset clears conversation
+                SIZING: /size EQUITY RISK_PERCENT ENTRY STOP
 
-                📈 *Market & Strategy*
-                /market [symbol] - Ticker and spread info
-                /strategy - Strategy performance metrics
-                /risk - Risk management status
-
-                📸 *Screenshots & Monitoring*
-                /screenshot - Capture and send UI screenshot
-                /health - System health status
-
-                ⚙️ *Configuration*
-                /setapikey <key> - Configure OpenAI API key
+                Trade actions require a preview and confirmation within 60 seconds.
+                PAPER uses local simulation; LIVE uses your connected broker.
+                Watchlists and AI conversations are session-local.
                 """;
+    }
+
+    private TradePair parsePair(String value) throws Exception {
+        String[] pair = value.toUpperCase(Locale.ROOT).split("[/_-]", -1);
+        if (pair.length != 2 || pair[0].isBlank() || pair[1].isBlank()) throw new IllegalArgumentException();
+        return new TradePair(pair[0], pair[1]);
     }
 
     private String getStatusReport() {
         try {
             StringBuilder report = new StringBuilder("*Account Status*\n\n");
 
-            Account account = systemCore.getExchange().fetchAccount().get();
+            Account account = systemCore.getExchange().tradingAccount().get(15, java.util.concurrent.TimeUnit.SECONDS);
 
             if (account != null) {
                 report.append("💰 Balance: $").append(formatPrice(account.getAvailableBalance())).append("\n");
@@ -207,7 +212,7 @@ public class TelegramCommandHandler {
             return report.toString();
         } catch (Exception e) {
             log.error("Error generating status report", e);
-            return "❌ Error fetching account status: " + e.getMessage();
+            return "Report unavailable. Check the desktop connection.";
         }
     }
 
@@ -215,7 +220,7 @@ public class TelegramCommandHandler {
         try {
             StringBuilder report = new StringBuilder("*Balance Breakdown*\n\n");
 
-            Account account = systemCore.getExchange().fetchAccount().get();
+            Account account = systemCore.getExchange().tradingAccount().get(15, java.util.concurrent.TimeUnit.SECONDS);
 
             if (account != null) {
                 report.append("💵 Cash Balance: $").append(formatPrice(account.getTotalBalance())).append("\n");
@@ -238,13 +243,14 @@ public class TelegramCommandHandler {
             return report.toString();
         } catch (Exception e) {
             log.error("Error generating balance report", e);
-            return "❌ Error fetching balance: " + e.getMessage();
+            return "Report unavailable. Check the desktop connection.";
         }
     }
 
     private String getPositionsReport() {
         try {
-            List<Position> positions = systemCore.getExchange().fetchAllPositions().get();
+            if (systemCore.getExchange().isPaperTrading()) return tradingCommands.handle("local", "portfolio", new String[]{"portfolio"});
+            List<Position> positions = systemCore.getExchange().fetchAllPositions().get(15, java.util.concurrent.TimeUnit.SECONDS);
 
             StringBuilder report = new StringBuilder("*Open Positions (" + positions.size() + ")*\n\n");
 
@@ -270,13 +276,13 @@ public class TelegramCommandHandler {
             return report.toString();
         } catch (Exception e) {
             log.error("Error generating positions report", e);
-            return "❌ Error fetching positions: " + e.getMessage();
+            return "Report unavailable. Check the desktop connection.";
         }
     }
 
     private String getOrdersReport() {
         try {
-            List<OpenOrder> orders = systemCore.getExchange().fetchAllOpenOrders().get();
+            List<OpenOrder> orders = systemCore.getExchange().orderExecution().fetchAllOpenOrders().get(15, java.util.concurrent.TimeUnit.SECONDS);
 
             if (orders == null || orders.isEmpty()) {
                 return "📭 No pending orders";
@@ -285,6 +291,7 @@ public class TelegramCommandHandler {
             StringBuilder report = new StringBuilder("*Open Orders (" + orders.size() + ")*\n\n");
 
             for (OpenOrder order : orders) {
+                report.append("Order ID: ").append(order.getOrderId()).append("\n");
                 report.append("🔔 *").append(order.getTradePair().toString()).append(" / ").append(order.getSide())
                         .append("*\n");
                 report.append("   Side: ").append(order.getSide()).append("\n");
@@ -299,7 +306,7 @@ public class TelegramCommandHandler {
             return report.toString();
         } catch (Exception e) {
             log.error("Error generating orders report", e);
-            return "❌ Error fetching orders: " + e.getMessage();
+            return "Report unavailable. Check the desktop connection.";
         }
     }
 
@@ -310,7 +317,7 @@ public class TelegramCommandHandler {
                         : null;
             }
 
-            Ticker ticker = systemCore.getExchange().fetchTicker(symbol).get();
+            Ticker ticker = systemCore.getExchange().fetchTicker(symbol).get(15, java.util.concurrent.TimeUnit.SECONDS);
 
             if (ticker == null) {
                 return "❌ Unable to fetch market data for " + symbol;
@@ -338,41 +345,27 @@ public class TelegramCommandHandler {
             return report.toString();
         } catch (Exception e) {
             log.error("Error generating market report", e);
-            return "❌ Error fetching market data: " + e.getMessage();
+            return "Report unavailable. Check the desktop connection.";
         }
     }
 
     private String getRiskReport() {
         try {
-            StringBuilder report = new StringBuilder("*Risk Management Status*\n\n");
-
-            Account account = systemCore.getExchange().fetchAccount().get();
-
-            if (account != null) {
-                double marginLevel = account.getLeverage();
-                String riskStatus = marginLevel > 2.0 ? "✅ LOW" : marginLevel > 1.5 ? "⚠️ MEDIUM" : "🔴 HIGH";
-
-                report.append("⚠️ Risk Level: ").append(riskStatus).append("\n");
-                report.append("📊 Margin Level: ").append(String.format("%.2f%%", marginLevel * 100)).append("\n");
-
-                double freeMargin = account.getMarginAvailable();
-                double usagePercent = freeMargin > 0 ? (account.getMarginUsed() / freeMargin) * 100 : 0.0;
-                report.append("💳 Margin Usage: ").append(String.format("%.1f%%", usagePercent)).append("\n");
-
-                report.append("📈 Unrealized P&L: $").append(formatPrice(account.getUnrealizedPnl())).append("\n");
-                report.append("🎯 Stop Loss Active: Yes\n");
-            } else {
-                report.append("⚠️ Unable to fetch risk information");
-            }
-
-            report.append("\n_Updated: ").append(getCurrentTime()).append("_");
-            return report.toString();
-        } catch (Exception e) {
-            log.error("Error generating risk report", e);
-            return "❌ Error fetching risk status: " + e.getMessage();
-        }
+            var exchange = systemCore.getExchange();
+            Account account = exchange.tradingAccount().get(15, java.util.concurrent.TimeUnit.SECONDS);
+            if (account == null) return "Account risk data unavailable.";
+            return "Risk snapshot (" + exchange.getResolvedTradingMode() + ")\n"
+                    + "Available balance: " + formatPrice(account.getAvailableBalance())
+                    + "\nEquity reported: " + formatPrice(account.getEquity())
+                    + "\nUsed margin: " + formatPrice(account.getMarginUsed())
+                    + "\nAvailable margin: " + formatPrice(account.getMarginAvailable())
+                    + "\nUnrealized P&L: " + formatPrice(account.getUnrealizedPnl())
+                    + "\nLeverage reported: " + account.getLeverage()
+                    + "\nStop protection: not verified; inspect individual orders."
+                    + "\nZero values may mean the exchange does not supply the metric."
+                    + "\nUpdated: " + getCurrentTime();
+        } catch (Exception error) { return "Risk data unavailable. Check the desktop connection."; }
     }
-
     private String getStrategyReport() {
         try {
 
@@ -386,28 +379,27 @@ public class TelegramCommandHandler {
                     "\n_Updated: " + getCurrentTime() + "_";
         } catch (Exception e) {
             log.error("Error generating strategy report", e);
-            return "❌ Error fetching strategy data: " + e.getMessage();
+            return "Report unavailable. Check the desktop connection.";
         }
     }
 
     private String getHealthReport() {
         try {
 
-            return "*System Health*\n\n" + "✅ Exchange Connected: Yes\n" +
-                    "📡 API Status: Online\n" +
-                    "🔋 System Status: Operational\n" +
-                    "🔄 Last Update: " + getCurrentTime() + "\n" +
-                    "📊 Active Streams: " +
-                    (systemCore.isStreaming() ? "Yes\n" : "No\n") +
-                    "\n_System Status: ✅ OPERATIONAL_";
+            return "System health\nExchange: " + systemCore.getExchange().getName()
+                    + "\nMode: " + systemCore.getExchange().getResolvedTradingMode()
+                    + "\nAuthenticated connection: " + systemCore.getExchange().isAuthenticatedSessionConnected()
+                    + "\nStreaming: " + systemCore.isStreaming()
+                    + "\nAuto trading: " + systemCore.isAutoTradingEnabled()
+                    + "\nUpdated: " + getCurrentTime();
         } catch (Exception e) {
             log.error("Error generating health report", e);
-            return "❌ Error fetching health status: " + e.getMessage();
+            return "Report unavailable. Check the desktop connection.";
         }
     }
 
     private String formatPrice(double price) {
-        return String.format("%.2f", Math.abs(price));
+        return String.format(Locale.ROOT, "%.8g", price);
     }
 
     private String getCurrentTime() {
@@ -417,98 +409,46 @@ public class TelegramCommandHandler {
     /**
      * Capture the current JavaFX scene and send as screenshot to Telegram.
      * Returns message text to be sent to user.
-     * 
+     * <p>
      * IMPORTANT: This method is called from TelegramPollingThread (background
      * thread)
      * but JavaFX operations must happen on the JavaFX Application Thread.
      * Uses Platform.runLater() to execute screenshot capture on the correct thread.
      */
-    private @NotNull String captureAndSendScreenshot(String chatId) {
-        if (primaryStage == null) {
-            return "❌ UI is not initialized yet. Please start the trading application.";
-        }
-
-        if (primaryStage.getScene() == null) {
-            return "❌ No UI scene available for screenshot. Please initialize the application first.";
-        }
-
-        // Use CountDownLatch to wait for screenshot on FX thread
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicReference<String> result = new AtomicReference<>("❌ Screenshot operation timed out");
-
+    private @NotNull String captureAndSendScreenshot() {
+        if (primaryStage == null) return "UI is not initialized.";
+        if (Platform.isFxApplicationThread()) return "Screenshot requests must run on the background command thread.";
+        var captured = new java.util.concurrent.CompletableFuture<WritableImage>();
+        Path temporary = null;
         try {
-            // Schedule screenshot capture on JavaFX Application Thread
             Platform.runLater(() -> {
+                if (captured.isDone()) return;
                 try {
-                    // Capture the JavaFX scene (must be on FX thread)
                     Scene scene = primaryStage.getScene();
-                    if (scene == null) {
-                        result.set("❌ Scene became unavailable during screenshot");
-                        latch.countDown();
-                        return;
-                    }
-
-                    WritableImage snapshot = scene.snapshot(null);
-
-                    if (snapshot == null) {
-                        result.set("❌ Failed to capture screenshot");
-                        latch.countDown();
-                        return;
-                    }
-
-                    // Convert to BufferedImage using SwingFXUtils
-                    BufferedImage bufferedImage = getBufferedImage(snapshot);
-
-                    // Save to temporary file
-                    Path tempFile = Files.createTempFile("investpro_screenshot_", ".png");
-                    ImageIO.write(bufferedImage, "png", tempFile.toFile());
-
-                    log.info("Screenshot captured: {}", tempFile.getFileName());
-
-                    // Send to Telegram
-                    String caption = "📸 *InvestPro UI Screenshot*\n\n" +
-                            "Captured: " + getCurrentTime() + "\n" +
-                            "Resolution: " + (int) snapshot.getWidth() + "x" + (int) snapshot.getHeight();
-
-                    boolean sent = telegramNotifier.sendPhoto(tempFile, caption);
-
-                    // Clean up temp file
-                    try {
-                        Files.delete(tempFile);
-                    } catch (IOException e) {
-                        log.debug("Could not delete temp screenshot file: {}", tempFile);
-                    }
-
-                    if (sent) {
-                        result.set("✅ Screenshot sent successfully!");
-                    } else {
-                        result.set("⚠️ Screenshot captured but failed to send to Telegram");
-                    }
-
-                } catch (Exception e) {
-                    log.error("Error capturing/sending screenshot", e);
-                    result.set("❌ Screenshot error: " + e.getMessage());
-                } finally {
-                    // Signal that screenshot operation is complete
-                    latch.countDown();
-                }
+                    if (scene == null) throw new IllegalStateException("No scene available");
+                    captured.complete(scene.snapshot(null));
+                } catch (Exception error) { captured.completeExceptionally(error); }
             });
-
-            // Wait for screenshot capture to complete (max 10 seconds)
-            if (latch.await(10, java.util.concurrent.TimeUnit.SECONDS)) {
-                return result.get();
-            } else {
-                log.warn("Screenshot capture timed out");
-                return "❌ Screenshot operation timed out after 10 seconds";
-            }
-
-        } catch (InterruptedException e) {
+            WritableImage image = captured.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            // Encoding, disk access and network upload must not block the JavaFX thread.
+            temporary = Files.createTempFile("investpro_screenshot_", ".png");
+            ImageIO.write(getBufferedImage(image), "png", temporary.toFile());
+            String caption = "InvestPro screenshot | " + getCurrentTime() + " | "
+                    + (int) image.getWidth() + "x" + (int) image.getHeight();
+            return telegramNotifier.sendPhoto(temporary, caption) ? "Screenshot sent." : "Screenshot upload failed.";
+        } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
-            log.error("Screenshot operation interrupted", e);
-            return "❌ Screenshot operation was interrupted";
+            return "Screenshot interrupted.";
+        } catch (Exception error) {
+            return "Screenshot unavailable. Check that the desktop window is open.";
+        } finally {
+            captured.cancel(false);
+            if (temporary != null) {
+                try { Files.deleteIfExists(temporary); }
+                catch (IOException error) { log.debug("Unable to remove temporary screenshot"); }
+            }
         }
     }
-
     private static @NotNull BufferedImage getBufferedImage(@NotNull WritableImage snapshot) {
         BufferedImage bufferedImage = new BufferedImage(
                 (int) snapshot.getWidth(),

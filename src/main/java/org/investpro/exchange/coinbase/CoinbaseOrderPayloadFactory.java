@@ -1,19 +1,16 @@
 package org.investpro.exchange.coinbase;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.investpro.exchange.core.NormalizedOrderRequest;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
-import java.util.logging.Logger;
 
 /**
  * CoinbaseOrderPayloadFactory - Converts NormalizedOrderRequest to Coinbase JSON payloads.
  */
 public class CoinbaseOrderPayloadFactory {
-    private static final Logger logger = Logger.getLogger(CoinbaseOrderPayloadFactory.class.getName());
     private static final ObjectMapper mapper = new ObjectMapper();
     
     /**
@@ -101,30 +98,5 @@ public class CoinbaseOrderPayloadFactory {
             case GTD -> "GTD";
         };
     }
-    
-    /**
-     * Parse a Coinbase order response.
-     */
-    public CoinbaseOrderResponse parseResponse(String jsonResponse) {
-        try {
-            JsonNode node = mapper.readTree(jsonResponse);
-            
-            return new CoinbaseOrderResponse(
-                node.get("id").asText(),
-                node.get("product_id").asText(),
-                node.get("side").asText(),
-                new BigDecimal(node.get("size").asText()),
-                node.get("price") != null ? new BigDecimal(node.get("price").asText()) : null,
-                node.get("status").asText(),
-                node.get("created_at").asText()
-            );
-        } catch (Exception e) {
-            logger.severe("Failed to parse Coinbase response: " + e.getMessage());
-            return null;
-        }
-    }
 
-    public record CoinbaseOrderResponse(String orderId, String productId, String side, BigDecimal size,
-                                        BigDecimal price, String status, String createdAt) {
-    }
 }

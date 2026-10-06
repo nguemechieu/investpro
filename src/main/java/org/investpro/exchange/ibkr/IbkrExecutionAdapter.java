@@ -41,22 +41,18 @@ public final class IbkrExecutionAdapter {
                     .failedFuture(new IllegalStateException("RiskEngine approval required before IBKR execution"));
         }
 
-        exchange.setLiveRiskApprovalGate(() -> plan.isRiskApproved());
+
 
         try {
             var pair = exchange.parsePair(plan.getSymbol());
             Side side = "SELL".equalsIgnoreCase(plan.getSide()) ? Side.SELL : Side.BUY;
             String orderType = plan.getOrderType() == null ? "MARKET" : plan.getOrderType().toUpperCase();
 
-            return switch (orderType) {
+            return exchange.executeRiskApproved(plan.isRiskApproved(), () -> switch (orderType) {
                 case "LIMIT" -> exchange.createLimitOrder(pair, side, plan.getUnits(), plan.getEntryPrice());
                 case "STOP" -> exchange.createStopOrder(pair, side, plan.getUnits(), plan.getStopLoss());
-                case "STOP_LIMIT" -> CompletableFuture.completedFuture(
-                        exchange.getOrderService().submitStopLimit(pair, side, plan.getUnits(), plan.getStopLoss(),
-                                plan.getEntryPrice()));
-                case "TRAILING_STOP" -> CompletableFuture.completedFuture(
-                        exchange.getOrderService().submitTrailingStop(pair, side, plan.getUnits(),
-                                plan.getSlippageTolerance()));
+                case "STOP_LIMIT", "TRAILING_STOP" -> CompletableFuture.failedFuture(
+                        new UnsupportedOperationException("Native IBKR " + orderType + " transmission is not implemented."));
                 case "BRACKET" -> exchange.createBracketOrder(
                         pair,
                         side,
@@ -65,7 +61,7 @@ public final class IbkrExecutionAdapter {
                         plan.getStopLoss(),
                         plan.getTakeProfit());
                 default -> exchange.createMarketOrder(pair, side, plan.getUnits());
-            };
+            });
         } catch (SQLException | ClassNotFoundException exception) {
             return CompletableFuture.failedFuture(exception);
         }

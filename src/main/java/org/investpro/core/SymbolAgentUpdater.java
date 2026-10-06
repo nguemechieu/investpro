@@ -1,7 +1,6 @@
 package org.investpro.core;
 
 import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.AgentEventBus;
@@ -11,6 +10,7 @@ import org.investpro.core.agents.symbol.SymbolEvaluationState;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Map;
 import java.util.function.Consumer;
@@ -53,7 +53,7 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
         try {
             eventBus.subscribeAll(this);
             listening = true;
-            log.info("\u2705 SymbolAgentUpdater started - Real-time symbol state updates enabled");
+            log.info("✅ SymbolAgentUpdater started - Real-time symbol state updates enabled");
         } catch (Exception exception) {
             log.error("Failed to start SymbolAgentUpdater", exception);
         }
@@ -357,7 +357,7 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
     /**
      * Get double attribute from event metadata
      */
-    private double getDoubleAttribute(AgentEvent event, String key, double defaultValue) {
+    private double getDoubleAttribute(@NonNull AgentEvent event, String key, double defaultValue) {
         Object value = event.metadata().getOrDefault(key, defaultValue);
         if (value instanceof Number) {
             return ((Number) value).doubleValue();

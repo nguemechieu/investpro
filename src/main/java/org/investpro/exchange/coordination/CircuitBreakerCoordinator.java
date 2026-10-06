@@ -1,5 +1,6 @@
 package org.investpro.exchange.coordination;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEventBus;
 import org.investpro.exchange.resilience.ExchangeCircuitBreaker;
@@ -7,6 +8,7 @@ import org.investpro.exchange.resilience.model.CircuitState;
 import org.investpro.exchange.resilience.model.EndpointType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -29,6 +31,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public final class CircuitBreakerCoordinator {
 
+    /**
+     * -- GETTER --
+     * Returns the exchange name this coordinator manages.
+     */
+    @Getter
     private final String exchangeName;
     private final Map<EndpointType, ExchangeCircuitBreaker> breakers;
 
@@ -117,11 +124,8 @@ public final class CircuitBreakerCoordinator {
         return cb == null ? Optional.empty() : Optional.of(cb.getState());
     }
 
-    /** Returns the exchange name this coordinator manages. */
-    public String getExchangeName() { return exchangeName; }
-
     /** Returns a snapshot map of all endpoint → circuit states. */
-    public Map<EndpointType, CircuitState> allStates() {
+    public @NonNull Map<EndpointType, CircuitState> allStates() {
         Map<EndpointType, CircuitState> result = new EnumMap<>(EndpointType.class);
         breakers.forEach((ep, cb) -> result.put(ep, cb.getState()));
         return result;

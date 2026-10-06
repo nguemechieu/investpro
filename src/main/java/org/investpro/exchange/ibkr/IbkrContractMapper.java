@@ -19,7 +19,7 @@ public final class IbkrContractMapper {
         String symbol = pair.getBaseCurrency().getCode().toUpperCase(Locale.ROOT);
         String currency = pair.getCounterCurrency().getCode().toUpperCase(Locale.ROOT);
 
-        if (looksLikeForex(pair)) {
+        if (marketTypeHint != MARKET_TYPES.FUTURES && looksLikeForex(pair)) {
             return new IbkrContract(symbol, "CASH", "IDEALPRO", currency, null, null, null, null);
         }
 

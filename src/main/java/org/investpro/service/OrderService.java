@@ -190,7 +190,7 @@ public class OrderService implements CrudService<Order, String> {
     /**
      * Mark an order as open and persist it.
      */
-    public Order markOpen(Order order) throws SQLException, ClassNotFoundException {
+    public Order markOpen(Order order) throws SQLException {
         requireOrder(order);
         order.setStatus(ORDER_STATUS_OPEN);
         return repository.save(order);

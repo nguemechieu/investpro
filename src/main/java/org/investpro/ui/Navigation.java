@@ -93,6 +93,7 @@ public class Navigation extends StackPane {
         getStyleClass().add("trading-navigation");
 
         VBox root = new VBox(12);
+        root.setMinWidth(0);
         root.setFillWidth(true);
         root.setPadding(new Insets(14));
         root.getStyleClass().addAll("pro-panel", "trading-navigation-panel");
@@ -109,7 +110,7 @@ public class Navigation extends StackPane {
 
         ScrollPane scrollPane = new ScrollPane(root);
         scrollPane.setFitToWidth(true);
-        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.getStyleClass().add("trading-navigation-scroll");
 
         LocalizationService.applyTranslations(root);
@@ -139,6 +140,8 @@ public class Navigation extends StackPane {
         String defaultExchange = resolveDefaultExchange();
 
         currentExchangeLabel = new Label(displayExchangeName(defaultExchange));
+        currentExchangeLabel.setMinWidth(0);
+        currentExchangeLabel.setWrapText(true);
         currentExchangeLabel.getStyleClass().add("trading-navigation-exchange-name");
 
         connectionStatusLabel = new Label("Disconnected");
@@ -147,6 +150,7 @@ public class Navigation extends StackPane {
         HBox statusRow = new HBox(8, currentExchangeLabel, new Region(), connectionStatusLabel);
         statusRow.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(statusRow.getChildren().get(1), Priority.ALWAYS);
+        HBox.setHgrow(currentExchangeLabel, Priority.ALWAYS);
 
         Label selectorLabel = new Label("Venue");
         selectorLabel.getStyleClass().add("trading-navigation-label");
@@ -171,6 +175,12 @@ public class Navigation extends StackPane {
         GridPane venueGrid = new GridPane();
         venueGrid.setHgap(6);
         venueGrid.setVgap(6);
+        for (int i = 0; i < 2; i++) {
+            javafx.scene.layout.ColumnConstraints column = new javafx.scene.layout.ColumnConstraints();
+            column.setPercentWidth(50);
+            column.setMinWidth(0);
+            venueGrid.getColumnConstraints().add(column);
+        }
         venueGrid.getStyleClass().add("trading-navigation-venue-grid");
         venueGrid.add(createExchangeButton("OANDA"), 0, 0);
         venueGrid.add(createExchangeButton("COINBASE"), 1, 0);
@@ -204,13 +214,13 @@ public class Navigation extends StackPane {
         return card;
     }
 
-    private HBox createQuickCommandRail() {
+    private javafx.scene.layout.FlowPane createQuickCommandRail() {
         Button tradeDesk = createQuickCommandButton("Trade", "Open order ticket", "order-panel");
         Button marketWatch = createQuickCommandButton("Markets", "Open market watch", "market-watch");
         Button ibkr = createQuickCommandButton("IBKR", "Open IBKR workspace", "ibkr");
         Button ops = createQuickCommandButton("Ops", "Open operations center", "operations-center");
 
-        HBox rail = new HBox(8, tradeDesk, marketWatch, ibkr, ops);
+        javafx.scene.layout.FlowPane rail = new javafx.scene.layout.FlowPane(8, 8, tradeDesk, marketWatch, ibkr, ops);
         rail.setAlignment(Pos.CENTER_LEFT);
         rail.getStyleClass().add("trading-navigation-quick-rail");
         return rail;
@@ -295,6 +305,8 @@ public class Navigation extends StackPane {
         Button button = new Button(displayExchangeName(exchangeName));
         button.getStyleClass().add("trading-navigation-venue-button");
         button.setMaxWidth(Double.MAX_VALUE);
+        button.setMinWidth(0);
+        button.setWrapText(true);
         button.setTooltip(new Tooltip("Switch to " + displayExchangeName(exchangeName)));
         String normalizedExchange = normalizeExchangeName(exchangeName);
         venueButtons.put(normalizedExchange, button);
@@ -313,6 +325,7 @@ public class Navigation extends StackPane {
 
     private Button createNavButton(String title, String description, String panelId, boolean emphasized) {
         Label titleLabel = new Label(title);
+        titleLabel.setWrapText(true);
         titleLabel.getStyleClass().add("trading-navigation-action-title");
 
         Label descriptionLabel = new Label(description);
@@ -320,18 +333,23 @@ public class Navigation extends StackPane {
         descriptionLabel.setWrapText(true);
 
         VBox text = new VBox(2, titleLabel, descriptionLabel);
+        text.setMinWidth(0);
         text.setAlignment(Pos.CENTER_LEFT);
 
         Label arrow = new Label(">");
         arrow.getStyleClass().add("trading-navigation-action-arrow");
 
-        HBox content = new HBox(10, text, new Region(), arrow);
+        HBox content = new HBox(10, text, arrow);
         content.setAlignment(Pos.CENTER_LEFT);
-        HBox.setHgrow(content.getChildren().get(1), Priority.ALWAYS);
+        HBox.setHgrow(text, Priority.ALWAYS);
+        content.setMinWidth(0);
 
         Button button = new Button();
         button.setGraphic(content);
         button.setMaxWidth(Double.MAX_VALUE);
+        button.setMinWidth(0);
+        content.prefWidthProperty().bind(javafx.beans.binding.Bindings.max(0,
+                button.widthProperty().subtract(32)));
         button.getStyleClass().add("trading-navigation-action");
         if (emphasized) {
             button.getStyleClass().add("primary-action");

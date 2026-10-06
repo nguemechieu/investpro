@@ -57,8 +57,7 @@ public class StrategyInstrumentCompatibilityService {
             return containsAny(name, "TREND", "MOMENTUM", "BREAKOUT", "VOLATILITY", "CARRY", "DERIVATIVE");
         }
         if (instrument.instrumentType() == InstrumentType.FOREX
-                || instrument.marketType() == MarketType.FX
-                || instrument.marketType() == MarketType.FOREX
+               
                 || instrument.assetClass() == AssetClass.FIAT) {
             return containsAny(name, "FX", "FOREX", "CARRY", "TREND", "REVERSION", "BREAKOUT");
         }
@@ -67,8 +66,9 @@ public class StrategyInstrumentCompatibilityService {
             case COMMODITY, METAL -> containsAny(name, "COMMODITY", "METAL", "TREND", "VOLATILITY", "BREAKOUT");
             case INDEX, EQUITY, ETF, FUND -> containsAny(name, "MOMENTUM", "GAP", "ROTATION", "TREND", "INDEX", "EQUITY");
             case BOND -> containsAny(name, "BOND", "CARRY", "TREND");
-            case FIAT, SYNTHETIC, UNKNOWN -> instrument.marketType() == MarketType.SPOT
+            case SYNTHETIC, UNKNOWN -> instrument.marketType() == MarketType.SPOT
                     || instrument.instrumentType() == InstrumentType.SPOT;
+            default -> throw new IllegalStateException("Unexpected value: " + instrument.assetClass());
         };
     }
 

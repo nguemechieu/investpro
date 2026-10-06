@@ -5,6 +5,11 @@ import org.investpro.exchange.Exchange;
 import org.investpro.exchange.coinbase.Coinbase;
 import org.investpro.exchange.oanda.Oanda;
 import org.jetbrains.annotations.NotNull;
+import org.investpro.exchange.models.ExchangeFeature;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.Set;
+import java.util.function.Supplier;
 
 import java.util.Map;
 import java.util.Objects;
@@ -16,13 +21,16 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 public class PollingExchangeStreamer {
+    private static final Logger log = LoggerFactory.getLogger(PollingExchangeStreamer.class);
     private static final long DEFAULT_TICKER_PERIOD_SECONDS = 10;
     private static final long DEFAULT_ORDER_BOOK_PERIOD_SECONDS = 15;
     private static final long DEFAULT_ACCOUNT_PERIOD_SECONDS = 15;
     private static final long DEFAULT_PRIVATE_PERIOD_SECONDS = 20;
 
     private final Exchange exchange;
-    private final ScheduledExecutorService scheduler;
+    private final Supplier<ScheduledExecutorService> schedulerFactory;
+    private ScheduledExecutorService scheduler;
+    private final Set<ExchangeFeature> skippedFeatures = ConcurrentHashMap.newKeySet();
     private final Map<TradePair, ScheduledFuture<?>> tickerTasks = new ConcurrentHashMap<>();
     private final Map<TradePair, AtomicInteger> tickerCycles = new ConcurrentHashMap<>();
     private final Map<TradePair, AtomicInteger> orderBookCycles = new ConcurrentHashMap<>();
@@ -40,15 +48,19 @@ public class PollingExchangeStreamer {
     private ScheduledFuture<?> positionsTask;
 
     public PollingExchangeStreamer(Exchange exchange) {
-        this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
-        this.scheduler = Executors.newScheduledThreadPool(3, runnable -> {
+        this(exchange, () -> Executors.newScheduledThreadPool(3, runnable -> {
             Thread thread = new Thread(runnable, "%s-polling-stream".formatted(exchange.getName()));
             thread.setDaemon(true);
             return thread;
-        });
+        }));
     }
 
-    public void streamTicker(TradePair tradePair, ExchangeStreamConsumer consumer) {
+    PollingExchangeStreamer(Exchange exchange, Supplier<ScheduledExecutorService> schedulerFactory) {
+        this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
+        this.schedulerFactory = Objects.requireNonNull(schedulerFactory, "schedulerFactory must not be null");
+    }
+
+    public synchronized void streamTicker(TradePair tradePair, ExchangeStreamConsumer consumer) {
         tickerTasks.computeIfAbsent(tradePair, pair -> scheduleAtFixedRate(() -> {
             try {
                 if (exchange instanceof Coinbase coinbase) {
@@ -73,7 +85,7 @@ public class PollingExchangeStreamer {
         }, tickerPeriodSeconds()));
     }
 
-    public void streamOrderBook(TradePair tradePair, ExchangeStreamConsumer consumer) {
+    public synchronized void streamOrderBook(TradePair tradePair, ExchangeStreamConsumer consumer) {
         orderBookTasks.computeIfAbsent(tradePair, pair -> scheduleAtFixedRate(() -> {
             try {
                 if (exchange instanceof Coinbase coinbase) {
@@ -138,7 +150,48 @@ public class PollingExchangeStreamer {
         return DEFAULT_PRIVATE_PERIOD_SECONDS;
     }
 
-    public void streamAccount(ExchangeStreamConsumer consumer) {
+    private boolean canStart(ExchangeFeature feature) {
+        if (exchange.canUseCapability(feature)) {
+            skippedFeatures.remove(feature);
+            return true;
+        }
+        if (skippedFeatures.add(feature)) {
+            boolean supported = exchange.getCapability() != null && exchange.getCapability().supports(feature);
+            log.info("Private polling disabled. exchange={} feature={} reason={}", exchange.getName(), feature,
+                    supported ? "authentication-not-configured" : "unsupported-capability");
+        }
+        return false;
+    }
+
+    public synchronized void streamBalances(ExchangeStreamConsumer consumer) {
+        if (exchange instanceof org.investpro.exchange.binanceus.BinanceUs binanceUs) {
+            binanceUs.streamBalances(consumer);
+            return;
+        }
+        if (canStart(ExchangeFeature.BALANCES)) {
+            streamAccount(consumer);
+        }
+    }
+
+    /** Existing fill fallback shares the orders poller; no separate fill endpoint is polled. */
+    public synchronized void streamFills(ExchangeStreamConsumer consumer) {
+        if (exchange instanceof org.investpro.exchange.binanceus.BinanceUs binanceUs) {
+            binanceUs.streamFills(consumer);
+            return;
+        }
+        if (canStart(ExchangeFeature.FILLS)) {
+            streamOrders(consumer);
+        }
+    }
+
+    public synchronized void streamAccount(ExchangeStreamConsumer consumer) {
+        if (exchange instanceof org.investpro.exchange.binanceus.BinanceUs binanceUs) {
+            binanceUs.streamAccount(consumer);
+            return;
+        }
+        if (!canStart(ExchangeFeature.ACCOUNT_INFO)) {
+            return;
+        }
         if (accountTask != null && !accountTask.isCancelled()) {
             return;
         }
@@ -155,7 +208,9 @@ public class PollingExchangeStreamer {
                         })
                         .thenAccept(account -> {
                             consumer.onAccount(exchange.getName(), account);
-                            consumer.onBalanceChanged(exchange.getName(), account);
+                            if (exchange.canUseCapability(ExchangeFeature.BALANCES)) {
+                                consumer.onBalanceChanged(exchange.getName(), account);
+                            }
                         })
                         .exceptionally(throwable -> {
                             consumer.onError(exchange.getName(), unwrap(throwable));
@@ -167,7 +222,14 @@ public class PollingExchangeStreamer {
         }, accountPeriodSeconds());
     }
 
-    public void streamOrders(ExchangeStreamConsumer consumer) {
+    public synchronized void streamOrders(ExchangeStreamConsumer consumer) {
+        if (exchange instanceof org.investpro.exchange.binanceus.BinanceUs binanceUs) {
+            binanceUs.streamOrders(consumer);
+            return;
+        }
+        if (!canStart(ExchangeFeature.OPEN_ORDERS)) {
+            return;
+        }
         if (ordersTask != null && !ordersTask.isCancelled()) {
             return;
         }
@@ -186,7 +248,10 @@ public class PollingExchangeStreamer {
         }, privatePeriodSeconds());
     }
 
-    public void streamPositions(ExchangeStreamConsumer consumer) {
+    public synchronized void streamPositions(ExchangeStreamConsumer consumer) {
+        if (!canStart(ExchangeFeature.POSITIONS)) {
+            return;
+        }
         if (positionsTask != null && !positionsTask.isCancelled()) {
             return;
         }
@@ -205,32 +270,38 @@ public class PollingExchangeStreamer {
         }, privatePeriodSeconds());
     }
 
-    public void stopTicker(TradePair tradePair) {
+    public synchronized void stopTicker(TradePair tradePair) {
         cancel(tickerTasks.remove(tradePair));
         tickerCycles.remove(tradePair);
     }
 
-    public void stopOrderBook(TradePair tradePair) {
+    public synchronized void stopOrderBook(TradePair tradePair) {
         cancel(orderBookTasks.remove(tradePair));
         orderBookCycles.remove(tradePair);
     }
 
-    public void stopAccount() {
+    public synchronized void stopAccount() {
+        if (exchange instanceof org.investpro.exchange.binanceus.BinanceUs binanceUs) {
+            binanceUs.stopAccountStream(); binanceUs.stopBalancesStream();
+        }
         cancel(accountTask);
         accountTask = null;
     }
 
-    public void stopOrders() {
+    public synchronized void stopOrders() {
+        if (exchange instanceof org.investpro.exchange.binanceus.BinanceUs binanceUs) {
+            binanceUs.stopOrdersStream(); binanceUs.stopFillsStream();
+        }
         cancel(ordersTask);
         ordersTask = null;
     }
 
-    public void stopPositions() {
+    public synchronized void stopPositions() {
         cancel(positionsTask);
         positionsTask = null;
     }
 
-    public void stopAll() {
+    public synchronized void stopAll() {
         tickerTasks.values().forEach(this::cancel);
         orderBookTasks.values().forEach(this::cancel);
         tickerTasks.clear();
@@ -240,9 +311,16 @@ public class PollingExchangeStreamer {
         stopAccount();
         stopOrders();
         stopPositions();
+        if (scheduler != null) {
+            scheduler.shutdownNow();
+            scheduler = null;
+        }
     }
 
     private @NotNull ScheduledFuture<?> scheduleAtFixedRate(Runnable runnable, long periodSeconds) {
+        if (scheduler == null) {
+            scheduler = schedulerFactory.get();
+        }
         return scheduler.scheduleAtFixedRate(() -> {
             try {
                 runnable.run();

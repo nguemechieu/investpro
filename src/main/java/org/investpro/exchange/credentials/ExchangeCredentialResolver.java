@@ -16,7 +16,7 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
     public ExchangeCredentials resolve(String exchangeId) {
         String id = normalize(exchangeId);
 
-        return switch (id) {
+        ExchangeCredentials resolved = switch (id) {
             case "coinbase" -> resolveCoinbase();
             case "binance" -> resolveBinance();
             case "binance_us" -> resolveBinanceUs();
@@ -29,6 +29,13 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
             case "stellar_network" -> resolveStellar();
             default -> new ExchangeCredentials(id, null, null, null, null, null, null, false);
         };
+        String mode = provider.getOrNull("TRADING_MODE");
+        if (mode == null || mode.isBlank()) return resolved;
+        Map<String, String> params = new HashMap<>(resolved.params());
+        params.put("tradingMode", mode);
+        return new ExchangeCredentials(resolved.exchangeId(), resolved.apiKey(), resolved.apiSecret(),
+                resolved.keyName(), resolved.privateKey(), resolved.accessToken(), resolved.accountId(),
+                resolved.sandbox(), params);
     }
 
     private ExchangeCredentials resolveSchwab() {
@@ -63,6 +70,9 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
         Map<String, String> params = new HashMap<>();
         putIfPresent(params, "host", provider.getOrNull("IBKR_HOST"), provider.getOrNull("IBK_HOST"));
         putIfPresent(params, "port", provider.getOrNull("IBKR_PORT"), provider.getOrNull("IBK_PORT"));
+        putIfPresent(params, "paperPort", provider.getOrNull("IBKR_PAPER_PORT"), provider.getOrNull("IBK_PAPER_PORT"));
+        putIfPresent(params, "livePort", provider.getOrNull("IBKR_LIVE_PORT"), provider.getOrNull("IBK_LIVE_PORT"));
+        putIfPresent(params, "watchlist", provider.getOrNull("IBKR_WATCHLIST"));
         putIfPresent(params, "clientId", provider.getOrNull("IBKR_CLIENT_ID"), provider.getOrNull("IBK_CLIENT_ID"));
         putIfPresent(params, "environment", provider.getOrNull("IBKR_ENVIRONMENT"),
                 provider.getOrNull("IBK_ENVIRONMENT"));
@@ -104,8 +114,8 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
     private ExchangeCredentials resolveCoinbase() {
         return new ExchangeCredentials(
                 "coinbase",
-                provider.getOrNull("COINBASE_API_KEY"),
-                provider.getOrNull("COINBASE_API_SECRET"),
+                firstPresent(provider.getOrNull("COINBASE_KEY_NAME"), provider.getOrNull("COINBASE_API_KEY")),
+                firstPresent(provider.getOrNull("COINBASE_PRIVATE_KEY"), provider.getOrNull("COINBASE_API_SECRET")),
                 provider.getOrNull("COINBASE_KEY_NAME"),
                 provider.getOrNull("COINBASE_PRIVATE_KEY"),
                 null,

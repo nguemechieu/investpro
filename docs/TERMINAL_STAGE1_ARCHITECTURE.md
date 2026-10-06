@@ -1,5 +1,7 @@
 # InvestPro Terminal Stage 1 Architecture
 
+> Current documentation baseline (2026-10-05): JDK 27, JavaFX 27 and Maven 3.8.5+. Use the [documentation index](../docs/README.md) for current setup, trading-desk behavior, Telegram commands and release limits. Design examples below are not proof of broker support or deployment verification.
+
 Stage 1 adds a non-disruptive foundation under `org.investpro.terminal`.
 
 ## Package Map
@@ -51,7 +53,7 @@ Prefer these new keys over older `tradeadviser.*` names:
 
 Stage 1 does not replace existing adapters or UI services. Existing classes can progressively implement `org.investpro.terminal.provider.*` interfaces in Stage 2.
 
-Broker/exchange activity remains the source of truth. The new `BrokerActivityEvent` and `BrokerActivityRepository` contracts are meant to converge with the existing `org.investpro.activity` persistence pipeline during Stage 3.
+Broker/exchange activity remains the source of truth. The new `BrokerActivityEvent` and `BrokerActivityRepository` contracts are meant to converge with the existing `activities` persistence pipeline during Stage 3.
 
 ## Run
 

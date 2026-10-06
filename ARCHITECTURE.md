@@ -1,5 +1,7 @@
 # InvestPro Clean Architecture Refactoring Guide
 
+> Current documentation baseline (2026-10-05): JDK 27, JavaFX 27 and Maven 3.8.5+. Use the [documentation index](docs/README.md) for current setup, trading-desk behavior, Telegram commands and release limits. Design examples below are not proof of broker support or deployment verification.
+
 ## Overview
 This document provides step-by-step guidance for refactoring InvestPro into a clean professional architecture with proper separation of concerns.
 
@@ -666,7 +668,7 @@ Must use:
 ### Phase 9: Testing & Compilation
 - [ ] Compile with no errors
 - [ ] Run agent unit tests in isolation
-- [ ] No Java 21-only methods (getFirst, addFirst, removeLast)
+- [ ] Collection APIs match the Java 27 compiler baseline
 - [ ] No primitive double compared with null
 
 ---
@@ -683,8 +685,8 @@ Must use:
 
 ## Java Compatibility
 
-- **Targets Java 21** (LTS)
-- **Use modern Java 21 idioms** where appropriate, but ensure compatibility with the build environment
+- **Targets Java 27**
+- **Use modern Java 27 idioms** where appropriate, but ensure compatibility with the build environment
 
 ---
 

@@ -1,5 +1,7 @@
 # Simple EMA Crossover User Strategy
 
+> Current documentation baseline (2026-10-05): JDK 27, JavaFX 27 and Maven 3.8.5+. Use the [documentation index](../../docs/README.md) for current setup, trading-desk behavior, Telegram commands and release limits. Design examples below are not proof of broker support or deployment verification.
+
 A complete example of a user-developed custom trading strategy for the InvestPro platform.
 
 ## Overview
@@ -14,9 +16,9 @@ This example demonstrates how to create your own trading strategy using the Inve
 
 ### Prerequisites
 
-- Java 21+ (Eclipse Temurin or OpenJDK)
-- Maven 3.8+
-- InvestPro 1.0.0+ (installed or available in your local Maven repository)
+- Java 27 (Eclipse Temurin or OpenJDK)
+- Maven 3.8.5+
+- InvestPro 1.0.0-SNAPSHOT (installed or available in your local Maven repository)
 
 ### Build Instructions
 

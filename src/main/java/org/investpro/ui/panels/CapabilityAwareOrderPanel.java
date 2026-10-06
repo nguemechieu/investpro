@@ -112,7 +112,7 @@ public class CapabilityAwareOrderPanel extends OrderPanel {
               + "-fx-background-color: rgba(245,158,11,0.1); "
               + "-fx-padding: 6 12; -fx-background-radius: 6;");
         banner.setMaxWidth(Double.MAX_VALUE);
-        getChildren().add(0, banner);
+        getChildren().addFirst(banner);
     }
 
     // ── Shared helpers ────────────────────────────────────────────────────────

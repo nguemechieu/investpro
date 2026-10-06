@@ -20,7 +20,7 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Fetches the ForexFactory weekly economic calendar from:
- * <pre>https://nfs.faireconomy.media/ff_calendar_thisweek.json</pre>
+ * <pre><a href="https://nfs.faireconomy.media/ff_calendar_thisweek.json">...</a></pre>
  *
  * <p>Each JSON entry has the shape:
  * <pre>

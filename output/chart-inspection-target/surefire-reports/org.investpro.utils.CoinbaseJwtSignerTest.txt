@@ -1,0 +1,28 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.utils.CoinbaseJwtSignerTest
+-------------------------------------------------------------------------------
+Tests run: 6, Failures: 0, Errors: 2, Skipped: 1, Time elapsed: 0.058 s <<< FAILURE! -- in org.investpro.utils.CoinbaseJwtSignerTest
+org.investpro.utils.CoinbaseJwtSignerTest.acceptsEscapedNewlinePrivateKeyPem -- Time elapsed: 0.004 s <<< ERROR!
+java.lang.IllegalArgumentException: Unable to load Coinbase EC private key.
+	at org.investpro.exchange.coinbase.CoinbaseJwtSigner.loadEcPrivateKey(CoinbaseJwtSigner.java:374)
+	at org.investpro.exchange.coinbase.CoinbaseJwtSigner.<init>(CoinbaseJwtSigner.java:70)
+	at org.investpro.utils.CoinbaseJwtSignerTest.acceptsEscapedNewlinePrivateKeyPem(CoinbaseJwtSignerTest.java:72)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:583)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+Caused by: java.lang.IllegalArgumentException: Unable to parse Coinbase private key PEM.
+	at org.investpro.exchange.coinbase.CoinbaseJwtSigner.loadEcPrivateKey(CoinbaseJwtSigner.java:348)
+	... 5 more
+
+org.investpro.utils.CoinbaseJwtSignerTest.acceptsQuotedOneLinePrivateKeyPem -- Time elapsed: 0.003 s <<< ERROR!
+java.lang.IllegalArgumentException: Unable to load Coinbase EC private key.
+	at org.investpro.exchange.coinbase.CoinbaseJwtSigner.loadEcPrivateKey(CoinbaseJwtSigner.java:374)
+	at org.investpro.exchange.coinbase.CoinbaseJwtSigner.<init>(CoinbaseJwtSigner.java:70)
+	at org.investpro.utils.CoinbaseJwtSignerTest.acceptsQuotedOneLinePrivateKeyPem(CoinbaseJwtSignerTest.java:83)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:583)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+Caused by: java.lang.IllegalArgumentException: Unable to parse Coinbase private key PEM.
+	at org.investpro.exchange.coinbase.CoinbaseJwtSigner.loadEcPrivateKey(CoinbaseJwtSigner.java:348)
+	... 5 more
+

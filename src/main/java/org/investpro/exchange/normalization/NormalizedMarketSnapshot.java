@@ -1,5 +1,6 @@
 package org.investpro.exchange.normalization;
 
+import lombok.Getter;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.TradePair;
 
@@ -12,6 +13,7 @@ import java.time.Instant;
  * <p>Instances are immutable once constructed. Use the static factory methods
  * {@link #fromTicker} and {@link #stale} to build instances.
  */
+@Getter
 public final class NormalizedMarketSnapshot {
 
     // ─── Identity ──────────────────────────────────────────────
@@ -243,30 +245,6 @@ public final class NormalizedMarketSnapshot {
     }
 
     // ─── Accessors ───────────────────────────────────────────────
-
-    public String getExchangeName()          { return exchangeName; }
-    public String getVenueId()               { return venueId; }
-    public TradePair getTradePair()          { return tradePair; }
-    public Instant getCapturedAt()           { return capturedAt; }
-    public double getBidPrice()              { return bidPrice; }
-    public double getAskPrice()              { return askPrice; }
-    public double getMidPrice()              { return midPrice; }
-    public double getSpreadBps()             { return spreadBps; }
-    public double getLastTradePrice()        { return lastTradePrice; }
-    public double getLastTradeSize()         { return lastTradeSize; }
-    public double getVolume24h()             { return volume24h; }
-    public double getVolumeQuote24h()        { return volumeQuote24h; }
-    public double getHigh24h()               { return high24h; }
-    public double getLow24h()                { return low24h; }
-    public double getOpen24h()               { return open24h; }
-    public double getClose24h()              { return close24h; }
-    public double getPriceChangePercent24h() { return priceChangePercent24h; }
-    public int getBidLevels()               { return bidLevels; }
-    public int getAskLevels()               { return askLevels; }
-    public double getTotalBidLiquidity()     { return totalBidLiquidity; }
-    public double getTotalAskLiquidity()     { return totalAskLiquidity; }
-    public boolean isDataFresh()             { return dataFresh; }
-    public String getDataSource()            { return dataSource; }
 
     // ─── Convenience record-style accessors (for use with SmartExecutionRouter) ──
     /** Alias for {@link #getDataSource()}. */

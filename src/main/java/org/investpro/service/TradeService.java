@@ -20,13 +20,13 @@ import java.util.stream.Collectors;
 
 /**
  * Service for Trade domain operations.
- *
+ * <p>
  * Responsibilities:
  * - validate completed trades before persistence
  * - delegate CRUD operations to TradeRepository
  * - provide trading-specific read/query helpers
  * - calculate trade analytics such as profit, fees, win rate, volume, and summaries
- *
+ * <p>
  * Trade model fields used:
  * - tradePair
  * - price
@@ -239,10 +239,10 @@ public class TradeService implements CrudService<Trade, String> {
 
     /**
      * Calculate net profit for a trade.
-     *
+     * <p>
      * Formula:
      * netProfit = profit - fee + swap
-     *
+     * <p>
      * Swap can be positive or negative depending on broker/market.
      */
     public double calculateNetProfit(Trade trade) {

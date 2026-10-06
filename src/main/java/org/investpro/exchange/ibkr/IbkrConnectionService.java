@@ -16,7 +16,7 @@ public final class IbkrConnectionService {
         connections.put(IbkrConnectionMode.CLIENT_PORTAL_GATEWAY, clientPortalConnection);
     }
 
-    public IbkrSessionState connect(IbkrConnectionProfile profile) {
+    public synchronized IbkrSessionState connect(IbkrConnectionProfile profile) {
         IbkrConnectionProfile safe = profile == null ? IbkrConnectionProfile.twsPaper() : profile;
         if (safe.mode() == IbkrConnectionMode.CLOUD_OAUTH_FUTURE) {
             throw new UnsupportedOperationException(
@@ -26,6 +26,8 @@ public final class IbkrConnectionService {
         if (connection == null) {
             throw new IllegalStateException("No IBKR connection adapter is registered for " + safe.mode());
         }
+        if (activeConnection != null) activeConnection.disconnect();
+        activeConnection = null;
         connection.connect(safe);
         activeConnection = connection;
         return connection.getSessionState();

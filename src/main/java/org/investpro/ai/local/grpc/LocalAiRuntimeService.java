@@ -170,14 +170,14 @@ public class LocalAiRuntimeService implements AiReasoningService, AutoCloseable 
             decision = AiDecision.ESCALATE_TO_MANUAL_REVIEW;
         }
 
-        double safeAdjustment = Math.max(0.0, Math.min(1.0, result.sizeAdjustment() <= 0.0 ? 1.0 : result.sizeAdjustment()));
+        double safeAdjustment = Math.clamp(result.sizeAdjustment() <= 0.0 ? 1.0 : result.sizeAdjustment(), 0.0, 1.0);
         double suggestedPosition = request.getRiskDecision() == null
                 ? 0.0
                 : request.getRiskDecision().getFinalPositionSize() * safeAdjustment;
 
         return AiTradeReviewResponse.builder()
                 .decision(decision)
-                .confidence(Math.max(0.0, Math.min(1.0, result.aiConfidence())))
+                .confidence(Math.clamp(result.aiConfidence(), 0.0, 1.0))
                 .suggestedRiskMultiplier(safeAdjustment)
                 .suggestedPositionSize(suggestedPosition)
                 .recommendedExecutionStrategy("LOCAL_GRPC_ADVISORY")

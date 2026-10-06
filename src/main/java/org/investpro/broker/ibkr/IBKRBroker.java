@@ -38,7 +38,7 @@ public class IBKRBroker implements Broker {
     public IBKRBroker(ExchangeCredentials credentials, IBKRConnectionConfig config) {
         this.exchange = new IbkrExchange(credentials);
         this.eventBridge = new IBKREventBridge();
-        this.connectionManager = new IBKRConnectionManager(exchange, new IBKRReflectiveApiGateway(), config);
+        this.connectionManager = new IBKRConnectionManager(exchange, new IBKRReflectiveApiGateway(exchange.getConnectionManager().getTwsSession()), config);
         this.accountService = new IBKRAccountService(exchange);
         this.positionService = new IBKRPositionService(exchange);
         this.orderService = new IBKROrderService(exchange);

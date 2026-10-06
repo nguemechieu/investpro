@@ -1,5 +1,7 @@
 # Signal/Strategy Integration System - Complete Documentation
 
+> Historical report: retained for its original revision. Java versions, test counts, completion claims and code examples below are historical, not current setup or release evidence. For the JDK 27 / JavaFX 27 baseline, use the [project README](README.md) and [documentation index](docs/README.md). Classified on 2026-10-05.
+
 ## Overview
 
 A complete signal/strategy evaluation system integrated into InvestPro's trading loop. Provides clean separation between strategy evaluation and execution, enabling multi-strategy consensus, safe plugin reloading, and comprehensive UI feedback.
@@ -298,5 +300,5 @@ These files are used by the integration system and already exist:
 ---
 
 **Status**: Complete and ready for integration  
-**Last Updated**: May 9, 2026  
+**Last Updated**: May 9, 2026
 **Files**: 9 complete files + 2 documentation files

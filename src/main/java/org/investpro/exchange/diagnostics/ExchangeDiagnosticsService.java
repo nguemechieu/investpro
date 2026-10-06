@@ -27,9 +27,6 @@ public class ExchangeDiagnosticsService {
     private final Map<String, ExchangeDiagnosticSnapshot> snapshots = new ConcurrentHashMap<>();
 
     public ExchangeDiagnosticsService(@NotNull ExchangeService exchangeService) {
-        if (exchangeService == null) {
-            throw new IllegalArgumentException("exchangeService must not be null");
-        }
         this.exchangeService = exchangeService;
         logger.info("ExchangeDiagnosticsService initialized");
     }

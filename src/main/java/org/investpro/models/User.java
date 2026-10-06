@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.Data;
 @Data
 @Slf4j
-class User {
+public class User {
     
     private Long id;
     private String username;

@@ -33,7 +33,7 @@ public class VolatilityCalculator {
         }
 
         double atrPercent = (atr / lastClose) * 100.0;
-        return Math.max(0.5, Math.min(atrPercent, 20.0)); // Cap at 0.5% - 20%
+        return Math.clamp(atrPercent, 0.5, 20.0); // Cap at 0.5% - 20%
     }
 
     /**
@@ -114,7 +114,7 @@ public class VolatilityCalculator {
                 .orElse(0);
 
         double stdDev = Math.sqrt(variance) * 100; // Convert to percentage
-        return Math.max(0.5, Math.min(stdDev, 20.0)); // Cap at 0.5% - 20%
+        return Math.clamp(stdDev, 0.5, 20.0); // Cap at 0.5% - 20%
     }
 
     /**
@@ -146,7 +146,7 @@ public class VolatilityCalculator {
 
         // Band width as percentage
         double bandwidth = ((upper - lower) / sma) * 100;
-        return Math.max(0.5, Math.min(bandwidth, 20.0));
+        return Math.clamp(bandwidth, 0.5, 20.0);
     }
 
     /**

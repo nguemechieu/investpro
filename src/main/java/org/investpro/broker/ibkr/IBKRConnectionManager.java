@@ -20,6 +20,7 @@ public class IBKRConnectionManager {
     private volatile IBKRConnectionConfig config;
 
     private volatile Instant lastHeartbeat = Instant.EPOCH;
+    private volatile boolean connectionRequested;
 
     public IBKRConnectionManager(IbkrExchange exchange, IBKROfficialApiGateway officialApiGateway,
             IBKRConnectionConfig config) {
@@ -42,13 +43,12 @@ public class IBKRConnectionManager {
     }
 
     public synchronized void connect() {
+        connectionRequested = true;
         IBKRConnectionMode mode = config.mode() == null ? IBKRConnectionMode.PAPER : config.mode();
-        exchange.getConnectionManager().connect(mode == IBKRConnectionMode.LIVE
-                ? org.investpro.exchange.ibkr.IbkrConnectionManager.Mode.LIVE
-                : org.investpro.exchange.ibkr.IbkrConnectionManager.Mode.PAPER);
-
-        officialApiGateway.connect(config.host(), config.activePort(), config.clientId());
-        officialApiGateway.ensureReaderLoopRunning();
+        exchange.connect(new org.investpro.exchange.ibkr.IbkrConnectionProfile(
+                org.investpro.exchange.ibkr.IbkrConnectionMode.TWS_API,
+                config.host(), config.activePort(), config.clientId(),
+                mode == IBKRConnectionMode.PAPER, false, null, null));
         markHeartbeat();
 
         log.info("Professional IBKR connection established mode={} host={} port={}", mode, config.host(),
@@ -56,12 +56,13 @@ public class IBKRConnectionManager {
     }
 
     public synchronized void disconnect() {
+        connectionRequested = false;
         exchange.disconnect();
-        officialApiGateway.disconnect();
+
     }
 
     public boolean isConnected() {
-        return Boolean.TRUE.equals(exchange.isConnected()) && officialApiGateway.isConnected();
+        return Boolean.TRUE.equals(exchange.isConnected());
     }
 
     public Instant lastHeartbeat() {
@@ -74,6 +75,7 @@ public class IBKRConnectionManager {
 
     private void healthTick() {
         try {
+            if (!connectionRequested) return;
             if (isConnected()) {
                 markHeartbeat();
                 return;

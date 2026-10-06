@@ -19,8 +19,6 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -31,12 +29,12 @@ import java.util.Set;
 
 /**
  * A detachable and draggable JavaFX Tab.
- *
+ * <p>
  * Features:
  * - Drag tab to reorder inside the same TabPane.
  * - Drag tab to another registered TabPane.
  * - Drag tab outside any registered TabPane to detach into a new window.
- *
+ * <p>
  * Notes:
  * - Works best when all tabs in the target pane are DraggableTab instances.
  * - Non-DraggableTab tabs are handled defensively and ignored for insertion
@@ -113,7 +111,7 @@ public class DraggableTab extends Tab {
 
         Scene scene = dragStage.getScene();
         if (scene != null && scene.getRoot() instanceof StackPane root && !root.getChildren().isEmpty()) {
-            Node node = root.getChildren().get(0);
+            Node node = root.getChildren().getFirst();
             if (node instanceof Text text) {
                 text.setText(safeTitle);
             }
@@ -247,7 +245,7 @@ public class DraggableTab extends Tab {
             addIndex--;
         }
 
-        addIndex = Math.max(0, Math.min(addIndex, targetPane.getTabs().size()));
+        addIndex = Math.clamp(addIndex, 0, targetPane.getTabs().size());
 
         targetPane.getTabs().add(addIndex, this);
         targetPane.getSelectionModel().select(this);
@@ -263,7 +261,7 @@ public class DraggableTab extends Tab {
         detachedPane.getTabs().add(this);
         detachedPane.getSelectionModel().select(this);
 
-        detachedPane.getTabs().addListener((ListChangeListener<Tab>) change -> {
+        detachedPane.getTabs().addListener((ListChangeListener<Tab>) _ -> {
             if (detachedPane.getTabs().isEmpty()) {
                 unregisterTabPane(detachedPane);
                 newStage.hide();
@@ -275,7 +273,7 @@ public class DraggableTab extends Tab {
         newStage.setX(event.getScreenX());
         newStage.setY(event.getScreenY());
 
-        newStage.setOnHiding(hidingEvent -> unregisterTabPane(detachedPane));
+        newStage.setOnHiding(_ -> unregisterTabPane(detachedPane));
 
         newStage.show();
         detachedPane.requestLayout();
@@ -300,7 +298,7 @@ public class DraggableTab extends Tab {
                 continue;
             }
 
-            Rectangle2D firstTabRect = getAbsoluteRect(tabPane.getTabs().get(0));
+            Rectangle2D firstTabRect = getAbsoluteRect(tabPane.getTabs().getFirst());
 
             if (firstTabRect == null) {
                 continue;
@@ -325,7 +323,7 @@ public class DraggableTab extends Tab {
             return 0;
         }
 
-        Rectangle2D firstTabRect = getAbsoluteRect(tabPane.getTabs().get(0));
+        Rectangle2D firstTabRect = getAbsoluteRect(tabPane.getTabs().getFirst());
         Rectangle2D lastTabRect = getAbsoluteRect(tabPane.getTabs().get(tabCount - 1));
 
         if (firstTabRect == null || lastTabRect == null) {
@@ -357,9 +355,9 @@ public class DraggableTab extends Tab {
     }
 
     @Contract("_ -> new")
-    private @Nullable Rectangle2D getAbsoluteRect(Control node) {
+    private Rectangle2D getAbsoluteRect(Control node) {
         if (node == null || node.getScene() == null || node.getScene().getWindow() == null) {
-            return null;
+            return new Rectangle2D(100,100,100,100);
         }
 
         Point2D localToScene = node.localToScene(

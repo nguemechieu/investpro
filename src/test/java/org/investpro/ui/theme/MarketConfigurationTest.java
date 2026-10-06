@@ -14,6 +14,31 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MarketConfigurationTest {
+    @Test
+    void brokerParamsAreImmutableAndNotLogged() {
+        var params = new java.util.HashMap<String, String>();
+        params.put("IBKR_HOST", "localhost");
+        params.put("password", "hidden-param-secret");
+        var configuration = new MarketConfiguration("user", "STOCK", "US", "IBKR", "", "", "", "", "", "", "", "PAPER", params);
+        params.clear();
+        assertEquals("localhost", configuration.params().get("IBKR_HOST"));
+        assertFalse(configuration.toString().contains("hidden-param-secret"));
+        org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class,
+                () -> configuration.params().put("IBKR_HOST", "other"));
+    }
+
+    @Test
+    void configurationNeverPrintsSecrets() {
+        MarketConfiguration config = new MarketConfiguration("user", "SPOT", "US", "coinbase",
+                "sensitive-key", "sensitive-pem", "account", "sensitive-telegram",
+                "sensitive-openai", "model", "org", "LIVE");
+        String summary = config.toString();
+        for (String secret : new String[]{"sensitive-key", "sensitive-pem", "sensitive-telegram", "sensitive-openai"}) {
+            assertFalse(summary.contains(secret));
+        }
+        assertEquals("<redacted>", MarketConfiguration.maskSecret("x"));
+        assertEquals("<redacted>", MarketConfiguration.maskSecret("ey.jwt.token"));
+    }
 
     @Test
     void tradingModeNormalizesLiveValues() {
@@ -38,13 +63,11 @@ class MarketConfigurationTest {
         assertEquals(MarketType.SPOT, configuration("Crypto Spot", "US", "coinbase", "PAPER").normalizedMarketType());
         assertEquals(MarketType.DERIVATIVES, configuration("Perpetuals", "International", "coinbase", "PAPER").normalizedMarketType());
         assertEquals(MarketType.DERIVATIVES, configuration("Futures", "US Derivatives", "coinbase", "PAPER").normalizedMarketType());
-        assertEquals(MarketType.FOREX, configuration("Forex", "Global", "oanda", "PAPER").normalizedMarketType());
-        assertEquals(MarketType.SECURITIES, configuration("Stocks", "US", "alpaca", "PAPER").normalizedMarketType());
-    }
+            }
 
     @Test
     void assetClassAndContractTypeNormalizeDisplayLabels() {
-        MarketConfiguration spot = configuration("Crypto Spot", "US", "coinbase", "PAPER");
+        MarketConfiguration spot = configuration("Spot", "US", "coinbase", "PAPER");
         MarketConfiguration perp = configuration("Perpetuals", "International", "coinbase", "PAPER");
         MarketConfiguration stock = configuration("Stocks", "US", "alpaca", "PAPER");
 

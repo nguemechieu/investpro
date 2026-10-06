@@ -1,5 +1,7 @@
 # Theme Customization System - User Guide
 
+> Current documentation baseline (2026-10-05): JDK 27, JavaFX 27 and Maven 3.8.5+. Use the [documentation index](docs/README.md) for current setup, trading-desk behavior, Telegram commands and release limits. Design examples below are not proof of broker support or deployment verification.
+
 ## Overview
 
 InvestPro now includes a comprehensive **theme customization system** that allows you to adjust all styling properties without touching code. Every color, font, spacing, and border radius can be customized through an intuitive UI and saved to configuration files.
@@ -298,6 +300,6 @@ For issues or questions about theme customization:
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: May 11, 2026  
-**Status**: Production Ready ✅
+**Version**: 1.0
+**Last Updated**: May 11, 2026
+**Status**: Development reference; release verification required ✅

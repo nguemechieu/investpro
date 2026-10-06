@@ -24,6 +24,8 @@ class IndicatorDefinitionRegistryTest {
         }
 
         for (INDICATORS indicator : INDICATORS.values()) {
+            // UNKNOWN represents invalid input, not a selectable catalog indicator.
+            if (indicator == INDICATORS.UNKNOWN) continue;
             assertFalse(!seen.contains(indicator), indicator.name() + " is missing metadata");
         }
     }

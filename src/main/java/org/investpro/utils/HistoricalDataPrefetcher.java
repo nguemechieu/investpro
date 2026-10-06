@@ -80,24 +80,25 @@ public record HistoricalDataPrefetcher(HistoricalDataRepository repository, Data
             @NotNull DataSupplierFactory supplierFactory
     ) {
         this.repository = Objects.requireNonNull(repository, "repository must not be null");
-        this.supplierFactory = Objects.requireNonNull(supplierFactory, "supplierFactory must not be null");
-    }
+        this.supplierFactory = Objects.requireNonNull(supplierFactory, "supplierFactory must not be null");}
 
-    /**
-     * Creates a HistoricalDataPrefetcher using the currently selected exchange.
-     */
+
+
+   static String identity;
+
+   static DataSupplierFactory factory;
+
     public static HistoricalDataPrefetcher forCurrentExchange(
             @NotNull Exchange exchange,
-            @NotNull HistoricalDataRepository historicalDataRepository
-    ) {
+            @NotNull HistoricalDataRepository historicalDataRepository) {
         Objects.requireNonNull(exchange, "exchange must not be null");
         Objects.requireNonNull(historicalDataRepository, "historicalDataRepository must not be null");
 
         String exchangeName = exchange.getClass().getSimpleName().toLowerCase();
         String packageName = exchange.getClass().getPackageName().toLowerCase();
-        String identity = exchangeName + " " + packageName;
+        identity = exchangeName + " " + packageName;
 
-        DataSupplierFactory factory;
+
 
         if (identity.contains("binanceus") || identity.contains("binance us")) {
             factory = exchange::getCandleDataSupplier;

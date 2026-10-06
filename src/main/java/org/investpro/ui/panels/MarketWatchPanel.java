@@ -74,6 +74,9 @@ public class MarketWatchPanel extends StackPane {
             MarketWatchProductFilter.ALL);
 
     private Timeline refreshTimer;
+    private final Label symbolCountLabel = new Label("Symbols: 0");
+    private volatile boolean paused;
+    private volatile boolean closed;
     private static final long REFRESH_INTERVAL_MS = 3000; // Refresh every 3 seconds
     private Set<String> lastSymbolKeys = Set.of();
 
@@ -95,7 +98,7 @@ public class MarketWatchPanel extends StackPane {
 
         this.tradabilityProvider = resolveTradabilityProvider();
         this.refreshScheduler = new TradabilityRefreshScheduler(() -> {
-            refreshMarketWatchData();
+            if (!paused && !closed) refreshMarketWatchData();
             return null;
         });
 
@@ -128,7 +131,7 @@ public class MarketWatchPanel extends StackPane {
         setupTableColumns();
 
         // Setup table styling with modern appearance
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         table.setStyle(
                 "-fx-font-size: 11px; " +
                         "-fx-control-inner-background: #0f172a; " +
@@ -142,21 +145,39 @@ public class MarketWatchPanel extends StackPane {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setStyle("");
+                    setTooltip(null);
                 } else {
                     // Alternate colors for better readability
                     String bgColor = getIndex() % 2 == 0 ? "#0f172a" : "#1a1f3a";
                     setStyle("-fx-background-color: " + bgColor + "; " +
                             "-fx-text-fill: #e0e7ff;");
+                    setTooltip(new Tooltip("Orders: " + item.getOrderType()
+                            + "\nRestrictions: " + item.getRestrictions()
+                            + "\nProduct health: " + item.getProductHealth()
+                            + "\nIssue: " + item.getIssue()
+                            + "\nRight-click to toggle favorite"));
                 }
             }
         });
 
         table.setPrefHeight(400);
+        MenuItem favorite = new MenuItem("Toggle favorite");
+        favorite.setOnAction(event -> {
+            MarketWatchRow row = table.getSelectionModel().getSelectedItem();
+            if (row == null) return;
+            String key = rowCache.entrySet().stream().filter(entry -> entry.getValue() == row)
+                    .map(Map.Entry::getKey).findFirst().orElse(null);
+            if (key == null) return;
+            if (!favoriteSymbols.remove(key)) favoriteSymbols.add(key);
+            row.setFavorite(favoriteSymbols.contains(key));
+            applyProductFilterToTable();
+        });
+        table.setContextMenu(new ContextMenu(favorite));
         table.setMinHeight(200);
         table.setFixedCellSize(26); // Slightly increased for better visibility
 
         // Create enhanced controls bar
-        HBox controls = createControlsBar();
+        FlowPane controls = createControlsBar();
 
         // Layout
         VBox content = new VBox(8, controls, table);
@@ -202,6 +223,17 @@ public class MarketWatchPanel extends StackPane {
         iconCol.setResizable(false);
 
         // Symbol column
+        TableColumn<MarketWatchRow, Boolean> favoriteCol = new TableColumn<>("Favorite");
+        favoriteCol.setCellValueFactory(data -> data.getValue().favoriteProperty());
+        favoriteCol.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(Boolean value, boolean empty) {
+                super.updateItem(value, empty);
+                setText(!empty && Boolean.TRUE.equals(value) ? "*" : "");
+            }
+        });
+        favoriteCol.setPrefWidth(65);
+        table.getColumns().add(favoriteCol);
         TableColumn<MarketWatchRow, String> symbolCol = new TableColumn<>("Symbol");
         symbolCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
                 cellData.getValue().getDisplaySymbol()));
@@ -421,7 +453,7 @@ public class MarketWatchPanel extends StackPane {
 
     }
 
-    private HBox createControlsBar() {
+    private FlowPane createControlsBar() {
         Label titleLabel = new Label("\uD83D\uDCCA Market Watch - Symbol Agent Status");
         titleLabel.setStyle(
                 "-fx-font-size: 13px; " +
@@ -430,7 +462,7 @@ public class MarketWatchPanel extends StackPane {
                         "-fx-font-family: 'Segoe UI', sans-serif;");
 
         Label statusLabel = new Label("Status: ");
-        Label symbolCountLabel = new Label("Symbols: 0");
+        symbolCountLabel.setText("Symbols: 0");
         symbolCountLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 11px;");
 
         productFilterSelector.getItems().setAll(MarketWatchProductFilter.values());
@@ -442,7 +474,24 @@ public class MarketWatchPanel extends StackPane {
             symbolCountLabel.setText("Symbols: " + table.getItems().size());
         });
 
-        Button refreshButton = new Button("⟳");
+        filterSelector.getItems().setAll(MarketWatchTradabilityFilter.SHOW_ALL,
+                MarketWatchTradabilityFilter.TRADABLE_ONLY, MarketWatchTradabilityFilter.FAVORITES,
+                MarketWatchTradabilityFilter.ACTIVE_MARKETS);
+        filterSelector.setValue(MarketWatchTradabilityFilter.SHOW_ALL);
+        filterSelector.setTooltip(new Tooltip("Filter by trading availability, favorites, or open session"));
+        filterSelector.setOnAction(event -> {
+            activeFilter.set(filterSelector.getValue());
+            applyProductFilterToTable();
+        });
+        sortSelector.getItems().setAll("Symbol", "Strategy score", "Spread", "Live ready");
+        sortSelector.setValue("Symbol");
+        sortSelector.setTooltip(new Tooltip("Sort symbols; column headers also support sorting"));
+        sortSelector.setOnAction(event -> {
+            table.getSortOrder().clear();
+            applyProductFilterToTable();
+        });
+
+        Button refreshButton = new Button("Refresh");
         refreshButton.setStyle(
                 "-fx-padding: 6 12; " +
                         "-fx-background-color: #3b82f6; " +
@@ -451,10 +500,10 @@ public class MarketWatchPanel extends StackPane {
                         "-fx-cursor: hand;");
         refreshButton.setOnAction(e -> {
             refreshMarketWatchData();
-            symbolCountLabel.setText("Symbols: " + rowCache.size());
+            refreshMarketInstrumentsAsync();
         });
 
-        Button pauseButton = new Button("⏸ ");
+        Button pauseButton = new Button("Pause");
         pauseButton.setStyle(
                 "-fx-padding: 6 12; " +
                         "-fx-background-color: #8b5cf6; " +
@@ -464,7 +513,8 @@ public class MarketWatchPanel extends StackPane {
         pauseButton.setOnAction(e -> {
             if (refreshTimer != null && refreshTimer.getStatus() == javafx.animation.Animation.Status.RUNNING) {
                 refreshTimer.stop();
-                pauseButton.setText("▶ ");
+                paused = true;
+                pauseButton.setText("Resume");
                 pauseButton.setStyle(
                         "-fx-padding: 6 12; " +
                                 "-fx-background-color: #10b981; " +
@@ -472,8 +522,9 @@ public class MarketWatchPanel extends StackPane {
                                 "-fx-border-radius: 3; " +
                                 "-fx-cursor: hand;");
             } else {
+                paused = false;
                 startAutoRefresh();
-                pauseButton.setText("⏸ Pause");
+                pauseButton.setText("Pause");
                 pauseButton.setStyle(
                         "-fx-padding: 6 12; " +
                                 "-fx-background-color: #8b5cf6; " +
@@ -495,7 +546,8 @@ public class MarketWatchPanel extends StackPane {
         Region spacer = new Region();
         HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
 
-        HBox controls = new HBox(12, titleLabel, statusLabel, symbolCountLabel, productFilterSelector, spacer,
+        FlowPane controls = new FlowPane(12, 8, titleLabel, symbolCountLabel, productFilterSelector,
+                filterSelector, sortSelector,
                 refreshButton, pauseButton, exportButton);
         controls.setPadding(new Insets(8, 12, 8, 12));
         controls.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
@@ -532,6 +584,7 @@ public class MarketWatchPanel extends StackPane {
         }
 
         Platform.runLater(() -> {
+            if (closed) return;
             try {
                 List<SymbolAgentState> allStates = symbolAgentManager.getAllStates();
 
@@ -565,12 +618,15 @@ public class MarketWatchPanel extends StackPane {
                                         .build());
                         row.setMarketInstrument(resolveInstrument(state));
                         row.updateSymbolState(state);
+                        row.setFavorite(favoriteSymbols.contains(symbolKey));
                     }
                 }
 
                 // Re-populate table items when the symbol set changes. Row properties update
                 // cells in-place between set changes.
-                if (!currentSymbolKeys.equals(lastSymbolKeys)) {
+                if (!currentSymbolKeys.equals(lastSymbolKeys) || activeProductFilter.get() != MarketWatchProductFilter.ALL
+                        || activeFilter.get() != MarketWatchTradabilityFilter.SHOW_ALL
+                        || !"Symbol".equals(sortSelector.getValue())) {
                     applyProductFilterToTable();
                     lastSymbolKeys = Set.copyOf(currentSymbolKeys);
                     log.debug("Refreshed MarketWatch with {} symbols", rowCache.size());
@@ -603,6 +659,7 @@ public class MarketWatchPanel extends StackPane {
                     instrumentsBySymbol.clear();
                     instrumentsBySymbol.putAll(refreshed);
                     Platform.runLater(() -> {
+                        if (closed) return;
                         rowCache.values().forEach(row -> row.setMarketInstrument(resolveInstrument(row.getSymbol())));
                         applyProductFilterToTable();
                     });
@@ -641,16 +698,39 @@ public class MarketWatchPanel extends StackPane {
 
     private void applyProductFilterToTable() {
         MarketWatchProductFilter filter = activeProductFilter.get();
+        Comparator<MarketWatchRow> bySymbol = Comparator.comparing(MarketWatchRow::getDisplaySymbol,
+                String.CASE_INSENSITIVE_ORDER);
+        Comparator<MarketWatchRow> comparator = switch (Objects.toString(sortSelector.getValue(), "Symbol")) {
+            case "Strategy score" -> Comparator.comparingDouble(MarketWatchRow::getStrategyScore).reversed();
+            case "Spread" -> Comparator.comparingDouble(MarketWatchRow::getSpreadPercent);
+            case "Live ready" -> Comparator.comparing(MarketWatchRow::isLiveReady).reversed();
+            default -> bySymbol;
+        };
         List<MarketWatchRow> rows = rowCache.values().stream()
                 .filter(row -> filter == null || filter.accepts(row.getMarketInstrument()))
+                .filter(row -> switch (activeFilter.get() == null
+                        ? MarketWatchTradabilityFilter.SHOW_ALL : activeFilter.get()) {
+                    case TRADABLE_ONLY -> row.isTradable();
+                    case FAVORITES -> row.isFavorite();
+                    case ACTIVE_MARKETS -> "OPEN".equals(row.getSession());
+                    default -> true;
+                })
+                .sorted(comparator.thenComparing(bySymbol))
                 .toList();
         table.getItems().setAll(rows);
+        table.sort();
+        symbolCountLabel.setText("Symbols: " + rows.size());
     }
 
     /**
      * Shutdown the panel and cleanup resources.
      */
     public void shutdown() {
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(this::shutdown);
+            return;
+        }
+        closed = true;
         if (refreshTimer != null) {
             refreshTimer.stop();
         }
@@ -667,19 +747,19 @@ public class MarketWatchPanel extends StackPane {
             csv.append("Symbol,Bid,Ask,Spread %,Session,Trading Mode,Strategy,Timeframe,Score,Live Ready,Issue\n");
 
             // Add rows
-            for (MarketWatchRow row : rowCache.values()) {
-                csv.append(String.format("%s,%.5f,%.5f,%.4f,%s,%s,%s,%s,%.2f,%s,%s\n",
-                        row.getDisplaySymbol(),
+            for (MarketWatchRow row : table.getItems()) {
+                csv.append(String.format(Locale.ROOT, "%s,%.5f,%.5f,%.4f,%s,%s,%s,%s,%.2f,%s,%s\n",
+                        csvField(row.getDisplaySymbol()),
                         row.getBid(),
                         row.getAsk(),
                         row.getSpreadPercent(),
-                        row.getSession(),
-                        row.getTradingMode(),
-                        row.getActiveStrategy(),
-                        row.getActiveTimeframe(),
+                        csvField(row.getSession()),
+                        csvField(row.getTradingMode()),
+                        csvField(row.getActiveStrategy()),
+                        csvField(row.getActiveTimeframe()),
                         row.getStrategyScore(),
                         row.isLiveReady(),
-                        row.getIssue() == null ? "" : row.getIssue()));
+                        csvField(row.getIssue())));
             }
 
             // Save to file
@@ -688,11 +768,16 @@ public class MarketWatchPanel extends StackPane {
                     "MarketWatch_" + java.time.LocalDateTime.now().format(
                             java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv");
 
+            java.nio.file.Files.createDirectories(exportPath.getParent());
             java.nio.file.Files.writeString(exportPath, csv.toString());
             log.info("Market watch data exported to {}", exportPath);
         } catch (Exception e) {
             log.error("Failed to export market watch data", e);
         }
+    }
+
+    static String csvField(String value) {
+        return "\"" + (value == null ? "" : value.replace("\"", "\"\"")) + "\"";
     }
 
     private static @NotNull String symbolKey(@NotNull TradePair symbol) {

@@ -189,7 +189,8 @@ public class Alpaca extends Exchange {
                 .supportsTicker(true)
                 .supportsTickers(true)
                 .supportsOrderBook(true)
-                .supportsHistoricalCandles(true)
+                // Historical candle retrieval is not implemented by this adapter yet.
+                .supportsHistoricalCandles(false)
                 .supportsRecentTrades(true)
                 .marketDepthType(MarketDepthType.TOP_OF_BOOK)
 

@@ -74,7 +74,9 @@ public final class IbkrAccountService {
 
     public Account toAccount(Exchange exchange, IbkrAccountSnapshot snapshot) {
         IbkrAccountSnapshot effectiveSnapshot = snapshot == null ? snapshot() : snapshot;
-        Account account = new Account(exchange, "ibkr", "");
+        Account account = new Account();
+        account.setExchange(exchange);
+        account.setUsername("ibkr");
         account.setAccountId(effectiveSnapshot.accountId());
         account.setAccount(effectiveSnapshot.accountId());
         account.setBrokerName(effectiveSnapshot.broker());

@@ -26,9 +26,6 @@ public final class IbkrAdaptiveContractDetailsService implements IbkrContractDet
                 && connectionManager.getConnectionMode() == IbkrConnectionMode.CLIENT_PORTAL_GATEWAY) {
             return clientPortalDetailsService.requestDetails(candidate, timeout);
         }
-        if (clientPortalClient != null && clientPortalClient.isAuthenticated()) {
-            return clientPortalDetailsService.requestDetails(candidate, timeout);
-        }
         return twsDetailsService.requestDetails(candidate, timeout);
     }
 }

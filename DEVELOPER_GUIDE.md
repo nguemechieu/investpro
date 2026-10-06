@@ -1,8 +1,10 @@
 # InvestPro - Developer Guide
 
-**Last Updated**: May 2026  
-**Version**: 1.0  
-**Target**: Java 21+, Maven 3.6+
+> Current documentation baseline (2026-10-05): JDK 27, JavaFX 27 and Maven 3.8.5+. Use the [documentation index](docs/README.md) for current setup, trading-desk behavior, Telegram commands and release limits. Design examples below are not proof of broker support or deployment verification.
+
+**Last Updated**: 2026-10-05
+**Version**: 1.0
+**Target**: Java 27, Maven 3.8.5+
 
 ---
 
@@ -11,11 +13,11 @@
 ### 1.1 Prerequisites
 
 ```bash
-# Check Java version (must be 21+)
+# Check Java version (must be 27)
 java -version
-# openjdk version "21.0.1" 2023-10-17 LTS
+# openjdk version "27"
 
-# Check Maven version (must be 3.6+)
+# Check Maven version (must be 3.8.5+)
 mvn --version
 # Apache Maven 3.9.5
 
@@ -53,12 +55,12 @@ nano .env
 #### IntelliJ IDEA
 ```
 1. File → Open → Select investpro folder
-2. Configure SDK: File → Project Structure → SDK → Select JDK 21+
-3. Configure JavaFX:
-   - Download JavaFX SDK from openjfx.io
+2. Configure SDK: File → Project Structure → SDK → Select JDK 27
+3. Import Maven dependencies (JavaFX 27 is provided by pom.xml):
+   - Use the Maven-managed JavaFX dependencies
    - Preferences → Java → JavaFX
-   - Set JavaFX SDK path
-4. VM Options: --module-path /path/to/javafx-sdk/lib --add-modules javafx.controls,javafx.fxml
+   - Run with the javafx:run Maven goal
+4. Prefer the Maven javafx:run configuration; a separate SDK is not needed.
 5. Run → Edit Configurations → Add JavaFX configuration
 ```
 
@@ -68,7 +70,7 @@ nano .env
 2. Select investpro folder
 3. Install m2e plugin if needed
 4. Windows → Preferences → Java → JavaFX
-5. Set JavaFX SDK location
+5. Import Maven-managed JavaFX 27 dependencies
 6. Create run configuration with JavaFX module options
 ```
 
@@ -85,7 +87,7 @@ nano .env
       "type": "java",
       "name": "Launch InvestPro",
       "request": "launch",
-      "mainClass": "org.investpro.InvestPro",
+      "mainClass": "org.investpro.InvestProLauncher",
       "projectName": "investpro",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
@@ -963,6 +965,6 @@ Fixes #890
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: May 2026  
-**Status**: Production Ready
+**Version**: 1.0
+**Last Updated**: 2026-10-05
+**Status**: Development reference; release verification required

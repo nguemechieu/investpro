@@ -1,14 +1,12 @@
 package org.investpro.exchange.coinbase;
 
 import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.ECDSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import io.github.cdimascio.dotenv.Dotenv;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -16,6 +14,7 @@ import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -26,19 +25,15 @@ import java.security.Security;
 import java.security.interfaces.ECPrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Coinbase Advanced Trade JWT signer.
- *
+ * <p>
  * Coinbase REST private endpoints require:
- *
+ * <p>
  * Authorization: Bearer <JWT>
- *
+ * <p>
  * REST JWT format:
  * - alg: ES256
  * - kid: API key name, for example organizations/{org_id}/apiKeys/{key_id}
@@ -48,24 +43,18 @@ import java.util.UUID;
  * - nbf: now epoch seconds
  * - exp: now + 120 seconds
  * - uri: METHOD api.coinbase.com/path?query
- *
+ * <p>
  * WebSocket JWT format:
  * - same signing format, but no uri claim.
  */
-@Getter
-@Setter
+
 @Slf4j
-public final class CoinbaseJwtSigner {
+public record CoinbaseJwtSigner(String keyName, String privateKeyPem, ECPrivateKey privateKey, long ttlSeconds) {
     public static final String DEFAULT_REQUEST_HOST = "api.coinbase.com";
     public static final long DEFAULT_TTL_SECONDS = 120L;
 
     private static final String ISSUER = "cdp";
     private static final String BOUNCY_CASTLE_PROVIDER = "BC";
-
-    private final String keyName;
-    private final String privateKeyPem;
-    private final ECPrivateKey privateKey;
-    private final long ttlSeconds;
 
     static {
         if (Security.getProvider(BOUNCY_CASTLE_PROVIDER) == null) {
@@ -78,18 +67,15 @@ public final class CoinbaseJwtSigner {
     }
 
     public CoinbaseJwtSigner(String keyName, String privateKeyPem, long ttlSeconds) {
-        this.keyName = normalizeKeyName(keyName);
-        this.privateKeyPem = normalizePem(privateKeyPem);
-        this.privateKey = loadEcPrivateKey(this.privateKeyPem);
-        this.ttlSeconds = Math.max(30L, Math.min(DEFAULT_TTL_SECONDS, ttlSeconds));
+        this(normalizeKeyName(keyName), normalizePem(privateKeyPem), loadEcPrivateKey(privateKeyPem), Math.clamp(ttlSeconds, 30L, DEFAULT_TTL_SECONDS));
     }
 
     /**
      * Build a REST JWT for Coinbase Advanced Trade private endpoints.
-     *
+     * <p>
      * Example:
      * buildRestJwt("GET", "/api/v3/brokerage/accounts")
-     *
+     * <p>
      * The resulting uri claim becomes:
      * GET api.coinbase.com/api/v3/brokerage/accounts
      */
@@ -99,7 +85,7 @@ public final class CoinbaseJwtSigner {
 
     /**
      * Build a REST JWT with explicit host.
-     *
+     * <p>
      * Example:
      * buildRestJwt("POST", "api.coinbase.com", "/api/v3/brokerage/orders")
      */
@@ -135,7 +121,7 @@ public final class CoinbaseJwtSigner {
 
     /**
      * Build a WebSocket JWT.
-     *
+     * <p>
      * Coinbase WebSocket JWTs are not tied to a REST method/path, so this
      * token intentionally omits the uri claim.
      */
@@ -164,8 +150,8 @@ public final class CoinbaseJwtSigner {
         JWTClaimsSet.Builder claimsBuilder = new JWTClaimsSet.Builder()
                 .issuer(ISSUER)
                 .subject(keyName)
-                .notBeforeTime(java.util.Date.from(Instant.ofEpochSecond(now)))
-                .expirationTime(java.util.Date.from(Instant.ofEpochSecond(now + ttlSeconds)));
+                .notBeforeTime(Date.from(Instant.ofEpochSecond(now)))
+                .expirationTime(Date.from(Instant.ofEpochSecond(now + ttlSeconds)));
 
         if (uriClaim != null && !uriClaim.isBlank()) {
             claimsBuilder.claim("uri", uriClaim);
@@ -174,7 +160,7 @@ public final class CoinbaseJwtSigner {
         JWTClaimsSet claimsSet = claimsBuilder.build();
 
         JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.ES256)
-                .type(com.nimbusds.jose.JOSEObjectType.JWT)
+                .type(JOSEObjectType.JWT)
                 .keyID(keyName)
                 .customParam("nonce", UUID.randomUUID().toString().replace("-", ""))
                 .build();
@@ -188,22 +174,9 @@ public final class CoinbaseJwtSigner {
             throw new IllegalStateException("Unable to sign Coinbase JWT.", exception);
         }
     }
-    private static final Dotenv DOTENV = Dotenv.configure()
-            .directory(System.getProperty("user.dir"))
-            .filename(".env")
-            .ignoreIfMalformed()
-            .ignoreIfMissing()
-            .load();
 
-    private static String env(String key) {
-        String value = System.getenv(key);
 
-        if (value == null || value.isBlank()) {
-            value = DOTENV.get(key);
-        }
 
-        return value;
-    }
     private static String normalizeKeyName(String keyName) {
         String value = keyName == null ? "" : keyName.trim();
 
@@ -215,7 +188,7 @@ public final class CoinbaseJwtSigner {
         return value;
     }
 
-    private static String normalizePem(String pem) {
+    public static String normalizePem(String pem) {
         String value = pem == null ? "" : pem.trim();
 
         if (value.isBlank()) {
@@ -344,7 +317,7 @@ public final class CoinbaseJwtSigner {
         return value;
     }
 
-    private static String normalizeRequestPath(String requestPath) {
+    private static @NonNull String normalizeRequestPath(String requestPath) {
         String value = requestPath == null ? "" : requestPath.trim();
 
         if (value.isBlank()) {
@@ -367,7 +340,7 @@ public final class CoinbaseJwtSigner {
         return value;
     }
 
-    private static ECPrivateKey loadEcPrivateKey(String privateKeyPem) {
+    private static @NonNull ECPrivateKey loadEcPrivateKey(String privateKeyPem) {
         try (PEMParser parser = new PEMParser(new StringReader(privateKeyPem))) {
             Object parsed = parser.readObject();
 
@@ -378,17 +351,13 @@ public final class CoinbaseJwtSigner {
             JcaPEMKeyConverter converter = new JcaPEMKeyConverter()
                     .setProvider(BOUNCY_CASTLE_PROVIDER);
 
-            PrivateKey privateKey;
-            if (parsed instanceof PEMKeyPair pemKeyPair) {
-                privateKey = converter.getPrivateKey(pemKeyPair.getPrivateKeyInfo());
-            } else if (parsed instanceof PrivateKeyInfo privateKeyInfo) {
-                privateKey = converter.getPrivateKey(privateKeyInfo);
-            } else if (parsed instanceof PrivateKey) {
-                privateKey = (PrivateKey) parsed;
-            } else {
-                throw new IllegalArgumentException(
+            PrivateKey privateKey = switch (parsed) {
+                case PEMKeyPair pemKeyPair -> converter.getPrivateKey(pemKeyPair.getPrivateKeyInfo());
+                case PrivateKeyInfo privateKeyInfo -> converter.getPrivateKey(privateKeyInfo);
+                case PrivateKey key -> key;
+                default -> throw new IllegalArgumentException(
                         "Unsupported Coinbase private key format: " + parsed.getClass().getName());
-            }
+            };
 
             KeyFactory keyFactory = KeyFactory.getInstance("EC");
             PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKey.getEncoded());
@@ -408,23 +377,24 @@ public final class CoinbaseJwtSigner {
 
     /**
      * Small CLI test helper.
-     *
+     * <p>
      * Environment variables:
      * COINBASE_KEY_NAME="organizations/{org_id}/apiKeys/{key_id}"
      * COINBASE_PRIVATE_KEY="-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC
      * PRIVATE KEY-----"
-     *
+     * <p>
      * Example:
      * java org.investpro.exchange.CoinbaseJwtSigner GET /api/v3/brokerage/accounts
      */
     static void main(String @NotNull [] args) {
-        String keyName = env("COINBASE_KEY_NAME");
-        String privateKey = env("COINBASE_PRIVATE_KEY");
+        String keyName = System.getProperty("COINBASE_KEY_NAME");
+        String privateKey = System.getProperty("COINBASE_PRIVATE_KEY");
 
         String method = args.length > 0 ? args[0] : "GET";
         String path = args.length > 1 ? args[1] : "/api/v3/brokerage/accounts";
 
         CoinbaseJwtSigner signer = new CoinbaseJwtSigner(keyName, privateKey);
-        System.out.println(signer.buildRestJwt(method, path));
+        signer.buildRestJwt(method, path);
+        log.info("Coinbase REST JWT generated successfully; token omitted.");
     }
 }
