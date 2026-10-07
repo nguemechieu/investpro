@@ -22,13 +22,7 @@ public enum ExecutionVenue {
     DEX(true, true, "Decentralized Exchange"),
 
     /** Direct on-chain execution via smart contract or native transfer (Solona, Stellar). */
-    BLOCKCHAIN(true, true, "Blockchain Direct"),
-
-    /** Paper trading mode — no real funds, orders are simulated locally. */
-    PAPER(false, false, "Paper Trading"),
-
-    /** Backtesting or simulation mode — purely in-memory, no network calls. */
-    SIMULATED(false, false, "Simulation");
+    BLOCKCHAIN(true, true, "Blockchain Direct");
 
     /** True if real funds are involved.
      * -- GETTER --

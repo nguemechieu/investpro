@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.net.URI;
@@ -123,6 +124,8 @@ public class OnboardingDesk extends StackPane {
     private final TextField emailField = new TextField();
     private final CheckBox rememberMeCheckBox = new CheckBox("REMEMBER ME");
 
+    private final ComboBox<String> marketGroupBox = new ComboBox<>();
+    private final ComboBox<String> underlyingAssetBox = new ComboBox<>();
     private final ComboBox<String> marketTypeBox = new ComboBox<>();
     private final ComboBox<String> venueBox = new ComboBox<>();
     private final ComboBox<String> exchangeBox = new ComboBox<>();
@@ -529,26 +532,10 @@ public class OnboardingDesk extends StackPane {
     }
 
     private void showConfigurationStep() {
-        marketTypeBox.getItems().setAll(
-                "Crypto Spot",
-                "Spot",
-                "Perpetuals",
-                "Futures",
-                "Options",
-                "Forex",
-                "Stocks",
-                "Indices",
-                "Commodities",
-                "ETFs",
-                "Bonds");
-        venueBox.getItems().setAll(
-                "US",
-                "Global",
-                "Spot",
-                "Derivatives",
-                "US Derivatives",
-                "International",
-                "Paper Trading");
+        marketGroupBox.getItems().setAll("Spot", "Derivatives");
+        underlyingAssetBox.getItems().setAll("Crypto", "FX", "Stocks", "ETFs", "Indices", "Commodities", "Metals", "Bonds", "Funds");
+        marketTypeBox.getItems().setAll("Spot", "Perpetuals", "Futures", "Options", "CFDs", "Forwards", "Swaps");
+        venueBox.getItems().clear();
 
         exchangeBox.getItems().clear();
         Arrays.stream(SupportedExchange.values())
@@ -557,6 +544,8 @@ public class OnboardingDesk extends StackPane {
 
         applySavedConfigurationSelection();
 
+        styleComboBox(marketGroupBox);
+        styleComboBox(underlyingAssetBox);
         styleComboBox(marketTypeBox);
         styleComboBox(venueBox);
         styleComboBox(exchangeBox);
@@ -569,16 +558,26 @@ public class OnboardingDesk extends StackPane {
         subtitle.setWrapText(true);
 
         GridPane grid = formGrid();
-        grid.addRow(0, createLabel("Instrument"), marketTypeBox);
-        grid.addRow(1, createLabel("Route"), venueBox);
-        grid.addRow(2, createLabel("Exchange"), exchangeBox);
+        grid.addRow(0, createLabel("Market"), marketGroupBox);
+        grid.addRow(1, createLabel("Contract"), marketTypeBox);
+        grid.addRow(2, createLabel("Underlying asset"), underlyingAssetBox);
+        grid.addRow(3, createLabel("Product venue"), venueBox);
+        grid.addRow(4, createLabel("Exchange"), exchangeBox);
+        marketGroupBox.setOnAction(_ -> {
+            boolean spot = "Spot".equals(marketGroupBox.getValue());
+            marketTypeBox.getItems().setAll(spot ? List.of("Spot") : List.of("Perpetuals", "Futures", "Options", "CFDs", "Forwards", "Swaps"));
+            marketTypeBox.getSelectionModel().selectFirst();
+        });
 
         Label validation = inlineValidationLabel();
+        exchangeBox.setOnAction(_ -> refreshProductVenues(null));
+        marketTypeBox.setOnAction(_ -> refreshProductVenues(null));
+        underlyingAssetBox.setOnAction(_ -> refreshProductVenues(null));
         Button loadMarketButton = createPrimaryButton("Load Market");
         loadMarketButton.setPrefWidth(180);
         loadMarketButton.setOnAction(event -> {
             if (marketTypeBox.getValue() == null || venueBox.getValue() == null || exchangeBox.getValue() == null) {
-                validation.setText("Select an instrument, route, and exchange.");
+                validation.setText("Select a contract, product venue, and exchange.");
                 return;
             }
             showExchangeCredentialsStep();
@@ -660,11 +659,6 @@ public class OnboardingDesk extends StackPane {
         ibkrHostField.setVisible(false);
         ibkrHostField.setManaged(false);
 
-        TextField ibkrPaperPortField = new TextField();
-        styleInputField(ibkrPaperPortField, "Paper Port (default: 4002)");
-        ibkrPaperPortField.setVisible(false);
-        ibkrPaperPortField.setManaged(false);
-
         TextField ibkrLivePortField = new TextField();
         styleInputField(ibkrLivePortField, "Live Port (default: 4001)");
         ibkrLivePortField.setVisible(false);
@@ -726,7 +720,6 @@ public class OnboardingDesk extends StackPane {
                 ibkrTwoFactorCodeField,
                 ibkrClientPortalUrlField,
                 ibkrHostField,
-                ibkrPaperPortField,
                 ibkrLivePortField,
                 ibkrClientIdField,
                 rememberCredentialsCheckBox,
@@ -772,8 +765,6 @@ public class OnboardingDesk extends StackPane {
         TextField hostField = new TextField();
         styleInputField(hostField, "Host");
 
-        TextField paperPortField = new TextField();
-        styleInputField(paperPortField, "Paper port");
 
         TextField livePortField = new TextField();
         styleInputField(livePortField, "Live port");
@@ -787,22 +778,22 @@ public class OnboardingDesk extends StackPane {
         styleChoiceBox(authModeChoiceBox);
 
         ChoiceBox<String> gatewaySessionChoiceBox = new ChoiceBox<>();
-        gatewaySessionChoiceBox.getItems().setAll("Paper account", "Live account");
-        gatewaySessionChoiceBox.setValue(Preferences.userNodeForPackage(OnboardingDesk.class)
-                .get("ibkr_gateway_session", "Paper account"));
+        gatewaySessionChoiceBox.getItems().setAll("Local paper simulation", "Live account");
+        gatewaySessionChoiceBox.setValue("Live account".equals(Preferences.userNodeForPackage(OnboardingDesk.class)
+                .get("ibkr_gateway_session", "")) ? "Live account" : "Local paper simulation");
         styleChoiceBox(gatewaySessionChoiceBox);
 
         loadRememberedIbkrAccount(selectedExchangeName, accountIdField);
-        loadSavedIbkrSettings(clientPortalUrlField, hostField, paperPortField, livePortField, clientIdField);
+        loadSavedIbkrSettings(clientPortalUrlField, hostField, livePortField, clientIdField);
 
         GridPane controlGrid = formGrid();
         int row = 0;
         controlGrid.addRow(row++, createLabel("Auth mode"), authModeChoiceBox);
-        controlGrid.addRow(row++, createLabel("Gateway session"), gatewaySessionChoiceBox);
+        controlGrid.addRow(row++, createLabel("Execution"), gatewaySessionChoiceBox);
         controlGrid.addRow(row++, createLabel("Account ID"), accountIdField);
         controlGrid.addRow(row++, createLabel("Client Portal URL"), clientPortalUrlField);
         controlGrid.addRow(row++, createLabel("Host"), hostField);
-        controlGrid.addRow(row++, createLabel("Paper port"), paperPortField);
+
         controlGrid.addRow(row++, createLabel("Live port"), livePortField);
         controlGrid.addRow(row++, createLabel("Client ID"), clientIdField);
 
@@ -831,7 +822,6 @@ public class OnboardingDesk extends StackPane {
                 accountIdField,
                 clientPortalUrlField,
                 hostField,
-                paperPortField,
                 livePortField,
                 clientIdField,
                 validation));
@@ -901,7 +891,6 @@ public class OnboardingDesk extends StackPane {
             TextField ibkrTwoFactorCodeField,
             TextField ibkrClientPortalUrlField,
             TextField ibkrHostField,
-            TextField ibkrPaperPortField,
             TextField ibkrLivePortField,
             TextField ibkrClientIdField,
             CheckBox rememberCheckBox,
@@ -944,7 +933,7 @@ public class OnboardingDesk extends StackPane {
             }
 
             applyIbkrRuntimeProperties(ibkrClientPortalUrlField.getText(), ibkrHostField.getText(),
-                    ibkrPaperPortField.getText(), ibkrLivePortField.getText(), ibkrClientIdField.getText());
+                    ibkrLivePortField.getText(), ibkrClientIdField.getText());
         } else if (selectedExchange == SupportedExchange.STELLAR_NETWORK) {
             if (apiKey.isBlank() || apiSecret.isBlank()) {
                 validation.setText("Stellar public account and secret seed are required.");
@@ -974,7 +963,7 @@ public class OnboardingDesk extends StackPane {
                 openAiField.getText().trim(),
                 null,
                 null,
-                tradingMode);
+                tradingMode, marketSelectionParams(Map.of()));
 
         validation.setStyle("-fx-text-fill: " + WARNING + "; -fx-font-size: 11;");
         validation.setText("Authenticating with %s...".formatted(selectedExchange.getDisplayName()));
@@ -995,7 +984,7 @@ public class OnboardingDesk extends StackPane {
                     telegramToken.getText().trim());
             if (selectedExchange == SupportedExchange.INTERACTIVE_BROKERS) {
                 saveIbkrSettings(ibkrClientPortalUrlField.getText(), ibkrHostField.getText(),
-                        ibkrPaperPortField.getText(), ibkrLivePortField.getText(), ibkrClientIdField.getText());
+                        ibkrLivePortField.getText(), ibkrClientIdField.getText());
             }
         }
 
@@ -1011,7 +1000,6 @@ public class OnboardingDesk extends StackPane {
             TextField accountIdField,
             TextField clientPortalUrlField,
             TextField hostField,
-            TextField paperPortField,
             TextField livePortField,
             TextField clientIdField,
             Label validation) {
@@ -1020,9 +1008,7 @@ public class OnboardingDesk extends StackPane {
         String normalizedTradingMode = safe(tradingMode).toUpperCase(Locale.ROOT);
         String accountId = accountIdField.getText().trim();
         String authMode = ibkrAuthModeValue(authModeChoiceBox.getValue());
-        String selectedPort = normalizedTradingMode.startsWith("LIVE")
-                ? parseIntOrDefault(livePortField.getText(), 4001)
-                : parseIntOrDefault(paperPortField.getText(), 4002);
+        String selectedPort = parseIntOrDefault(livePortField.getText(), 4001);
         String sanitizedClientPortalUrl = sanitizeIbkrClientPortalUrl(clientPortalUrlField.getText());
         Map<String, String> ibkrParams = new LinkedHashMap<>();
         putCredential(ibkrParams, "IBKR_AUTH_MODE", authMode);
@@ -1032,7 +1018,6 @@ public class OnboardingDesk extends StackPane {
         putCredential(ibkrParams, "IBKR_CLIENT_PORTAL_URL", sanitizedClientPortalUrl);
         putCredential(ibkrParams, "IBKR_HOST", hostField.getText());
         putCredential(ibkrParams, "IBKR_PORT", selectedPort);
-        putCredential(ibkrParams, "IBKR_PAPER_PORT", parseIntOrDefault(paperPortField.getText(), 4002));
         putCredential(ibkrParams, "IBKR_LIVE_PORT", parseIntOrDefault(livePortField.getText(), 4001));
         putCredential(ibkrParams, "IBKR_CLIENT_ID", parseIntOrDefault(clientIdField.getText(), 1));
         putCredential(ibkrParams, "IBK_AUTH_MODE", authMode);
@@ -1041,7 +1026,7 @@ public class OnboardingDesk extends StackPane {
         putCredential(ibkrParams, "IBK_PORT", selectedPort);
         putCredential(ibkrParams, "IBK_CLIENT_ID", parseIntOrDefault(clientIdField.getText(), 1));
 
-        applyIbkrRuntimeProperties(sanitizedClientPortalUrl, hostField.getText(), paperPortField.getText(),
+        applyIbkrRuntimeProperties(sanitizedClientPortalUrl, hostField.getText(),
                 livePortField.getText(), clientIdField.getText(), authMode);
 
         configuration = new MarketConfiguration(
@@ -1056,12 +1041,12 @@ public class OnboardingDesk extends StackPane {
                 "",
                 null,
                 null,
-                tradingMode, ibkrParams);
+                tradingMode, marketSelectionParams(ibkrParams));
 
         validation.setStyle("-fx-text-fill: " + WARNING + "; -fx-font-size: 11;");
         validation.setText("Connecting to IBKR session...");
 
-        AuthResult gatewayCheck = validateIbkrGatewayEndpoint(authMode, hostField.getText(), selectedPort,
+        AuthResult gatewayCheck = "PAPER".equals(tradingMode) ? AuthResult.success("Local simulation ready") : validateIbkrGatewayEndpoint(authMode, hostField.getText(), selectedPort,
                 sanitizedClientPortalUrl);
         if (!gatewayCheck.success()) {
             validation.setStyle("-fx-text-fill: " + DANGER + "; -fx-font-size: 11;");
@@ -1084,7 +1069,7 @@ public class OnboardingDesk extends StackPane {
         Preferences gatewayPreferences = Preferences.userNodeForPackage(OnboardingDesk.class);
         gatewayPreferences.put("ibkr_gateway_session", gatewaySessionChoiceBox.getValue());
         flushPreferences(gatewayPreferences);
-        saveIbkrSettings(sanitizedClientPortalUrl, hostField.getText(), paperPortField.getText(),
+        saveIbkrSettings(sanitizedClientPortalUrl, hostField.getText(),
                 livePortField.getText(), clientIdField.getText(), authModeChoiceBox.getValue());
         saveConfiguration(configuration);
         showLoadingOverlay();
@@ -1108,8 +1093,8 @@ public class OnboardingDesk extends StackPane {
         if (selectedExchange == SupportedExchange.COINBASE) {
             return """
                     Coinbase Advanced Trade
-                    API Key: organizations/{org_id}/apiKeys/{key_id}
-                    API Secret: EC private key in PEM format
+                    API Key: key name or key ID from the Coinbase export
+                    API Secret: ECDSA PEM or Ed25519 private key from the same export
                     Tip: grant account/order permissions only when live trading is needed.""";
         }
         if (selectedExchange == SupportedExchange.OANDA) {
@@ -1117,7 +1102,7 @@ public class OnboardingDesk extends StackPane {
                     OANDA
                     Token: Bearer token from account settings
                     Account ID: optional if your adapter can auto-detect it
-                    Tip: start with practice/paper mode before live trading.""";
+                    Paper trading runs locally; broker credentials are for live accounts.""";
         }
         if (selectedExchange == SupportedExchange.BINANCE || selectedExchange == SupportedExchange.BINANCE_US) {
             return """
@@ -1129,27 +1114,27 @@ public class OnboardingDesk extends StackPane {
         if (selectedExchange == SupportedExchange.BITFINEX) {
             return """
                     Bitfinex
-                    API Key: public key from Settings â†’ API
-                    API Secret: secret key from Settings â†’ API""";
+                    API Key: public key from Settings Ã¢â€ â€™ API
+                    API Secret: secret key from Settings Ã¢â€ â€™ API""";
         }
         if (selectedExchange == SupportedExchange.ALPACA) {
             return """
                     Alpaca
-                    API Key: from Dashboard â†’ API Keys
-                    API Secret: from Dashboard â†’ API Keys
-                    Tip: use Alpaca paper account first.""";
+                    API Key: from Dashboard Ã¢â€ â€™ API Keys
+                    API Secret: from Dashboard Ã¢â€ â€™ API Keys
+                    Use local paper simulation to test strategies before live trading.""";
         }
         if (selectedExchange == SupportedExchange.INTERACTIVE_BROKERS) {
             return """
                     Interactive Brokers
                     TWS / IB Gateway: log in and complete 2FA in IBKR software, then enable API socket clients
                     InvestPro connects using host, socket port and a unique client ID; no API key or password is needed
-                    Gateway session: select the paper/live account already logged in to IBKR software
+                    Execution: local paper simulation or the live account logged in to IBKR software
                     Client Portal mode: sign in through the local Gateway browser page and complete 2FA there
                     Account ID: required for live order routing
                     Client Portal URL: defaults to https://localhost:5000/v1/api
                     Gateway Host/Ports/Client ID: configure TWS or IB Gateway socket session
-                    Paper mode note: use your dedicated paper username for paper login
+                    Paper mode runs locally and requires no IBKR paper login
                     Tip: if a competing session exists (TWS/Mobile), close it before API trading.""";
         }
         if (selectedExchange == SupportedExchange.STELLAR_NETWORK) {
@@ -1377,6 +1362,7 @@ public class OnboardingDesk extends StackPane {
         preferences.put("marketType", safe(configuration.marketType()));
         preferences.put("instrumentType", configuration.normalizedInstrumentType().name());
         preferences.put("leverageMode", configuration.normalizedLeverageMode().name());
+        preferences.put("underlyingAsset", safe(underlyingAssetBox.getValue()));
         preferences.put("normalizedMarketType", configuration.normalizedMarketType().name());
         preferences.put("venue", safe(configuration.venue()));
         preferences.put("routingExchange", safe(configuration.venue()));
@@ -1415,6 +1401,17 @@ public class OnboardingDesk extends StackPane {
         authService.rememberedUsername().ifPresent(usernameField::setText);
     }
 
+    private Map<String, String> marketSelectionParams(Map<String, String> connectionParams) {
+        Map<String, String> params = new java.util.LinkedHashMap<>(connectionParams);
+        String selection = underlyingAssetBox.getValue();
+        params.put("asset_class", switch (selection == null ? "Crypto" : selection) {
+            case "FX" -> "FIAT"; case "Stocks" -> "EQUITY"; case "ETFs" -> "ETF";
+            case "Indices" -> "INDEX"; case "Commodities" -> "COMMODITY"; case "Metals" -> "METAL";
+            case "Bonds" -> "BOND"; case "Funds" -> "FUND"; default -> "CRYPTO";
+        });
+        return params;
+    }
+
     private void applySavedConfigurationSelection() {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
 
@@ -1422,18 +1419,37 @@ public class OnboardingDesk extends StackPane {
         String savedVenue = preferences.get("venue", "US");
         String savedExchange = preferences.get("exchange", SupportedExchange.COINBASE.getFactoryKey());
 
-        marketTypeBox.getSelectionModel().select(
-                marketTypeBox.getItems().contains(savedMarketType) ? savedMarketType : "Crypto Spot");
-        venueBox.getSelectionModel().select(
-                venueBox.getItems().contains(savedVenue) ? savedVenue : "US");
+        String selectedContract = marketTypeBox.getItems().contains(savedMarketType) ? savedMarketType
+                : switch (savedMarketType) { case "Indices", "Commodities" -> "Futures"; case "Forex" -> "CFDs"; default -> "Spot"; };
+        boolean derivative = !selectedContract.equals("Spot");
+        marketGroupBox.setValue(derivative ? "Derivatives" : "Spot");
+        marketTypeBox.getItems().setAll(derivative ? List.of("Perpetuals", "Futures", "Options", "CFDs", "Forwards", "Swaps") : List.of("Spot"));
+        marketTypeBox.setValue(selectedContract);
+        underlyingAssetBox.setValue(preferences.get("underlyingAsset", switch (savedMarketType) {
+            case "Forex" -> "FX"; case "Stocks", "Indices", "Commodities", "ETFs", "Bonds" -> savedMarketType;
+            default -> "Crypto";
+        }));
+
 
         String savedExchangeDisplayName = resolveExchangeDisplayName(savedExchange);
         exchangeBox.getSelectionModel().select(
                 exchangeBox.getItems().contains(savedExchangeDisplayName)
                         ? savedExchangeDisplayName
                         : SupportedExchange.COINBASE.getDisplayName());
+        refreshProductVenues(savedVenue);
     }
 
+    private void refreshProductVenues(String savedVenue) {
+        if (exchangeBox.getValue() == null) return;
+        SupportedExchange selected = SupportedExchange.fromDisplayName(exchangeBox.getValue());
+        MarketConfiguration selection = new MarketConfiguration("", marketTypeBox.getValue(), savedVenue,
+                selected.getFactoryKey(), "", "", "", "", "", null, null, "PAPER", marketSelectionParams(Map.of()));
+        var options = MarketConfiguration.availableVenues(selected.getFactoryKey());
+        venueBox.getItems().setAll(options.stream().map(org.investpro.models.market.ProductVenue::displayName).toList());
+        String resolved = selection.normalizedVenue().displayName();
+        if (venueBox.getItems().contains(resolved)) venueBox.setValue(resolved);
+        else venueBox.getSelectionModel().selectFirst();
+    }
     private String resolveExchangeDisplayName(String savedExchange) {
         if (savedExchange == null || savedExchange.isBlank()) {
             return SupportedExchange.COINBASE.getDisplayName();
@@ -1823,55 +1839,50 @@ public class OnboardingDesk extends StackPane {
 
     private void applyIbkrRuntimeProperties(String clientPortalUrl,
             String host,
-            String paperPort,
             String livePort,
             String clientId) {
-        applyIbkrRuntimeProperties(clientPortalUrl, host, paperPort, livePort, clientId, null);
+        applyIbkrRuntimeProperties(clientPortalUrl, host, livePort, clientId, null);
     }
 
     private void applyIbkrRuntimeProperties(String clientPortalUrl,
             String host,
-            String paperPort,
             String livePort,
             String clientId,
             String authMode) {
         String sanitizedClientPortalUrl = sanitizeIbkrClientPortalUrl(clientPortalUrl);
         putSystemPropertyIfNotBlank("investpro.ibkr.clientPortalUrl", sanitizedClientPortalUrl);
         putSystemPropertyIfNotBlank("investpro.ibkr.host", host);
-        putSystemPropertyIfNotBlank("investpro.ibkr.paperPort", parseIntOrDefault(paperPort, 4002));
         putSystemPropertyIfNotBlank("investpro.ibkr.livePort", parseIntOrDefault(livePort, 4001));
         putSystemPropertyIfNotBlank("investpro.ibkr.clientId", parseIntOrDefault(clientId, 1));
         putSystemPropertyIfNotBlank("investpro.ibkr.authMode", authMode);
     }
 
-    private void saveIbkrSettings(String clientPortalUrl, String host, String paperPort, String livePort,
+    private void saveIbkrSettings(String clientPortalUrl, String host, String livePort,
             String clientId) {
-        saveIbkrSettings(clientPortalUrl, host, paperPort, livePort, clientId, "TWS / IB Gateway");
+        saveIbkrSettings(clientPortalUrl, host, livePort, clientId, "TWS / IB Gateway");
     }
 
-    private void saveIbkrSettings(String clientPortalUrl, String host, String paperPort, String livePort,
+    private void saveIbkrSettings(String clientPortalUrl, String host, String livePort,
             String clientId, String authModeDisplay) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
         preferences.put("ibkr_client_portal_url", safe(sanitizeIbkrClientPortalUrl(clientPortalUrl)));
         preferences.put("ibkr_host", safe(host));
-        preferences.put("ibkr_paper_port", parseIntOrDefault(paperPort, 4002));
         preferences.put("ibkr_live_port", parseIntOrDefault(livePort, 4001));
         preferences.put("ibkr_client_id", parseIntOrDefault(clientId, 1));
         preferences.put("ibkr_auth_mode", safe(authModeDisplay));
         flushPreferences(preferences);
     }
 
-    private void loadSavedIbkrSettings(TextField clientPortalUrlField, TextField hostField, TextField paperPortField,
+    private void loadSavedIbkrSettings(TextField clientPortalUrlField, TextField hostField,
             TextField livePortField, TextField clientIdField) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
 
         clientPortalUrlField.setText(preferences.get("ibkr_client_portal_url", ""));
         hostField.setText(preferences.get("ibkr_host", "127.0.0.1"));
-        paperPortField.setText(preferences.get("ibkr_paper_port", "4002"));
         livePortField.setText(preferences.get("ibkr_live_port", "4001"));
         clientIdField.setText(preferences.get("ibkr_client_id", "1"));
 
-        applyIbkrRuntimeProperties(clientPortalUrlField.getText(), hostField.getText(), paperPortField.getText(),
+        applyIbkrRuntimeProperties(clientPortalUrlField.getText(), hostField.getText(),
                 livePortField.getText(), clientIdField.getText(), ibkrAuthModeValue(loadSavedIbkrAuthModeDisplay()));
     }
 
@@ -1915,8 +1926,8 @@ public class OnboardingDesk extends StackPane {
         }
         return AuthResult.failure("""
                 IB Gateway/TWS is not reachable at %s:%d.
-                Start TWS or IB Gateway, log in to the correct paper/live account, enable API socket clients, and confirm the port.
-                Default IB Gateway ports are 4002 for paper and 4001 for live. TWS often uses 7497 for paper and 7496 for live.""".formatted(
+                Start TWS or IB Gateway, log in to the live account, enable API socket clients, and confirm the port.
+                Live IB Gateway defaults to 4001; live TWS defaults to 7496. Paper simulation needs no gateway.""".formatted(
                 gatewayHost,
                 gatewayPort));
     }

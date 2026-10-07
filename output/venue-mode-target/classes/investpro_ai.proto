@@ -1,0 +1,191 @@
+syntax = "proto3";
+
+package investpro.ai;
+
+option java_multiple_files = true;
+option java_package = "org.investpro.ai.local.grpc.generated";
+option java_outer_classname = "InvestProAiProto";
+
+service InvestProAiService {
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc AnalyzeSignal(SignalReviewRequest) returns (SignalReviewResponse);
+  rpc DetectRegime(RegimeDetectionRequest) returns (RegimeDetectionResponse);
+  rpc ReviewStrategy(StrategyReviewRequest) returns (StrategyReviewResponse);
+  rpc RankStrategies(StrategyRankingRequest) returns (StrategyRankingResponse);
+  rpc ReviewBacktest(BacktestReviewRequest) returns (BacktestReviewResponse);
+  rpc ScoreRisk(RiskScoreRequest) returns (RiskScoreResponse);
+  rpc DetectAnomaly(AnomalyDetectionRequest) returns (AnomalyDetectionResponse);
+
+  // Extension points for future low-latency streaming workflows.
+  rpc StreamSignals(stream SignalReviewRequest) returns (stream SignalReviewResponse);
+  rpc StreamMarketState(stream RegimeDetectionRequest) returns (stream RegimeDetectionResponse);
+}
+
+message HealthRequest {
+  string source = 1;
+}
+
+message HealthResponse {
+  bool ok = 1;
+  string status = 2;
+  string version = 3;
+  int64 timestamp_ms = 4;
+  string service_name = 5;
+  int64 uptime_ms = 6;
+  int32 active_models = 7;
+  double avg_latency_ms = 8;
+  string circuit_hint = 9;
+}
+
+message Candle {
+  int64 open_time = 1;
+  double open = 2;
+  double high = 3;
+  double low = 4;
+  double close = 5;
+  double volume = 6;
+}
+
+message SignalReviewRequest {
+  string symbol = 1;
+  string timeframe = 2;
+  string side = 3;
+  double confidence = 4;
+  double price = 5;
+  double spread = 6;
+  double volatility = 7;
+  double volume = 8;
+  string strategy_name = 9;
+  string market_regime = 10;
+}
+
+message SignalReviewResponse {
+  bool approved = 1;
+  double ai_confidence = 2;
+  string recommendation = 3;
+  double size_adjustment = 4;
+  repeated string reasons = 5;
+  repeated string warnings = 6;
+}
+
+message RegimeDetectionRequest {
+  string symbol = 1;
+  string timeframe = 2;
+  repeated Candle candles = 3;
+}
+
+message RegimeDetectionResponse {
+  string regime = 1;
+  double confidence = 2;
+  string volatility_state = 3;
+  double trend_strength = 4;
+  repeated string reasons = 5;
+}
+
+message StrategyReviewRequest {
+  string strategy_id = 1;
+  string strategy_name = 2;
+  string symbol = 3;
+  string timeframe = 4;
+  string market_regime = 5;
+  double historical_win_rate = 6;
+  double historical_profit_factor = 7;
+  double historical_max_drawdown = 8;
+  int32 sample_size = 9;
+}
+
+message StrategyReviewResponse {
+  bool accepted = 1;
+  double ai_score = 2;
+  string recommendation = 3;
+  repeated string reasons = 4;
+  repeated string warnings = 5;
+}
+
+message StrategyCandidate {
+  string strategy_id = 1;
+  string strategy_name = 2;
+  double score = 3;
+  double win_rate = 4;
+  double profit_factor = 5;
+  double max_drawdown = 6;
+  string preferred_regime = 7;
+}
+
+message StrategyRankingRequest {
+  string symbol = 1;
+  string timeframe = 2;
+  string market_regime = 3;
+  repeated StrategyCandidate candidates = 4;
+}
+
+message RankedStrategy {
+  string strategy_id = 1;
+  string strategy_name = 2;
+  double ai_score = 3;
+  double rank_score = 4;
+  repeated string reasons = 5;
+}
+
+message StrategyRankingResponse {
+  repeated RankedStrategy ranked = 1;
+  string recommendation = 2;
+  repeated string warnings = 3;
+}
+
+message BacktestReviewRequest {
+  string strategy_id = 1;
+  string strategy_name = 2;
+  string symbol = 3;
+  string timeframe = 4;
+  int32 total_trades = 5;
+  double win_rate = 6;
+  double profit_factor = 7;
+  double max_drawdown = 8;
+  double sharpe_ratio = 9;
+  double expectancy = 10;
+  int32 sample_size = 11;
+}
+
+message BacktestReviewResponse {
+  bool accepted = 1;
+  double ai_score = 2;
+  double overfit_risk = 3;
+  repeated string warnings = 4;
+  repeated string rejection_reasons = 5;
+}
+
+message RiskScoreRequest {
+  string symbol = 1;
+  string side = 2;
+  double account_equity = 3;
+  double current_exposure = 4;
+  double volatility = 5;
+  double spread = 6;
+  double drawdown = 7;
+  double confidence = 8;
+}
+
+message RiskScoreResponse {
+  double risk_score = 1;
+  string recommendation = 2;
+  double max_position_size = 3;
+  repeated string reasons = 4;
+}
+
+message AnomalyDetectionRequest {
+  string symbol = 1;
+  string timeframe = 2;
+  repeated Candle candles = 3;
+  double spread = 4;
+  double volatility = 5;
+  double volume = 6;
+}
+
+message AnomalyDetectionResponse {
+  bool anomalous = 1;
+  double anomaly_score = 2;
+  string severity = 3;
+  repeated string reasons = 4;
+  repeated string warnings = 5;
+}

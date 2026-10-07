@@ -31,8 +31,17 @@ public final class CoinbaseProductSymbolParser {
     }
 
     public boolean isPerpetual(String productId) {
-        String normalized = normalize(productId);
-        return normalized.endsWith("-PERP") || normalized.contains("-PERP-");
+        return TradePair.isPerpetualProductSymbol(productId);
+    }
+
+    public boolean isPerpetual(String productId, JsonNode metadata) {
+        JsonNode details = metadata == null ? null : metadata.path("future_product_details");
+        return isPerpetual(productId)
+                || "PERPETUAL".equalsIgnoreCase(firstText(metadata, "product_type"))
+                || "PERPETUAL".equalsIgnoreCase(firstNonBlank(firstText(metadata, "contract_expiry_type"),
+                        firstText(details, "contract_expiry_type")))
+                || (normalize(productId).endsWith("-CDE") && !firstNonBlank(firstText(details, "funding_rate"),
+                        firstText(details == null ? null : details.path("perpetual_details"), "funding_rate")).isBlank());
     }
 
     public boolean isNativeDerivativeSymbol(String productId) {
@@ -46,12 +55,15 @@ public final class CoinbaseProductSymbolParser {
             throw new IllegalArgumentException("Coinbase product id must not be blank");
         }
 
-        if (isNativeDerivativeSymbol(nativeSymbol)) {
+        JsonNode details = metadata == null ? null : metadata.path("future_product_details");
+        String productType = firstText(metadata, "product_type").toUpperCase(Locale.ROOT);
+        boolean perpetual = isPerpetual(nativeSymbol, metadata);
+        if (isNativeDerivativeSymbol(nativeSymbol) || "FUTURE".equals(productType) || "OPTION".equals(productType) || perpetual) {
             TradePair pair = TradePair.fromNativeProductSymbol(nativeSymbol);
             pair.setDisplaySymbol(nativeSymbol);
             pair.setNativeSymbol(nativeSymbol);
             pair.setExchangeId("coinbase");
-            pair.setProductVenue(COINBASE_DERIVATIVES_VENUE);
+            pair.setProductVenue(routingVenue(nativeSymbol, metadata));
             pair.setUnderlyingCode(firstNonBlank(
                     realCurrency(firstText(metadata, "base_currency_id", "base_currency", "base_currency_code")),
                     realCurrency(firstText(metadata == null ? null : metadata.path("future_product_details"),
@@ -64,7 +76,11 @@ public final class CoinbaseProductSymbolParser {
                 pair.setContractExpiryDate(parseCdeExpiry(nativeSymbol).orElse(null));
             }
 
-            if (isPerpetual(nativeSymbol)) {
+            if ("OPTION".equals(productType)) {
+                pair.setSymbolKind(TradeSymbolKind.DERIVATIVE_CONTRACT);
+                pair.setContractType(ContractType.OPTION);
+                pair.setMarketType(MarketType.DERIVATIVES);
+            } else if (perpetual) {
                 pair.setSymbolKind(TradeSymbolKind.PERPETUAL_CONTRACT);
                 pair.setContractType(ContractType.PERPETUAL);
                 pair.setMarketType(MarketType.PERPETUAL);
@@ -90,6 +106,15 @@ public final class CoinbaseProductSymbolParser {
         pair.setMarketType(MarketType.SPOT);
         pair.setExchangeId("coinbase");
         return pair;
+    }
+
+    /** Preserve explicit exchange metadata. A perpetual contract is not necessarily a US CDE product. */
+    public static String routingVenue(String symbol, JsonNode metadata) {
+        String venue = firstText(metadata, "product_venue");
+        if (!venue.isBlank() && !venue.startsWith("UNKNOWN")) return venue;
+        if (normalize(symbol).endsWith("-INTX")) return "INTX";
+        if (normalize(symbol).endsWith("-CDE")) return COINBASE_DERIVATIVES_VENUE;
+        return firstText(metadata == null ? null : metadata.path("future_product_details"), "venue");
     }
 
     public Optional<LocalDate> parseCdeExpiry(String productId) {

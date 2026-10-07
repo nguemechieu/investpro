@@ -13,6 +13,88 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class TelegramRemoteDeskTest {
+    @Test void notificationChatIsDiscoveredFromAuthorizedGetUpdatesInsteadOfGuessed() throws Exception {
+        var client = mock(java.net.http.HttpClient.class);
+        java.net.http.HttpResponse<String> response = mock(java.net.http.HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn("""
+                {"ok":true,"result":[{"update_id":1,"message":{"from":{"id":123},"chat":{"id":123,"type":"private"}}}]}
+                """);
+        when(client.send(any(java.net.http.HttpRequest.class), any(java.net.http.HttpResponse.BodyHandler.class))).thenReturn(response);
+        var bot = new TelegramNotifier("test-token", client);
+        Properties settings = new Properties(); settings.setProperty("TELEGRAM_ALLOWED_USER_IDS", "123");
+        bot.configureRemoteAccess(settings);
+        assertNull(bot.getChatId());
+        assertEquals(java.util.Optional.of("123"), bot.detectAndUseLatestChatId());
+        assertEquals("123", bot.getChatId());
+        var request = org.mockito.ArgumentCaptor.forClass(java.net.http.HttpRequest.class);
+        verify(client).send(request.capture(), any(java.net.http.HttpResponse.BodyHandler.class));
+        assertEquals("api.telegram.org", request.getValue().uri().getHost());
+        assertTrue(request.getValue().uri().getPath().endsWith("/getUpdates"));
+        bot.close();
+    }
+    @Test void botStartNeedsConfirmationAndStopUsesDesktopWorkflow() throws Exception {
+        var core = mock(SystemCore.class); var exchange = mock(Exchange.class);
+        when(core.getExchange()).thenReturn(exchange); when(exchange.isPaperTrading()).thenReturn(true);
+        when(exchange.getResolvedTradingMode()).thenReturn("PAPER");
+        var commands = new TelegramTradingCommands(core);
+        java.util.List<String> actions = new java.util.ArrayList<>();
+        commands.setBotControl(action -> { actions.add(action); return "requested " + action; });
+        String preview = commands.handle("u", "botstart", new String[]{"botstart"});
+        assertTrue(actions.isEmpty());
+        String code = preview.split("/confirm ")[1].split("\\s")[0];
+        assertEquals("requested start", commands.handle("u", "confirm", new String[]{"confirm", code}));
+        assertEquals("requested stop", commands.handle("u", "botstop", new String[]{"botstop"}));
+        assertEquals(java.util.List.of("start", "stop"), actions);
+    }
+    @Test void invalidBracketPricesDoNotCreatePreview() throws Exception {
+        var core = mock(SystemCore.class); var exchange = mock(Exchange.class);
+        when(core.getExchange()).thenReturn(exchange); when(exchange.isPaperTrading()).thenReturn(true);
+        var commands = new TelegramTradingCommands(core);
+        assertTrue(commands.handle("u", "bracket", new String[]{"bracket", "buy", "BTC/USD", "1", "100", "110", "90"})
+                .contains("stop on the loss side"));
+        verify(exchange, never()).orderExecution();
+    }
+    @Test void nativePerpetualStopOrdersRequireConfirmation() throws Exception {
+        SystemCore core = mock(SystemCore.class); Exchange exchange = mock(Exchange.class);
+        OrderExecutionProvider execution = mock(OrderExecutionProvider.class);
+        when(core.getExchange()).thenReturn(exchange); when(exchange.isPaperTrading()).thenReturn(true);
+        when(exchange.getResolvedTradingMode()).thenReturn("PAPER"); when(exchange.orderExecution()).thenReturn(execution);
+        when(execution.createStopOrder(any(), eq(Side.SELL), eq(1.0), eq(100.0))).thenReturn(CompletableFuture.completedFuture("stop-1"));
+        var commands = new TelegramTradingCommands(core);
+        String preview = commands.handle("desktop", "stop", new String[]{"stop", "sell", "BIP-20DEC30-CDE", "1", "100"});
+        assertTrue(preview.contains("BIP-20DEC30-CDE")); verifyNoInteractions(execution);
+        String code = preview.split("/confirm ")[1].split("\\s")[0];
+        assertTrue(commands.handle("desktop", "confirm", new String[]{"confirm", code}).contains("stop-1"));
+        var pair = org.mockito.ArgumentCaptor.forClass(TradePair.class);
+        verify(execution).createStopOrder(pair.capture(), eq(Side.SELL), eq(1.0), eq(100.0));
+        assertTrue(pair.getValue().isPerpetual());
+    }
+    @Test void slowQuestionDoesNotBlockPollingOrAnotherUserAndAskWorksWithoutCore() throws Exception {
+        var bot = spy(new TelegramNotifier(""));
+        Properties config = new Properties(); config.setProperty("telegram.allowed_user_ids", "123,456");
+        bot.configureRemoteAccess(config);
+        doNothing().when(bot).sendChatAction(anyString(), any());
+        doNothing().when(bot).sendMessageToChat(anyString(), anyString());
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        doAnswer(_ -> { entered.countDown(); release.await(5, java.util.concurrent.TimeUnit.SECONDS); return "First answer"; })
+                .when(bot).askAI("123:123", "Slow question");
+        doReturn("Bonds explained").when(bot).askAI("456:456", "Explain bonds");
+        var updates = new ObjectMapper().readTree("""
+                {"ok":true,"result":[
+                {"update_id":1,"message":{"text":"Slow question","from":{"id":123},"chat":{"id":123,"type":"private"}}},
+                {"update_id":2,"message":{"text":"/ask Explain bonds","from":{"id":456},"chat":{"id":456,"type":"private"}}}]}
+                """);
+        try {
+            assertTimeout(java.time.Duration.ofSeconds(1), () -> bot.processUpdates(updates));
+            assertTrue(entered.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            verify(bot, timeout(3000)).sendMessageToChat("456", "Bonds explained");
+            assertEquals(2, bot.getLastUpdateId());
+            verify(bot, never()).sendMessageToChat("123", "First answer");
+        } finally { release.countDown(); bot.close(); }
+    }
+
     @Test
     void uppercaseSettingsWorkWhenLowercaseSettingsAreBlank() {
         TelegramNotifier bot = new TelegramNotifier("");
@@ -24,7 +106,7 @@ class TelegramRemoteDeskTest {
         bot.configureRemoteAccess(config);
         assertTrue(bot.isAuthorized("123", "123", "private"));
         assertFalse(bot.isAuthorized("456", "123", "private"));
-        assertEquals("123", bot.getChatId());
+        assertNull(bot.getChatId()); // Configuration selects a preference; the API must verify the chat.
     }
 
     @Test
@@ -49,8 +131,8 @@ class TelegramRemoteDeskTest {
         doReturn("Diversification spreads exposure.").when(bot).askAI("123:123", "What is diversification?");
         assertTrue(bot.detectChatIds().contains("123"));
         bot.processUpdates(new ObjectMapper().readTree(updates));
-        verify(bot, times(1)).askAI("123:123", "What is diversification?");
-        verify(bot, times(1)).sendMessageToChat("123", "Diversification spreads exposure.");
+        verify(bot, timeout(5000).times(1)).askAI("123:123", "What is diversification?");
+        verify(bot, timeout(5000).times(1)).sendMessageToChat("123", "Diversification spreads exposure.");
         assertEquals(10, bot.getLastUpdateId());
     }
 
@@ -125,8 +207,8 @@ class TelegramRemoteDeskTest {
                 """);
         bot.processUpdates(updates);
         bot.processUpdates(updates);
-        verify(handler).handleCommand("/help", "123:123");
-        verify(handler).handleCommand("/health", "456:456");
+        verify(handler, timeout(5000)).handleCommand("/help", "123:123");
+        verify(handler, timeout(5000)).handleCommand("/health", "456:456");
         verifyNoMoreInteractions(handler);
         assertEquals(3, bot.getLastUpdateId());
     }

@@ -98,8 +98,7 @@ public final class SmartExecutionRouter {
         // Filter candidates: venue preference and exchange preference
         List<String> filtered = candidates.stream()
                 .filter(name -> {
-                    // Skip paper-mode exchanges if request is real
-                    if (request.paperMode()) return true; // anything allowed
+                    if (!request.allowFallback() && venueFor(name) != request.preferredVenue()) return false;
                     // If request specifies preferred exchange and fallback is not allowed, enforce it
                     return request.getPreferredExchange()
                             .map(pref -> request.allowFallback() || name.equalsIgnoreCase(pref))
@@ -116,8 +115,8 @@ public final class SmartExecutionRouter {
         if (request.getPreferredExchange().isPresent()) {
             String pref = request.getPreferredExchange().get();
             NormalizedMarketSnapshot snap = snapshotRegistry.get(pref);
-            if (snap != null && snap.isDataFresh()) {
-                ExecutionRoute route = buildRoute(request.requestId(), request.preferredVenue(), pref, snap);
+            if (filtered.contains(pref) && snap != null && snap.isDataFresh()) {
+                ExecutionRoute route = buildRoute(request, pref, snap);
                 publishRouteSelected(route);
                 return Optional.of(route);
             } else if (!request.allowFallback()) {
@@ -139,7 +138,7 @@ public final class SmartExecutionRouter {
             double score = computeScore(snap);
             if (score > bestScore) {
                 bestScore = score;
-                best = buildRoute(request.requestId(), request.preferredVenue(), candidate, snap);
+                best = buildRoute(request, candidate, snap);
             }
         }
 
@@ -154,16 +153,23 @@ public final class SmartExecutionRouter {
 
     // ── Private helpers ──────────────────────────────────────────────────────────
 
+    private ExecutionVenue venueFor(String exchange) {
+        String name = exchange.toUpperCase(Locale.ROOT).replace(' ', '_');
+        if (name.contains("IBKR") || name.contains("INTERACTIVE_BROKERS") || name.contains("OANDA")
+                || name.contains("ALPACA") || name.contains("SCHWAB")) return ExecutionVenue.BROKER;
+        if (name.contains("STELLAR") || name.contains("SOLONA") || name.contains("SOLANA")) return ExecutionVenue.BLOCKCHAIN;
+        if (name.contains("DEX") || name.contains("UNISWAP") || name.contains("JUPITER")) return ExecutionVenue.DEX;
+        return ExecutionVenue.CENTRALIZED;
+    }
     private ExecutionRoute buildRoute(
-            String requestId,
-            ExecutionVenue venue,
+            ExecutionRequest request,
             String exchangeName,
             NormalizedMarketSnapshot snap
     ) {
         return new ExecutionRoute(
                 UUID.randomUUID().toString(),
-                requestId,
-                venue,
+                request.requestId(),
+                venueFor(exchangeName),
                 exchangeName,
                 bpsToBigDecimal(snap.spreadBps()),
                 null, // fee not in snapshot — exchange adapter provides if available
@@ -171,7 +177,8 @@ public final class SmartExecutionRouter {
                 null, // latency — available from ExchangeTelemetryEngine
                 snap.totalBidLiquidity(),
                 computeScore(snap),
-                Instant.now()
+                Instant.now(),
+                request.executionMode()
         );
     }
 

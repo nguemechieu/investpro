@@ -48,10 +48,13 @@ public record AssetCatalogEntry(
         Instant lastRefreshedAt,
         String metadataJson
 ) {
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
     public AssetCatalogEntry {
         exchangeId = exchangeId == null ? ExchangeId.UNKNOWN : exchangeId;
         symbol = normalizeSymbol(symbol, baseAsset, quoteAsset);
         rawExchangeSymbol = blankTo(rawExchangeSymbol, symbol);
+        // Keep the persisted ID stable, while displaying native contract identity rather than a currency pair.
+        if (assetType == AssetType.FUTURE && exchangeId == ExchangeId.COINBASE) symbol = rawExchangeSymbol;
         baseAsset = normalizeCode(baseAsset);
         quoteAsset = normalizeCode(quoteAsset);
         assetType = assetType == null ? AssetType.UNKNOWN : assetType;
@@ -69,11 +72,11 @@ public record AssetCatalogEntry(
         Objects.requireNonNull(pair, "pair must not be null");
         String base = normalizeCode(pair.getBaseCode());
         String quote = normalizeCode(pair.getCounterCode());
-        String symbol = base + "/" + quote;
+        String symbol = pair.isNativeProductSymbol() ? pair.toSlashSymbol() : base + "/" + quote;
         String nativeSymbol = pair.getNativeSymbol() == null || pair.getNativeSymbol().isBlank()
                 ? symbol
                 : pair.getNativeSymbol();
-        AssetType type = inferType(exchangeId, base, quote);
+        AssetType type = pair.isDerivativeContract() || pair.isPerpetual() ? AssetType.FUTURE : inferType(exchangeId, base, quote);
         return new AssetCatalogEntry(
                 null,
                 exchangeId,
@@ -170,10 +173,34 @@ public record AssetCatalogEntry(
 
     public TradePair toTradePair() {
         try {
+            if (exchangeId == ExchangeId.COINBASE && (assetType == AssetType.FUTURE
+                    || new org.investpro.exchange.coinbase.CoinbaseProductSymbolParser().isNativeDerivativeSymbol(rawExchangeSymbol))) {
+                var metadata = JSON.readTree(metadataJson);
+                var product = metadata.deepCopy();
+                if (product instanceof com.fasterxml.jackson.databind.node.ObjectNode object) {
+                    object.put("product_id", rawExchangeSymbol);
+                    if (!object.has("product_type")) object.put("product_type", "FUTURE");
+                    if (!object.has("product_venue")) object.put("product_venue", object.path("routing_exchange").asText(""));
+                }
+                return new org.investpro.exchange.coinbase.CoinbaseProductSymbolParser().parseProduct(rawExchangeSymbol, product);
+            }
             TradePair pair = TradePair.of(baseAsset, quoteAsset);
             pair.setNativeSymbol(rawExchangeSymbol);
+            pair.setExchangeId(exchangeId.id());
+            if (assetType == AssetType.CFD) pair.setMarketType(MarketType.CFD);
+            if (assetType == AssetType.FUTURE) {
+                pair.setMarketType(MarketType.FUTURE);
+                pair.setContractType(org.investpro.enums.ContractType.FUTURE);
+            }
+            pair.setAssetClass(switch (assetType) {
+                case CRYPTO, STELLAR_ASSET -> org.investpro.enums.AssetClass.CRYPTO_ASSET;
+                case FOREX -> org.investpro.enums.AssetClass.FIAT_CURRENCY;
+                case EQUITY -> org.investpro.enums.AssetClass.EQUITY;
+                case CFD, FUTURE -> org.investpro.enums.AssetClass.DERIVATIVE;
+                case UNKNOWN -> org.investpro.enums.AssetClass.UNKNOWN;
+            });
             return pair;
-        } catch (SQLException | ClassNotFoundException exception) {
+        } catch (SQLException | ClassNotFoundException | java.io.IOException exception) {
             throw new IllegalStateException("Unable to create TradePair for " + symbol, exception);
         }
     }

@@ -7,7 +7,6 @@ package org.investpro.strategy.execution;
  */
 public enum ExecutionVenue {
     // Legacy names retained for compatibility with existing routing code.
-    PAPER_TRADE("Paper Trading Simulator", "simulation", false),
     COINBASE_ADVANCED("Coinbase Advanced Trade", "crypto", true),
     BINANCE_SPOT("Binance", "crypto", true),
     OANDA_REST("OANDA FX", "forex", true),
@@ -18,8 +17,7 @@ public enum ExecutionVenue {
     BINANCE("Binance", "crypto", true),
     SOLONA_DEX("Solona DEX", "defi", true),
     STELLAR("Stellar Network", "defi", true),
-    PAPER_TRADING("Paper Trading Simulator", "simulation", false),
-    SIMULATION("Backtest Simulation Engine", "simulation", false);
+    UNKNOWN("No exchange venue selected", "unknown", false);
 
     /** Display name for UI and logging. */
     public final String displayName;
@@ -36,8 +34,18 @@ public enum ExecutionVenue {
         this.isLive = isLive;
     }
 
-    /** @return true if this venue is a simulation and does not send real orders. */
+    /** @deprecated Simulation is an ExecutionMode, never an exchange venue. */
+    @Deprecated
     public boolean isSimulation() {
-        return !isLive;
+        return false;
+    }
+
+    public ExecutionVenue canonical() {
+        return switch (this) {
+            case COINBASE_ADVANCED -> COINBASE;
+            case BINANCE_SPOT -> BINANCE;
+            case OANDA_REST -> OANDA;
+            default -> this;
+        };
     }
 }

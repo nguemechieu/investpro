@@ -119,7 +119,7 @@ public class ExecutionPlanningEngine {
                 .riskRewardRatio(riskRewardRatio)
                 .riskAmount(sizeResult.getRiskAmount())
                 .riskPercent(sizeResult.getRiskPercent())
-                .venue(ExecutionVenue.PAPER_TRADE) // default; router will override
+                .venue(ExecutionVenue.UNKNOWN) // Exchange venue is resolved by the router.
                 .aiApproved(aiApprovedFlag)
                 .aiConfidence(aiConfidenceValue)
                 .aiReasoningSummary(aiSummary)

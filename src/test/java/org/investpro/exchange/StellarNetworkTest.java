@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StellarNetworkTest {
 
     @Test
-    void usesTestnetInPaperTradingMode() throws Exception {
+    void usesMainnetMarketDataInLocalPaperTradingMode() throws Exception {
         StellarNetwork stellar = new StellarNetwork(new ExchangeCredentials(
                 "stellar",
                 "",
@@ -36,8 +36,8 @@ class StellarNetworkTest {
         Network network = (Network) networkMethod.invoke(stellar);
 
         assertThat(stellar.isPaperTrading()).isTrue();
-        assertThat(horizonUrl).isEqualTo("https://horizon-testnet.stellar.org");
-        assertThat(network).isEqualTo(Network.TESTNET);
+        assertThat(horizonUrl).isEqualTo("https://horizon.stellar.org");
+        assertThat(network).isEqualTo(Network.PUBLIC);
     }
 
     @Test

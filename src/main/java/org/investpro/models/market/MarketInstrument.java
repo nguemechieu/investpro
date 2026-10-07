@@ -133,7 +133,14 @@ public record MarketInstrument(
     }
 
     public boolean isDerivative() {
-        return instrumentType.isDerivative() || contractType.isDerivative() || leverageMode == LeverageMode.DERIVATIVE_LEVERAGE;
+        return marketType.isDerivative() || instrumentType.isDerivative() || contractType.isDerivative() || leverageMode == LeverageMode.DERIVATIVE_LEVERAGE;
+    }
+
+    public MarketCategory marketCategory() {
+        if (isDerivative()) return MarketCategory.DERIVATIVES;
+        if (isSpot() || contractType == ContractType.CASH || contractType == ContractType.MARGIN
+                || marketType == MarketType.MARGIN) return MarketCategory.SPOT;
+        return MarketCategory.UNKNOWN;
     }
 
     public boolean canShowInMarketWatch() {

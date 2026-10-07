@@ -69,7 +69,8 @@ public class ExecutionRouter {
         if (plan == null)
             throw new IllegalArgumentException("ExecutionPlan must not be null");
 
-        ExecutionVenue selectedVenue = selectVenue(plan.getSymbol(), record);
+        ExecutionVenue selectedVenue = plan.getVenue() != null && plan.getVenue() != ExecutionVenue.UNKNOWN
+                ? pickHealthy(plan.getVenue().canonical(), ExecutionVenue.UNKNOWN) : selectVenue(plan.getSymbol());
 
         log.debug("Routing: assignment={} symbol={} -> venue={}",
                 plan.getAssignmentId(), plan.getSymbol(), selectedVenue);
@@ -97,10 +98,12 @@ public class ExecutionRouter {
                 .leverage(plan.getLeverage())
                 .slippageTolerance(plan.getSlippageTolerance())
                 .venue(selectedVenue)
+                .executionMode(record == null ? plan.getExecutionMode() : record.getLifecycleStatus().isLive()
+                        ? org.investpro.exchange.execution.ExecutionMode.LIVE : org.investpro.exchange.execution.ExecutionMode.LOCAL_PAPER)
                 .aiApproved(plan.isAiApproved())
                 .aiConfidence(plan.getAiConfidence())
                 .aiReasoningSummary(plan.getAiReasoningSummary())
-                .isValid(plan.isValid())
+                .isValid(plan.isValid() && selectedVenue != ExecutionVenue.UNKNOWN)
                 .riskApproved(plan.isRiskApproved())
                 .createdAt(plan.getCreatedAt())
                 .planValidUntil(plan.getPlanValidUntil());
@@ -123,6 +126,7 @@ public class ExecutionRouter {
     public void recordVenueError(ExecutionVenue venue) {
         if (venue == null)
             return;
+        venue = venue.canonical();
         int errors = venueErrorCounts.computeIfAbsent(venue, v -> new AtomicInteger(0))
                 .incrementAndGet();
         if (errors >= MAX_ERRORS_BEFORE_DEMOTION) {
@@ -139,6 +143,7 @@ public class ExecutionRouter {
     public void recoverVenue(ExecutionVenue venue) {
         if (venue == null)
             return;
+        venue = venue.canonical();
         venueErrorCounts.computeIfAbsent(venue, v -> new AtomicInteger(0)).set(0);
         venueHealthy.put(venue, true);
         log.info("Venue recovered: {}", venue);
@@ -151,50 +156,45 @@ public class ExecutionRouter {
      * @return true if healthy
      */
     public boolean isVenueHealthy(ExecutionVenue venue) {
-        return venueHealthy.getOrDefault(venue, false);
+        return venue != null && venueHealthy.getOrDefault(venue.canonical(), false);
     }
 
     // =========================================================================
     // Private helpers
     // =========================================================================
 
-    private ExecutionVenue selectVenue(String symbol, StrategyLifecycleRecord record) {
-        if (symbol == null)
-            return ExecutionVenue.PAPER_TRADE;
+    private ExecutionVenue selectVenue(String symbol) {
+        if (symbol == null || symbol.isBlank())
+            return ExecutionVenue.UNKNOWN;
 
-        // Use paper trading for non-live strategies
-        if (record != null && !record.getLifecycleStatus().isLive()) {
-            return ExecutionVenue.PAPER_TRADE;
-        }
-
-        String upper = symbol.toUpperCase();
+        String upper = symbol.toUpperCase(java.util.Locale.ROOT);
 
         if (upper.contains("/SOL") || upper.startsWith("SOL/") || upper.contains("SOL")) {
-            return pickHealthy(ExecutionVenue.SOLONA_DEX, ExecutionVenue.COINBASE_ADVANCED);
+            return pickHealthy(ExecutionVenue.SOLONA_DEX, ExecutionVenue.COINBASE);
         }
 
         if (upper.contains("/XLM") || upper.startsWith("XLM/") || upper.contains("XLM")) {
-            return pickHealthy(ExecutionVenue.STELLAR, ExecutionVenue.COINBASE_ADVANCED);
+            return pickHealthy(ExecutionVenue.STELLAR, ExecutionVenue.COINBASE);
         }
 
         // Crypto symbols
         if (upper.contains("BTC") || upper.contains("ETH") || upper.contains("USDT")
                 || upper.contains("BNB") || upper.contains("XRP")) {
-            return pickHealthy(ExecutionVenue.COINBASE_ADVANCED, ExecutionVenue.BINANCE_SPOT);
+            return pickHealthy(ExecutionVenue.COINBASE, ExecutionVenue.BINANCE);
         }
 
         // Forex pairs (contain _ separating currencies, e.g. EUR_USD)
         if (upper.contains("_") || isForexPair(upper)) {
-            return pickHealthy(ExecutionVenue.OANDA_REST, ExecutionVenue.INTERACTIVE_BROKERS);
+            return pickHealthy(ExecutionVenue.OANDA, ExecutionVenue.INTERACTIVE_BROKERS);
         }
 
         // Indices or equities
         if (upper.contains("SPX") || upper.contains("NDX") || upper.contains("US30")) {
-            return pickHealthy(ExecutionVenue.INTERACTIVE_BROKERS, ExecutionVenue.OANDA_REST);
+            return pickHealthy(ExecutionVenue.INTERACTIVE_BROKERS, ExecutionVenue.OANDA);
         }
 
         // Default fallback
-        return pickHealthy(ExecutionVenue.OANDA_REST, ExecutionVenue.PAPER_TRADE);
+        return pickHealthy(ExecutionVenue.INTERACTIVE_BROKERS, ExecutionVenue.UNKNOWN);
     }
 
     private ExecutionVenue pickHealthy(ExecutionVenue preferred, ExecutionVenue fallback) {
@@ -202,7 +202,7 @@ public class ExecutionRouter {
             return preferred;
         if (venueHealthy.getOrDefault(fallback, true))
             return fallback;
-        return ExecutionVenue.PAPER_TRADE;
+        return ExecutionVenue.UNKNOWN;
     }
 
     private boolean isForexPair(String symbol) {

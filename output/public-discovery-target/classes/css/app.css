@@ -1,0 +1,1968 @@
+/* ============================================================================
+   INVESTPRO PROFESSIONAL TRADING TERMINAL
+   MT5 / MetaTrader-Inspired Dark Theme
+   Optimized for JavaFX, chart visibility, Market Watch, and bottom terminal flow
+   ============================================================================ */
+
+
+/* ============================================================================
+   ROOT THEME TOKENS
+   ============================================================================ */
+
+.root {
+    /* Concrete Color lookups used by Modena's derived control paints. */
+    -fx-base: #151f2e;
+    -fx-background: #070b12;
+    -fx-control-inner-background: #111827;
+    /* Core backgrounds */
+    -dark-bg: #070b12;
+    -workspace-bg: #0b1120;
+    -surface-bg: #111827;
+    -panel-bg: #151f2e;
+    -elevated-bg: #1f2937;
+    -header-bg: #243244;
+    -terminal-bg: #0f172a;
+
+    /* Component backgrounds */
+    -btn-bg: #141f31;
+    -input-bg: #0f172a;
+    -table-bg: #020617;
+    -table-alt-bg: #08111f;
+    -table-hover-bg: #1e293b;
+    -table-header-bg: #1e293b;
+
+    /* Borders */
+    -border-color: #334155;
+    -border-strong: #475569;
+    -border-soft: rgba(148, 163, 184, 0.22);
+    -border-radius: 4px;
+    -border-radius-lg: 8px;
+
+    /* Text */
+    -text-primary: #f8fafc;
+    -text-secondary: #dbeafe;
+    -text-muted: #94a3b8;
+    -text-faint: #64748b;
+    -text-header: #e0f2fe;
+
+    /* Trading colors */
+    -buy-color: #16a34a;
+    -buy-hover: #22c55e;
+    -buy-light: #4ade80;
+    -sell-color: #dc2626;
+    -sell-hover: #ef4444;
+    -sell-light: #f87171;
+    -profit-color: #22c55e;
+    -loss-color: #f87171;
+    -neutral-color: #64748b;
+
+    /* Accent colors */
+    -primary-color: #2563eb;
+    -primary-light: #60a5fa;
+    -primary-dark: #1d4ed8;
+    -accent-color: #f59e0b;
+    -accent-light: #fde68a;
+    -warning: #fbbf24;
+    -info: #38bdf8;
+    -danger: #ef4444;
+    -success: #22c55e;
+
+    /* Chart colors */
+    -chart-bg: #050914;
+    -chart-grid: rgba(148, 163, 184, 0.18);
+    -chart-axis: #cbd5e1;
+    -chart-border: #334155;
+
+    /* Font */
+    -fx-font-family: "Segoe UI", "Inter", "Arial", sans-serif;
+    -fx-font-size: 12px;
+    -fx-background-color: -dark-bg;
+    -fx-text-fill: -text-primary;
+}
+
+/* Override Modena's layered background lookup for application scroll panes. */
+.scroll-pane {
+    -fx-background: #070b12;
+    -fx-background-color: #070b12;
+}
+
+.scroll-pane > .viewport {
+    -fx-background-color: #070b12;
+}
+
+
+/* ============================================================================
+   GLOBAL LAYOUT
+   ============================================================================ */
+
+AnchorPane,
+BorderPane,
+SplitPane,
+VBox,
+HBox,
+StackPane,
+GridPane {
+    -fx-background-color: transparent;
+}
+
+.trade-view,
+.trade-view-root,
+.trading-window,
+.trading-window-pro,
+.terminal-root,
+.mt5-root {
+    -fx-background-color: -dark-bg;
+}
+
+.trading-window-pro {
+    -fx-background-color: #070b12;
+}
+
+.split-pane {
+    -fx-background-color: #070b12;
+    -fx-padding: 0;
+}
+
+.split-pane-divider {
+    -fx-background-color: #475569;
+    -fx-padding: 0 1 0 1;
+}
+
+.split-pane:vertical > .split-pane-divider {
+    -fx-padding: 1 0 1 0;
+}
+
+.pro-panel,
+.mt5-panel {
+    -fx-background-color: #0b1120;
+    -fx-border-color: #263246;
+    -fx-border-width: 1;
+}
+
+.panel-header,
+.workspace-header,
+.mt5-panel-header,
+.mt5-chart-header {
+    -fx-background-color: linear-gradient(to bottom, #162033, #0f1724);
+    -fx-border-color: #263246;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 8 10 8 10;
+}
+
+.panel-title,
+.workspace-title,
+.terminal-title {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 13px;
+    -fx-font-weight: 900;
+}
+
+.workspace-title {
+    -fx-font-size: 15px;
+}
+
+.panel-meta,
+.workspace-subtitle,
+.mt5-chart-meta,
+.mt5-status-chip {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 11px;
+}
+
+
+/* ============================================================================
+   MENU BAR
+   ============================================================================ */
+
+.menu-bar,
+.mt5-menu-bar {
+    -fx-background-color: linear-gradient(to bottom, #1f2937, #111827);
+    -fx-border-color: -border-color;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 0 4 0 4;
+}
+
+.menu-bar .label {
+    -fx-text-fill: -text-secondary;
+    -fx-font-size: 12px;
+}
+
+.menu {
+    -fx-padding: 5 8 5 8;
+}
+
+.menu:hover,
+.menu:showing {
+    -fx-background-color: #334155;
+}
+
+.context-menu {
+    -fx-background-color: -panel-bg;
+    -fx-border-color: -border-strong;
+    -fx-border-width: 1;
+    -fx-padding: 4;
+}
+
+.menu-item {
+    -fx-background-color: transparent;
+    -fx-padding: 8 18 8 18;
+}
+
+.menu-item .label {
+    -fx-text-fill: -text-primary;
+}
+
+.menu-item:focused,
+.menu-item:hover {
+    -fx-background-color: -primary-color;
+}
+
+.menu-item:focused .label,
+.menu-item:hover .label {
+    -fx-text-fill: white;
+}
+
+.market-watch-context-menu {
+    -fx-background-color: #0b1220;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-padding: 5;
+}
+
+.market-watch-menu-item {
+    -fx-padding: 8 18 8 14;
+}
+
+.market-watch-menu-item .label {
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 12px;
+}
+
+.market-watch-menu-item:focused,
+.market-watch-menu-item:hover {
+    -fx-background-color: #1d4ed8;
+}
+
+
+/* ============================================================================
+   TOOLBARS
+   ============================================================================ */
+
+.tool-bar,
+.main-trading-toolbar,
+.mt5-toolbar {
+    -fx-background-color: linear-gradient(to bottom, #1e293b, #111827);
+    -fx-border-color: -border-color;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 7 10 7 10;
+    -fx-spacing: 8;
+}
+
+.tool-bar .label,
+.main-trading-toolbar .label,
+.mt5-toolbar .label {
+    -fx-text-fill: -text-secondary;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.mt5-top-section {
+    -fx-background-color: #101827;
+    -fx-border-color: #263449;
+    -fx-border-width: 0 0 1 0;
+}
+
+.mt5-brand,
+.terminal-brand {
+    -fx-text-fill: white;
+    -fx-font-size: 15px;
+    -fx-font-weight: 900;
+}
+
+.desk-command-strip {
+    -fx-padding: 7 10 8 10;
+    -fx-spacing: 8;
+    -fx-background-color: linear-gradient(to bottom, #101827, #0b1120);
+    -fx-border-color: #263246;
+    -fx-border-width: 1 0 1 0;
+}
+
+.toolbar-group {
+    -fx-alignment: center-left;
+    -fx-spacing: 6;
+    -fx-padding: 3 8;
+    -fx-background-color: rgba(15, 23, 36, 0.72);
+    -fx-border-color: rgba(96, 165, 250, 0.18);
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.toolbar-chip-label {
+    -fx-text-fill: #93c5fd;
+    -fx-font-size: 10px;
+    -fx-font-weight: 800;
+}
+
+.toolbar-toolbox-label {
+    -fx-text-fill: #7dd3fc;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+}
+
+.desk-metric-cluster {
+    -fx-alignment: center-left;
+    -fx-spacing: 8;
+}
+
+.desk-action-cluster {
+    -fx-alignment: center-left;
+    -fx-spacing: 8;
+    -fx-padding: 3 6;
+    -fx-background-color: rgba(12, 23, 37, 0.70);
+    -fx-border-color: rgba(96, 165, 250, 0.2);
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.separator {
+    -fx-background-color: -border-color;
+}
+
+
+/* ============================================================================
+   BUTTONS
+   ============================================================================ */
+
+.button {
+    -fx-background-color: linear-gradient(to bottom, #334155, #1e293b);
+    -fx-text-fill: -text-primary;
+    -fx-font-weight: 700;
+    -fx-font-size: 12px;
+    -fx-padding: 7 14 7 14;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-border-color: #475569;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: linear-gradient(to bottom, #475569, #334155);
+    -fx-border-color: #60a5fa;
+}
+
+.button:pressed {
+    -fx-background-color: #0f172a;
+    -fx-translate-y: 1;
+}
+
+.button:focused,
+.toggle-button:focused,
+.menu-button:focused {
+    -fx-border-color: -primary-light;
+    -fx-effect: dropshadow(gaussian, rgba(96, 165, 250, 0.35), 8, 0, 0, 0);
+}
+
+.button:disabled {
+    -fx-opacity: 0.45;
+    -fx-cursor: default;
+}
+
+.toggle-button,
+.menu-button {
+    -fx-background-color: linear-gradient(to bottom, #334155, #1e293b);
+    -fx-text-fill: -text-primary;
+    -fx-font-weight: 700;
+    -fx-font-size: 12px;
+    -fx-padding: 7 14 7 14;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-border-color: #475569;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+}
+
+.toggle-button:hover,
+.menu-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #475569, #334155);
+    -fx-border-color: #60a5fa;
+}
+
+.toggle-button:selected {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #60a5fa;
+    -fx-text-fill: white;
+}
+
+.mt5-toolbar-button,
+.mt5-command-button,
+.desk-action-button,
+.terminal-button {
+    -fx-background-color: #141f31;
+    -fx-border-color: #2a3548;
+    -fx-border-width: 1;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-text-fill: #dbe6f3;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+    -fx-padding: 6 10 6 10;
+    -fx-cursor: hand;
+}
+
+.mt5-toolbar-button:hover,
+.mt5-command-button:hover,
+.desk-action-button:hover,
+.terminal-button:hover {
+    -fx-background-color: #1b2a40;
+    -fx-border-color: #60a5fa;
+    -fx-text-fill: white;
+}
+
+.primary-button {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #60a5fa;
+    -fx-text-fill: white;
+}
+
+.button.buy-button,
+.buy-button {
+    -fx-background-color: linear-gradient(to bottom, #22c55e, #15803d);
+    -fx-border-color: #4ade80;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 900;
+    -fx-padding: 8 22 8 22;
+}
+
+.button.buy-button:hover,
+.buy-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #4ade80, #16a34a);
+}
+
+.button.sell-button,
+.sell-button {
+    -fx-background-color: linear-gradient(to bottom, #ef4444, #b91c1c);
+    -fx-border-color: #f87171;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 900;
+    -fx-padding: 8 22 8 22;
+}
+
+.button.sell-button:hover,
+.sell-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #f87171, #dc2626);
+}
+
+.button.auto-button,
+.auto-button {
+    -fx-background-color: linear-gradient(to bottom, #fbbf24, #d97706);
+    -fx-border-color: #fde68a;
+    -fx-text-fill: #111827;
+    -fx-font-weight: 900;
+}
+
+.button.danger,
+.danger-button {
+    -fx-background-color: linear-gradient(to bottom, #ef4444, #991b1b);
+    -fx-border-color: #f87171;
+    -fx-text-fill: white;
+}
+
+.button.success,
+.success-button {
+    -fx-background-color: linear-gradient(to bottom, #22c55e, #15803d);
+    -fx-border-color: #4ade80;
+    -fx-text-fill: white;
+}
+
+
+/* ============================================================================
+   INPUTS / COMBOBOXES
+   ============================================================================ */
+
+.combo-box,
+.choice-box,
+.text-field,
+.mt5-compact-combo,
+.mt5-amount-field,
+.mt5-market-search,
+.terminal-combo-box,
+.chart-timeframe-selector {
+    -fx-background-color: #0f172a;
+    -fx-border-color: -border-strong;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-text-fill: -text-primary;
+    -fx-padding: 5 8 5 8;
+    -fx-font-size: 12px;
+}
+
+.combo-box:focused,
+.choice-box:focused,
+.text-field:focused,
+.mt5-compact-combo:focused,
+.mt5-amount-field:focused,
+.mt5-market-search:focused,
+.terminal-combo-box:focused,
+.chart-timeframe-selector:focused {
+    -fx-border-color: -primary-light;
+    -fx-effect: dropshadow(gaussian, rgba(96, 165, 250, 0.35), 8, 0, 0, 0);
+}
+
+
+/* ============================================================================
+   CHECKBOXES
+   ============================================================================ */
+
+.check-box {
+    -fx-text-fill: -text-secondary;
+    -fx-font-size: 12px;
+    -fx-padding: 2 0 2 0;
+}
+
+.check-box > .box {
+    -fx-background-color: #0f172a;
+    -fx-border-color: -border-strong;
+    -fx-border-width: 1;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-padding: 2;
+}
+
+.check-box:hover > .box {
+    -fx-border-color: -primary-light;
+}
+
+.check-box:selected > .box,
+.check-box:indeterminate > .box {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #60a5fa;
+}
+
+.check-box:selected > .box > .mark,
+.check-box:indeterminate > .box > .mark {
+    -fx-background-color: white;
+}
+
+.check-box:focused > .box {
+    -fx-border-color: -primary-light;
+    -fx-effect: dropshadow(gaussian, rgba(96, 165, 250, 0.35), 7, 0, 0, 0);
+}
+
+.check-box:disabled {
+    -fx-opacity: 0.5;
+}
+
+.combo-box .list-cell,
+.choice-box .label {
+    -fx-text-fill: -text-primary;
+    -fx-background-color: transparent;
+}
+
+.combo-box-popup .list-view,
+.choice-box .context-menu {
+    -fx-background-color: #111827;
+    -fx-border-color: -border-strong;
+}
+
+.combo-box-popup .list-cell {
+    -fx-background-color: #111827;
+    -fx-text-fill: -text-primary;
+    -fx-padding: 7 10 7 10;
+}
+
+.combo-box-popup .list-cell:hover,
+.combo-box-popup .list-cell:selected {
+    -fx-background-color: -primary-color;
+    -fx-text-fill: white;
+}
+
+.text-area {
+    -fx-background-color: #020617;
+    -fx-text-fill: #d1fae5;
+    -fx-border-color: -border-strong;
+    -fx-border-width: 1;
+    -fx-font-family: "Consolas", "Cascadia Mono", "Monaco", monospace;
+    -fx-font-size: 12px;
+    -fx-highlight-fill: -primary-color;
+    -fx-highlight-text-fill: white;
+}
+
+.text-area .content {
+    -fx-background-color: #020617;
+}
+
+
+/* ============================================================================
+   LABELS / BADGES / METRICS
+   ============================================================================ */
+
+.label {
+    -fx-text-fill: -text-primary;
+}
+
+.label.muted,
+.muted {
+    -fx-text-fill: -text-muted;
+}
+
+.label.secondary,
+.secondary {
+    -fx-text-fill: -text-secondary;
+}
+
+.price-badge,
+.connection-status,
+.trade-view-live-badge,
+.trade-view-static-badge,
+.terminal-mode-badge {
+    -fx-padding: 4 9 4 9;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+}
+
+.price-badge {
+    -fx-background-color: rgba(37, 99, 235, 0.25);
+    -fx-border-color: -primary-light;
+    -fx-text-fill: #bfdbfe;
+}
+
+.trade-view-live-badge,
+.terminal-mode-badge {
+    -fx-background-color: rgba(34, 197, 94, 0.20);
+    -fx-border-color: -success;
+    -fx-text-fill: #bbf7d0;
+}
+
+.trade-view-static-badge {
+    -fx-background-color: rgba(245, 158, 11, 0.20);
+    -fx-border-color: -warning;
+    -fx-text-fill: #fde68a;
+}
+
+.trade-view-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: 900;
+    -fx-text-fill: white;
+}
+
+.trade-view-meta {
+    -fx-font-size: 12px;
+    -fx-text-fill: -text-secondary;
+}
+
+.desk-metric {
+    -fx-padding: 5 9 5 9;
+    -fx-background-color: #0f1724;
+    -fx-border-color: rgba(148, 163, 184, 0.24);
+    -fx-border-width: 1;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-min-width: 92;
+}
+
+.desk-metric-title {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+}
+
+.desk-metric-value {
+    -fx-text-fill: #e5edf7;
+    -fx-font-size: 11px;
+    -fx-font-weight: 900;
+}
+
+.desk-positive,
+.trading-positive,
+.symbol-up {
+    -fx-text-fill: -profit-color;
+    -fx-font-weight: 900;
+}
+
+.desk-warning {
+    -fx-text-fill: -warning;
+    -fx-font-weight: 900;
+}
+
+.desk-negative,
+.trading-negative,
+.symbol-down {
+    -fx-text-fill: -loss-color;
+    -fx-font-weight: 900;
+}
+
+.symbol-flat {
+    -fx-text-fill: -text-secondary;
+}
+
+.desk-updated-label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+}
+
+
+/* ============================================================================
+   TAB PANES / TERMINAL
+   ============================================================================ */
+
+.tab-pane {
+    -fx-background-color: #0f172a;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+}
+
+.tab-pane .tab-header-area {
+    -fx-padding: 0;
+}
+
+.tab-pane .tab-header-background {
+    -fx-background-color: linear-gradient(to bottom, #1e293b, #111827);
+    -fx-border-color: #334155;
+    -fx-border-width: 0 0 1 0;
+}
+
+.tab {
+    -fx-background-color: #111827;
+    -fx-border-color: #334155;
+    -fx-border-width: 0 1 0 0;
+    -fx-padding: 7 14 7 14;
+}
+
+.tab .tab-label {
+    -fx-text-fill: #dbeafe;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
+.tab:selected {
+    -fx-background-color: #243244;
+    -fx-border-color: #60a5fa;
+    -fx-border-width: 0 1 3 0;
+}
+
+.tab:selected .tab-label {
+    -fx-text-fill: white;
+}
+
+.tab:hover {
+    -fx-background-color: #334155;
+}
+
+.tab:hover .tab-label {
+    -fx-text-fill: white;
+}
+
+.compact-tabs .tab {
+    -fx-padding: 6 10 6 10;
+}
+
+.system-console,
+.terminal-console,
+.bottom-terminal,
+.mt5-terminal {
+    -fx-background-color: #0b1120;
+    -fx-border-color: #475569;
+    -fx-border-width: 1 0 0 0;
+}
+
+.system-console .label,
+.bottom-terminal .label {
+    -fx-text-fill: #dbeafe;
+}
+
+.system-console-title,
+.terminal-title {
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 900;
+    -fx-padding: 2 0 4 0;
+}
+
+.system-console .tab-pane,
+.bottom-terminal .tab-pane {
+    -fx-background-color: #020617;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+}
+
+.system-console .tab,
+.bottom-terminal .tab {
+    -fx-padding: 6 13 6 13;
+}
+
+.system-console .tab:selected,
+.bottom-terminal .tab:selected {
+    -fx-background-color: #0f172a;
+    -fx-border-color: #f59e0b;
+    -fx-border-width: 0 1 3 0;
+}
+
+.system-console .tab:selected .tab-label,
+.bottom-terminal .tab:selected .tab-label {
+    -fx-text-fill: #fde68a;
+}
+
+.terminal-scroll-pane,
+.terminal-scroll-pane > .viewport,
+.terminal-scroll-content {
+    -fx-background-color: #020617;
+}
+
+.terminal-scroll-content {
+    -fx-padding: 8;
+}
+
+.mt5-terminal-tab-strip-scroll,
+.mt5-terminal-tab-strip-scroll > .viewport {
+    -fx-background-color: #020617;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.mt5-terminal-tab-strip-scroll {
+    -fx-border-color: #334155;
+    -fx-border-width: 0 0 1 0;
+}
+
+.mt5-terminal-tab-strip {
+    -fx-padding: 6 8 6 8;
+    -fx-background-color: #0f172a;
+}
+
+.mt5-terminal-tab-button {
+    -fx-background-color: #111827;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 6 12 6 12;
+    -fx-text-fill: #dbeafe;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
+.mt5-terminal-tab-button:selected {
+    -fx-background-color: #0f172a;
+    -fx-border-color: #f59e0b;
+    -fx-text-fill: #fde68a;
+}
+
+.mt5-terminal-tab-button:hover {
+    -fx-border-color: #f59e0b;
+    -fx-text-fill: white;
+}
+
+
+/* ============================================================================
+   TABLES / MARKET WATCH / ORDER BOOK
+   ============================================================================ */
+
+.table-view,
+.tree-table-view,
+.mt5-market-watch-table {
+    -fx-background-color: #020617;
+    -fx-border-color: -border-color;
+    -fx-border-width: 1;
+    -fx-table-cell-border-color: rgba(51, 65, 85, 0.85);
+    -fx-control-inner-background: #020617;
+    -fx-control-inner-background-alt: #0b1120;
+}
+
+.table-view .placeholder .label,
+.tree-table-view .placeholder .label {
+    -fx-text-fill: -text-muted;
+    -fx-font-size: 12px;
+}
+
+.table-view .column-header-background,
+.tree-table-view .column-header-background {
+    -fx-background-color: #1e293b;
+    -fx-border-color: -border-strong;
+    -fx-border-width: 0 0 1 0;
+}
+
+.table-view .column-header,
+.table-view .filler,
+.tree-table-view .column-header,
+.tree-table-view .filler {
+    -fx-background-color: #1e293b;
+    -fx-border-color: -border-color;
+    -fx-border-width: 0 1 1 0;
+    -fx-padding: 7 5 7 5;
+}
+
+.table-view .column-header .label,
+.tree-table-view .column-header .label {
+    -fx-text-fill: #e0f2fe;
+    -fx-font-size: 12px;
+    -fx-font-weight: 900;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.table-row-cell,
+.tree-table-row-cell {
+    -fx-background-color: #020617;
+    -fx-border-color: rgba(51, 65, 85, 0.65);
+    -fx-border-width: 0 0 1 0;
+    -fx-cell-size: 28px;
+}
+
+.table-row-cell:odd,
+.tree-table-row-cell:odd {
+    -fx-background-color: #08111f;
+}
+
+.table-row-cell:hover,
+.tree-table-row-cell:hover {
+    -fx-background-color: #1e293b;
+}
+
+.table-row-cell:selected,
+.tree-table-row-cell:selected {
+    -fx-background-color: #1d4ed8;
+}
+
+.table-cell,
+.tree-table-cell {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 12px;
+    -fx-padding: 5 7 5 7;
+    -fx-alignment: CENTER_LEFT;
+    -fx-font-family: "Segoe UI", "Arial", sans-serif;
+}
+
+.table-row-cell:selected .table-cell,
+.tree-table-row-cell:selected .tree-table-cell {
+    -fx-text-fill: white;
+}
+
+.market-watch,
+.navigator-pane {
+    -fx-background-color: #0b1120;
+    -fx-border-color: -border-color;
+    -fx-border-width: 1;
+}
+
+.market-watch-title,
+.navigator-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: 900;
+    -fx-text-fill: white;
+    -fx-padding: 4 0 4 0;
+}
+
+.mini-symbol-row {
+    -fx-background-color: #08111f;
+    -fx-border-color: rgba(51, 65, 85, 0.65);
+    -fx-border-width: 0 0 1 0;
+}
+
+.mini-symbol-row:hover {
+    -fx-background-color: #111c2d;
+}
+
+.symbol-name {
+    -fx-font-weight: 900;
+    -fx-text-fill: #93c5fd;
+}
+
+.symbol-bid {
+    -fx-text-fill: #86efac;
+    -fx-font-size: 11px;
+}
+
+.symbol-ask {
+    -fx-text-fill: #fca5a5;
+    -fx-font-size: 11px;
+}
+
+.order-book-pane,
+.mt5-order-book {
+    -fx-background-color: #0b1120;
+    -fx-padding: 8;
+    -fx-border-color: #263246;
+    -fx-border-width: 1;
+}
+
+.book-bid-title {
+    -fx-text-fill: #86efac;
+    -fx-font-weight: 900;
+}
+
+.book-ask-title {
+    -fx-text-fill: #fca5a5;
+    -fx-font-weight: 900;
+}
+
+.bid-table .table-cell {
+    -fx-text-fill: #bbf7d0;
+}
+
+.ask-table .table-cell {
+    -fx-text-fill: #fecaca;
+}
+
+
+/* ============================================================================
+   LIST VIEW
+   ============================================================================ */
+
+.list-view {
+    -fx-background-color: #020617;
+    -fx-border-color: -border-color;
+    -fx-border-width: 1;
+    -fx-control-inner-background: #020617;
+}
+
+.list-cell {
+    -fx-background-color: #020617;
+    -fx-text-fill: #f8fafc;
+    -fx-padding: 7 10 7 10;
+    -fx-font-size: 12px;
+    -fx-border-color: rgba(51, 65, 85, 0.55);
+    -fx-border-width: 0 0 1 0;
+}
+
+.list-cell:odd {
+    -fx-background-color: #08111f;
+}
+
+.list-cell:hover {
+    -fx-background-color: #1e293b;
+}
+
+.list-cell:selected {
+    -fx-background-color: #1d4ed8;
+    -fx-text-fill: white;
+}
+
+
+/* ============================================================================
+   CHART CONTAINER / CHART WORKSPACE
+   ============================================================================ */
+
+.candle-chart-container,
+.chart-container-root,
+.chart-host,
+.chart-workspace,
+.mt5-chart-workspace,
+.chart-terminal-stack {
+    -fx-background-color: #070b12;
+}
+
+.chart-toolbar-container {
+    -fx-background-color: #101827;
+    -fx-border-color: #263246;
+    -fx-border-width: 0 0 1 0;
+}
+
+.chart-workspace {
+    -fx-border-color: #263246;
+    -fx-border-width: 0 0 0 1;
+}
+
+.workspace-scroll-pane,
+.workspace-scroll-pane > .viewport {
+    -fx-background-color: #070b12;
+}
+
+.left-rail {
+    -fx-background-color: #070b12;
+}
+
+.chart,
+.candle-chart,
+.trade-view-chart-host,
+.candlestick-chart {
+    -fx-background-color: -chart-bg;
+    -fx-padding: 8;
+}
+
+.chart-plot-background,
+.candle-chart .chart-plot-background {
+    -fx-background-color: #020617;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+}
+
+.chart-vertical-grid-lines,
+.chart-horizontal-grid-lines {
+    -fx-stroke: -chart-grid;
+}
+
+.axis {
+    -fx-tick-label-fill: -chart-axis;
+    -fx-tick-label-font-size: 11px;
+}
+
+.axis-label {
+    -fx-text-fill: -chart-axis;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+.axis-tick-mark {
+    -fx-stroke: #64748b;
+    -fx-stroke-width: 1;
+}
+
+.axis-minor-tick-mark {
+    -fx-stroke: #334155;
+    -fx-stroke-width: 1;
+}
+
+.chart-title {
+    -fx-text-fill: white;
+    -fx-font-size: 15px;
+    -fx-font-weight: 900;
+}
+
+.chart-legend {
+    -fx-background-color: rgba(15, 23, 42, 0.90);
+    -fx-border-color: -border-strong;
+    -fx-border-width: 1;
+    -fx-padding: 8;
+}
+
+.chart-legend .label {
+    -fx-text-fill: -text-primary;
+}
+
+.mt5-chart-symbol {
+    -fx-text-fill: #f8fafc;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+}
+
+.mt5-chart-empty-state,
+.mt5-terminal-placeholder {
+    -fx-background-color: #050915;
+    -fx-padding: 24;
+}
+
+.mt5-empty-title {
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.mt5-empty-subtitle {
+    -fx-text-fill: #94a3b8;
+}
+
+
+/* ============================================================================
+   CANDLESTICK NODES
+   ============================================================================ */
+
+.candlestick-bar.close-above-open {
+    -fx-background-color: rgba(34, 197, 94, 0.95);
+    -fx-border-color: #86efac;
+    -fx-border-width: 1;
+}
+
+.candlestick-bar.open-above-close {
+    -fx-background-color: rgba(239, 68, 68, 0.95);
+    -fx-border-color: #fca5a5;
+    -fx-border-width: 1;
+}
+
+.candlestick-line {
+    -fx-stroke: #cbd5e1;
+    -fx-stroke-width: 1.2px;
+}
+
+.candlestick-average-line {
+    -fx-stroke: #60a5fa;
+    -fx-stroke-width: 2.2px;
+    -fx-opacity: 0.95;
+}
+
+.candlestick-candle {
+    -fx-background-color: #334155;
+    -fx-stroke: #cbd5e1;
+    -fx-stroke-width: 1px;
+}
+
+.candlestick-tooltip-label {
+    -fx-background-color: #020617;
+    -fx-border-color: -primary-light;
+    -fx-border-width: 1;
+    -fx-text-fill: white;
+    -fx-font-family: "Consolas", "Cascadia Mono", monospace;
+    -fx-font-size: 12px;
+    -fx-font-weight: 900;
+    -fx-padding: 6 10 6 10;
+}
+
+
+/* ============================================================================
+   CHART TOOLBAR
+   ============================================================================ */
+
+.candle-chart-toolbar-wrapper {
+    -fx-background-color: transparent;
+}
+
+.candle-chart-toolbar {
+    -fx-alignment: center-left;
+    -fx-spacing: 6;
+    -fx-background-color: transparent;
+}
+
+.candle-chart-toolbar-separator {
+    -fx-background-color: #334155;
+    -fx-opacity: 0.55;
+}
+
+.candle-chart-toolbar-button {
+    -fx-background-color: linear-gradient(to bottom, #1d293d, #111827);
+    -fx-border-color: #34445f;
+    -fx-border-width: 1;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-text-fill: #e5edf7;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.22), 8, 0.2, 0, 1);
+}
+
+.candle-chart-toolbar-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #263755, #18243a);
+    -fx-border-color: #60a5fa;
+}
+
+.candle-chart-toolbar-button:armed,
+.candle-chart-toolbar-button:active {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #93c5fd;
+    -fx-text-fill: white;
+}
+
+.candle-chart-toolbar-button.drawing-tool-button {
+    -fx-border-color: #334155;
+}
+
+.candle-chart-toolbar-button.drawing-tool-button:active {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #93c5fd;
+    -fx-text-fill: white;
+}
+
+.candle-chart-toolbar-button.erase-objects-button {
+    -fx-border-color: #7f1d1d;
+}
+
+.candle-chart-toolbar-button.erase-objects-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #7f1d1d, #450a0a);
+    -fx-border-color: #f87171;
+    -fx-text-fill: #fee2e2;
+}
+
+.candle-chart-toolbar-button.erase-objects-button:armed {
+    -fx-background-color: linear-gradient(to bottom, #dc2626, #7f1d1d);
+    -fx-border-color: #fecaca;
+    -fx-text-fill: white;
+}
+
+.chart-action-button {
+    -fx-background-color: linear-gradient(to bottom, #1d293d, #111827);
+    -fx-border-color: #34445f;
+    -fx-border-width: 1;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-padding: 5;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.22), 8, 0.2, 0, 1);
+}
+
+.chart-action-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #263755, #18243a);
+    -fx-border-color: #60a5fa;
+}
+
+.chart-timeframe-label {
+    -fx-text-fill: #9aa7ba;
+    -fx-font-weight: bold;
+}
+
+
+/* ============================================================================
+   CHART OPTIONS POPOVER
+   ============================================================================ */
+
+.chart-options-pane {
+    -fx-background-color: linear-gradient(to bottom, #101827, #0b1220);
+    -fx-border-color: #3b4d66;
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-spacing: 10;
+    -fx-padding: 12;
+}
+
+.chart-options-grid {
+    -fx-hgap: 18;
+    -fx-vgap: 12;
+}
+
+.chart-options-label {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.chart-options-switch {
+    -fx-cursor: hand;
+}
+
+.chart-options-switch .text {
+    -fx-fill: #f1f5f9;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+.chart-options-switch .thumb-area {
+    -fx-background-color: #1e293b;
+    -fx-border-color: #64748b;
+    -fx-border-width: 1;
+    -fx-border-radius: 999;
+    -fx-background-radius: 999;
+}
+
+.chart-options-switch .thumb {
+    -fx-background-color: linear-gradient(to bottom, #f8fafc, #cbd5e1);
+}
+
+.chart-options-switch:selected .thumb-area {
+    -fx-background-color: #2563eb;
+    -fx-border-color: #93c5fd;
+}
+
+.chart-options-switch:hover .thumb-area {
+    -fx-border-color: #93c5fd;
+}
+
+
+/* ============================================================================
+   TIMEFRAME BUTTONS
+   ============================================================================ */
+
+.mt5-timeframe-strip {
+    -fx-spacing: 2;
+    -fx-alignment: center-left;
+}
+
+.timeframe-button,
+.mt5-timeframe-button {
+    -fx-background-color: #0f172a;
+    -fx-text-fill: -text-primary;
+    -fx-border-color: -border-strong;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+    -fx-font-weight: 800;
+    -fx-padding: 5 9 5 9;
+    -fx-font-size: 11px;
+}
+
+.timeframe-button:hover,
+.mt5-timeframe-button:hover {
+    -fx-background-color: #1e293b;
+    -fx-border-color: -primary-light;
+}
+
+.timeframe-button:selected,
+.timeframe-button.active,
+.mt5-timeframe-button-active,
+.mt5-timeframe-button:selected {
+    -fx-background-color: -primary-color;
+    -fx-text-fill: white;
+    -fx-border-color: -primary-light;
+}
+
+
+/* ============================================================================
+   QUICK TRADE / STATUS BAR
+   ============================================================================ */
+
+.mt5-quick-trade,
+.mt5-status-bar,
+.status-bar {
+    -fx-background-color: linear-gradient(to bottom, #111827, #020617);
+    -fx-border-color: -border-color;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 5 10 5 10;
+    -fx-spacing: 6;
+}
+
+.status-bar .label,
+.mt5-status-bar .label {
+    -fx-text-fill: -text-secondary;
+    -fx-font-size: 12px;
+}
+
+.connection-status.connected {
+    -fx-text-fill: -success;
+    -fx-font-weight: 900;
+}
+
+.connection-status.disconnected {
+    -fx-text-fill: -danger;
+    -fx-font-weight: 900;
+}
+
+.paper-mode-chip {
+    -fx-text-fill: #38bdf8;
+    -fx-font-weight: 900;
+}
+
+.live-mode-chip {
+    -fx-text-fill: #22c55e;
+    -fx-font-weight: 900;
+}
+
+
+/* ============================================================================
+   ACCOUNT / PNL PANELS
+   ============================================================================ */
+
+.account-metrics {
+    -fx-background-color: #08111f;
+    -fx-padding: 12;
+    -fx-border-color: #263246;
+    -fx-border-width: 1;
+}
+
+.metric-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: #94a3b8;
+}
+
+.metric-value {
+    -fx-font-size: 16px;
+    -fx-font-weight: 900;
+}
+
+.pnl-strip {
+    -fx-background-color: #08111f;
+    -fx-border-color: #263246;
+    -fx-border-width: 1;
+}
+
+
+/* ============================================================================
+   ALERTS / ERRORS / HYPERLINKS / WEBVIEW
+   ============================================================================ */
+
+.trade-view-error {
+    -fx-text-fill: #fecaca;
+    -fx-font-size: 14px;
+    -fx-font-weight: 800;
+    -fx-background-color: rgba(127, 29, 29, 0.35);
+    -fx-border-color: #ef4444;
+    -fx-border-width: 1;
+    -fx-padding: 18;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.web-view,
+.web-view .scroll-bar {
+    -fx-background-color: #020617;
+}
+
+.hyperlink {
+    -fx-text-fill: -primary-light;
+    -fx-underline: false;
+}
+
+.hyperlink:hover {
+    -fx-text-fill: -info;
+    -fx-underline: true;
+}
+
+
+/* ============================================================================
+   SCROLLBARS
+   ============================================================================ */
+
+.scroll-bar {
+    -fx-background-color: #020617;
+}
+
+.scroll-bar .track {
+    -fx-background-color: #020617;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #475569;
+    -fx-background-radius: 999;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: #64748b;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 2;
+}
+
+.scroll-bar .increment-arrow,
+.scroll-bar .decrement-arrow {
+    -fx-background-color: -text-muted;
+}
+
+
+/* ============================================================================
+   PROGRESS
+   ============================================================================ */
+
+.progress-bar {
+    -fx-accent: -primary-light;
+}
+
+.progress-bar .track {
+    -fx-background-color: #020617;
+    -fx-border-color: -border-color;
+}
+
+.progress-bar .bar {
+    -fx-background-color: linear-gradient(to right, #2563eb, #22c55e);
+}
+
+.progress-indicator {
+    -fx-progress-color: -primary-light;
+}
+
+
+/* ============================================================================
+   LEGACY COMPATIBILITY CLASSES WITHOUT GLOBAL OVERRIDES
+   ============================================================================ */
+
+.tradeToolbar {
+    -fx-background-color: linear-gradient(to bottom, #1e293b, #111827);
+    -fx-border-color: -border-color;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 7 10 7 10;
+}
+
+.trade-pair-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: 900;
+    -fx-text-fill: -primary-light;
+}
+
+.gridPane {
+    -fx-padding: 10;
+    -fx-border-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 5px;
+}
+
+.chart-tab {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+.chart-tab:selected {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+.trading-tab-pane {
+    -fx-padding: 0;
+    -fx-background-color: #0b1120;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+.fx-background-color {
+    -fx-background-color: red;
+}
+
+
+/* ============================================================================
+   OPTIONAL TAB COLOR CLASSES
+   ============================================================================ */
+
+.trade-tab,
+.account-tab,
+.position-tab,
+.order-tab,
+.news-tab,
+.market-data-tab,
+.historical-data-tab {
+    -fx-text-fill: white;
+    -fx-text-align: center;
+    -fx-background-radius: 5;
+    -fx-background-insets: 0;
+}
+
+.trade-tab {
+    -fx-background-color: #116798;
+    -fx-border-color: #ac7446;
+    -fx-border-width: 2;
+}
+
+.account-tab {
+    -fx-background-color: #1d70cc;
+}
+
+.position-tab {
+    -fx-background-color: #2959ea;
+}
+
+.order-tab {
+    -fx-background-color: #3385ff;
+}
+
+.news-tab {
+    -fx-background-color: #166534;
+}
+
+.market-data-tab {
+    -fx-background-color: #1f917c;
+}
+
+.historical-data-tab {
+    -fx-background-color: #0a3463;
+}
+.exchange-navigation,
+.trading-navigation {
+    -fx-background-color: #070b12;
+}
+
+.exchange-navigation-panel,
+.trading-navigation-panel {
+    -fx-background-color: #0b1120;
+    -fx-border-color: #263246;
+    -fx-border-width: 1;
+}
+
+.trading-navigation-scroll {
+    -fx-background: #070b12;
+    -fx-background-color: #070b12;
+    -fx-border-color: transparent;
+}
+
+.trading-navigation-scroll > .viewport {
+    -fx-background-color: #070b12;
+}
+
+.trading-navigation-header {
+    -fx-padding: 2 0 8 0;
+}
+
+.exchange-navigation-title {
+    -fx-text-fill: #60a5fa;
+    -fx-font-size: 13px;
+    -fx-font-weight: 900;
+}
+
+.trading-navigation-title {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 17px;
+    -fx-font-weight: 900;
+}
+
+.trading-navigation-subtitle,
+.trading-navigation-label,
+.trading-navigation-action-description {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 11px;
+}
+
+.trading-navigation-quick-rail {
+    -fx-padding: 4 0 2 0;
+}
+
+.trading-navigation-quick-button {
+    -fx-background-color: linear-gradient(to bottom, #0f2238, #0c1b2d);
+    -fx-border-color: #2a4a64;
+    -fx-border-width: 1;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-text-fill: #cbe8ff;
+    -fx-font-size: 10px;
+    -fx-font-weight: 900;
+    -fx-padding: 5 12;
+    -fx-cursor: hand;
+}
+
+.trading-navigation-quick-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #15304e, #10263e);
+    -fx-border-color: #38bdf8;
+    -fx-text-fill: #e0f2fe;
+}
+
+.trading-navigation-chip {
+    -fx-background-color: #172033;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-padding: 4 8;
+    -fx-text-fill: #bae6fd;
+    -fx-font-size: 10px;
+    -fx-font-weight: 800;
+}
+
+.trading-navigation-card,
+.trading-navigation-section {
+    -fx-background-color: #101827;
+    -fx-border-color: #253247;
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-padding: 10;
+}
+
+.trading-navigation-section-title {
+    -fx-text-fill: #cbd5e1;
+    -fx-font-size: 11px;
+    -fx-font-weight: 900;
+}
+
+.exchange-current-label {
+    -fx-padding: 8;
+    -fx-background-color: #1e293b;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+}
+
+.exchange-selector {
+    -fx-font-size: 11px;
+}
+
+.trading-navigation-exchange-name {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 14px;
+    -fx-font-weight: 900;
+}
+
+.trading-navigation-status {
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-padding: 4 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: 900;
+}
+
+.trading-navigation-status.connecting {
+    -fx-background-color: rgba(245, 158, 11, 0.14);
+    -fx-border-color: #f59e0b;
+    -fx-text-fill: #fbbf24;
+}
+
+.trading-navigation-status.connected {
+    -fx-background-color: rgba(16, 185, 129, 0.14);
+    -fx-border-color: #10b981;
+    -fx-text-fill: #34d399;
+}
+
+.trading-navigation-status.disconnected {
+    -fx-background-color: rgba(239, 68, 68, 0.12);
+    -fx-border-color: #ef4444;
+    -fx-text-fill: #f87171;
+}
+
+.trading-navigation-selector {
+    -fx-font-size: 11px;
+}
+
+.exchange-nav-button {
+    -fx-font-size: 10px;
+    -fx-padding: 8;
+}
+
+.trading-navigation-venue-button,
+.trading-navigation-utility-button {
+    -fx-background-color: #182235;
+    -fx-border-color: #2e3b52;
+    -fx-border-width: 1;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-text-fill: #dbeafe;
+    -fx-font-size: 10px;
+    -fx-font-weight: 800;
+    -fx-padding: 8;
+    -fx-cursor: hand;
+}
+
+.trading-navigation-venue-button:hover,
+.trading-navigation-utility-button:hover {
+    -fx-background-color: #21314a;
+    -fx-border-color: #60a5fa;
+}
+
+.trading-navigation-venue-button.selected {
+    -fx-background-color: linear-gradient(to bottom, #1f3a58, #182c45);
+    -fx-border-color: #38bdf8;
+    -fx-text-fill: #ecfeff;
+}
+
+.trading-navigation-action {
+    -fx-background-color: #111a2b;
+    -fx-border-color: #26364f;
+    -fx-border-width: 1;
+    -fx-background-radius: 7;
+    -fx-border-radius: 7;
+    -fx-padding: 8 10;
+    -fx-cursor: hand;
+    -fx-alignment: center-left;
+}
+
+.trading-navigation-action:hover {
+    -fx-background-color: #18243a;
+    -fx-border-color: #38bdf8;
+}
+
+.trading-navigation-action.primary-action {
+    -fx-background-color: #102338;
+    -fx-border-color: #0ea5e9;
+}
+
+.trading-navigation-action-title {
+    -fx-text-fill: #e5edf7;
+    -fx-font-size: 12px;
+    -fx-font-weight: 900;
+}
+
+.trading-navigation-action-arrow {
+    -fx-text-fill: #38bdf8;
+    -fx-font-size: 13px;
+    -fx-font-weight: 900;
+}
+
+.exchange-control-buttons .button {
+    -fx-font-size: 11px;
+    -fx-padding: 8;
+}
+
+.connection-status.connecting {
+    -fx-text-fill: #f59e0b;
+    -fx-font-weight: 900;
+}
+
+.connection-status.connected {
+    -fx-text-fill: #10b981;
+    -fx-font-weight: 900;
+}
+
+.connection-status.disconnected {
+    -fx-text-fill: #ef4444;
+    -fx-font-weight: 900;
+}
+
+/* Transfer Funds panel */
+.transfer-funds-panel {
+    -fx-background-color: linear-gradient(to bottom right, #0b1220, #111827);
+    -fx-border-color: rgba(71, 85, 105, 0.6);
+    -fx-border-width: 1;
+}
+
+.transfer-funds-root {
+    -fx-background-color: rgba(15, 23, 42, 0.85);
+    -fx-border-color: rgba(71, 85, 105, 0.6);
+    -fx-border-width: 1;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+}
+
+.transfer-funds-title {
+    -fx-font-size: 20;
+    -fx-font-weight: 800;
+    -fx-text-fill: #e2e8f0;
+}
+
+.transfer-funds-section-title {
+    -fx-font-size: 13;
+    -fx-font-weight: 700;
+    -fx-text-fill: #cbd5e1;
+}
+
+.transfer-funds-label {
+    -fx-font-size: 12;
+    -fx-font-weight: 600;
+    -fx-text-fill: #94a3b8;
+}
+
+.transfer-funds-metric {
+    -fx-font-size: 12;
+    -fx-font-weight: 700;
+    -fx-text-fill: #e2e8f0;
+}
+
+.transfer-funds-message {
+    -fx-font-size: 12;
+    -fx-text-fill: #7dd3fc;
+}
+
+.transfer-funds-root .combo-box,
+.transfer-funds-root .text-field,
+.transfer-funds-root .text-area,
+.transfer-funds-root .spinner {
+    -fx-background-color: #0b1220;
+    -fx-control-inner-background: #0b1220;
+    -fx-text-fill: #e2e8f0;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.transfer-funds-preview-button {
+    -fx-background-color: #1d4ed8;
+    -fx-text-fill: #ffffff;
+    -fx-font-weight: 700;
+}
+
+.transfer-funds-execute-button {
+    -fx-background-color: #0f766e;
+    -fx-text-fill: #ffffff;
+    -fx-font-weight: 700;
+}
+
+.transfer-funds-cancel-button {
+    -fx-background-color: #334155;
+    -fx-text-fill: #e2e8f0;
+    -fx-font-weight: 700;
+}
+
+.transfer-funds-root .table-view {
+    -fx-background-color: #0b1220;
+    -fx-control-inner-background: #0b1220;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+}
+
+.transfer-funds-root .table-view .column-header-background {
+    -fx-background-color: #111827;
+}
+
+.transfer-funds-root .table-view .column-header,
+.transfer-funds-root .table-view .filler {
+    -fx-background-color: #111827;
+    -fx-border-color: #1f2937;
+}
+
+.transfer-funds-root .table-view .label {
+    -fx-text-fill: #cbd5e1;
+}

@@ -15,16 +15,16 @@ Write-Host ""
 # Check if .env file already exists
 $envFilePath = ".env"
 if (Test-Path $envFilePath) {
-    Write-Host "⚠️  .env file already exists!" -ForegroundColor Yellow
+    Write-Host "  .env file already exists!" -ForegroundColor Yellow
     Write-Host "This script will show you how to set environment variables." -ForegroundColor Yellow
     Write-Host ""
 } else {
-    Write-Host "✓ Creating .env file from template..." -ForegroundColor Green
+    Write-Host " Creating .env file from template..." -ForegroundColor Green
     if (Test-Path ".env.example") {
         Copy-Item ".env.example" ".env"
-        Write-Host "✓ .env file created from .env.example" -ForegroundColor Green
+        Write-Host " .env file created from .env.example" -ForegroundColor Green
     } else {
-        Write-Host "⚠️  .env.example not found. Creating .env manually..." -ForegroundColor Yellow
+        Write-Host "  .env.example not found. Creating .env manually..." -ForegroundColor Yellow
     }
 }
 
@@ -35,7 +35,7 @@ Write-Host ""
 
 # Get credentials from user
 $keyName = Read-Host "Enter your Key Name (organizations/.../apiKeys/...)" -AsSecureString
-$privateKey = Read-Host "Enter your EC Private Key (paste entire key)" -AsSecureString
+$privateKey = Read-Host "Enter your API Secret (ECDSA PEM or Ed25519 private key)" -AsSecureString
 
 # Convert to plain text for environment variable
 $keyNamePlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemAlloc($keyName))
@@ -49,7 +49,7 @@ Write-Host ""
 [Environment]::SetEnvironmentVariable("COINBASE_KEY_NAME", $keyNamePlain, "Process")
 [Environment]::SetEnvironmentVariable("COINBASE_PRIVATE_KEY", $privateKeyPlain, "Process")
 
-Write-Host "✓ Environment variables set for this PowerShell session" -ForegroundColor Green
+Write-Host " Environment variables set for this PowerShell session" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "STEP 3: Save to .env File" -ForegroundColor Cyan
@@ -77,9 +77,9 @@ if ($saveToEnvPlain -eq "y") {
     }
     
     $envContent | Set-Content ".env" -Encoding UTF8
-    Write-Host "✓ Credentials saved to .env file" -ForegroundColor Green
+    Write-Host " Credentials saved to .env file" -ForegroundColor Green
     Write-Host ""
-    Write-Host "⚠️  IMPORTANT: Keep .env file SECURE!" -ForegroundColor Yellow
+    Write-Host "  IMPORTANT: Keep .env file SECURE!" -ForegroundColor Yellow
     Write-Host "   - Add .env to .gitignore (if using git)" -ForegroundColor Gray
     Write-Host "   - Never commit .env to version control" -ForegroundColor Gray
     Write-Host "   - Restrict file permissions: icacls .env /grant ""%username%:F"" /inheritance:r" -ForegroundColor Gray
@@ -94,8 +94,8 @@ Write-Host ""
 Write-Host "Option B - Persistent System Environment Variables:" -ForegroundColor Gray
 Write-Host "  1. Open Settings > Environment Variables" -ForegroundColor DarkGray
 Write-Host "  2. Add new User variables:" -ForegroundColor DarkGray
-Write-Host "     - COINBASE_KEY_NAME: $keyNamePlain" -ForegroundColor DarkGray
-Write-Host "     - COINBASE_PRIVATE_KEY: $privateKeyPlain" -ForegroundColor DarkGray
+Write-Host "     - COINBASE_KEY_NAME: [configured]" -ForegroundColor DarkGray
+Write-Host "     - COINBASE_PRIVATE_KEY: [redacted]" -ForegroundColor DarkGray
 Write-Host "  3. Restart IDE/terminal for changes to take effect" -ForegroundColor DarkGray
 Write-Host ""
 
@@ -106,15 +106,15 @@ $verifyKey = [Environment]::GetEnvironmentVariable("COINBASE_KEY_NAME", "Process
 $verifyPrivate = [Environment]::GetEnvironmentVariable("COINBASE_PRIVATE_KEY", "Process")
 
 if ($verifyKey) {
-    Write-Host "✓ COINBASE_KEY_NAME is set (length: $($verifyKey.Length) chars)" -ForegroundColor Green
+    Write-Host " COINBASE_KEY_NAME is set (length: $($verifyKey.Length) chars)" -ForegroundColor Green
 } else {
-    Write-Host "✗ COINBASE_KEY_NAME is NOT set" -ForegroundColor Red
+    Write-Host " COINBASE_KEY_NAME is NOT set" -ForegroundColor Red
 }
 
 if ($verifyPrivate) {
-    Write-Host "✓ COINBASE_PRIVATE_KEY is set (length: $($verifyPrivate.Length) chars)" -ForegroundColor Green
+    Write-Host " COINBASE_PRIVATE_KEY is set (length: $($verifyPrivate.Length) chars)" -ForegroundColor Green
 } else {
-    Write-Host "✗ COINBASE_PRIVATE_KEY is NOT set" -ForegroundColor Red
+    Write-Host " COINBASE_PRIVATE_KEY is NOT set" -ForegroundColor Red
 }
 
 Write-Host ""

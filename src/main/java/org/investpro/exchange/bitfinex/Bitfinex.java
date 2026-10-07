@@ -336,7 +336,7 @@ public class Bitfinex extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
-        if (modeRequestsPaperNetwork()) {
+        if (modeRequestsLocalPaper()) {
             return true;
         }
         if (modeRequestsLiveNetwork()) {

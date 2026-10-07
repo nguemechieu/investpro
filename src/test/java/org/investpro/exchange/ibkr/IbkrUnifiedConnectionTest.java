@@ -40,7 +40,7 @@ class IbkrUnifiedConnectionTest {
         StubIbkrTwsSession session = new StubIbkrTwsSession();
         IbkrConnectionManager manager = new IbkrConnectionManager(session, "");
         try {
-            manager.connect(IbkrConnectionProfile.twsPaper());
+            manager.connect(new IbkrConnectionProfile(IbkrConnectionMode.TWS_API, null, 7496, 1, false, false, null, null));
             session.disconnect();
             assertFalse(manager.isConnected());
             assertFalse(manager.snapshotHealth().connected());

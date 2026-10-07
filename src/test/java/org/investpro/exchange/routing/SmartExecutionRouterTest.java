@@ -19,6 +19,21 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>All tests use in-memory snapshots — no live API calls.
  */
 class SmartExecutionRouterTest {
+    @Test
+    void paperModeKeepsBrokerDestinationAndRespectsExchangePreference() {
+        var paperRouter = new SmartExecutionRouter(null);
+        paperRouter.updateSnapshot("IBKR", tightSpreadSnapshot("IBKR", "AAPL"));
+        paperRouter.updateSnapshot("Coinbase", tightSpreadSnapshot("Coinbase", "AAPL"));
+        var request = ExecutionRequest.builder("AAPL", ExecutionRequest.Side.BUY, BigDecimal.ONE)
+                .paperMode(true).exchange("IBKR").venue(org.investpro.exchange.execution.ExecutionVenue.BROKER)
+                .allowFallback(false).build();
+        var result = paperRouter.route(request, List.of("Coinbase", "IBKR")).orElseThrow();
+        assertThat(result.exchangeName()).isEqualTo("IBKR");
+        assertThat(result.venue()).isEqualTo(org.investpro.exchange.execution.ExecutionVenue.BROKER);
+        assertThat(result.executionMode()).isEqualTo(org.investpro.exchange.execution.ExecutionMode.LOCAL_PAPER);
+        assertThat(paperRouter.route(request, List.of("Coinbase"))).isEmpty();
+    }
+
 
     private SmartExecutionRouter router;
 

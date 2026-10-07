@@ -169,6 +169,11 @@ public class SystemCore {
 
     public SystemCore(@NotNull Exchange exchange, Properties config, String open_ai_api_key)
             throws SQLException, ClassNotFoundException {
+        this(exchange, config, open_ai_api_key, null);
+    }
+
+    public SystemCore(@NotNull Exchange exchange, Properties config, String open_ai_api_key,
+                      TelegramNotifier applicationNotifier) throws SQLException, ClassNotFoundException {
 
         this.exchange = Objects.requireNonNull(exchange, "exchange cannot be null");
         this.universalTradabilityService = new UniversalTradabilityService(this.exchange, null);
@@ -258,13 +263,13 @@ public class SystemCore {
         // Wire symbol agent state updates for real-time UI
         this.symbolAgentUpdater = new SymbolAgentUpdater(smartBot.getEventBus(), getSymbolAgentManager());
 
-        if (!telegramToken.isBlank()) {
+        if (applicationNotifier != null || !telegramToken.isBlank()) {
 
-            this.telegramNotifier = new TelegramNotifier(telegramToken);
-            this.telegramNotifier.configureRemoteAccess(this.config);
+            this.telegramNotifier = applicationNotifier == null ? new TelegramNotifier(telegramToken) : applicationNotifier;
+            if (applicationNotifier == null) this.telegramNotifier.configureRemoteAccess(this.config);
             // Initialize command handler for Telegram commands
             this.telegramCommandHandler = new TelegramCommandHandler(this, telegramNotifier);
-            this.telegramNotifier.setCommandHandler(telegramCommandHandler);
+            if (applicationNotifier == null) this.telegramNotifier.setCommandHandler(telegramCommandHandler);
             // Create event listener - will be wired to SmartBot in start()
             this.telegramEventListener = new TelegramEventListener(smartBot.getEventBus(), telegramNotifier);
 
@@ -275,10 +280,10 @@ public class SystemCore {
                 openaiApiKey = System.getenv("OPENAI_API_KEY") != null ? System.getenv("OPENAI_API_KEY").trim() : "";
             }
 
-            if (!openaiApiKey.isBlank()) {
+            if (applicationNotifier == null && !openaiApiKey.isBlank()) {
                 telegramNotifier.initializeChatGPT(openaiApiKey);
                 log.info("✅ ChatGPT integration initialized for Telegram bot");
-            } else {
+            } else if (applicationNotifier == null) {
                 log.info("ℹ️ OpenAI API key not configured - ChatGPT features disabled");
             }
 
@@ -502,8 +507,7 @@ public class SystemCore {
                                     "Telegram notifications are idle until TELEGRAM_CHAT_ID is configured or the bot receives /start."));
         }
 
-        // Start Telegram polling if bot token is configured
-        startTelegramPolling();
+        // Assistant polling is owned by the application, independently of trading.
 
         notifyAllChannels("SmartBot", "\uD83E\uDD16 SmartBot started.");
     }
@@ -568,8 +572,7 @@ public class SystemCore {
             log.info("✅ Telegram event listener stopped");
         }
 
-        // Stop Telegram polling
-        stopTelegramPolling();
+        // Leave the application assistant running when trading stops.
 
         if (signalMonitorService != null) {
             signalMonitorService.stop();

@@ -111,10 +111,8 @@ import java.util.stream.Stream;
 public class StellarNetwork extends Exchange {
 
     private static final String STELLAR_API_URL = "https://horizon.stellar.org";
-    private static final String STELLAR_TEST_URL = "https://horizon-testnet.stellar.org";
 
     private static final String MAINNET_USDC_ISSUER = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
-    private static final String TESTNET_USDC_ISSUER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 
     private static final double DEFAULT_XLM_USDC_PRICE = 0.50;
     private static final int DEFAULT_ORDER_BOOK_LIMIT = 200;
@@ -217,11 +215,11 @@ public class StellarNetwork extends Exchange {
     }
 
     private String horizonUrl(boolean paperMode) {
-        return paperMode ? STELLAR_TEST_URL : STELLAR_API_URL;
+        return STELLAR_API_URL;
     }
 
     private Network stellarNetwork() {
-        return isPaperTrading() ? Network.TESTNET : Network.PUBLIC;
+        return Network.PUBLIC;
     }
 
     private @NotNull Server activeServer() {
@@ -291,14 +289,14 @@ public class StellarNetwork extends Exchange {
         balances.put("XLM", 1_000.0);
         balances.put("EURC", 1_000.0);
 
-        trustedAssetIssuers.put("USDC", isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
+        trustedAssetIssuers.put("USDC", MAINNET_USDC_ISSUER);
         syncTrustedIssuerCache();
 
         log.info("Stellar paper account initialized with 1000 USDC and 1000 XLM");
     }
 
     private StellarTrustedAssetRegistry trustedAssetRegistryForMode() {
-        boolean testnet = isPaperTrading();
+        boolean testnet = false;
         StellarTrustedAssetRegistry current = trustedAssetRegistry;
         if (current == null || trustedAssetRegistryTestnet == null || !trustedAssetRegistryTestnet.equals(testnet)) {
             current = new StellarTrustedAssetRegistry(testnet);
@@ -350,7 +348,7 @@ public class StellarNetwork extends Exchange {
             throw new IllegalStateException(result.getMessage());
         }
         connected = true;
-        log.info("Connected to Stellar {} through {}", isPaperTrading() ? "paper/testnet" : "live/mainnet",
+        log.info("Connected to Stellar {} through {}", isPaperTrading() ? "local paper" : "live/mainnet",
                 horizonUrl());
     }
 
@@ -401,7 +399,7 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
-        if (modeRequestsPaperNetwork()) {
+        if (modeRequestsLocalPaper()) {
             return true;
         }
         if (modeRequestsLiveNetwork()) {
@@ -410,9 +408,8 @@ public class StellarNetwork extends Exchange {
         return Boolean.parseBoolean(System.getenv().getOrDefault("STELLAR_PAPER", "true")) || !hasLiveCredentials();
     }
 
-    protected boolean modeRequestsPaperNetwork() {
-        String mode = trimToNull(getUserSelectedTradingMode());
-        return ("PAPER".equalsIgnoreCase(mode) || "SANDBOX".equalsIgnoreCase(mode) || "TESTNET".equalsIgnoreCase(mode));
+    protected boolean modeRequestsLocalPaper() {
+        return "PAPER".equals(getResolvedTradingMode());
     }
 
     protected boolean modeRequestsLiveNetwork() {
@@ -431,7 +428,7 @@ public class StellarNetwork extends Exchange {
     }
 
     private String horizonUrl() {
-        return isPaperTrading() ? STELLAR_TEST_URL : STELLAR_API_URL;
+        return STELLAR_API_URL;
     }
 
     private boolean hasLiveCredentials() {
@@ -572,8 +569,8 @@ public class StellarNetwork extends Exchange {
 
                 trustedAssetIssuers.clear();
                 trustedAssetIssuers.putAll(liveIssuers);
-                trustedAssetIssuers.put("USDC", isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
-                trustedAssetIssuers.put("USD", isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
+                trustedAssetIssuers.put("USDC", MAINNET_USDC_ISSUER);
+                trustedAssetIssuers.put("USD", MAINNET_USDC_ISSUER);
                 for (Map.Entry<String, String> entry : liveIssuers.entrySet()) {
                     trustedAssetRegistryForMode().addUserTrustlineAsset(entry.getKey(), entry.getValue(), "");
                 }
@@ -2913,7 +2910,7 @@ public class StellarNetwork extends Exchange {
 
                 .supportsLiveTrading(hasLiveCredentials())
                 .supportsPaperTradingMode(true)
-                .supportsSandbox(isPaperTrading())
+                .supportsSandbox(false)
                 .supportsMarketOrders(true)
                 .supportsLimitOrders(true)
                 .supportsStopOrders(false)
@@ -2970,7 +2967,7 @@ public class StellarNetwork extends Exchange {
                         Uses Stellar Horizon Server SDK for account loading, asset discovery, order book, trades, candles, and transaction submission.
                         Stellar does not have broker-style market orders; market orders are simulated with aggressive limit offers.
                         Stellar does not support margin, leverage, bracket orders, or stop-loss/take-profit as native order types.
-                        Paper mode uses a local simulated account and Horizon testnet data when available.
+                        Paper mode uses a local simulated account and public mainnet market data.
                         Live mode requires accountId=G... and apiSecret=S... secret seed.
                         """)
                 .build();
@@ -3043,7 +3040,7 @@ public class StellarNetwork extends Exchange {
         }
 
         if ("USDC".equalsIgnoreCase(normalized) || "USD".equalsIgnoreCase(normalized)) {
-            return isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER;
+            return MAINNET_USDC_ISSUER;
         }
 
         try {
@@ -3078,7 +3075,7 @@ public class StellarNetwork extends Exchange {
         }
 
         if ("USDC".equalsIgnoreCase(normalized) || "USD".equalsIgnoreCase(normalized)) {
-            return isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER;
+            return MAINNET_USDC_ISSUER;
         }
 
         String trustedIssuer = trimToNull(trustedAssetIssuers.get(normalized));

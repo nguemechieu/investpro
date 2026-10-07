@@ -61,6 +61,9 @@ public final class IbkrConnectionManager {
     }
     public synchronized void connect(IbkrConnectionProfile profile) {
         IbkrConnectionProfile safeProfile = profile == null ? IbkrConnectionProfile.twsPaper() : profile;
+        if (safeProfile.paper()) {
+            throw new IllegalArgumentException("IBKR remote paper connections are disabled; use InvestPro local paper simulation.");
+        }
         if (safeProfile.mode() == IbkrConnectionMode.TWS_API) {
             twsSession.connect(safeProfile, requestedAccountId);
         }

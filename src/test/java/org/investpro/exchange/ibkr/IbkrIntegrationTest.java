@@ -18,14 +18,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class IbkrIntegrationTest {
 
     @Test
-    void connectionLifecycleWorksForPaperAndReconnect() {
+    void paperLifecycleNeverConnectsToBroker() {
         IbkrExchange exchange = paperExchange();
 
         exchange.connect();
-        assertThat(exchange.isConnected()).isTrue();
+        assertThat(exchange.isConnected()).isFalse();
 
         exchange.reconnect();
-        assertThat(exchange.isConnected()).isTrue();
+        assertThat(exchange.isConnected()).isFalse();
 
         exchange.disconnect();
         assertThat(exchange.isConnected()).isFalse();
@@ -93,12 +93,12 @@ class IbkrIntegrationTest {
 
         IbkrConnectionManager.ConnectionHealth health = exchange.connectionHealth();
 
-        assertThat(health.connected()).isTrue();
+        assertThat(health.connected()).isFalse();
         assertThat(health.reconnectAttempts()).isGreaterThanOrEqualTo(0);
     }
 
     @Test
-    void connectionUsesEndpointParamsFromExchangeCredentials() {
+    void legacyPaperEndpointParamsCannotOpenRemoteConnection() {
         ExchangeCredentials credentials = new ExchangeCredentials(
                 "interactive_brokers",
                 "paper-key",
@@ -116,9 +116,8 @@ class IbkrIntegrationTest {
         IbkrExchange exchange = new IbkrExchange(credentials, new StubIbkrTwsSession());
         exchange.connect();
 
-        assertThat(exchange.getConnectionManager().getHost()).isEqualTo("192.0.2.10");
-        assertThat(exchange.getConnectionManager().getPort()).isEqualTo(7497);
-        assertThat(exchange.getConnectionManager().getClientId()).isEqualTo(42);
+        assertThat(exchange.isConnected()).isFalse();
+        assertThat(exchange.fetchAccount().join().isPaperTrading()).isTrue();
     }
 
     @Test

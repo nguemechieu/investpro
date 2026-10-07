@@ -211,6 +211,10 @@ public class DecisionPipelineOrchestrator {
         if (plan == null) {
             throw new IllegalArgumentException("Execution plan is required");
         }
+        if (plan.getExecutionMode().isLocal()) {
+            return BlockchainTransactionResult.failed(plan.getPlanId(), "LOCAL", "LOCAL_EXECUTION_MODE",
+                    "Local paper/backtest plans cannot submit blockchain transactions.");
+        }
         if (blockchainExecutionService == null) {
             throw new IllegalArgumentException("BlockchainExecutionService is required");
         }

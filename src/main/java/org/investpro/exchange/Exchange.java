@@ -91,6 +91,10 @@ public abstract class Exchange implements
         return localPaperExecution.account(getExchangeId());
     }
 
+    public OrderExecutionProvider localPaperOrderExecution() {
+        return localPaperExecution.provider();
+    }
+
     public CompletableFuture<Account> tradingAccount() {
         return isPaperTrading() ? CompletableFuture.completedFuture(localPaperAccount()) : fetchAccount();
     }
@@ -160,7 +164,8 @@ public abstract class Exchange implements
         return !(privateFeature || authenticatedMarketData) || hasPrivateAuthentication();
     }
 
-    protected boolean modeRequestsPaperNetwork() {
+    /** Paper, sandbox and practice settings select in-process simulation, never a broker environment. */
+    protected boolean modeRequestsLocalPaper() {
         return "PAPER".equals(getResolvedTradingMode());
     }
 

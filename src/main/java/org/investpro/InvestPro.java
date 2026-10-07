@@ -81,6 +81,7 @@ public class InvestPro extends Application {
     private CurrencyRepository currencyRepository;
     private BorderPane root;
     private ScreenManager screenManager;
+    private org.investpro.ai.AssistantRuntime assistantRuntime;
 
     public static void main(String[] args) {
         initializeGlobalExceptionHandling();
@@ -126,6 +127,8 @@ public class InvestPro extends Application {
 
     @Override
     public void start(@NotNull Stage primaryStage) {
+        assistantRuntime = org.investpro.ai.AssistantRuntime.fromEnvironment("", "");
+        assistantRuntime.start();
         this.primaryStage = Objects.requireNonNull(primaryStage, "primaryStage must not be null");
 
         try {
@@ -190,11 +193,18 @@ public class InvestPro extends Application {
         }
 
         try {
+            String requestedToken = configuration.telegramToken();
+            if (requestedToken != null && !requestedToken.isBlank()
+                    && !requestedToken.equals(assistantRuntime.notifier().getBotToken())) {
+                assistantRuntime.close();
+                assistantRuntime = org.investpro.ai.AssistantRuntime.fromEnvironment(requestedToken, configuration.openaiApiKey());
+                assistantRuntime.start();
+            }
             TradingScreen tradingScreen = new TradingScreen(
                     configuration,
                     tradeRepository,
                     orderRepository,
-                    currencyRepository);
+                    currencyRepository, assistantRuntime);
             screenManager.show(tradingScreen);
 
             primaryStage.setTitle(buildWindowTitle("Trading Desk"));
@@ -312,6 +322,7 @@ public class InvestPro extends Application {
             log.warn("Error while shutting down InvestPro", exception);
 
         } finally {
+            if (assistantRuntime != null) assistantRuntime.close();
             if (exitPlatform) {
                 Platform.exit();
             }

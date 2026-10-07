@@ -15,6 +15,7 @@ public enum MarketType {
 
     public boolean isDerivative() {
         return this == DERIVATIVE
+                || this == DERIVATIVES
 
                 || this == FUTURE
                 || this == PERPETUAL
@@ -29,6 +30,11 @@ public enum MarketType {
 
     public boolean isMarket() {
         return this == MARGIN;
+    }
+
+    public MarketCategory category() {
+        if (isDerivative()) return MarketCategory.DERIVATIVES;
+        return this == SPOT || this == MARGIN ? MarketCategory.SPOT : MarketCategory.UNKNOWN;
     }
 
 }

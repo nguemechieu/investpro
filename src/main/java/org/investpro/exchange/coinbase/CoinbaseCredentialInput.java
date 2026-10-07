@@ -36,13 +36,6 @@ public final class CoinbaseCredentialInput {
         secret = unwrap(secret);
         if (secret.contains("-----BEGIN ")) {
             secret = CoinbaseJwtSigner.normalizePem(secret);
-        } else if (isRawEd25519Key(secret)) {
-            throw new IllegalArgumentException("This appears to be a raw Base64 Ed25519 private key. "
-                    + "Coinbase Advanced Trade requires an ECDSA (ES256) key. "
-                    + "Create a new key in Coinbase Developer Platform: API Keys > Secret API Keys > "
-                    + "Create API key > Advanced Settings > Signature algorithm: ECDSA. "
-                    + "Paste the new name and PEM privateKey, or the complete JSON export. "
-                    + "Adding PEM markers cannot convert an Ed25519 key to ECDSA.");
         }
         return new Normalized(key, secret);
     }
@@ -56,9 +49,10 @@ public final class CoinbaseCredentialInput {
         return null;
     }
 
-    private static boolean isRawEd25519Key(String secret) {
+    public static boolean isRawEd25519Key(String secret) {
         try {
-            return Base64.getDecoder().decode(secret).length == 64;
+            int length = Base64.getDecoder().decode(secret.replaceAll("\\s+", "")).length;
+            return length == 32 || length == 64;
         } catch (IllegalArgumentException invalidBase64) {
             return false;
         }

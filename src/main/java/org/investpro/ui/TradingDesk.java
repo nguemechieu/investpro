@@ -256,6 +256,9 @@ public class TradingDesk extends BorderPane {
     private final ComboBox<String> botSymbolScopeSelector = new ComboBox<>();
     private final ComboBox<String> orderTypeSelector = new ComboBox<>();
     private final ComboBox<String> botTradingModeSelector = new ComboBox<>();
+    private final ComboBox<String> marketCategorySelector = new ComboBox<>();
+    private final ComboBox<String> contractFilterSelector = new ComboBox<>();
+    private final ComboBox<String> underlyingFilterSelector = new ComboBox<>();
     private final ComboBox<MarketWatchTradabilityFilter> marketWatchFilterSelector = new ComboBox<>();
     private final Label exchangeVenueLabel = new Label(t("label.venue"));
 
@@ -531,6 +534,14 @@ public class TradingDesk extends BorderPane {
             TradeRepository tradeRepository,
             OrderRepository orderRepository,
             CurrencyRepository currencyRepository) {
+        this(configuration, tradeRepository, orderRepository, currencyRepository, null);
+    }
+
+    public TradingDesk(MarketConfiguration configuration, TradeRepository tradeRepository,
+                       OrderRepository orderRepository, CurrencyRepository currencyRepository,
+                       org.investpro.ai.AssistantRuntime applicationAssistant) {
+        assistantRuntime = applicationAssistant;
+        ownsAssistantRuntime = applicationAssistant == null;
         this.tradeRepository = Objects.requireNonNull(tradeRepository, "tradeRepository must not be null");
         this.orderRepository = Objects.requireNonNull(orderRepository, "orderRepository must not be null");
         this.currencyRepository = Objects.requireNonNull(currencyRepository, "currencyRepository must not be null");
@@ -611,11 +622,51 @@ public class TradingDesk extends BorderPane {
 
     private NewsEventOverlay newsEventOverlay;
 
+    private org.investpro.ai.AssistantRuntime assistantRuntime;
+    private final boolean ownsAssistantRuntime;
+    private org.investpro.ui.panels.AiInteractionPanel aiInteractionPanel;
+    private Stage aiInteractionStage;
+
+    private void openAiInteractionPanel() {
+        if (aiInteractionPanel == null) {
+            aiInteractionPanel = new org.investpro.ui.panels.AiInteractionPanel(assistantRuntime);
+            aiInteractionStage = new Stage();
+            if (getScene() != null) aiInteractionStage.initOwner(getScene().getWindow());
+            aiInteractionStage.setTitle("AI Interaction — InvestPro");
+            Scene scene = new Scene(aiInteractionPanel, 900, 720);
+            if (getScene() != null) scene.getStylesheets().setAll(getScene().getStylesheets());
+            ThemeManager.getInstance().applyTheme(aiInteractionPanel);
+            aiInteractionStage.setScene(scene);
+            aiInteractionStage.setOnHiding(_ -> aiInteractionPanel.stopAudio());
+            aiInteractionStage.setMinWidth(620); aiInteractionStage.setMinHeight(520);
+        }
+        aiInteractionStage.show(); aiInteractionStage.toFront();
+    }
+
     private void initialize(MarketConfiguration configuration) {
         if (initialized) {
             return;
         }
         initialized = true;
+        if (assistantRuntime != null) assistantRuntime.setScreenshotSource(this::getScene);
+        if (assistantRuntime != null) assistantRuntime.setBotControl(action -> {
+            Exchange requestedExchange = exchange;
+            Platform.runLater(() -> {
+                if (!action.equals("start")) { stopBotTradingAsync(); return; }
+                if (exchange != requestedExchange || requestedExchange == null) {
+                    showWarning("Bot Trading", "Selected exchange changed. Request a new bot start preview."); return;
+                }
+                if (botTradingEnabled) { appendAgentActivity("Bot is already running."); return; }
+                if (!hasBrokerAccess() || !requestedExchange.canSubmitBotOrders()) {
+                    showWarning("Bot Trading", "The selected exchange cannot currently submit bot orders."); return;
+                }
+                List<TradePair> symbols = filterBotTradableSymbols(selectedBotSymbols());
+                if (symbols.isEmpty()) { showWarning("Bot Trading", "No tradable symbols in the selected bot scope."); return; }
+                startBotTradingAsync(symbols, "AI request on " + requestedExchange.getDisplayName(),
+                        () -> withActiveChart(chart -> chart.setAutoTradeEnabled(true)));
+            });
+            return "Bot " + action + " requested. Check the desktop bot status for completion.";
+        });
 
         // Load and apply saved theme configuration at startup
         ThemeManager themeManager = ThemeManager.getInstance();
@@ -645,7 +696,13 @@ public class TradingDesk extends BorderPane {
 
         tradingDeskState.setPaperMode(isPaperTradingMode());
         telegramToken = resolveTelegramToken(configuration);
-        configuredOpenAiApiKey = preferences.get("openai_api_key", safe(System.getenv("OPENAI_API_KEY")));
+        configuredOpenAiApiKey = configuration != null && !safe(configuration.openaiApiKey()).isBlank()
+                ? configuration.openaiApiKey() : preferences.get("openai_api_key", safe(System.getenv("OPENAI_API_KEY")));
+        if (assistantRuntime == null) assistantRuntime = org.investpro.ai.AssistantRuntime.fromEnvironment(telegramToken, configuredOpenAiApiKey);
+        if (!safe(configuredOpenAiApiKey).isBlank()) assistantRuntime.notifier().initializeChatGPT(configuredOpenAiApiKey);
+        if (configuration != null && !safe(configuration.openaiModel()).isBlank()) assistantRuntime.notifier().setOpenaiModel(configuration.openaiModel());
+        assistantRuntime.start();
+        symbolSelector.valueProperty().addListener((_, _, symbol) -> assistantRuntime.selectSymbol(symbol));
 
         configureButtonStyles();
         configureSelectors(configuration);
@@ -957,7 +1014,9 @@ public class TradingDesk extends BorderPane {
 
         Menu languageMenu = createLanguageMenu();
 
-        return new MenuBar(fileMenu, editMenu, viewMenu, chartsMenu, tradeMenu, accountsMenu, strategyMenu,
+        Menu aiMenu = new Menu("AI");
+        aiMenu.getItems().add(menuItem("AI Interaction", null, this::openAiInteractionPanel));
+        return new MenuBar(aiMenu, fileMenu, editMenu, viewMenu, chartsMenu, tradeMenu, accountsMenu, strategyMenu,
                 researchMenu, reviewMenu, systemMenu, educationMenu, settingsMenu, languageMenu, helpMenu);
     }
 
@@ -1659,7 +1718,7 @@ public class TradingDesk extends BorderPane {
         marketWatchTable.setItems(filteredItems);
 
         VBox.setVgrow(marketWatchTable, Priority.ALWAYS);
-        VBox box = new VBox(4, header, marketWatchFilterSelector, searchField, marketWatchTable);
+        VBox box = new VBox(4, header, createMarketClassificationFilters(), marketWatchFilterSelector, searchField, marketWatchTable);
         box.setPadding(new Insets(8));
         box.getStyleClass().addAll("market-watch", "pro-panel", "mt5-panel", "mt5-market-watch");
         return box;
@@ -1729,7 +1788,7 @@ public class TradingDesk extends BorderPane {
         marketWatchTable.setItems(filteredItems);
 
         VBox.setVgrow(marketWatchTable, Priority.ALWAYS);
-        VBox box = new VBox(4, header, marketWatchFilterSelector, searchField, marketWatchTable);
+        VBox box = new VBox(4, header, createMarketClassificationFilters(), marketWatchFilterSelector, searchField, marketWatchTable);
         box.setPadding(new Insets(8));
         box.getStyleClass().addAll("market-watch", "pro-panel");
         return box;
@@ -3969,13 +4028,11 @@ public class TradingDesk extends BorderPane {
         });
         marketTypeCol.setPrefWidth(92);
 
-        TableColumn<TradePair, String> venueCol = new TableColumn<>("Route");
+        TableColumn<TradePair, String> venueCol = new TableColumn<>("Product venue");
         venueCol.setCellValueFactory(cd -> {
             TradePair pair = cd.getValue();
             MarketInstrument instrument = pair == null ? null : marketInstrumentBySymbol.get(symbolKey(pair));
-            return new SimpleStringProperty(instrument == null || instrument.routingExchange().isBlank()
-                    ? ""
-                    : instrument.routingExchange());
+            return new SimpleStringProperty(instrument == null ? "" : MarketConfiguration.venueFor(instrument).displayName());
         });
         venueCol.setPrefWidth(120);
 
@@ -5732,6 +5789,7 @@ public class TradingDesk extends BorderPane {
         disablePositionAutoRefresh();
         stopDesktopStream();
         systemCore = null;
+        if (assistantRuntime != null) assistantRuntime.attach(null);
         systemCoreEventsSubscribed = false;
         botTradingEnabled = false;
         if (universalTradabilityService != null) {
@@ -5937,6 +5995,8 @@ public class TradingDesk extends BorderPane {
                 systemCore = createSystemCore(exchange);
                 connectedDeskCores.put(exchange, systemCore);
             }
+            assistantRuntime.attach(systemCore);
+            assistantRuntime.selectSymbol(symbolSelector.getValue());
             // Wire up the primary stage to the Telegram command handler for screenshot
             // capability
             if (systemCore.getTelegramCommandHandler() != null && getScene() != null
@@ -6086,6 +6146,7 @@ public class TradingDesk extends BorderPane {
                 log.debug("Failed to stop SystemCore after validation failure", exception);
             }
             systemCore = null;
+            if (assistantRuntime != null) assistantRuntime.attach(null);
             systemCoreEventsSubscribed = false;
         }
 
@@ -6695,7 +6756,7 @@ public class TradingDesk extends BorderPane {
             config.setProperty("ai.provider", "local");
         }
 
-        SystemCore core = new SystemCore(exchange, config, openAiKey);
+        SystemCore core = new SystemCore(exchange, config, openAiKey, assistantRuntime.notifier());
 
         // Record SystemCore initialization
         SystemOperationsService.getInstance().recordEvent(
@@ -6983,6 +7044,8 @@ public class TradingDesk extends BorderPane {
             }
 
             runOnFxAndWait(() -> {
+                assistantRuntime.attach(systemCore);
+                assistantRuntime.selectSymbol(symbolSelector.getValue());
                 // Wire up the primary stage to the Telegram command handler for screenshot
                 // capability.
                 if (systemCore.getTelegramCommandHandler() != null && getScene() != null
@@ -7433,6 +7496,71 @@ public class TradingDesk extends BorderPane {
         }, "InstrumentBootstrapper-" + exchange.getName()).start();
     }
 
+    private VBox createMarketClassificationFilters() {
+        if (marketCategorySelector.getItems().isEmpty()) {
+            marketCategorySelector.getItems().setAll("All markets", "Spot", "Derivatives");
+            contractFilterSelector.getItems().add("All contracts");
+            for (ContractType contract : ContractType.values()) {
+                if (contract != ContractType.UNKNOWN && contract != ContractType.NONE) contractFilterSelector.getItems().add(contract.name());
+            }
+            underlyingFilterSelector.getItems().setAll("All assets", "CRYPTO", "FX", "EQUITY", "ETF", "INDEX", "COMMODITY", "METAL", "BOND", "FUND", "SYNTHETIC");
+            marketCategorySelector.setValue(configuredInstrumentType.isDerivative() ? "Derivatives"
+                    : configuredContractType == ContractType.CASH ? "Spot" : "All markets");
+            contractFilterSelector.setValue(configuredContractType.isDerivative() ? configuredContractType.name() : "All contracts");
+            underlyingFilterSelector.setValue("All assets");
+            for (ComboBox<String> filter : List.of(marketCategorySelector, contractFilterSelector, underlyingFilterSelector)) {
+                filter.setMaxWidth(Double.MAX_VALUE); filter.getStyleClass().add("terminal-combo-box");
+                filter.setOnAction(_ -> applyCurrentMarketWatchFilter());
+            }
+            marketCategorySelector.setTooltip(new Tooltip("Market structure: spot or derivatives"));
+            contractFilterSelector.setTooltip(new Tooltip("Contract: perpetual, future, option and other derivative structures"));
+            underlyingFilterSelector.setTooltip(new Tooltip("Underlying asset: crypto, FX, indices, commodities, bonds and securities"));
+        }
+        return new VBox(4, marketCategorySelector, contractFilterSelector, underlyingFilterSelector);
+    }
+
+    private boolean matchesMarketBrowserSelection(TradePair pair) {
+        String categoryText = marketCategorySelector.getValue();
+        String contractText = contractFilterSelector.getValue();
+        String assetText = underlyingFilterSelector.getValue();
+        var category = "Spot".equals(categoryText) ? org.investpro.models.market.MarketCategory.SPOT
+                : "Derivatives".equals(categoryText) ? org.investpro.models.market.MarketCategory.DERIVATIVES : null;
+        var contract = contractText == null || contractText.equals("All contracts") ? null : ContractType.valueOf(contractText);
+        var asset = assetText == null || assetText.equals("All assets") ? null
+                : org.investpro.models.market.AssetClass.valueOf(assetText.equals("FX") ? "FIAT" : assetText);
+        MarketInstrument instrument = marketInstrumentBySymbol.get(botRuntimeKey(exchange) + ":" + symbolKey(pair));
+        if (instrument == null) instrument = marketInstrumentBySymbol.get(symbolKey(pair));
+        if (instrument != null) return new org.investpro.models.market.MarketSelection(category, contract, asset).matches(instrument);
+        // Catalog-only entries can still be grouped by their preserved native contract metadata.
+        var pairContract = pair.getMarketType() == MarketType.CFD ? ContractType.CFD
+                : pair.getContractType() == null ? ContractType.UNKNOWN
+                : switch (pair.getContractType().name()) {
+                    case "SPOT", "CASH" -> ContractType.CASH;
+                    case "FUTURE" -> ContractType.FUTURE;
+                    case "PERPETUAL" -> ContractType.PERPETUAL;
+                    case "OPTION" -> ContractType.OPTION;
+                    case "MARGIN" -> ContractType.MARGIN;
+                    case "CFD" -> ContractType.CFD;
+                    default -> pair.getMarketType() == MarketType.CFD ? ContractType.CFD : ContractType.UNKNOWN;
+                };
+        var pairCategory = pairContract.isDerivative() ? org.investpro.models.market.MarketCategory.DERIVATIVES
+                : pair.getMarketType().category();
+        var pairAsset = pair.getAssetClass() == null ? org.investpro.models.market.AssetClass.UNKNOWN
+                : switch (pair.getAssetClass()) {
+                    case CRYPTO, CRYPTO_ASSET -> org.investpro.models.market.AssetClass.CRYPTO;
+                    case FIAT_CURRENCY, CASH -> org.investpro.models.market.AssetClass.FIAT;
+                    case EQUITY -> org.investpro.models.market.AssetClass.EQUITY;
+                    case EQUITY_INDEX -> org.investpro.models.market.AssetClass.INDEX;
+                    case COMMODITY -> org.investpro.models.market.AssetClass.COMMODITY;
+                    case FIXED_INCOME -> org.investpro.models.market.AssetClass.BOND;
+                    case SYNTHETIC -> org.investpro.models.market.AssetClass.SYNTHETIC;
+                    case DERIVATIVE, UNKNOWN -> pair.getBaseCurrency() instanceof org.investpro.models.currency.CryptoCurrency
+                            ? org.investpro.models.market.AssetClass.CRYPTO : org.investpro.models.market.AssetClass.UNKNOWN;
+                };
+        return (category == null || category == pairCategory) && (contract == null || contract == pairContract)
+                && (asset == null || asset == pairAsset);
+    }
+
     private void configureMarketWatchFilterSelector() {
         if (!marketWatchFilterSelector.getItems().isEmpty()) {
             return;
@@ -7444,7 +7572,7 @@ public class TradingDesk extends BorderPane {
                 MarketWatchTradabilityFilter.RESTRICTED_ONLY,
                 MarketWatchTradabilityFilter.ALL_PRODUCTS);
 
-        marketWatchFilterSelector.getSelectionModel().select(MarketWatchTradabilityFilter.TRADABLE_ONLY);
+        marketWatchFilterSelector.getSelectionModel().select(MarketWatchTradabilityFilter.MARKET_DATA_ONLY);
         marketWatchFilterSelector.getStyleClass().add("terminal-combo-box");
         marketWatchFilterSelector.setPrefWidth(220);
         marketWatchFilterSelector.setOnAction(event -> applyCurrentMarketWatchFilter());
@@ -7505,7 +7633,7 @@ public class TradingDesk extends BorderPane {
 
         List<TradePair> filtered = new ArrayList<>(pairs.size());
         for (TradePair pair : pairs) {
-            if (isAllowedMarketWatchSymbol(pair)
+            if (matchesMarketBrowserSelection(pair) && isAllowedMarketWatchSymbol(pair)
                     && isAllowedByMarketWatchFilter(pair, selectedFilter)) {
                 filtered.add(pair);
             }
@@ -7558,9 +7686,6 @@ public class TradingDesk extends BorderPane {
 
         TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
         List<TradePair> filtered = applyTradabilityFilter(marketWatchUniverse);
-        if (filtered.isEmpty()) {
-            filtered = List.copyOf(marketWatchUniverse);
-        }
         marketWatchItems.setAll(filtered);
         symbolSelector.getItems().setAll(filtered);
         symbolCountLabel.setText(t("label.symbols", filtered.size()));
@@ -7571,6 +7696,8 @@ public class TradingDesk extends BorderPane {
         } else if (!filtered.isEmpty()) {
             symbolSelector.getSelectionModel().select(filtered.getFirst());
             marketWatchTable.getSelectionModel().select(filtered.getFirst());
+        } else {
+            clearSelectedMarketData();
         }
 
         marketWatchTable.refresh();
@@ -7972,7 +8099,7 @@ public class TradingDesk extends BorderPane {
         org.investpro.asset.AssetCatalogService assetCatalog = org.investpro.asset.AssetCatalogRuntime.service();
         org.investpro.asset.ExchangeId exchangeId = org.investpro.asset.AssetCatalogService.exchangeId(exchange);
         List<MarketInstrument> cachedInstruments = cachedMarketInstrumentsForExchange(exchange);
-        List<MarketInstrument> instruments = routeFilteredInstruments(cachedInstruments);
+        List<MarketInstrument> instruments = cachedInstruments;
         if (cachedInstruments.isEmpty()) {
             refreshMarketInstrumentCacheForExchangeAsync(exchange);
         }
@@ -8040,9 +8167,6 @@ public class TradingDesk extends BorderPane {
         marketWatchUniverse.addAll(tradePairs);
 
         List<TradePair> filteredPairs = applyTradabilityFilter(tradePairs);
-        if (filteredPairs.isEmpty()) {
-            filteredPairs = tradePairs;
-        }
 
         marketWatchItems.setAll(filteredPairs);
         symbolSelector.getItems().setAll(filteredPairs);
@@ -8062,14 +8186,14 @@ public class TradingDesk extends BorderPane {
         }
 
         String rememberedSymbol = preferences.get("selected_symbol_" + safe(exchangeSelector.getValue()), "");
-        TradePair rememberedPair = filteredPairs.stream()
-                .filter(pair -> Objects.equals(pair.toString('/'), rememberedSymbol))
-                .findFirst()
-                .orElse(null);
-
-        TradePair selected = rememberedPair != null ? rememberedPair : filteredPairs.getFirst();
-        symbolSelector.getSelectionModel().select(selected);
-        marketWatchTable.getSelectionModel().select(selected);
+        TradePair selected = selectMarketWatchSymbol(filteredPairs, rememberedSymbol);
+        if (selected != null) {
+            symbolSelector.getSelectionModel().select(selected);
+            marketWatchTable.getSelectionModel().select(selected);
+        } else {
+            clearSelectedMarketData();
+            journal("No symbols match the selected market, contract, asset and tradability filters.");
+        }
         symbolCountLabel.setText(t("label.symbols", filteredPairs.size()));
         updateDeskCommandStrip();
         if (symbolAgentMarketWatch != null) {
@@ -8077,21 +8201,21 @@ public class TradingDesk extends BorderPane {
         }
 
         // Ensure market info panel is initialized and updated with selected symbol
-        if (marketInfoPanel == null) {
+        if (selected != null && marketInfoPanel == null) {
             marketInfoPanel = new MarketInfoPanel(exchange, newsDataProvider);
-        } else {
+        } else if (marketInfoPanel != null) {
             marketInfoPanel.setExchange(exchange);
         }
-        marketInfoPanel.updateForPair(selected);
+        if (marketInfoPanel != null) marketInfoPanel.updateForPair(selected);
 
         // Display trading hours for selected pair
-        if (marketDataEngine != null) {
+        if (selected != null && marketDataEngine != null) {
             String tradingHours = marketDataEngine.getTradingHours(selected);
             journal("Trading hours for %s: %s".formatted(selected.toString('/'), tradingHours));
         }
 
         // Load orderbook data for the selected symbol
-        loadOrderBook(selected);
+        if (selected != null) loadOrderBook(selected);
 
         updateConnectionStatus();
         assetCatalog.refreshIfStale(exchange)
@@ -8103,6 +8227,24 @@ public class TradingDesk extends BorderPane {
                     return null;
                 });
 
+    }
+
+    static TradePair selectMarketWatchSymbol(List<TradePair> visiblePairs, String rememberedSymbol) {
+        return visiblePairs.stream()
+                .filter(pair -> Objects.equals(pair.toString('/'), rememberedSymbol))
+                .findFirst()
+                .orElseGet(() -> visiblePairs.stream().findFirst().orElse(null));
+    }
+
+    private void clearSelectedMarketData() {
+        symbolSelector.getSelectionModel().clearSelection();
+        marketWatchTable.getSelectionModel().clearSelection();
+        activeOrderBookPair = null;
+        orderBookBids.clear();
+        orderBookAsks.clear();
+        orderBookSymbolLabel.setText("No symbol selected");
+        if (marketInfoPanel != null) marketInfoPanel.updateForPair(null);
+        updateOrderActionAvailability(null);
     }
 
     private List<TradePair> filterPaperSymbolsForExchange(List<TradePair> tradePairs) {
@@ -12301,7 +12443,7 @@ public class TradingDesk extends BorderPane {
                 normalizedName.equals("COINBASE") ? safe(apiSecret) : null,
                 null,
                 normalizedAccountId,
-                sandboxMode, connectionParamsForMode(configuredConnectionParams, "LIVE"));
+                sandboxMode, connectionParamsForMode(configuredConnectionParams, sandboxMode ? "PAPER" : "LIVE"));
 
         Exchange createdExchange;
         try {
@@ -12334,7 +12476,7 @@ public class TradingDesk extends BorderPane {
             };
         }
 
-        createdExchange.setUserSelectedTradingMode("LIVE");
+        createdExchange.setUserSelectedTradingMode(sandboxMode ? "PAPER" : "LIVE");
         createdExchange.setBotTradingMode(configuredBotTradingMode);
 
         // Wire the exchange to the central MarketDataEngine
@@ -13898,6 +14040,11 @@ public class TradingDesk extends BorderPane {
      */
 
     public void shutdown() {
+        if (aiInteractionPanel != null) aiInteractionPanel.close();
+        if (aiInteractionStage != null) aiInteractionStage.close();
+        aiInteractionPanel = null;
+        aiInteractionStage = null;
+        if (assistantRuntime != null && ownsAssistantRuntime) assistantRuntime.close();
         journal("Shutting down TradingWindow.");
         if (symbolAgentMarketWatch != null) {
             symbolAgentMarketWatch.shutdown();
@@ -13935,6 +14082,7 @@ public class TradingDesk extends BorderPane {
             }
 
             systemCore = null;
+            if (assistantRuntime != null) assistantRuntime.attach(null);
             systemCoreEventsSubscribed = false;
         }
 

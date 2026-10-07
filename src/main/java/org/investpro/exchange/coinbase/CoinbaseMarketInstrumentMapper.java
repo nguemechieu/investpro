@@ -58,7 +58,7 @@ public class CoinbaseMarketInstrumentMapper {
             expiryTypeText = firstText(details, "contract_expiry_type");
         }
         if (expiryTypeText.isBlank() && derivativeSymbol) {
-            expiryTypeText = nativeSymbol.toUpperCase(Locale.ROOT).contains("-PERP")
+            expiryTypeText = productSymbolParser.isPerpetual(nativeSymbol, product)
                     ? "PERPETUAL"
                     : "EXPIRING";
         }
@@ -67,11 +67,18 @@ public class CoinbaseMarketInstrumentMapper {
             underlyingTypeText = firstText(details, "futures_underlying_type", "underlying_type");
         }
 
+        if (productType.isBlank() && derivativeSymbol) productType = "FUTURE";
+        if (underlyingTypeText.isBlank()) underlyingTypeText = firstText(details, "futures_asset_type", "underlying_type");
+        if (underlyingTypeText.isBlank()) underlyingTypeText = firstText(details.path("perpetual_details"), "underlying_type");
         ContractExpiryType contractExpiryType = parseContractExpiryType(expiryTypeText);
+        // A dated CDE perpetual-style future can legitimately report EXPIRING.
+        // Keep that lifecycle metadata while classifying its funding-based contract type.
+        String classificationExpiryType = productSymbolParser.isPerpetual(nativeSymbol, product)
+                ? "PERPETUAL" : expiryTypeText;
         UnderlyingType underlyingType = parseUnderlyingType(underlyingTypeText);
-        MarketType marketType = classifyMarketType(productType, expiryTypeText, underlyingTypeText);
-        InstrumentType instrumentType = classifyInstrumentType(productType, expiryTypeText, underlyingTypeText);
-        ContractType contractType = classifyContractType(productType, expiryTypeText);
+        MarketType marketType = classifyMarketType(productType, classificationExpiryType, underlyingTypeText);
+        InstrumentType instrumentType = classifyInstrumentType(productType, classificationExpiryType, underlyingTypeText);
+        ContractType contractType = classifyContractType(productType, classificationExpiryType);
         LeverageMode leverageMode = classifyLeverageMode(marketType, instrumentType, contractType);
         AssetClass assetClass = classifyAssetClass(productType, underlyingTypeText);
 
@@ -96,7 +103,10 @@ public class CoinbaseMarketInstrumentMapper {
             displaySymbol = nativeSymbol;
         }
 
+        if (contractType.isDerivative()) displaySymbol = nativeSymbol;
         TradePair tradePair = tryCreateTradePair(product, nativeSymbol, baseAsset, quoteAsset, contractType);
+        if (assetClass == AssetClass.UNKNOWN && tradePair != null
+                && tradePair.getBaseCurrency() instanceof org.investpro.models.currency.CryptoCurrency) assetClass = AssetClass.CRYPTO;
         SymbolTradability tradability = tradabilityResolver == null || tradePair == null
                 ? null
                 : tradabilityResolver.apply(tradePair);
@@ -162,11 +172,11 @@ public class CoinbaseMarketInstrumentMapper {
         }
 
         if ("PERPETUAL".equals(product) || "PERPETUAL".equals(expiry)) {
-            return MarketType.PERPETUAL;
+            return MarketType.DERIVATIVES;
         }
 
-        if ("FUTURE".equals(product)) {
-            return MarketType.DERIVATIVE;
+        if ("FUTURE".equals(product) || "OPTION".equals(product)) {
+            return MarketType.DERIVATIVES;
         }
 
         return MarketType.UNKNOWN;
@@ -180,6 +190,7 @@ public class CoinbaseMarketInstrumentMapper {
         if ("SPOT".equals(product)) {
             return InstrumentType.SPOT;
         }
+        if ("OPTION".equals(product)) return InstrumentType.OPTION;
 
         if ("PERPETUAL".equals(product) || "PERPETUAL".equals(expiry)) {
             return InstrumentType.PERPETUAL;
@@ -189,13 +200,7 @@ public class CoinbaseMarketInstrumentMapper {
             return InstrumentType.UNKNOWN;
         }
 
-        return switch (underlying) {
-            case "INDEX" -> InstrumentType.INDEX;
-            case "EQUITY" -> InstrumentType.STOCK;
-            case "COMMODITY" -> InstrumentType.COMMODITY;
-            case "FX" -> InstrumentType.FOREX;
-            default -> InstrumentType.FUTURE;
-        };
+        return InstrumentType.FUTURE;
     }
     LeverageMode classifyLeverageMode(
             MarketType marketType,
@@ -227,6 +232,7 @@ public class CoinbaseMarketInstrumentMapper {
         if ("SPOT".equals(product)) {
             return ContractType.CASH;
         }
+        if ("OPTION".equals(product)) return ContractType.OPTION;
 
         if ("PERPETUAL".equals(product) || "PERPETUAL".equals(expiry)) {
             return ContractType.PERPETUAL;
@@ -248,11 +254,12 @@ public class CoinbaseMarketInstrumentMapper {
         }
 
         return switch (underlying) {
-            case "SPOT" -> AssetClass.CRYPTO;
+            case "SPOT", "CRYPTO" -> AssetClass.CRYPTO;
             case "INDEX" -> AssetClass.INDEX;
             case "EQUITY" -> AssetClass.EQUITY;
             case "COMMODITY" -> AssetClass.COMMODITY;
-            case "FX" -> AssetClass.FIAT;
+            case "BOND", "FIXED_INCOME" -> AssetClass.BOND;
+            case "FX", "FOREX" -> AssetClass.FIAT;
             default -> AssetClass.UNKNOWN;
         };
     }
@@ -279,14 +286,7 @@ public class CoinbaseMarketInstrumentMapper {
 
 
     String parseRoutingExchange(JsonNode product, boolean derivativeSymbol) {
-        if (derivativeSymbol) {
-            return COINBASE_DERIVATIVES_VENUE;
-        }
-        String venue = firstText(product.path("future_product_details"), "venue");
-        if (!venue.isBlank()) {
-            return venue.trim();
-        }
-        return "";
+        return CoinbaseProductSymbolParser.routingVenue(firstText(product, "product_id", "id", "symbol"), product);
     }
 
     TradePair tryCreateTradePair(

@@ -15,7 +15,7 @@ class IbkrGatewayCredentialsTest {
     @Test
     void socketEndpointDoesNotRequireApiKeyPasswordOrAccountId() throws Exception {
         try (ServerSocket endpoint = new ServerSocket(0)) {
-            IbkrExchange exchange = exchange(endpoint.getLocalPort(), true);
+            IbkrExchange exchange = exchange(endpoint.getLocalPort(), false);
             try {
                 var result = exchange.AuthCheckResult("interactive_brokers");
                 assertTrue(result.success(), result.message());
@@ -34,7 +34,7 @@ class IbkrGatewayCredentialsTest {
         try (ServerSocket endpoint = new ServerSocket(0)) {
             port = endpoint.getLocalPort();
         }
-        IbkrExchange exchange = new IbkrExchange(new ExchangeCredentials("interactive_brokers", null, null, null, null, null, null, true), new StubIbkrTwsSession() {
+        IbkrExchange exchange = new IbkrExchange(new ExchangeCredentials("interactive_brokers", null, null, null, null, null, null, false), new StubIbkrTwsSession() {
             @Override public void connect(IbkrConnectionProfile profile, String account) {
                 throw new IllegalStateException("IBKR endpoint unavailable");
             }

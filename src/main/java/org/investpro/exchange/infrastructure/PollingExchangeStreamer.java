@@ -156,7 +156,8 @@ public class PollingExchangeStreamer {
             return true;
         }
         if (skippedFeatures.add(feature)) {
-            boolean supported = exchange.getCapability() != null && exchange.getCapability().supports(feature);
+            exchange.getCapability();
+            boolean supported = exchange.getCapability().supports(feature);
             log.info("Private polling disabled. exchange={} feature={} reason={}", exchange.getName(), feature,
                     supported ? "authentication-not-configured" : "unsupported-capability");
         }

@@ -62,7 +62,9 @@ class StrategyInstrumentCompatibilityServiceTest {
                 .marketCompatibility(Set.of(StrategyMarketCompatibility.COMMODITY))
                 .build();
 
-        assertTrue(service.supports(carry, instrument(MarketType.DERIVATIVE)));
+        // Derivative describes contract structure, not an FX underlying.
+        assertFalse(service.supports(carry, instrument(MarketType.DERIVATIVE)));
+        assertTrue(service.supports(carry, instrument(AssetClass.FIAT, MarketType.DERIVATIVE, ContractType.CFD)));
         assertTrue(service.supports(commodity, instrument(
                 AssetClass.COMMODITY,
                 MarketType.DERIVATIVE,

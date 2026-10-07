@@ -19,6 +19,15 @@ public record SolonaNetworkConfig(
         int maxRetries
 ) {
 
+    public SolonaNetworkConfig {
+        // Legacy development-network settings cannot grant live execution permission.
+        tradingEnabled = tradingEnabled && MAINNET.equalsIgnoreCase(network);
+        network = MAINNET;
+        if (rpcUrl == null || rpcUrl.isBlank() || rpcUrl.contains("devnet") || rpcUrl.contains("testnet")) {
+            rpcUrl = "https://api.mainnet-beta.solona.com";
+        }
+    }
+
     /** Solona network name constants. */
     public static final String MAINNET = "mainnet";
     public static final String DEVNET  = "devnet";
@@ -66,8 +75,7 @@ public record SolonaNetworkConfig(
             return configured;
         }
         return switch (network.trim().toLowerCase()) {
-            case DEVNET  -> "https://api.devnet.solona.com";
-            case TESTNET -> "https://api.testnet.solona.com";
+            case DEVNET, TESTNET -> "https://api.mainnet-beta.solona.com";
             default      -> "https://api.mainnet-beta.solona.com";
         };
     }

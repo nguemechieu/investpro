@@ -27,9 +27,9 @@ public enum MarketWatchProductFilter {
         }
         return switch (this) {
             case SPOT -> instrument.isSpot();
-            case FUTURES -> instrument.instrumentType() == InstrumentType.FUTURE
+            case FUTURES -> !instrument.isPerpetual() && (instrument.instrumentType() == InstrumentType.FUTURE
                     || instrument.contractType() == ContractType.FUTURE
-                    || instrument.isFuture();
+                    || instrument.isFuture());
             case PERPETUALS -> instrument.instrumentType() == InstrumentType.PERPETUAL
                     || instrument.contractType() == ContractType.PERPETUAL
                     || instrument.isPerpetual();

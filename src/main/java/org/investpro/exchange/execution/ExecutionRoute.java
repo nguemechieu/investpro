@@ -24,7 +24,8 @@ public record ExecutionRoute(
         @Nullable Long estimatedLatencyMs,
         @Nullable BigDecimal availableLiquidity,
         double routeScore,
-        @NotNull Instant selectedAt
+        @NotNull Instant selectedAt,
+        @NotNull ExecutionMode executionMode
 ) {
 
     public ExecutionRoute {
@@ -33,6 +34,15 @@ public record ExecutionRoute(
         Objects.requireNonNull(venue, "venue");
         Objects.requireNonNull(exchangeName, "exchangeName");
         Objects.requireNonNull(selectedAt, "selectedAt");
+        Objects.requireNonNull(executionMode, "executionMode");
+    }
+
+    /** Source compatibility for callers predating explicit execution mode. */
+    public ExecutionRoute(String routeId, String requestId, ExecutionVenue venue, String exchangeName,
+                          BigDecimal spread, BigDecimal fee, BigDecimal slippage, Long latency,
+                          BigDecimal liquidity, double score, Instant selectedAt) {
+        this(routeId, requestId, venue, exchangeName, spread, fee, slippage, latency, liquidity,
+                score, selectedAt, ExecutionMode.LIVE);
     }
 
     /** Returns available liquidity at the time of routing. */

@@ -1,0 +1,11 @@
+org.investpro.exchange.providers.CoinbaseExchangeProvider
+org.investpro.exchange.providers.OandaExchangeProvider
+org.investpro.exchange.providers.BinanceExchangeProvider
+org.investpro.exchange.providers.BinanceUsExchangeProvider
+org.investpro.exchange.providers.BitfinexExchangeProvider
+org.investpro.exchange.providers.KrakenExchangeProvider
+org.investpro.exchange.providers.AlpacaExchangeProvider
+org.investpro.exchange.providers.InteractiveBrokersExchangeProvider
+org.investpro.exchange.providers.SchwabExchangeProvider
+org.investpro.exchange.providers.StellarNetworkExchangeProvider
+org.investpro.exchange.providers.SolonaNetworkExchangeProvider

@@ -1,8 +1,12 @@
 package org.investpro.exchange.ibkr;
 
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.NonNull;
+
 public final class IbkrFeatureAvailabilityService {
 
-    public FeatureAvailability evaluate(IbkrSessionState state) {
+    @Contract("null -> new")
+    public @NonNull FeatureAvailability evaluate(IbkrSessionState state) {
         if (state == null || !state.connectionSuccessful()) {
             return new FeatureAvailability(false, false, false, false, false);
         }

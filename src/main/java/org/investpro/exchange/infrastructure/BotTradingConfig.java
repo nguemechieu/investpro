@@ -128,15 +128,7 @@ public class BotTradingConfig {
         this.takeProfit = 0.0;
         this.allowedSignals = new HashSet<>();
     }
-    
-    public boolean isEnabled() {
-        return enabled;
-    }
-    
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-    
+
     public List<TradePair> getTradingSymbols() {
         return new ArrayList<>(tradingSymbols);
     }
@@ -162,14 +154,8 @@ public class BotTradingConfig {
     public void setSymbolTradingMode(SymbolTradingMode mode) {
         this.symbolTradingMode = mode != null ? mode : SymbolTradingMode.SELECTED_SYMBOLS;
     }
-    
-    public double getTradeSize() {
-        return tradeSize;
-    }
-    
-    public void setTradeSize(double tradeSize) {
-        this.tradeSize = Math.max(0, tradeSize);
-    }
+
+
 
     public void setStopLoss(double stopLoss) {
         this.stopLoss = Math.max(0, stopLoss);
@@ -178,36 +164,7 @@ public class BotTradingConfig {
     public void setTakeProfit(double takeProfit) {
         this.takeProfit = Math.max(0, takeProfit);
     }
-    
-    public double getMinProfitPercent() {
-        return minProfitPercent;
-    }
-    
-    public void setMinProfitPercent(double percent) {
-        this.minProfitPercent = Math.max(0, percent);
-    }
-    
-    public double getMaxPortfolioRiskPercent() {
-        return maxPortfolioRiskPercent;
-    }
-    
-    public void setMaxPortfolioRiskPercent(double percent) {
-        this.maxPortfolioRiskPercent = Math.max(0, percent);
-    }
-    
-    public Set<String> getAllowedSignals() {
-        return new HashSet<>(allowedSignals);
-    }
-    
-    public void setAllowedSignals(Set<String> signals) {
-        this.allowedSignals = signals != null ? new HashSet<>(signals) : new HashSet<>();
-    }
-    
-    public void addAllowedSignal(String signal) {
-        if (signal != null && !signal.isBlank()) {
-            allowedSignals.add(signal.toUpperCase().trim());
-        }
-    }
+
     
     public boolean isSignalAllowed(String signal) {
         if (signal == null || signal.isBlank() || allowedSignals.isEmpty()) {
@@ -360,76 +317,8 @@ public class BotTradingConfig {
     public void setPositionSizingStrategy(PositionSizingStrategy strategy) {
         this.positionSizingStrategy = strategy != null ? strategy : PositionSizingStrategy.PERCENTAGE;
     }
-    
-    // Risk management
-    public boolean isEnableStrictMoneyManagement() {
-        return enableStrictMoneyManagement;
-    }
-    
-    public void setEnableStrictMoneyManagement(boolean enable) {
-        this.enableStrictMoneyManagement = enable;
-    }
-    
-    public boolean isEnableDynamicPositionSizing() {
-        return enableDynamicPositionSizing;
-    }
-    
-    public void setEnableDynamicPositionSizing(boolean enable) {
-        this.enableDynamicPositionSizing = enable;
-    }
-    
-    public double getProfitTakingPercent() {
-        return profitTakingPercent;
-    }
-    
-    public void setProfitTakingPercent(double percent) {
-        this.profitTakingPercent = Math.max(0, Math.min(100.0, percent));
-    }
-    
-    public long getTrailingStopUpdateInterval() {
-        return trailingStopUpdateInterval;
-    }
-    
-    public void setTrailingStopUpdateInterval(long intervalMs) {
-        this.trailingStopUpdateInterval = Math.max(1000, intervalMs);
-    }
-    
-    public boolean isEnablePartialProfitTaking() {
-        return enablePartialProfitTaking;
-    }
-    
-    public void setEnablePartialProfitTaking(boolean enable) {
-        this.enablePartialProfitTaking = enable;
-    }
 
-    public boolean isSmallAccountModeEnabled() {
-        return smallAccountModeEnabled;
-    }
 
-    public void setSmallAccountModeEnabled(boolean smallAccountModeEnabled) {
-        this.smallAccountModeEnabled = smallAccountModeEnabled;
-    }
-
-    public double getSmallAccountBalanceThreshold() {
-        return smallAccountBalanceThreshold;
-    }
-
-    public void setSmallAccountBalanceThreshold(double smallAccountBalanceThreshold) {
-        this.smallAccountBalanceThreshold = Math.max(0.0, smallAccountBalanceThreshold);
-    }
-
-    public double getSmallAccountOandaUnits() {
-        return smallAccountOandaUnits;
-    }
-
-    public void setSmallAccountOandaUnits(double smallAccountOandaUnits) {
-        this.smallAccountOandaUnits = Math.max(0.0, smallAccountOandaUnits);
-    }
-    
-    public StreamingMode getStreamingMode() {
-        return streamingMode;
-    }
-    
     public void setStreamingMode(StreamingMode mode) {
         this.streamingMode = mode != null ? mode : StreamingMode.HYBRID;
     }

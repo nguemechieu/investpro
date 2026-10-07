@@ -1,5 +1,8 @@
 package org.investpro.exchange.ibkr;
 
+import org.jetbrains.annotations.Unmodifiable;
+import org.jspecify.annotations.NonNull;
+
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.time.Instant;
@@ -8,9 +11,9 @@ import java.util.List;
 
 public final class IbkrLocalServiceDetector {
 
-    public static final List<Integer> TWS_AND_GATEWAY_PORTS = List.of(7497, 7496, 4002, 4001);
+    public static final List<Integer> TWS_AND_GATEWAY_PORTS = List.of(7496, 4001);
 
-    public List<DetectionResult> detect(IbkrConnectionProfile profile) {
+    public @NonNull @Unmodifiable List<DetectionResult> detect(IbkrConnectionProfile profile) {
         String host = profile == null ? IbkrConnectionProfile.DEFAULT_HOST : profile.host();
         List<Integer> ports = new ArrayList<>(TWS_AND_GATEWAY_PORTS);
         int configuredPort = profile == null ? IbkrConnectionProfile.CLIENT_PORTAL_PORT : profile.port();

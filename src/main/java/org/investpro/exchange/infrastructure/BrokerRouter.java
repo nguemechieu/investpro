@@ -13,7 +13,6 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Logger;
 
 /**
  * BrokerRouter - Central routing logic for selecting the right broker/venue implementation
@@ -76,7 +75,7 @@ public class BrokerRouter {
             // Route to OANDA
             else if (brokerName.equalsIgnoreCase("OANDA")) {
                 if (venue != BrokerVenue.OANDA_FX_CFD) {
-                    log.error("OANDA only supports FX_CFD venue, got: " + venue);
+                    log.error("OANDA only supports FX_CFD venue, got: {}", venue);
                     return null;
                 }
                 return new OandaFxCfdExchange(apiKey);
@@ -88,7 +87,7 @@ public class BrokerRouter {
                 return null;
             }
         } catch (Exception e) {
-            log.error("Failed to create exchange: " + e.getMessage());
+            log.error("Failed to create exchange: {}", e.getMessage());
             return null;
         }
     }

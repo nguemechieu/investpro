@@ -35,5 +35,13 @@ public enum ProductVenue {
     STELLAR_DEX,
     SOLANA_DEX,
 
-    UNKNOWN
+    UNKNOWN;
+
+    public String displayName() {
+        return java.util.Arrays.stream(name().split("_"))
+                .map(word -> switch (word) {
+                    case "IBKR", "OANDA", "US", "DEX", "SMART", "ARCA", "NASDAQ", "NYSE", "CME", "CBOE", "IDEALPRO", "IG" -> word;
+                    default -> word.substring(0, 1) + word.substring(1).toLowerCase(java.util.Locale.ROOT);
+                }).collect(java.util.stream.Collectors.joining(" "));
+    }
 }

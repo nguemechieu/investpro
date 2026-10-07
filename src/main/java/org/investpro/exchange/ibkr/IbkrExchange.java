@@ -113,7 +113,7 @@ public class IbkrExchange extends InteractiveBrokers {
                 connectionManager,
                 persistenceStore,
                 clientPortalClient,
-                modeRequestsPaperNetwork());
+                modeRequestsLocalPaper());
         this.positionService = new IbkrPositionService(persistenceStore);
         this.portfolioService = new IbkrPortfolioService(positionService, accountService);
         this.orderService = new IbkrOrderService(positionService, accountService, marketDataProvider, persistenceStore,
@@ -149,9 +149,10 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public void connect() {
+        if (isPaperTrading()) return; // Local simulation requires no broker session.
         IbkrConnectionProfile profile = connectionProfileFromCredentials();
         if (profile == null) {
-            boolean paper = getCredentials() == null ? modeRequestsPaperNetwork() : getCredentials().sandbox();
+            boolean paper = getCredentials() == null ? modeRequestsLocalPaper() : getCredentials().sandbox();
             profile = new IbkrConnectionProfile(IbkrConnectionMode.TWS_API,
                     IbkrConnectionProfile.DEFAULT_HOST,
                     paper ? IbkrConnectionProfile.GATEWAY_PAPER_PORT : IbkrConnectionProfile.GATEWAY_LIVE_PORT,
@@ -162,6 +163,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public AuthResult AuthCheckResult(String selectedExchange) {
+        if (isPaperTrading()) return AuthResult.success("Local paper simulation ready; no IBKR paper gateway is used.");
         try {
             if (!Boolean.TRUE.equals(isConnected())) connect();
             IbkrSessionState state = ibkrSessionState();
@@ -180,6 +182,9 @@ public class IbkrExchange extends InteractiveBrokers {
     }
 
     public IbkrSessionState connect(IbkrConnectionProfile profile) {
+        if (profile.paper()) {
+            throw new IllegalArgumentException("Remote IBKR paper sessions are disabled. Use local PAPER mode or a live gateway.");
+        }
         IbkrSessionState state = connectionService.connect(profile);
         activeConnectionProfile = profile;
         if (state.connectionSuccessful()) {
@@ -231,6 +236,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
+        if (isPaperTrading()) return orderExecution().createMarketOrder(tradePair, side, amount);
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return submitBrokerOrder(tradePair, side, amount, "MKT", 0, 0);
         ensureResolvedContract(tradePair);
@@ -244,6 +250,7 @@ public class IbkrExchange extends InteractiveBrokers {
     @Override
     public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
             double limitPrice) {
+        if (isPaperTrading()) return orderExecution().createLimitOrder(tradePair, side, amount, limitPrice);
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return submitBrokerOrder(tradePair, side, amount, "LMT", limitPrice, 0);
         ensureResolvedContract(tradePair);
@@ -256,6 +263,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice) {
+        if (isPaperTrading()) return orderExecution().createStopOrder(tradePair, side, amount, stopPrice);
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return submitBrokerOrder(tradePair, side, amount, "STP", 0, stopPrice);
         ensureResolvedContract(tradePair);
@@ -273,6 +281,7 @@ public class IbkrExchange extends InteractiveBrokers {
             double entryPrice,
             double stopLoss,
             double takeProfit) {
+        if (isPaperTrading()) return orderExecution().createBracketOrder(tradePair, side, amount, entryPrice, stopLoss, takeProfit);
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return CompletableFuture.failedFuture(new UnsupportedOperationException(
                     "IBKR native bracket transmission is not implemented; no orders were submitted."));
@@ -287,6 +296,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
+        if (isPaperTrading()) return orderExecution().fetchOpenOrders(tradePair);
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return fetchAllOpenOrders().thenApply(orders -> orders.stream().filter(order -> order.getTradePair().equals(tradePair)).toList());
         return CompletableFuture.completedFuture(orderService.fetchOpenOrders(tradePair));
@@ -294,6 +304,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
+        if (isPaperTrading()) return orderExecution().fetchAllOpenOrders();
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return connectionManager.getTwsSession().openOrders();
         return CompletableFuture.completedFuture(orderService.fetchAllOpenOrders());
@@ -301,6 +312,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> cancelOrder(String orderId) {
+        if (isPaperTrading()) return orderExecution().cancelOrder(orderId);
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return connectionManager.getTwsSession().cancel(orderId);
         return CompletableFuture.completedFuture(orderService.cancelOrder(orderId));
@@ -308,6 +320,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<List<String>> cancelOrders(List<String> orderIds) {
+        if (isPaperTrading()) return orderExecution().cancelOrders(orderIds);
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API) {
             List<CompletableFuture<String>> cancellations = orderIds.stream().map(this::cancelOrder).toList();
             return CompletableFuture.allOf(cancellations.toArray(CompletableFuture[]::new)).thenApply(_ -> cancellations.stream().map(CompletableFuture::join).toList());
@@ -317,6 +330,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> cancelAllOrders() {
+        if (isPaperTrading()) return orderExecution().cancelAllOrders();
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return fetchAllOpenOrders().thenCompose(orders -> cancelOrders(orders.stream().map(OpenOrder::getOrderId).toList())).thenApply(ids -> String.valueOf(ids.size()));
         return CompletableFuture.completedFuture(orderService.cancelAll());
@@ -477,6 +491,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
+        if (isPaperTrading()) return CompletableFuture.completedFuture(localPaperAccount());
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API && Boolean.TRUE.equals(isConnected())) {
             return connectionManager.getTwsSession().accountSnapshot()
                     .thenApply(snapshot -> accountService.toAccount(this, snapshot));
@@ -492,6 +507,7 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<Double> fetchAvailableBalance(String currencyCode) {
+        if (isPaperTrading()) return CompletableFuture.completedFuture(localPaperAccount().getBalances().getOrDefault(normalize(currencyCode), 0.0));
         return CompletableFuture.completedFuture(
                 currentSnapshot().balances().getOrDefault(normalize(currencyCode), 0.0));
     }
@@ -503,16 +519,19 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<Double> fetchEquity() {
+        if (isPaperTrading()) return CompletableFuture.completedFuture(localPaperAccount().getTotalBalance());
         return CompletableFuture.completedFuture(currentSnapshot().equity());
     }
 
     @Override
     public CompletableFuture<Double> fetchMarginUsed() {
+        if (isPaperTrading()) return CompletableFuture.completedFuture(0.0);
         return CompletableFuture.completedFuture(currentSnapshot().marginUsed());
     }
 
     @Override
     public CompletableFuture<Double> fetchFreeMargin() {
+        if (isPaperTrading()) return CompletableFuture.completedFuture(localPaperAccount().getAvailableBalance());
         return CompletableFuture.completedFuture(currentSnapshot().availableFunds());
     }
 
@@ -524,11 +543,13 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<Optional<Order>> fetchOrder(String orderId) {
+        if (isPaperTrading()) return orderExecution().fetchOrder(orderId);
         return CompletableFuture.completedFuture(orderService.fetchOrder(orderId).map(this::toOrder));
     }
 
     @Override
     public CompletableFuture<List<Order>> fetchOrderHistory(TradePair tradePair, Instant since) {
+        if (isPaperTrading()) return orderExecution().fetchOrderHistory(tradePair, since);
         List<Order> history = new ArrayList<>();
 
         for (OpenOrder openOrder : orderService.fetchAllOpenOrders()) {
@@ -572,7 +593,7 @@ public class IbkrExchange extends InteractiveBrokers {
     }
 
     public void synchronizePortfolio() {
-        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API) {
+        if (!isPaperTrading() && connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API) {
             persistenceStore.persistAccount(currentSnapshot());
             persistenceStore.persistPositions(fetchAllPositions().join());
             persistenceStore.persistOrders(fetchAllOpenOrders().join());
@@ -636,10 +657,11 @@ public class IbkrExchange extends InteractiveBrokers {
     }
 
     private IbkrAccountSnapshot currentSnapshot() {
+        if (isPaperTrading()) return accountService.snapshot();
         ensureAuthenticatedSessionForAccountAccess();
         if (connectionProfileFromCredentials().mode() == IbkrConnectionMode.TWS_API)
             return connectionManager.getTwsSession().accountSnapshot().join();
-        if (modeRequestsPaperNetwork()) {
+        if (modeRequestsLocalPaper()) {
             return accountService.snapshot();
         }
         return accountService.refreshFromBrokerIfAvailable();
@@ -652,7 +674,7 @@ public class IbkrExchange extends InteractiveBrokers {
     }
 
     private boolean shouldRequireClientPortalAuth() {
-        if (modeRequestsPaperNetwork()) {
+        if (modeRequestsLocalPaper()) {
             return false;
         }
 

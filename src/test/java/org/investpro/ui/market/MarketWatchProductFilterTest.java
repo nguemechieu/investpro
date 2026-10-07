@@ -16,6 +16,23 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class MarketWatchProductFilterTest {
 
+    @Test void coinbaseDatedContractsDisplayAndFilterByTheirActualContractType() throws Exception {
+        var json = new com.fasterxml.jackson.databind.ObjectMapper();
+        var mapper = new org.investpro.exchange.coinbase.CoinbaseMarketInstrumentMapper();
+        for (String symbol : java.util.List.of("GOL-25NOV26-CDE", "BIP-20DEC30-CDE")) {
+            var mapped = mapper.map(json.readTree("{\"product_id\":\"" + symbol + "\",\"product_type\":\"FUTURE\"}"));
+            boolean perpetual = symbol.startsWith("BIP-");
+            assertEquals(perpetual, MarketWatchProductFilter.PERPETUALS.accepts(mapped));
+            assertEquals(!perpetual, MarketWatchProductFilter.FUTURES.accepts(mapped));
+            assertFalse(MarketWatchProductFilter.SPOT.accepts(mapped));
+            assertEquals(symbol, MarketWatchSymbolFormatter.displaySymbol(mapped, mapped.tradePair()));
+            var restored = org.investpro.models.trading.TradePair.fromSymbol(symbol);
+            assertEquals(perpetual, restored.isPerpetual());
+            assertEquals(symbol, MarketWatchSymbolFormatter.displaySymbol(null, restored));
+            assertNotNull(restored.getContractExpiryDate());
+        }
+    }
+
     @Test
     void spotFilterReturnsOnlySpot() {
         assertTrue(MarketWatchProductFilter.SPOT.accepts(instrument(MarketType.SPOT, null)));

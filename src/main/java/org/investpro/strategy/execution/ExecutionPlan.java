@@ -43,6 +43,11 @@ public class ExecutionPlan {
     /** Target execution venue. */
     private final ExecutionVenue venue;
 
+    /** Local simulation or live execution; selecting a venue never grants live permission. */
+    @Builder.Default
+    private final org.investpro.exchange.execution.ExecutionMode executionMode =
+            org.investpro.exchange.execution.ExecutionMode.LOCAL_PAPER;
+
     /** Trade direction: BUY, SELL, or HOLD. */
     private final String side;
 

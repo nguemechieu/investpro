@@ -51,7 +51,6 @@ public class Alpaca extends Exchange {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
     private static final String ALPACA_LIVE_URL = "https://api.alpaca.markets";
-    private static final String ALPACA_PAPER_URL = "https://paper-api.alpaca.markets";
 
     // Paper trading state
     private final java.util.Map<String, Double> balances = new java.util.concurrent.ConcurrentHashMap<>();
@@ -112,7 +111,7 @@ public class Alpaca extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
-        if (modeRequestsPaperNetwork()) {
+        if (modeRequestsLocalPaper()) {
             return true;
         }
         if (modeRequestsLiveNetwork()) {
@@ -147,7 +146,7 @@ public class Alpaca extends Exchange {
                 .exchangeName("ALPACA")
                 .exchangeId("alpaca")
                 .displayName("Alpaca Trading")
-                .apiBaseUrl(isPaperTrading() ? ALPACA_PAPER_URL : ALPACA_LIVE_URL)
+                .apiBaseUrl(ALPACA_LIVE_URL)
 
                 // Market coverage - Alpaca specializes in US equities/stocks
                 .supportsCrypto(false)
@@ -164,7 +163,7 @@ public class Alpaca extends Exchange {
                 // Trading support
                 .supportsLiveTrading(!isPaperTrading())
                 .supportsPaperTradingMode(true)
-                .supportsSandbox(isPaperTrading())
+                .supportsSandbox(false)
                 .supportsMarketOrders(true)
                 .supportsLimitOrders(true)
                 .supportsStopOrders(true)
@@ -219,7 +218,7 @@ public class Alpaca extends Exchange {
                 .notes("""
                         Alpaca Trading capability profile.
                         Specializes in US stocks and equities trading.
-                        Supports both paper (sandbox) and live trading modes.
+                        Supports local paper simulation and live trading.
                         Minimum $25,000 required for pattern day trader (PDT) margin account.
                         Market data and trading require authenticated access.
                         """)
@@ -1369,9 +1368,12 @@ public class Alpaca extends Exchange {
     private String alpacaBaseUrl() {
         String configured = System.getenv("ALPACA_BASE_URL");
         if (configured != null && !configured.isBlank()) {
+            if (configured.toLowerCase(java.util.Locale.ROOT).contains("paper-api")) {
+                throw new IllegalStateException("Remote Alpaca paper endpoints are disabled. Use local PAPER mode and remove ALPACA_BASE_URL's paper endpoint.");
+            }
             return configured.strip();
         }
-        return isPaperTrading() ? ALPACA_PAPER_URL : ALPACA_LIVE_URL;
+        return ALPACA_LIVE_URL;
     }
 
     private static String alpacaSymbol(TradePair tradePair) {

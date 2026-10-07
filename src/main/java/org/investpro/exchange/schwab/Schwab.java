@@ -96,6 +96,7 @@ public class Schwab extends Exchange {
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
+        if (isPaperTrading()) return CompletableFuture.completedFuture(localPaperAccount());
         return CompletableFuture.supplyAsync(() -> {
             try {
                 JsonNode root = apiClient.fetchAccounts();
@@ -358,7 +359,7 @@ public class Schwab extends Exchange {
                 .authenticationType("OAUTH2")
                 .supportsLiveTrading(true)
                 .supportsPaperTradingMode(true)
-                .supportsSandbox(config.sandbox())
+                .supportsSandbox(false)
                 .supportsStocks(true)
                 .supportsEquities(true)
                 .supportsMarketOrders(true)
@@ -592,6 +593,7 @@ public class Schwab extends Exchange {
 
     @Override
     public CompletableFuture<String> createOrder(Order order) throws JsonProcessingException {
+        if (isPaperTrading()) return orderExecution().createOrder(order);
         if (order == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("order must not be null"));
         }
@@ -618,6 +620,7 @@ public class Schwab extends Exchange {
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
+        if (isPaperTrading()) return orderExecution().createMarketOrder(tradePair, side, amount);
         JsonNode payload = buildOrderPayload(toSchwabSymbol(tradePair), side == Side.SELL ? "SELL" : "BUY", amount,
                 "MARKET", 0.0);
         return submitOrder(payload);
@@ -626,6 +629,7 @@ public class Schwab extends Exchange {
     @Override
     public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
             double limitPrice) {
+        if (isPaperTrading()) return orderExecution().createLimitOrder(tradePair, side, amount, limitPrice);
         JsonNode payload = buildOrderPayload(toSchwabSymbol(tradePair), side == Side.SELL ? "SELL" : "BUY", amount,
                 "LIMIT", limitPrice);
         return submitOrder(payload);
@@ -646,6 +650,7 @@ public class Schwab extends Exchange {
 
     @Override
     public CompletableFuture<String> cancelOrder(String orderId) {
+        if (isPaperTrading()) return orderExecution().cancelOrder(orderId);
         return CompletableFuture.supplyAsync(() -> {
             try {
                 boolean cancelled = apiClient.cancelOrder(resolveAccountId(), orderId);
@@ -671,27 +676,32 @@ public class Schwab extends Exchange {
 
     @Override
     public CompletableFuture<String> cancelAllOrders() {
+        if (isPaperTrading()) return orderExecution().cancelAllOrders();
         return CompletableFuture.failedFuture(new UnsupportedOperationException(
                 "Schwab cancelAllOrders requires an open-orders query implementation"));
     }
 
     @Override
     public CompletableFuture<Optional<Order>> fetchOrder(String orderId) {
+        if (isPaperTrading()) return orderExecution().fetchOrder(orderId);
         return CompletableFuture.completedFuture(Optional.empty());
     }
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
+        if (isPaperTrading()) return orderExecution().fetchOpenOrders(tradePair);
         return CompletableFuture.completedFuture(List.of());
     }
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
+        if (isPaperTrading()) return orderExecution().fetchAllOpenOrders();
         return CompletableFuture.completedFuture(List.of());
     }
 
     @Override
     public CompletableFuture<List<Order>> fetchOrderHistory(TradePair tradePair, Instant since) {
+        if (isPaperTrading()) return orderExecution().fetchOrderHistory(tradePair, since);
         return CompletableFuture.completedFuture(List.of());
     }
 
@@ -936,6 +946,7 @@ public class Schwab extends Exchange {
     }
 
     private CompletableFuture<String> submitOrder(JsonNode payload) {
+        if (isPaperTrading()) return CompletableFuture.failedFuture(new IllegalStateException("Broker submissions are disabled in local paper mode."));
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return apiClient.placeOrder(resolveAccountId(), payload);

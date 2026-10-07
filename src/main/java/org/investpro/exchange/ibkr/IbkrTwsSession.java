@@ -75,6 +75,10 @@ public class IbkrTwsSession {
     public void addListener(BiConsumer<String, Object[]> listener) { listeners.addIfAbsent(listener); }
 
     public synchronized void connect(IbkrConnectionProfile connectionProfile, String accountId) {
+        if (connectionProfile.paper() || connectionProfile.port() == IbkrConnectionProfile.TWS_PAPER_PORT
+                || connectionProfile.port() == IbkrConnectionProfile.GATEWAY_PAPER_PORT) {
+            throw new IllegalArgumentException("Remote IBKR paper sessions are disabled; use local paper simulation.");
+        }
         disconnect();
         int generation = sessionGeneration.get();
         profile = connectionProfile;
@@ -205,12 +209,15 @@ public class IbkrTwsSession {
     }
 
     public CompletableFuture<String> submit(IbkrResolvedContract contract, Side side, double quantity,
-                                            String type, double price, double stopPrice) {
+                                              String type, double price, double stopPrice) {
         if (!Double.isFinite(quantity) || quantity <= 0)
             return CompletableFuture.failedFuture(new IllegalArgumentException("IBKR quantity must be positive and finite."));
         try {
-            Object current = client();
             String account = selectAccount();
+            if ((profile != null && profile.paper()) || account.toUpperCase(java.util.Locale.ROOT).startsWith("DU")) {
+                return CompletableFuture.failedFuture(new IllegalStateException("Remote IBKR paper orders are disabled; use local paper simulation."));
+            }
+            Object current = client();
             Object order = IbkrApiRuntime.type("com.ib.client.Order").getConstructor().newInstance();
             call(order, "account", account);
             call(order, "action", side == Side.BUY ? "BUY" : "SELL");
@@ -264,6 +271,9 @@ public class IbkrTwsSession {
 
     public CompletableFuture<String> cancel(String orderId) {
         try {
+            if ((profile != null && profile.paper()) || selectAccount().toUpperCase(java.util.Locale.ROOT).startsWith("DU")) {
+                return CompletableFuture.failedFuture(new IllegalStateException("Remote IBKR paper cancellation is disabled; use local paper simulation."));
+            }
             int id = Integer.parseInt(orderId);
             Object cancel = IbkrApiRuntime.type("com.ib.client.OrderCancel").getConstructor().newInstance();
             CompletableFuture<String> result = new CompletableFuture<>();

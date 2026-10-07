@@ -319,7 +319,7 @@ public class Coinbase extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
-        if (modeRequestsPaperNetwork()) {
+        if (modeRequestsLocalPaper()) {
             return true;
         }
         modeRequestsLiveNetwork();
@@ -433,28 +433,41 @@ public class Coinbase extends Exchange {
 
     @Override
     public AuthCheckResult checkAuthentication() {
-        if (!hasPrivateEndpointAuth()) {
-            String detailedMessage = buildCredentialErrorMessage();
-            return AuthCheckResult.builder()
-                    .exchangeName(getName())
-                    .success(false)
-                    .credentialIssue(true)
-                    .message(detailedMessage)
-                    .checkedAt(Instant.now())
-                    .build();
+        // Bot simulation must not hide a configured broker key pair from connection validation.
+        if (jwtSigner == null && bearerToken().isBlank()) {
+            return AuthCheckResult.builder().exchangeName(getName()).success(false).credentialIssue(true)
+                    .message(buildCredentialErrorMessage()).checkedAt(Instant.now()).build();
         }
-
-        return AuthCheckResult.builder()
-                .exchangeName(getName())
-                .success(true)
-                .httpStatus(200)
-                .credentialSource("JWT_SIGNER_OR_BEARER_TOKEN")
-                .endpointTested(ACCOUNTS_URL)
-                .message("Coinbase API credentials validated")
-                .checkedAt(Instant.now())
-                .build();
+        try {
+            HttpResponse<byte[]> response = httpClient.send(
+                    authenticatedRequest("GET", ACCOUNTS_URL).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+            int status = response.statusCode();
+            boolean success = status >= 200 && status < 300;
+            if (success) {
+                JsonNode body = OBJECT_MAPPER.readTree(decodeBody(response.body(),
+                        response.headers().firstValue("Content-Encoding").orElse("")));
+                success = body != null && body.path("accounts").isArray();
+            }
+            String message = success ? "Coinbase API key and secret verified through the accounts API."
+                    : switch (status) {
+                        case 401 -> "Coinbase rejected the API key/secret. Check the key pair, IP restrictions and system clock.";
+                        case 403 -> "Coinbase denied account access. Grant this key permission to view the selected portfolio.";
+                        case 429 -> "Coinbase authentication check was rate limited. Retry shortly.";
+                        default -> "Coinbase account authentication failed (HTTP " + status + ").";
+                    };
+            return AuthCheckResult.builder().exchangeName(getName()).success(success).httpStatus(status)
+                    .credentialIssue(status == 401).credentialSource("API_KEY_AND_SECRET")
+                    .endpointTested(ACCOUNTS_URL).message(message).checkedAt(Instant.now()).build();
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            return AuthCheckResult.builder().exchangeName(getName()).success(false)
+                    .message("Coinbase authentication check was interrupted.").checkedAt(Instant.now()).build();
+        } catch (Exception error) {
+            return AuthCheckResult.builder().exchangeName(getName()).success(false)
+                    .message("Unable to verify Coinbase account access. Check connectivity and retry.")
+                    .checkedAt(Instant.now()).build();
+        }
     }
-
     @Override
     public CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity) {
         return createMarketOrder(symbol, side, quantity);
@@ -636,8 +649,8 @@ public class Coinbase extends Exchange {
 
     private boolean looksLikePrivateKey(String value) {
         return value != null
-                && value.contains("BEGIN")
-                && value.contains(PEM_KEY_MARKER);
+                && ((value.contains("BEGIN") && value.contains(PEM_KEY_MARKER))
+                    || CoinbaseCredentialInput.isRawEd25519Key(value));
     }
 
     private void logCredentialDiagnostics(String keyName, String privateKey, String source) {
@@ -645,23 +658,23 @@ public class Coinbase extends Exchange {
 
         // Key name format check
         if (keyName != null && keyName.contains("organizations/") && keyName.contains("/apiKeys/")) {
-            log.debug("  ✓ Key name format appears correct");
+            log.debug("  âœ“ Key name format appears correct");
         } else {
-            log.warn("  ⚠ Key name format suspicious. Expected: organizations/{{org_id}}/apiKeys/{{key_id}}");
+            log.warn("  âš  Key name format suspicious. Expected: organizations/{{org_id}}/apiKeys/{{key_id}}");
             log.warn("    Got: {}", maskSensitive(keyName));
         }
 
         // Private key format check
         if (privateKey != null && privateKey.contains("BEGIN") && privateKey.contains(PEM_KEY_MARKER)) {
-            log.debug("  ✓ Private key contains PEM markers");
+            log.debug("  âœ“ Private key contains PEM markers");
 
             if (privateKey.contains(PEM_EC_BEGIN)) {
-                log.debug("    → EC PRIVATE KEY format");
+                log.debug("    â†’ EC PRIVATE KEY format");
             } else if (privateKey.contains(PEM_PKCS8_BEGIN)) {
-                log.debug("    → PRIVATE KEY format (PKCS8)");
+                log.debug("    â†’ PRIVATE KEY format (PKCS8)");
             }
         } else {
-            log.error("  ✗ Private key missing PEM markers (BEGIN ... PRIVATE KEY)");
+            log.error("  âœ— Private key missing PEM markers (BEGIN ... PRIVATE KEY)");
         }
 
         log.debug("  Key name length: {} chars, Private key length: {} chars",
@@ -699,7 +712,7 @@ public class Coinbase extends Exchange {
             }
             if (privateKey != null && !privateKey.isBlank()
                     && !privateKey.matches("Bearer [A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+")) {
-                throw new IllegalArgumentException("Invalid Coinbase secret: use a PEM EC private key or explicit Bearer JWT mode.");
+                throw new IllegalArgumentException("Invalid Coinbase secret: use an ECDSA P-256 PEM, Ed25519 private key, or explicit Bearer JWT mode.");
             }
             return null;
         }
@@ -772,7 +785,7 @@ public class Coinbase extends Exchange {
         if (!keyFormatOk) {
             return "Coinbase API Key has invalid format: " + redact(apiKey) +
                     "\n\nExpected format: organizations/{org_id}/apiKeys/{key_id}" +
-                    "\n\nGet this from: Coinbase → Developer → API Keys";
+                    "\n\nGet this from: Coinbase â†’ Developer â†’ API Keys";
         }
 
         if (apiSecret == null || apiSecret.isBlank()) {
@@ -783,14 +796,14 @@ public class Coinbase extends Exchange {
             return """
                     Coinbase API Secret (Private Key) has invalid format. It must be a PEM-encoded EC private key:\
 
-                    • Starting with: %s or %s\
+                    â€¢ Starting with: %s or %s\
 
-                    • Containing: Base64-encoded key content (multiple lines)\
+                    â€¢ Containing: Base64-encoded key content (multiple lines)\
 
-                    • Ending with: %s or %s\
+                    â€¢ Ending with: %s or %s\
 
 
-                    Get this from: Coinbase → Developer → API Keys → Download Private Key"""
+                    Get this from: Coinbase â†’ Developer â†’ API Keys â†’ Download Private Key"""
                     .formatted(PEM_EC_BEGIN, PEM_PKCS8_BEGIN, PEM_EC_END, PEM_PKCS8_END);
         }
 
@@ -806,7 +819,7 @@ public class Coinbase extends Exchange {
             log.error("Check account read permissions and REST JWT generation.");
             log.error("");
             log.error("To fix this:");
-            log.error("  1. Go to Coinbase → Settings → Developers → API Keys");
+            log.error("  1. Go to Coinbase â†’ Settings â†’ Developers â†’ API Keys");
             log.error("  2. Click your API key to view details");
             log.error("  3. Check that 'View accounts' is enabled");
             log.error("  4. If you see 'Pending activation', wait for Coinbase email confirmation");
@@ -815,11 +828,11 @@ public class Coinbase extends Exchange {
         }
 
         log.error("Common causes:");
-        log.error("  • API key format: organizations/{{org_id}}/apiKeys/{{key_id}}");
-        log.error("  • Private key: complete EC key in PEM format (copy entire .pem file)");
-        log.error("  • Permissions: 'View accounts' required for account endpoints");
-        log.error("  • Status: Key may be pending activation or revoked");
-        log.error("  • Account: Verify you're using the correct Coinbase account");
+        log.error("  â€¢ API key format: organizations/{{org_id}}/apiKeys/{{key_id}}");
+        log.error("  â€¢ Private key: complete EC key in PEM format (copy entire .pem file)");
+        log.error("  â€¢ Permissions: 'View accounts' required for account endpoints");
+        log.error("  â€¢ Status: Key may be pending activation or revoked");
+        log.error("  â€¢ Account: Verify you're using the correct Coinbase account");
         log.error("");
         log.error("Possible causes: REST JWT URI mismatch, unnecessary Authorization on a public endpoint, missing permissions, derivative region/eligibility restrictions, revoked/pending key, or bad secret loading.");
         log.error("WebSocket success does not prove REST JWT correctness.");
@@ -1231,7 +1244,7 @@ public class Coinbase extends Exchange {
         String product = normalizeCoinbaseProductId(productId);
         String type = productType == null ? "" : productType.toUpperCase(Locale.ROOT);
 
-        if (product.endsWith("-PERP") || type.contains("PERPETUAL")) {
+        if (TradePair.isPerpetualProductSymbol(product) || type.contains("PERPETUAL")) {
             return ContractType.PERPETUAL;
         }
         if (type.contains("OPTION") || product.contains("-OPT")) {
@@ -1391,7 +1404,7 @@ public class Coinbase extends Exchange {
                 }
 
                 TradePair pair = symbolParser.parseProduct(nativeProductId, product);
-                ContractType contractType = contractTypeForCoinbaseProduct(pair.getNativeSymbol(), productType);
+                ContractType contractType = pair.getContractType();
                 pair.setContractType(contractType);
                 pair.setAssetClass(contractType == ContractType.SPOT ? AssetClass.CRYPTO_ASSET : AssetClass.DERIVATIVE);
                 tradePairs.add(pair);
@@ -1452,6 +1465,9 @@ public class Coinbase extends Exchange {
     private @NonNull JsonNode fetchCoinbaseProductsRoot() {
         List<String> urls = new ArrayList<>();
         urls.add(PUBLIC_PRODUCTS_URL);
+        // Discover actual exchange contracts publicly, independent of account entitlement.
+        urls.add(PUBLIC_PRODUCTS_URL + "?product_type=FUTURE&contract_expiry_type=PERPETUAL");
+        urls.add(PUBLIC_PRODUCTS_URL + "?product_type=FUTURE&contract_expiry_type=EXPIRING&expiring_contract_status=STATUS_UNEXPIRED");
         if (hasPrivateEndpointAuth()) {
             urls.addAll(coinbaseProductDiscoveryUrls());
         }
@@ -1487,6 +1503,12 @@ public class Coinbase extends Exchange {
                     continue;
                 }
                 String productId = normalizeCoinbaseProductId(firstText(product, "product_id", "id", "symbol"));
+                if (url.contains("/market/products") && (isCoinbaseDerivativeProductId(productId)
+                        || "FUTURE".equalsIgnoreCase(firstText(product, "product_type")))) {
+                    // Public visibility is not evidence that this account may submit orders.
+                    product = product.deepCopy();
+                    ((com.fasterxml.jackson.databind.node.ObjectNode) product).put("view_only", true);
+                }
                 String key = productId.isBlank() ? product.toString() : productId;
                 if (seenProductIds.add(key)) {
                     products.add(product);
@@ -1500,7 +1522,8 @@ public class Coinbase extends Exchange {
                     }
                 }
             }
-            markProductDiscoveryAvailable(segment);
+            if (!url.contains("/market/products") || segment == CoinbaseProductDiscoverySegment.SPOT)
+                markProductDiscoveryAvailable(segment);
         }
 
         if (products.isEmpty()) {
@@ -1537,7 +1560,7 @@ public class Coinbase extends Exchange {
         if (url == null || url.isBlank()) {
             return CoinbaseProductDiscoverySegment.UNKNOWN;
         }
-        if (url.contains("/market/products") || url.contains("product_type=SPOT")) {
+        if (url.contains("product_type=SPOT") || (url.contains("/market/products") && !url.contains("product_type=FUTURE"))) {
             return CoinbaseProductDiscoverySegment.SPOT;
         }
         if (url.contains("product_type=FUTURE") && url.contains("contract_expiry_type=PERPETUAL")) {
@@ -1943,7 +1966,8 @@ public class Coinbase extends Exchange {
 
         String nativeProductId = normalizeCoinbaseProductId(product.path("product_id").asText(productId(pair)));
         String productType = product.path("product_type").asText("SPOT").toUpperCase(Locale.ROOT);
-        ContractType contractType = contractTypeForCoinbaseProduct(nativeProductId, productType);
+        ContractType contractType = new CoinbaseProductSymbolParser().isPerpetual(nativeProductId, product)
+                ? ContractType.PERPETUAL : contractTypeForCoinbaseProduct(nativeProductId, productType);
         CoinbaseProductDiscoverySegment segment = productDiscoverySegment(productType, product);
         ExchangeCapabilityStatus capabilityStatus = capabilityStatus(segment);
         pair.setNativeSymbol(nativeProductId);
@@ -2157,7 +2181,7 @@ public class Coinbase extends Exchange {
 
         CompletableFuture<OrderBook> future = sendAsync(request).thenApply(response -> {
             OrderBook orderBook = parseOrderBook(response, tradePair);
-            // Cache for 15 seconds — order books don't need sub-second freshness for
+            // Cache for 15 seconds â€” order books don't need sub-second freshness for
             // display
             orderBookCache.put(cacheKey, new CacheEntry<>(orderBook, System.currentTimeMillis() + 15_000L));
             marketDataService.onOrderBookUpdate(tradePair, orderBook);
@@ -2388,7 +2412,7 @@ public class Coinbase extends Exchange {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
-        return CompletableFuture.completedFuture(
+        return CompletableFuture.supplyAsync(() ->
                 tradePairs.stream()
                         .filter(Objects::nonNull)
                         .map(this::getLivePrice)
@@ -3575,12 +3599,9 @@ public class Coinbase extends Exchange {
 
     @Override
     public AuthResult AuthCheckResult(String selectedExchange) {
-        if (!hasCredentials()) {
-            return AuthResult.failure("Coinbase credentials are not configured");
-        }
-        return AuthResult.success("Coinbase authentication validated");
+        AuthCheckResult result = checkAuthentication();
+        return result.isSuccess() ? AuthResult.success(result.getMessage()) : AuthResult.failure(result.getMessage());
     }
-
     @Override
     public CompletableFuture<Boolean> validateOrder(
             TradePair tradePair,

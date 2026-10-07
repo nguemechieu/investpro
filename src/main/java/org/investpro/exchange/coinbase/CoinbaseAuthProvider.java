@@ -124,30 +124,11 @@ public final class CoinbaseAuthProvider {
             return "Coinbase private key is missing. Paste the privateKey value or the full Coinbase key JSON.";
         }
 
-        java.util.regex.Matcher headerMatch = PEM_HEADER_RE.matcher(credentials.secret());
-        java.util.regex.Matcher footerMatch = PEM_FOOTER_RE.matcher(credentials.secret());
-
-        if (!headerMatch.find() || !footerMatch.find() || headerMatch.start() >= footerMatch.start()) {
-            return "Coinbase private key is malformed. Paste the full privateKey value or the full Coinbase key JSON.";
-        }
-
-        String body = credentials.secret().substring(headerMatch.end(), footerMatch.start());
-        String condensed = body.replaceAll("\\s+", "");
-
-        if (condensed.isBlank()) {
-            return "Coinbase private key is missing its encoded body. Paste the full privateKey value from Coinbase.";
-        }
-
-        if (condensed.length() < 32) {
-            return "Coinbase private key looks truncated. Paste the complete privateKey value, not a shortened snippet.";
-        }
-
         try {
-            parseEcPrivateKey(credentials.secret());
-        } catch (Exception exception) {
-            return "Coinbase private key could not be parsed as an EC private key. Paste the complete Coinbase privateKey value.";
+            new CoinbaseJwtSigner(credentials.apiKey(), credentials.secret());
+        } catch (IllegalArgumentException invalidKey) {
+            return "Coinbase secret could not be parsed. Use the complete ECDSA P-256 PEM or Ed25519 private key from the key export.";
         }
-
         return null;
     }
 
@@ -212,6 +193,7 @@ public final class CoinbaseAuthProvider {
         }
 
         String condensed = normalized.replaceAll("\\s+", "");
+        if (CoinbaseCredentialInput.isRawEd25519Key(condensed)) return condensed;
 
         if (looksLikePrivateKeyBody(condensed)) {
             return "-----BEGIN EC PRIVATE KEY-----\n%s\n-----END EC PRIVATE KEY-----\n".formatted(condensed);

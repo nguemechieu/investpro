@@ -49,7 +49,7 @@ import java.util.*;
  */
 
 @Slf4j
-public record CoinbaseJwtSigner(String keyName, String privateKeyPem, ECPrivateKey privateKey, long ttlSeconds) {
+public record CoinbaseJwtSigner(String keyName, String privateKeyPem, PrivateKey privateKey, long ttlSeconds) {
     public static final String DEFAULT_REQUEST_HOST = "api.coinbase.com";
     public static final long DEFAULT_TTL_SECONDS = 120L;
 
@@ -67,7 +67,7 @@ public record CoinbaseJwtSigner(String keyName, String privateKeyPem, ECPrivateK
     }
 
     public CoinbaseJwtSigner(String keyName, String privateKeyPem, long ttlSeconds) {
-        this(normalizeKeyName(keyName), normalizePem(privateKeyPem), loadEcPrivateKey(privateKeyPem), Math.clamp(ttlSeconds, 30L, DEFAULT_TTL_SECONDS));
+        this(normalizeKeyName(keyName), normalizeSecret(privateKeyPem), loadPrivateKey(privateKeyPem), Math.clamp(ttlSeconds, 30L, DEFAULT_TTL_SECONDS));
     }
 
     /**
@@ -159,7 +159,7 @@ public record CoinbaseJwtSigner(String keyName, String privateKeyPem, ECPrivateK
 
         JWTClaimsSet claimsSet = claimsBuilder.build();
 
-        JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.ES256)
+        JWSHeader header = new JWSHeader.Builder(privateKey instanceof ECPrivateKey ? JWSAlgorithm.ES256 : JWSAlgorithm.EdDSA)
                 .type(JOSEObjectType.JWT)
                 .keyID(keyName)
                 .customParam("nonce", UUID.randomUUID().toString().replace("-", ""))
@@ -168,7 +168,25 @@ public record CoinbaseJwtSigner(String keyName, String privateKeyPem, ECPrivateK
         SignedJWT signedJwt = new SignedJWT(header, claimsSet);
 
         try {
-            signedJwt.sign(new ECDSASigner(privateKey));
+            if (privateKey instanceof ECPrivateKey ecKey) {
+                signedJwt.sign(new ECDSASigner(ecKey));
+            } else {
+                signedJwt.sign(new com.nimbusds.jose.JWSSigner() {
+                    private final com.nimbusds.jose.jca.JCAContext context = new com.nimbusds.jose.jca.JCAContext();
+                    @Override public Set<JWSAlgorithm> supportedJWSAlgorithms() { return Set.of(JWSAlgorithm.EdDSA); }
+                    @Override public com.nimbusds.jose.jca.JCAContext getJCAContext() { return context; }
+                    @Override public com.nimbusds.jose.util.Base64URL sign(JWSHeader header, byte[] input) throws JOSEException {
+                        try {
+                            java.security.Signature signature = java.security.Signature.getInstance("Ed25519");
+                            signature.initSign(privateKey);
+                            signature.update(input);
+                            return com.nimbusds.jose.util.Base64URL.encode(signature.sign());
+                        } catch (java.security.GeneralSecurityException error) {
+                            throw new JOSEException("Unable to sign Coinbase Ed25519 JWT", error);
+                        }
+                    }
+                });
+            }
             return signedJwt.serialize();
         } catch (JOSEException exception) {
             throw new IllegalStateException("Unable to sign Coinbase JWT.", exception);
@@ -340,41 +358,51 @@ public record CoinbaseJwtSigner(String keyName, String privateKeyPem, ECPrivateK
         return value;
     }
 
-    private static @NonNull ECPrivateKey loadEcPrivateKey(String privateKeyPem) {
-        try (PEMParser parser = new PEMParser(new StringReader(privateKeyPem))) {
-            Object parsed = parser.readObject();
+    private static String normalizeSecret(String input) {
+        String value = stripWrappingQuotes(input);
+        return value.contains("-----BEGIN ") ? normalizePem(value) : value.replaceAll("\\s+", "");
+    }
 
-            if (parsed == null) {
-                throw new IllegalArgumentException("Unable to parse Coinbase private key PEM.");
+    private static @NonNull PrivateKey loadPrivateKey(String input) {
+        String secret = normalizeSecret(input);
+        try {
+            PrivateKey key;
+            if (!secret.startsWith("-----BEGIN ")) {
+                byte[] raw = Base64.getDecoder().decode(secret);
+                if (raw.length != 32 && raw.length != 64)
+                    throw new IllegalArgumentException("Ed25519 secret must decode to 32 or 64 bytes.");
+                byte[] encoded = new byte[48];
+                byte[] prefix = HexFormat.of().parseHex("302e020100300506032b657004220420");
+                System.arraycopy(prefix, 0, encoded, 0, prefix.length);
+                System.arraycopy(raw, 0, encoded, prefix.length, 32);
+                key = KeyFactory.getInstance("Ed25519").generatePrivate(new PKCS8EncodedKeySpec(encoded));
+            } else {
+                try (PEMParser parser = new PEMParser(new StringReader(secret))) {
+                    Object parsed = parser.readObject();
+                    JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider(BOUNCY_CASTLE_PROVIDER);
+                    key = switch (parsed) {
+                        case PEMKeyPair pair -> converter.getPrivateKey(pair.getPrivateKeyInfo());
+                        case PrivateKeyInfo info -> converter.getPrivateKey(info);
+                        default -> throw new IllegalArgumentException("Unsupported Coinbase private key format.");
+                    };
+                }
+                String algorithm = key instanceof ECPrivateKey ? "EC" : "Ed25519";
+                key = KeyFactory.getInstance(algorithm).generatePrivate(new PKCS8EncodedKeySpec(key.getEncoded()));
             }
-
-            JcaPEMKeyConverter converter = new JcaPEMKeyConverter()
-                    .setProvider(BOUNCY_CASTLE_PROVIDER);
-
-            PrivateKey privateKey = switch (parsed) {
-                case PEMKeyPair pemKeyPair -> converter.getPrivateKey(pemKeyPair.getPrivateKeyInfo());
-                case PrivateKeyInfo privateKeyInfo -> converter.getPrivateKey(privateKeyInfo);
-                case PrivateKey key -> key;
-                default -> throw new IllegalArgumentException(
-                        "Unsupported Coinbase private key format: " + parsed.getClass().getName());
-            };
-
-            KeyFactory keyFactory = KeyFactory.getInstance("EC");
-            PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKey.getEncoded());
-            PrivateKey ecPrivateKey = keyFactory.generatePrivate(keySpec);
-
-            if (!(ecPrivateKey instanceof ECPrivateKey)) {
-                throw new IllegalArgumentException("Coinbase private key is not an EC private key.");
+            if (key instanceof ECPrivateKey ec) {
+                java.security.AlgorithmParameters parameters = java.security.AlgorithmParameters.getInstance("EC");
+                parameters.init(new java.security.spec.ECGenParameterSpec("secp256r1"));
+                var expected = parameters.getParameterSpec(java.security.spec.ECParameterSpec.class);
+                if (!ec.getParams().getCurve().equals(expected.getCurve()) || !ec.getParams().getOrder().equals(expected.getOrder()))
+                    throw new IllegalArgumentException("Coinbase ES256 requires an ECDSA P-256 key.");
             }
-
-            return (ECPrivateKey) ecPrivateKey;
-        } catch (IOException exception) {
-            throw new IllegalArgumentException("Unable to read Coinbase private key PEM.", exception);
-        } catch (Exception exception) {
-            throw new IllegalArgumentException("Unable to load Coinbase EC private key.", exception);
+            return key;
+        } catch (Exception error) {
+            throw new IllegalArgumentException("Unable to load Coinbase secret. Use an ECDSA P-256 PEM or Ed25519 private key.", error);
         }
     }
 
+    @Override public String toString() { return "CoinbaseJwtSigner[redacted]"; }
     /**
      * Small CLI test helper.
      * <p>

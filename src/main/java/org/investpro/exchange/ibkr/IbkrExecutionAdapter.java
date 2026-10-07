@@ -47,20 +47,22 @@ public final class IbkrExecutionAdapter {
             var pair = exchange.parsePair(plan.getSymbol());
             Side side = "SELL".equalsIgnoreCase(plan.getSide()) ? Side.SELL : Side.BUY;
             String orderType = plan.getOrderType() == null ? "MARKET" : plan.getOrderType().toUpperCase();
+            var execution = plan.getExecutionMode().isLocal()
+                    ? exchange.localPaperOrderExecution() : exchange.botOrderExecution();
 
             return exchange.executeRiskApproved(plan.isRiskApproved(), () -> switch (orderType) {
-                case "LIMIT" -> exchange.createLimitOrder(pair, side, plan.getUnits(), plan.getEntryPrice());
-                case "STOP" -> exchange.createStopOrder(pair, side, plan.getUnits(), plan.getStopLoss());
+                case "LIMIT" -> execution.createLimitOrder(pair, side, plan.getUnits(), plan.getEntryPrice());
+                case "STOP" -> execution.createStopOrder(pair, side, plan.getUnits(), plan.getStopLoss());
                 case "STOP_LIMIT", "TRAILING_STOP" -> CompletableFuture.failedFuture(
                         new UnsupportedOperationException("Native IBKR " + orderType + " transmission is not implemented."));
-                case "BRACKET" -> exchange.createBracketOrder(
+                case "BRACKET" -> execution.createBracketOrder(
                         pair,
                         side,
                         plan.getUnits(),
                         plan.getEntryPrice(),
                         plan.getStopLoss(),
                         plan.getTakeProfit());
-                default -> exchange.createMarketOrder(pair, side, plan.getUnits());
+                default -> execution.createMarketOrder(pair, side, plan.getUnits());
             });
         } catch (SQLException | ClassNotFoundException exception) {
             return CompletableFuture.failedFuture(exception);

@@ -43,9 +43,8 @@ public class IbkrSetupWizard extends VBox {
     private final ComboBox<String> modeSelector = new ComboBox<>();
     private final TextField connectionNameField = new TextField();
     private final TextField hostField = new TextField();
-    private final Spinner<Integer> portSpinner = new Spinner<>(1, 65535, IbkrConnectionProfile.TWS_PAPER_PORT);
+    private final Spinner<Integer> portSpinner = new Spinner<>(1, 65535, IbkrConnectionProfile.TWS_LIVE_PORT);
     private final Spinner<Integer> clientIdSpinner = new Spinner<>(1, 9999, 1);
-    private final CheckBox paperCheck = new CheckBox("Paper trading");
     private final CheckBox autoDetectCheck = new CheckBox("Auto-detect local service");
     private final ListView<String> detectionList = new ListView<>();
     private final ListView<String> diagnosticsList = new ListView<>();
@@ -105,13 +104,6 @@ public class IbkrSetupWizard extends VBox {
             refreshDiagnostics();
         });
 
-        paperCheck.setSelected(true);
-        autoDetectCheck.setSelected(true);
-        paperCheck.setOnAction(event -> {
-            profile = currentProfile().withPaper(paperCheck.isSelected());
-            applyProfile(profile);
-            refreshDetection();
-        });
         autoDetectCheck.setOnAction(event -> refreshDetection());
 
         portSpinner.setEditable(true);
@@ -125,7 +117,7 @@ public class IbkrSetupWizard extends VBox {
         form.addRow(2, new Label("Host"), hostField);
         form.addRow(3, new Label("Port"), portSpinner);
         form.addRow(4, new Label("Client ID"), clientIdSpinner);
-        form.addRow(5, new Label("Environment"), paperCheck);
+        form.addRow(5, new Label("Execution"), new Label("Live gateway (paper simulation is local)"));
         form.addRow(6, new Label("Detection"), autoDetectCheck);
         GridPane.setHgrow(modeSelector, Priority.ALWAYS);
         GridPane.setHgrow(connectionNameField, Priority.ALWAYS);
@@ -234,7 +226,7 @@ public class IbkrSetupWizard extends VBox {
                 hostField.getText(),
                 portSpinner.getValue(),
                 clientIdSpinner.getValue(),
-                paperCheck.isSelected(),
+                false,
                 autoDetectCheck.isSelected(),
                 connectionNameField.getText(),
                 profile == null ? null : profile.lastSuccessfulConnectionAt());
@@ -242,13 +234,13 @@ public class IbkrSetupWizard extends VBox {
 
     private void applyProfile(IbkrConnectionProfile selected) {
         if (selected == null) {
-            selected = IbkrConnectionProfile.twsPaper();
+            selected = new IbkrConnectionProfile(IbkrConnectionMode.TWS_API, null, IbkrConnectionProfile.TWS_LIVE_PORT, 1, false, true, null, null);
         }
         connectionNameField.setText(selected.connectionName());
         hostField.setText(selected.host());
         portSpinner.getValueFactory().setValue(selected.port());
         clientIdSpinner.getValueFactory().setValue(selected.clientId());
-        paperCheck.setSelected(selected.paper());
+
         autoDetectCheck.setSelected(selected.autoDetect());
 
         switch (selected.mode()) {
@@ -284,9 +276,9 @@ public class IbkrSetupWizard extends VBox {
         return new IbkrConnectionProfile(
                 mode,
                 preferences.get("host", IbkrConnectionProfile.DEFAULT_HOST),
-                preferences.getInt("port", IbkrConnectionProfile.defaultPort(mode, true)),
+                preferences.getInt("port", IbkrConnectionProfile.defaultPort(mode, false)),
                 preferences.getInt("clientId", 1),
-                preferences.getBoolean("paper", true),
+                false,
                 preferences.getBoolean("autoDetect", true),
                 preferences.get("connectionName", ""),
                 lastSuccess);

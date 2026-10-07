@@ -17,6 +17,90 @@ class CoinbaseMarketInstrumentMapperTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private final CoinbaseMarketInstrumentMapper mapper = new CoinbaseMarketInstrumentMapper();
 
+    @Test void datedGoldFuturePreservesNativeIdAndExpiry() throws Exception {
+        var instrument = mapper.map(MAPPER.readTree("""
+                {"product_id":"GOL-25NOV26-CDE","product_type":"FUTURE",
+                 "future_product_details":{"contract_expiry_type":"EXPIRING","futures_asset_type":"COMMODITY"}}
+                """));
+        assertEquals(ContractType.FUTURE, instrument.contractType());
+        assertEquals(AssetClass.COMMODITY, instrument.assetClass());
+        assertEquals("GOL-25NOV26-CDE", instrument.displaySymbol());
+        assertEquals("GOL-25NOV26-CDE", instrument.tradePair().toExchangeSymbol("coinbase"));
+        assertEquals(java.time.Instant.parse("2026-11-25T00:00:00Z"), instrument.contractExpiry());
+        assertEquals("COINBASE_DERIVATIVES", instrument.routingExchange());
+    }
+
+    @Test void datedCdePerpetualRetainsExpiryMetadataAndUsVenue() throws Exception {
+        var instrument = mapper.map(MAPPER.readTree("""
+                {"product_id":"BIP-20DEC30-CDE","product_type":"FUTURE","base_currency_id":"BTC",
+                 "future_product_details":{"contract_expiry_type":"EXPIRING","funding_rate":"0",
+                 "futures_asset_type":"CRYPTO"}}
+                """));
+        assertEquals(ContractType.PERPETUAL, instrument.contractType());
+        assertEquals(InstrumentType.PERPETUAL, instrument.instrumentType());
+        assertEquals(ContractExpiryType.EXPIRING, instrument.contractExpiryType());
+        assertEquals("BIP-20DEC30-CDE", instrument.displaySymbol());
+        assertEquals("BIP-20DEC30-CDE", instrument.tradePair().toSlashSymbol());
+        assertTrue(instrument.tradePair().isPerpetual());
+        assertEquals(java.time.Instant.parse("2030-12-20T00:00:00Z"), instrument.contractExpiry());
+        assertEquals("COINBASE_DERIVATIVES", instrument.tradePair().getProductVenue());
+        assertEquals(org.investpro.models.market.ProductVenue.COINBASE_DERIVATIVES,
+                org.investpro.ui.theme.MarketConfiguration.venueFor(instrument));
+        assertTrue(new org.investpro.models.market.MarketSelection(null, ContractType.PERPETUAL, AssetClass.CRYPTO).matches(instrument));
+        assertFalse(new org.investpro.models.market.MarketSelection(null, ContractType.FUTURE, null).matches(instrument));
+    }
+
+    @Test void cdePerpetualRootWorksWithoutMetadataAndFundingSupportsNewRoots() throws Exception {
+        var parser = new CoinbaseProductSymbolParser();
+        assertTrue(parser.parseProduct("BIP-20DEC30-CDE", null).isPerpetual());
+        assertFalse(parser.parseProduct("GOL-25NOV26-CDE", null).isPerpetual());
+        var instrument = mapper.map(MAPPER.readTree("""
+                {"product_id":"NEW-20DEC30-CDE","product_type":"FUTURE",
+                 "future_product_details":{"contract_expiry_type":"EXPIRING","funding_rate":"0"}}
+                """));
+        assertEquals(ContractType.PERPETUAL, instrument.contractType());
+        assertTrue(instrument.tradePair().isPerpetual());
+    }
+
+    @Test void nativePerpetualIdAndExplicitVenueArePreserved() throws Exception {
+        var instrument = mapper.map(MAPPER.readTree("""
+                {"product_id":"BTC-PERP-INTX","product_type":"FUTURE","product_venue":"INTX",
+                 "display_name":"Bitcoin Perpetual","base_currency_id":"BTC","quote_currency_id":"USDC",
+                 "future_product_details":{"contract_expiry_type":"PERPETUAL"}}
+                """));
+        assertEquals("BTC-PERP-INTX", instrument.displaySymbol());
+        assertEquals("BTC-PERP-INTX", instrument.tradePair().toSlashSymbol());
+        assertEquals("INTX", instrument.routingExchange());
+        assertEquals("INTX", instrument.tradePair().getProductVenue());
+        assertEquals(org.investpro.models.market.MarketCategory.DERIVATIVES, instrument.marketCategory());
+        assertTrue(new org.investpro.models.market.MarketSelection(null, ContractType.PERPETUAL, AssetClass.CRYPTO).matches(instrument));
+    }
+
+    @Test void futureContractAndUnderlyingAreIndependentAndMetadataOverridesPairFormat() throws Exception {
+        var instrument = mapper.map(MAPPER.readTree("""
+                {"product_id":"TEST-FUT","product_type":"FUTURE","product_venue":"FCM",
+                 "display_name":"Index future","futures_underlying_type":"INDEX",
+                 "base_currency_id":"TEST","quote_currency_id":"USD","contract_expiry_type":"EXPIRING"}
+                """));
+        assertEquals(InstrumentType.FUTURE, instrument.instrumentType());
+        assertEquals(AssetClass.INDEX, instrument.assetClass());
+        assertEquals("TEST-FUT", instrument.tradePair().toSlashSymbol());
+        assertEquals("TEST-FUT", instrument.displaySymbol());
+        assertEquals("FCM", instrument.routingExchange());
+        var selection = new org.investpro.models.market.MarketSelection(org.investpro.models.market.MarketCategory.DERIVATIVES, ContractType.FUTURE, AssetClass.INDEX);
+        assertTrue(selection.matches(instrument));
+        assertFalse(new org.investpro.models.market.MarketSelection(org.investpro.models.market.MarketCategory.SPOT, null, null).matches(instrument));
+    }
+
+    @Test void expiriesOfSameUnderlyingRemainDistinct() throws Exception {
+        var first = mapper.map(MAPPER.readTree("{\"product_id\":\"BTC-26JUN26-CDE\",\"product_type\":\"FUTURE\"}"));
+        var second = mapper.map(MAPPER.readTree("{\"product_id\":\"BTC-25SEP26-CDE\",\"product_type\":\"FUTURE\"}"));
+        assertNotEquals(first.tradePair().toSlashSymbol(), second.tradePair().toSlashSymbol());
+        assertEquals(2, java.util.stream.Stream.of(first.tradePair(), second.tradePair()).distinct().count());
+        assertTrue(MarketType.DERIVATIVES.isDerivative());
+        assertEquals(org.investpro.models.market.MarketCategory.DERIVATIVES, MarketType.PERPETUAL.category());
+    }
+
     @Test
     void spotProductMapsToSpot() throws Exception {
         MarketInstrument instrument = mapper.map(MAPPER.readTree("""
@@ -42,10 +126,10 @@ class CoinbaseMarketInstrumentMapperTest {
 
         assertEquals(MarketType.DERIVATIVES, instrument.marketType());
         assertEquals(InstrumentType.PERPETUAL, instrument.instrumentType());
-        assertEquals(LeverageMode.DERIVATIVE_LEVERAGE, instrument.leverageMode());
+        assertEquals(LeverageMode.PERPETUAL, instrument.leverageMode());
         assertEquals(AssetClass.CRYPTO, instrument.assetClass());
         assertEquals(ContractType.PERPETUAL, instrument.contractType());
-        assertEquals("COINBASE_DERIVATIVES", instrument.routingExchange());
+        assertEquals("", instrument.routingExchange());
         assertTrue(instrument.isPerpetual());
         assertNotNull(instrument.tradePair());
         assertEquals("BTC-PERP", instrument.tradePair().getNativeSymbol());
@@ -61,7 +145,7 @@ class CoinbaseMarketInstrumentMapperTest {
                 """));
 
         assertEquals(MarketType.DERIVATIVES, instrument.marketType());
-        assertEquals(InstrumentType.INDEX, instrument.instrumentType());
+        assertEquals(InstrumentType.FUTURE, instrument.instrumentType());
         assertEquals(LeverageMode.DERIVATIVE_LEVERAGE, instrument.leverageMode());
         assertEquals(AssetClass.INDEX, instrument.assetClass());
         assertEquals(ContractType.FUTURE, instrument.contractType());
@@ -103,7 +187,7 @@ class CoinbaseMarketInstrumentMapperTest {
         assertEquals(AssetClass.FIAT, mapFuture("FX").assetClass());
         assertEquals(ContractType.FUTURE, mapFuture("INDEX").contractType());
         assertEquals(MarketType.DERIVATIVES, mapFuture("INDEX").marketType());
-        assertEquals(InstrumentType.INDEX, mapFuture("INDEX").instrumentType());
+        assertEquals(InstrumentType.FUTURE, mapFuture("INDEX").instrumentType());
     }
 
     @Test

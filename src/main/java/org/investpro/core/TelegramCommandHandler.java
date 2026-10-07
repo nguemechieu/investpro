@@ -82,6 +82,7 @@ public class TelegramCommandHandler {
         this.primaryStage = stage;
         log.debug("Primary stage set for Telegram screenshot commands");
     }
+    public void setBotControl(java.util.function.Function<String, String> control) { tradingCommands.setBotControl(control); }
 
     public String handleCommand(@NotNull String command, String user) {
         if (command.isBlank()) {
@@ -107,33 +108,14 @@ public class TelegramCommandHandler {
                 case "balance" -> getBalanceReport();
                 case "positions" -> getPositionsReport();
                 case "orders" -> getOrdersReport();
-                case "screenshot" -> user.startsWith(Objects.toString(telegramNotifier.getChatId(), "") + ":")
+                case "screenshot" -> user.startsWith("desktop:") || user.startsWith(Objects.toString(telegramNotifier.getChatId(), "") + ":")
                         ? captureAndSendScreenshot() : "Screenshots are available only in the configured notification chat.";
                 case "market", "quote" -> {
-                    // Parse symbol for market command (e.g., "market BTC/USD" or "market EUR/USD")
-                    if (parts.length > 1) {
-                        String symbol = parts[1].trim();
-
-                        // Validate symbol format (must contain /)
-                        if (!symbol.contains("/")) {
-                            yield "❌ Invalid symbol format. Use /market BTC/USD";
-                        }
-
-                        String[] currencyPair = symbol.split("/", -1); // -1 keeps trailing empty strings
-
-                        if (currencyPair.length == 2 && !currencyPair[0].isBlank() && !currencyPair[1].isBlank()) {
-                            try {
-                                TradePair pair = new TradePair(currencyPair[0].trim(), currencyPair[1].trim());
-                                yield getMarketReport(pair);
-                            } catch (SQLException | ClassNotFoundException e) {
-                                log.warn("Error creating TradePair for {}: {}", symbol, e.getMessage());
-                                yield "❌ Error: Could not fetch data for " + symbol;
-                            }
-                        } else {
-                            yield "❌ Invalid symbol format. Use /market BTC/USD";
-                        }
-                    } else {
-                        yield "❌ Please specify a symbol. Usage: /market BTC/USD";
+                    if (parts.length < 2) yield "Usage: /quote PAIR_OR_NATIVE_PRODUCT_ID";
+                    try {
+                        yield getMarketReport(TradePair.fromSymbol(parts[1]));
+                    } catch (SQLException | ClassNotFoundException | IllegalArgumentException error) {
+                        yield "Invalid symbol. Use a currency pair or an exchange-native futures/perpetual product ID.";
                     }
                 }
                 case "risk" -> getRiskReport();
@@ -168,6 +150,10 @@ public class TelegramCommandHandler {
                 WATCHLIST: /watch BTC/USD /unwatch BTC/USD /watchlist
                 TRADING: /buy BTC/USD QUANTITY /sell BTC/USD QUANTITY
                 /limit buy|sell BTC/USD QUANTITY PRICE
+                /stop buy|sell SYMBOL QUANTITY STOP_PRICE
+                /trailing buy|sell SYMBOL QUANTITY DISTANCE amount|percent
+                /bracket buy|sell SYMBOL QUANTITY ENTRY STOP_LOSS TAKE_PROFIT
+                /cancelall /botstart /botstop
                 /cancel ORDER_ID /confirm CODE /abort
                 CONTROL: /pause /resume /mode /exchange /health /screenshot
                 INVESTMENT: /invest TOPIC /compare ASSETS /learn TOPIC /news TOPIC
@@ -181,9 +167,7 @@ public class TelegramCommandHandler {
     }
 
     private TradePair parsePair(String value) throws Exception {
-        String[] pair = value.toUpperCase(Locale.ROOT).split("[/_-]", -1);
-        if (pair.length != 2 || pair[0].isBlank() || pair[1].isBlank()) throw new IllegalArgumentException();
-        return new TradePair(pair[0], pair[1]);
+        return TradePair.fromSymbol(value);
     }
 
     private String getStatusReport() {

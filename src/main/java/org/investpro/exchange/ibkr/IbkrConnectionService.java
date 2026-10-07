@@ -18,6 +18,9 @@ public final class IbkrConnectionService {
 
     public synchronized IbkrSessionState connect(IbkrConnectionProfile profile) {
         IbkrConnectionProfile safe = profile == null ? IbkrConnectionProfile.twsPaper() : profile;
+        if (safe.paper()) {
+            throw new IllegalArgumentException("IBKR remote paper connections are disabled; use InvestPro local paper simulation.");
+        }
         if (safe.mode() == IbkrConnectionMode.CLOUD_OAUTH_FUTURE) {
             throw new UnsupportedOperationException(
                     "IBKR cloud/OAuth mode is reserved for a future IBKR-approved authorization flow.");

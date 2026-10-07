@@ -82,16 +82,7 @@ public class SolonaNetwork extends Exchange {
         int timeoutSeconds = AppConfig.getInt("solona.requestTimeoutSeconds", 30);
         int maxRetries = AppConfig.getInt("solona.maxRetries", 3);
         String rpcUrl = AppConfig.get("solona.rpcUrl", "");
-        if (rpcUrl.isBlank()) {
-            rpcUrl = switch (network.trim().toLowerCase(Locale.ROOT)) {
-                case SolonaNetworkConfig.DEVNET -> """
-                        https://api.devnet.solona.com""";
-                case SolonaNetworkConfig.TESTNET -> """
-                        https://api.testnet.solona.com""";
-                default -> """
-                        https://api.mainnet-beta.solona.com""";
-            };
-        }
+        if (rpcUrl.isBlank()) rpcUrl = "https://api.mainnet-beta.solona.com";
         boolean tradingEnabled = AppConfig.getBoolean("solona.tradingEnabled", false);
         return new SolonaNetworkConfig(true, network, rpcUrl, commitment, tradingEnabled, timeoutSeconds, maxRetries);
     }
@@ -118,16 +109,12 @@ public class SolonaNetwork extends Exchange {
 
     @Override
     public boolean isSandbox() {
-        return modeRequestsExternalPaperNetwork();
-    }
-
-    private boolean modeRequestsExternalPaperNetwork() {
-        return modeRequestsPaperNetwork();
+        return false;
     }
 
     @Override
     public boolean isPaperTrading() {
-        return modeRequestsPaperNetwork() || !adapter.getConfig().isLiveTradingAllowed();
+        return modeRequestsLocalPaper() || !adapter.getConfig().isLiveTradingAllowed();
     }
 
     @Override

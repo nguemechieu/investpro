@@ -63,6 +63,8 @@ public record ExecutionRequest(
     /** Returns the preferred exchange name if specified. */
     public Optional<String> getPreferredExchange() { return Optional.ofNullable(preferredExchange); }
 
+    public ExecutionMode executionMode() { return paperMode ? ExecutionMode.LOCAL_PAPER : ExecutionMode.LIVE; }
+
 
     // ── Builder ─────────────────────────────────────────────────────────────────
 
@@ -98,6 +100,7 @@ public record ExecutionRequest(
         public Builder venue(ExecutionVenue v) { this.preferredVenue = v; return this; }
         public Builder allowFallback(boolean allow) { this.allowFallback = allow; return this; }
         public Builder exchange(String name) { this.preferredExchange = name; return this; }
+        public Builder paperMode(boolean paper) { this.paperMode = paper; return this; }
 
         @Contract(" -> new")
         public @NonNull ExecutionRequest build() {

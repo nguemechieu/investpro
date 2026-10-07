@@ -7,6 +7,20 @@ import static org.mockito.Mockito.*;
 
 class TradingDeskSessionTest {
     @Test
+    void emptyVisibleMarketDoesNotSelectARememberedHiddenSymbol() {
+        assertNull(TradingDesk.selectMarketWatchSymbol(java.util.List.of(), "BTC/USD"));
+        assertNull(TradingDesk.selectMarketWatchSymbol(java.util.List.of(), ""));
+    }
+
+    @Test
+    void visibleMarketRestoresRememberedSymbolOrUsesFirstVisibleSymbol() throws Exception {
+        var btc = org.investpro.models.trading.TradePair.fromSymbol("BTC/USD");
+        var eth = org.investpro.models.trading.TradePair.fromSymbol("ETH/USD");
+        var visible = java.util.List.of(btc, eth);
+        assertSame(eth, TradingDesk.selectMarketWatchSymbol(visible, "ETH/USD"));
+        assertSame(btc, TradingDesk.selectMarketWatchSymbol(visible, "SOL/USD"));
+    }
+    @Test
     void ibkrFactoryPreservesSelectedGatewayRatherThanForcingLivePort() throws Exception {
         var method = TradingDesk.class.getDeclaredMethod("credentialValueForPluginFactory", String.class,
                 org.investpro.exchange.credentials.ExchangeCredentials.class);

@@ -209,12 +209,16 @@ public class TradePair extends Pair<Currency, Currency> {
         pair.setUnderlyingCode(underlying);
         pair.setExchangeId("coinbase");
 
+        String expiry = expirySegment(normalized);
+        pair.setExpiryCode(expiry);
+        pair.setContractExpiryDate(parseExpiryDate(expiry));
+
         if (isPerpetualProductSymbol(normalized)) {
             pair.setSymbolKind(TradeSymbolKind.PERPETUAL_CONTRACT);
             pair.setContractType(ContractType.PERPETUAL);
             pair.setAssetClass(AssetClass.DERIVATIVE);
             pair.setMarketType(MarketType.PERPETUAL);
-            pair.setProductVenue("COINBASE_DERIVATIVES");
+            pair.setProductVenue(normalized.endsWith("-INTX") ? "INTX" : normalized.endsWith("-CDE") ? "COINBASE_DERIVATIVES" : "");
             return pair;
         }
 
@@ -222,11 +226,8 @@ public class TradePair extends Pair<Currency, Currency> {
         pair.setContractType(ContractType.FUTURE);
         pair.setAssetClass(AssetClass.DERIVATIVE);
         pair.setMarketType(MarketType.FUTURE);
-        pair.setProductVenue("COINBASE_DERIVATIVES");
+        pair.setProductVenue(normalized.endsWith("-INTX") ? "INTX" : normalized.endsWith("-CDE") ? "COINBASE_DERIVATIVES" : "");
 
-        String expiry = expirySegment(normalized);
-        pair.setExpiryCode(expiry);
-        pair.setContractExpiryDate(parseExpiryDate(expiry));
         return pair;
     }
 
@@ -245,7 +246,11 @@ public class TradePair extends Pair<Currency, Currency> {
             return false;
         }
         String normalized = symbol.trim().toUpperCase(Locale.ROOT).replace('/', '-').replace('_', '-');
-        return normalized.endsWith("-PERP") || normalized.contains("-PERP-");
+        return normalized.endsWith("-PERP") || normalized.contains("-PERP-")
+                || (normalized.endsWith("-CDE") && switch (normalized.split("-", 2)[0]) {
+                    case "BIP", "ETP", "SLP", "XPP" -> true;
+                    default -> false;
+                });
     }
 
     private static String expirySegment(String symbol) {

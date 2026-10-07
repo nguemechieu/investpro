@@ -76,9 +76,7 @@ public class Oanda extends Exchange {
     protected final ExchangeStreamConsumer liveTradeConsumers = new UiExchangeStreamConsumer();
 
     private static final String OANDA_LIVE_API_URL = "https://api-fxtrade.oanda.com";
-    private static final String OANDA_PRACTICE_API_URL = "https://api-fxpractice.oanda.com";
     private static final String OANDA_LIVE_STREAM_URL = "https://stream-fxtrade.oanda.com";
-    private static final String OANDA_PRACTICE_STREAM_URL = "https://stream-fxpractice.oanda.com";
     private static final String ACCOUNTS_ROUTE = "/v3/accounts";
     private static final String ACCOUNT_ROUTE = "/v3/accounts/%s";
     private static final String ACCOUNT_SUMMARY_ROUTE = "/v3/accounts/%s/summary";
@@ -224,11 +222,11 @@ public class Oanda extends Exchange {
     }
 
     private String oandaApiUrl() {
-        return isPaperTrading() ? OANDA_PRACTICE_API_URL : OANDA_LIVE_API_URL;
+        return OANDA_LIVE_API_URL;
     }
 
     private String oandaStreamUrl() {
-        return isPaperTrading() ? OANDA_PRACTICE_STREAM_URL : OANDA_LIVE_STREAM_URL;
+        return OANDA_LIVE_STREAM_URL;
     }
 
     private String oandaRoute(String routeTemplate, Object... args) {
@@ -239,6 +237,7 @@ public class Oanda extends Exchange {
     }
 
     private OandaTransactionClient transactionClient() {
+        if (isPaperTrading()) throw new IllegalStateException("Broker account operations are disabled in local paper mode.");
         return new OandaTransactionClient(httpClient, OBJECT_MAPPER, oandaApiUrl(), oandaStreamUrl(), apiKey);
     }
 
@@ -268,12 +267,12 @@ public class Oanda extends Exchange {
 
     @Override
     public boolean isSandbox() {
-        return true;
+        return false;
     }
 
     @Override
     public boolean isPaperTrading() {
-        if (modeRequestsPaperNetwork()) {
+        if (modeRequestsLocalPaper()) {
             return true;
         }
         if (modeRequestsLiveNetwork()) {
@@ -319,7 +318,7 @@ public class Oanda extends Exchange {
                 // Trading support
                 .supportsLiveTrading(true)
                 .supportsPaperTradingMode(true)
-                .supportsSandbox(true)
+                .supportsSandbox(false)
                 .supportsMarketOrders(true)
                 .supportsLimitOrders(true)
                 .supportsStopOrders(true)
@@ -375,7 +374,7 @@ public class Oanda extends Exchange {
                 .notes("""
                         OANDA Forex & CFD Trading capability profile.
                         Specializes in currency pairs (forex), indices, commodities, and CFD instruments.
-                        Supports both live and sandbox (demo) accounts for learning and testing.
+                        Supports live accounts and local paper simulation.
                         High leverage available (up to 50:1 depending on regulatory region).
                         Streaming prices and candles via REST API with polling support.
                         Account, order, position, and balance data require authenticated API access.
@@ -781,7 +780,7 @@ public class Oanda extends Exchange {
                 .GET()
                 .build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         log.warn("OANDA in-progress candle failed HTTP {}: {}", response.statusCode(),
@@ -1337,6 +1336,7 @@ public class Oanda extends Exchange {
 
     @Override
     public Account getUserAccountDetails() {
+        if (isPaperTrading()) return localPaperAccount();
         String account = resolveAccountId();
 
         if (account.isBlank()) {
@@ -1371,13 +1371,6 @@ public class Oanda extends Exchange {
                 log.warn("OANDA account summary failed HTTP {} at [{}]: {}",
                         response.statusCode(), url, truncate(response.body(), 300));
 
-                // On 401: the token may belong to the alternate OANDA environment
-                // (practice vs live). Automatically retry with the opposite base URL
-                // so users who have practice credentials but select Live trading mode
-                // are still connected, and a clear suggestion is logged.
-                if (response.statusCode() == 401) {
-                    return retryWithAlternateEnvironment(account, cacheKey);
-                }
                 return null;
             }
 
@@ -1450,6 +1443,7 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
+        if (isPaperTrading()) return CompletableFuture.completedFuture(localPaperAccount());
         synchronized (this) {
             if (inflightAccountRequest != null && !inflightAccountRequest.isDone()) {
                 return inflightAccountRequest;
@@ -1501,6 +1495,10 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<String> createOrder(Order order) {
+        if (isPaperTrading()) {
+            try { return orderExecution().createOrder(order); }
+            catch (com.fasterxml.jackson.core.JsonProcessingException error) { return failedFuture(error); }
+        }
         Objects.requireNonNull(order, "order must not be null");
 
         return CompletableFuture.supplyAsync(() -> {
@@ -1602,6 +1600,7 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
+        if (isPaperTrading()) return orderExecution().createMarketOrder(tradePair, side, amount);
         Order order = createOrder(0, tradePair, "MARKET", 0, amount, side, 0, 0, 0);
         return createOrder(order);
     }
@@ -1623,6 +1622,9 @@ public class Oanda extends Exchange {
             double amount,
             double price,
             String orderType) {
+        if (isPaperTrading()) return "LIMIT".equals(orderType)
+                ? orderExecution().createLimitOrder(tradePair, side, amount, price)
+                : orderExecution().createStopOrder(tradePair, side, amount, price);
         if (tradePair == null) {
             return failedFuture(new IllegalArgumentException("tradePair must not be null"));
         }
@@ -1682,6 +1684,7 @@ public class Oanda extends Exchange {
             double amount,
             double trailingAmount,
             boolean trailingPercent) {
+        if (isPaperTrading()) return orderExecution().createTrailingStopOrder(tradePair, side, amount, trailingAmount, trailingPercent);
         if (trailingPercent) {
             return failedFuture(new UnsupportedOperationException(
                     "OANDA trailing stop orders require an absolute trailing distance, not a percent."));
@@ -1751,6 +1754,7 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<String> cancelOrder(String orderId) {
+        if (isPaperTrading()) return orderExecution().cancelOrder(orderId);
         if (safe(orderId).isBlank()) {
             return failedFuture(new IllegalArgumentException("orderId must not be blank"));
         }
@@ -1767,7 +1771,7 @@ public class Oanda extends Exchange {
                 .PUT(HttpRequest.BodyPublishers.noBody())
                 .build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> isSuccess(response) ? orderId : "");
     }
 
@@ -1791,6 +1795,7 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<String> cancelAllOrders() {
+        if (isPaperTrading()) return orderExecution().cancelAllOrders();
         return fetchAllOpenOrders()
                 .thenCompose(orders -> {
                     /*
@@ -1808,6 +1813,7 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<Optional<Order>> fetchOrder(String orderId) {
+        if (isPaperTrading()) return orderExecution().fetchOrder(orderId);
         if (safe(orderId).isBlank()) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
@@ -1824,7 +1830,7 @@ public class Oanda extends Exchange {
                 .GET()
                 .build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         return Optional.empty();
@@ -1854,12 +1860,14 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
+        if (isPaperTrading()) return orderExecution().fetchOpenOrders(tradePair);
         return fetchAllOpenOrders()
                 .thenApply(orders -> orders.stream().toList());
     }
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
+        if (isPaperTrading()) return orderExecution().fetchAllOpenOrders();
         String account = resolveAccountId();
 
         if (account.isBlank()) {
@@ -1872,7 +1880,7 @@ public class Oanda extends Exchange {
                 .GET()
                 .build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         log.warn("OANDA open orders failed HTTP {}: {}", response.statusCode(), response.body());
@@ -1964,6 +1972,7 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<List<Order>> fetchOrderHistory(TradePair tradePair, Instant since) {
+        if (isPaperTrading()) return orderExecution().fetchOrderHistory(tradePair, since);
         String account = resolveAccountId();
 
         if (account.isBlank()) {
@@ -2091,7 +2100,7 @@ public class Oanda extends Exchange {
                 .GET()
                 .build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         log.warn("OANDA positions failed HTTP {}: {}", response.statusCode(), response.body());
@@ -2158,7 +2167,7 @@ public class Oanda extends Exchange {
                     .PUT(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(body)))
                     .build();
 
-            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            return sendAsync(request)
                     .thenApply(response -> isSuccess(response) ? response.body() : "");
 
         } catch (Exception exception) {
@@ -2187,7 +2196,7 @@ public class Oanda extends Exchange {
                 .GET()
                 .build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         logger.warn("OANDA account trades failed HTTP {}: {}", response.statusCode(), response.body());
@@ -2799,6 +2808,7 @@ public class Oanda extends Exchange {
      */
     @Override
     public CompletableFuture<List<Order>> fetchAllOrders() {
+        if (isPaperTrading()) return orderExecution().fetchOrderHistory(null, null);
         String account = resolveAccountId();
         if (account.isBlank()) {
             return CompletableFuture.completedFuture(Collections.emptyList());
@@ -2807,7 +2817,7 @@ public class Oanda extends Exchange {
         String url = oandaRoute(ACCOUNT_ORDERS_ROUTE, account);
         HttpRequest request = requestBuilder(url).GET().build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         logger.warn("OANDA fetch all orders failed HTTP {}", response.statusCode());
@@ -2830,6 +2840,7 @@ public class Oanda extends Exchange {
      */
     @Override
     public CompletableFuture<List<Order>> fetchPendingOrders() {
+        if (isPaperTrading()) return orderExecution().fetchOrderHistory(null, null).thenApply(orders -> orders.stream().filter(order -> "OPEN".equals(order.getStatus())).toList());
         String account = resolveAccountId();
         if (account.isBlank()) {
             return CompletableFuture.completedFuture(Collections.emptyList());
@@ -2838,7 +2849,7 @@ public class Oanda extends Exchange {
         String url = oandaRoute(ACCOUNT_PENDING_ORDERS_ROUTE, account);
         HttpRequest request = requestBuilder(url).GET().build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         logger.warn("OANDA fetch pending orders failed HTTP {}", response.statusCode());
@@ -2880,7 +2891,7 @@ public class Oanda extends Exchange {
                     .PUT(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(payload)))
                     .build();
 
-            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            return sendAsync(request)
                     .thenApply(response -> isSuccess(response) ? orderId : "");
         } catch (Exception e) {
             return failedFuture(e);
@@ -2911,7 +2922,7 @@ public class Oanda extends Exchange {
                     .PUT(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(payload)))
                     .build();
 
-            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            return sendAsync(request)
                     .thenApply(response -> isSuccess(response) ? orderId : "");
         } catch (Exception e) {
             return failedFuture(e);
@@ -2925,10 +2936,11 @@ public class Oanda extends Exchange {
      */
     @Override
     public CompletableFuture<List<Account>> listAccounts() {
+        if (isPaperTrading()) return CompletableFuture.completedFuture(List.of(localPaperAccount()));
         String url = oandaRoute(ACCOUNTS_ROUTE);
         HttpRequest request = requestBuilder(url).GET().build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         logger.warn("OANDA list accounts failed HTTP {}", response.statusCode());
@@ -2957,6 +2969,7 @@ public class Oanda extends Exchange {
      */
     @Override
     public CompletableFuture<Account> getAccountDetails(String accountID) {
+        if (isPaperTrading()) return CompletableFuture.completedFuture(localPaperAccount());
         if (safe(accountID).isBlank()) {
             accountID = resolveAccountId();
         }
@@ -2969,7 +2982,7 @@ public class Oanda extends Exchange {
         String url = oandaRoute(ACCOUNT_ROUTE, finalAccountId);
         HttpRequest request = requestBuilder(url).GET().build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         logger.warn("OANDA get account details failed HTTP {}", response.statusCode());
@@ -3001,7 +3014,7 @@ public class Oanda extends Exchange {
                     .method("PATCH", HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(config)))
                     .build();
 
-            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            return sendAsync(request)
                     .thenApply(response -> isSuccess(response) ? "Configuration updated" : "");
         } catch (Exception e) {
             return failedFuture(e);
@@ -3031,7 +3044,7 @@ public class Oanda extends Exchange {
         String finalUrl = url;
         HttpRequest request = requestBuilder(finalUrl).GET().build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         logger.warn("OANDA get account changes failed HTTP {}", response.statusCode());
@@ -3060,7 +3073,7 @@ public class Oanda extends Exchange {
         String url = "%s/v3/accounts/%s/trades".formatted(oandaApiUrl(), account);
         HttpRequest request = requestBuilder(url).GET().build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         logger.warn("OANDA get all trades failed HTTP {}", response.statusCode());
@@ -3093,7 +3106,7 @@ public class Oanda extends Exchange {
         String url = "%s/v3/accounts/%s/trades/%s".formatted(oandaApiUrl(), account, tradeID.trim());
         HttpRequest request = requestBuilder(url).GET().build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         return Optional.empty();
@@ -3133,7 +3146,7 @@ public class Oanda extends Exchange {
                     .PUT(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(payload)))
                     .build();
 
-            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            return sendAsync(request)
                     .thenApply(response -> isSuccess(response) ? tradeID : "");
         } catch (Exception e) {
             return failedFuture(e);
@@ -3166,7 +3179,7 @@ public class Oanda extends Exchange {
                     .PUT(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(payload)))
                     .build();
 
-            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            return sendAsync(request)
                     .thenApply(response -> isSuccess(response) ? tradeID : "");
         } catch (Exception e) {
             return failedFuture(e);
@@ -3205,7 +3218,7 @@ public class Oanda extends Exchange {
                     .PUT(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(orders)))
                     .build();
 
-            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            return sendAsync(request)
                     .thenApply(response -> isSuccess(response) ? tradeID : "");
         } catch (Exception e) {
             return failedFuture(e);
@@ -3227,7 +3240,7 @@ public class Oanda extends Exchange {
         String url = oandaRoute(ACCOUNT_POSITIONS_ROUTE, account);
         HttpRequest request = requestBuilder(url).GET().build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         logger.warn("OANDA get all positions failed HTTP {}", response.statusCode());
@@ -3255,7 +3268,7 @@ public class Oanda extends Exchange {
         String url = oandaRoute(ACCOUNT_POSITION_ROUTE, account, instrument.trim().toUpperCase());
         HttpRequest request = requestBuilder(url).GET().build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         return Optional.empty();
@@ -3298,7 +3311,7 @@ public class Oanda extends Exchange {
         String finalUrl = url;
         HttpRequest request = requestBuilder(finalUrl).GET().build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         logger.warn("OANDA get transactions failed HTTP {}", response.statusCode());
@@ -3396,7 +3409,7 @@ public class Oanda extends Exchange {
                 .formatted(oandaApiUrl(), account, instrumentsParam);
         HttpRequest request = requestBuilder(url).GET().build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         logger.warn("OANDA get latest candles failed HTTP {}", response.statusCode());
@@ -3456,7 +3469,7 @@ public class Oanda extends Exchange {
         String finalUrl = url;
         HttpRequest request = requestBuilder(finalUrl).GET().build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return sendAsync(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         logger.warn("OANDA get instrument candles failed HTTP {}", response.statusCode());
@@ -3657,106 +3670,6 @@ public class Oanda extends Exchange {
     // Helpers
     // ---------------------------------------------------------------------
 
-    /**
-     * When a 401 is received from the primary OANDA environment, tries the
-     * alternate
-     * environment (practice Γåö live). If the alternate succeeds, the adapter's
-     * internal base URL switches accordingly so all subsequent calls work.
-     */
-    private Account retryWithAlternateEnvironment(String account, String cacheKey) {
-        boolean currentlyLive = !isPaperTrading();
-        String alternateBaseUrl = currentlyLive ? OANDA_PRACTICE_API_URL : OANDA_LIVE_API_URL;
-        String alternateUrl = alternateBaseUrl + ACCOUNT_SUMMARY_ROUTE.formatted(account);
-
-        log.warn("OANDA 401 on {} environment. Retrying with {} environment: {}",
-                currentlyLive ? "LIVE" : "PRACTICE",
-                currentlyLive ? "PRACTICE" : "LIVE",
-                alternateUrl);
-
-        HttpRequest retryRequest = requestBuilder(alternateUrl).GET().build();
-        try {
-            HttpResponse<String> retryResponse = sendCritical(retryRequest);
-            if (!isSuccess(retryResponse)) {
-                log.error("OANDA account auth failed on both environments (HTTP {}). "
-                        + "Check that your API token is valid and matches the {} environment. "
-                        + "Live API: api-fxtrade.oanda.com  |  Practice API: api-fxpractice.oanda.com",
-                        retryResponse.statusCode(),
-                        currentlyLive ? "LIVE" : "PRACTICE");
-                return null;
-            }
-
-            // Success on alternate environment ΓÇö adapt internal mode and notify
-            String suggestedMode = currentlyLive ? "PAPER" : "LIVE";
-            log.warn("OANDA credentials validated against {} environment. "
-                    + "Consider changing 'Trading Mode' to '{}' in the connection dialog "
-                    + "to avoid this auto-detection on every connection.",
-                    currentlyLive ? "PRACTICE" : "LIVE", suggestedMode);
-
-            // Override the trading mode so all subsequent calls use the correct URL
-            setUserSelectedTradingMode(suggestedMode);
-
-            return parseAndCacheAccount(retryResponse, account, cacheKey);
-
-        } catch (Exception ex) {
-            log.error("OANDA alternate-environment retry failed", ex);
-            return null;
-        }
-    }
-
-    /**
-     * Parses an OANDA /summary response body into an {@link Account} and caches it.
-     */
-    private Account parseAndCacheAccount(HttpResponse<String> response, String account, String cacheKey) {
-        try {
-            JsonNode accountNode = OBJECT_MAPPER.readTree(response.body()).path("account");
-            Account userAccount = new Account();
-            userAccount.setExchange(this);
-            userAccount.setEmail(accountNode.path("id").asText(account));
-            userAccount.setUsername(accountNode.path("id").asText(account));
-            userAccount.setAccountId(accountNode.path("id").asText(account));
-            userAccount.setBrokerName("OANDA");
-            userAccount.setExchangeId("oanda");
-            userAccount.setBaseCurrency(accountNode.path("currency").asText("USD"));
-            userAccount.setTotalBalance(accountNode.path("balance").asDouble(0.0));
-            userAccount.setAvailableBalance(accountNode.path("availableMarginClosingOnly").asDouble(0.0));
-            userAccount.setEquity(accountNode.path("NAV").asDouble(0.0));
-            userAccount.setNav(accountNode.path("NAV").asDouble(0.0));
-            userAccount.setMarginUsed(accountNode.path("marginUsed").asDouble(0.0));
-            userAccount.setFreeMargin(accountNode.path("marginAvailable").asDouble(0.0));
-            userAccount.setMarginAvailable(accountNode.path("marginAvailable").asDouble(0.0));
-            userAccount.setUnrealizedPnl(accountNode.path("unrealizedPL").asDouble(0.0));
-            userAccount.setRealizedPnl(accountNode.path("realizedPL").asDouble(0.0));
-            userAccount.setOpenPositionCount(accountNode.path("openPositionCount").asInt(0));
-            userAccount.setOpenOrderCount(accountNode.path("openTradeCount").asInt(0));
-            if (accountNode.has("hedgingEnabled")) {
-                userAccount.getMetadata().put("hedgingEnabled", accountNode.path("hedgingEnabled").asBoolean());
-            }
-            if (accountNode.has("marginRate")) {
-                userAccount.getMetadata().put("marginRate", accountNode.path("marginRate").asText());
-            }
-            if (accountNode.has("positionAggregationMode")) {
-                userAccount.getMetadata().put("positionAggregationMode",
-                        accountNode.path("positionAggregationMode").asText());
-            }
-            String lastTransactionIDStr = accountNode.path("lastTransactionID").asText("");
-            if (!lastTransactionIDStr.isEmpty()) {
-                userAccount.getMetadata().put("lastTransactionID", lastTransactionIDStr);
-            }
-            userAccount.setUpdatedAt(Instant.now());
-            userAccount.setConnected(true);
-            String resolvedId = accountNode.path("id").asText("");
-            userAccount.setSandbox(resolvedId.startsWith("101-"));
-            userAccount.setPaperTrading(userAccount.isSandbox());
-            setAccountCached(cacheKey, userAccount);
-            log.info("OANDA account loaded via alternate-environment fallback: {} ({})",
-                    userAccount.getUsername(), userAccount.getAccountId());
-            return userAccount;
-        } catch (Exception ex) {
-            log.error("Failed to parse OANDA account from alternate-environment response", ex);
-            return null;
-        }
-    }
-
     /** Truncates a string to at most {@code maxLen} chars for safe log output. */
     private static @NonNull String truncate(String s, int maxLen) {
         if (s == null)
@@ -3806,6 +3719,12 @@ public class Oanda extends Exchange {
         }
     }
 
+    private CompletableFuture<HttpResponse<String>> sendAsync(HttpRequest request) {
+        if (isPaperTrading() && !"GET".equals(request.method())) {
+            return failedFuture(new IllegalStateException("Broker mutations are disabled in local paper mode."));
+        }
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+    }
     private HttpRequest.Builder requestBuilder(String url) {
         return HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -3867,6 +3786,7 @@ public class Oanda extends Exchange {
     }
 
     private HttpResponse<String> send(HttpRequest request) throws IOException {
+        if (isPaperTrading() && !"GET".equals(request.method())) throw new IllegalStateException("Broker mutations are disabled in local paper mode.");
         totalOandaRequests.incrementAndGet();
         try {
             return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 3, 1000L, 30000L));

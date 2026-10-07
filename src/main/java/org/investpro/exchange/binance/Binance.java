@@ -1259,7 +1259,7 @@ public class Binance extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
-        if (modeRequestsPaperNetwork()) {
+        if (modeRequestsLocalPaper()) {
             return true;
         }
         if (modeRequestsLiveNetwork()) {

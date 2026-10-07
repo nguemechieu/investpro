@@ -38,19 +38,15 @@ class CoinbaseCredentialInputTest {
     }
 
     @Test
-    void explainsUnsupportedRawEd25519KeyWithoutExposingIt() {
+    void acceptsRawEd25519KeyAndJsonExportWithoutExposingIt() {
         String secret = java.util.Base64.getEncoder().encodeToString(new byte[64]);
         String json = new JSONObject().put("name", NAME).put("privateKey", secret).toString();
         for (String input : new String[]{secret, json, json.substring(1, json.length() - 1)}) {
-            var error = assertThrows(IllegalArgumentException.class,
-                    () -> CoinbaseCredentialInput.normalize(NAME, input));
-            assertTrue(error.getMessage().contains("Ed25519"));
-            assertTrue(error.getMessage().contains("ECDSA"));
-            assertFalse(error.getMessage().contains(secret));
-            assertFalse(error.getMessage().contains(NAME));
+            var normalized = CoinbaseCredentialInput.normalize(NAME, input);
+            assertEquals(secret, normalized.privateKey());
+            assertFalse(normalized.toString().contains(secret));
         }
     }
-
     @Test
     void doesNotInventMissingDataOrExposeMalformedExport() {
         assertEquals("short-id", CoinbaseCredentialInput.normalize("short-id", "").keyName());

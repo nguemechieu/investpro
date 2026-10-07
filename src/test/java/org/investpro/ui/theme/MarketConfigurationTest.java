@@ -14,6 +14,18 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MarketConfigurationTest {
+    @Test void underlyingDoesNotChangeTheSelectedContractOrRoute() {
+        var indexFuture = new MarketConfiguration("user", "Futures", "US", "coinbase", "", "", "", "", "", null, null, "PAPER", java.util.Map.of("asset_class", "INDEX"));
+        assertEquals(InstrumentType.FUTURE, indexFuture.normalizedInstrumentType());
+        assertEquals(org.investpro.models.market.AssetClass.INDEX, indexFuture.normalizedAssetClass());
+        assertEquals(ContractType.FUTURE, indexFuture.normalizedContractType());
+        var spotCommodity = new MarketConfiguration("user", "Spot", "Global", "interactive-brokers", "", "", "", "", "", null, null, "PAPER", java.util.Map.of("asset_class", "COMMODITY"));
+        assertEquals(MarketType.SPOT, spotCommodity.normalizedMarketType());
+        assertEquals(ContractType.CASH, spotCommodity.normalizedContractType());
+        assertEquals(ProductVenue.IBKR_SMART, spotCommodity.normalizedVenue());
+        var spotFx = new MarketConfiguration("user", "Spot", "Global", "interactive-brokers", "", "", "", "", "", null, null, "PAPER", java.util.Map.of("asset_class", "FIAT"));
+        assertEquals(ProductVenue.IBKR_IDEALPRO, spotFx.normalizedVenue());
+    }
     @Test
     void brokerParamsAreImmutableAndNotLogged() {
         var params = new java.util.HashMap<String, String>();

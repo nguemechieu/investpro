@@ -93,7 +93,7 @@ public record MarketConfiguration(
             case "CRYPTO", "CRYPTO_SPOT", "SPOT" ->
                     MarketType.SPOT;
 
-            case "PERPETUAL", "PERPETUALS", "PERP", "PERPS", "FUTURE", "FUTURES", "US_FUTURES", "OPTION", "OPTIONS",
+            case "PERPETUAL", "PERPETUALS", "PERP", "PERPS", "FUTURE", "FUTURES", "US_FUTURES", "OPTION", "OPTIONS", "CFD", "CFDS", "FORWARD", "FORWARDS", "SWAP", "SWAPS",
                     "INDEX", "INDICES", "COMMODITY", "COMMODITIES" -> MarketType.DERIVATIVES;
             case "FOREX", "FX" -> MarketType.DERIVATIVE;
             default -> MarketType.UNKNOWN;
@@ -107,6 +107,9 @@ public record MarketConfiguration(
             case "PERPETUAL", "PERPETUALS", "PERP", "PERPS" -> InstrumentType.PERPETUAL;
             case "FUTURE", "FUTURES", "US_FUTURES" -> InstrumentType.FUTURE;
             case "OPTION", "OPTIONS" -> InstrumentType.OPTION;
+            case "CFD", "CFDS" -> InstrumentType.CFD;
+            case "FORWARD", "FORWARDS" -> InstrumentType.FORWARD;
+            case "SWAP", "SWAPS" -> InstrumentType.SWAP;
             case "FOREX", "FX" -> InstrumentType.FOREX;
             case "STOCK", "STOCKS", "EQUITY", "EQUITIES" -> InstrumentType.STOCK;
             case "ETF", "ETFS" -> InstrumentType.ETF;
@@ -130,6 +133,11 @@ public record MarketConfiguration(
     }
 
     public @NonNull AssetClass normalizedAssetClass() {
+        String explicitAsset = params.getOrDefault("asset_class", "");
+        if (!explicitAsset.isBlank()) {
+            try { return AssetClass.valueOf(normalizeLabel(explicitAsset)); }
+            catch (IllegalArgumentException ignored) { return AssetClass.UNKNOWN; }
+        }
         String normalized = normalizeLabel(marketType);
         return switch (normalized) {
             case "CRYPTO", "CRYPTO_SPOT", "SPOT", "PERPETUAL", "PERPETUALS", "PERP", "PERPS", "FUTURE", "FUTURES",
@@ -153,6 +161,9 @@ public record MarketConfiguration(
             case "FUTURE", "FUTURES", "US_FUTURES", "INDEX", "INDICES", "COMMODITY", "COMMODITIES" ->
                     ContractType.FUTURE;
             case "OPTION", "OPTIONS" -> ContractType.OPTION;
+            case "CFD", "CFDS" -> ContractType.CFD;
+            case "FORWARD", "FORWARDS" -> ContractType.FORWARD;
+            case "SWAP", "SWAPS" -> ContractType.SWAP;
             case "FOREX", "FX" -> ContractType.CFD;
             default -> ContractType.UNKNOWN;
         };
@@ -161,6 +172,11 @@ public record MarketConfiguration(
     public @NonNull ProductVenue normalizedVenue() {
         String exchangeKey = normalizeLabel(exchange);
         String venueKey = normalizeLabel(venue);
+
+        try {
+            ProductVenue explicit = ProductVenue.valueOf(venueKey);
+            if (availableVenues(exchange).contains(explicit)) return explicit;
+        } catch (IllegalArgumentException ignored) { /* Legacy geographic labels are resolved below. */ }
 
         ProductVenue directVenue = directVenueAlias(exchangeKey, venueKey);
         if (directVenue != ProductVenue.UNKNOWN) {
@@ -230,10 +246,11 @@ public record MarketConfiguration(
         }
 
         if (exchangeKey.contains("INTERACTIVE_BROKERS") || exchangeKey.contains("IBKR")) {
-            if (normalizedInstrumentType() == InstrumentType.FOREX) {
+            if (normalizedInstrumentType() == InstrumentType.FOREX
+                    || normalizedContractType() == ContractType.CASH && normalizedAssetClass() == AssetClass.FIAT) {
                 return ProductVenue.IBKR_IDEALPRO;
             }
-            if (normalizedContractType() == ContractType.FUTURE || normalizedAssetClass() == AssetClass.COMMODITY) {
+            if (normalizedContractType() == ContractType.FUTURE) {
                 return ProductVenue.IBKR_CME;
             }
             return ProductVenue.IBKR_SMART;
@@ -247,6 +264,31 @@ public record MarketConfiguration(
         }
 
         return ProductVenue.UNKNOWN;
+    }
+
+    /** Actual product destinations for an exchange; execution mode is never a venue. */
+    public static java.util.List<ProductVenue> availableVenues(String exchange) {
+        String key = normalizeLabel(exchange);
+        String prefix = switch (key) {
+            case "INTERACTIVE_BROKERS", "INTERACTIVE_BROKER", "IBKR", "IBK" -> "IBKR";
+            case "STELLAR_NETWORK", "STELLAR" -> "STELLAR";
+            case "SOLONA_NETWORK", "SOLANA_NETWORK", "SOLONA", "SOLANA" -> "SOLANA";
+            case "CHARLES_SCHWAB", "SCHWAB" -> "SCHWAB";
+            default -> key;
+        };
+        if (prefix.equals("IBKR")) return java.util.List.of(ProductVenue.IBKR_SMART,
+                ProductVenue.IBKR_CME, ProductVenue.IBKR_IDEALPRO);
+        return java.util.Arrays.stream(ProductVenue.values())
+                .filter(venue -> venue.name().equals(prefix) || venue.name().startsWith(prefix + "_"))
+                .filter(venue -> !prefix.equals("BINANCE") || venue != ProductVenue.BINANCE_US_SPOT)
+                .filter(venue -> !prefix.equals("BITFINEX") || venue != ProductVenue.BITFINEX_US_SPOT)
+                .toList();
+    }
+
+    public static ProductVenue venueFor(org.investpro.models.market.MarketInstrument instrument) {
+        return new MarketConfiguration("", instrument.contractType().name(), instrument.routingExchange(),
+                instrument.exchangeId(), "", "", "", "", "", null, null, "PAPER",
+                java.util.Map.of("asset_class", instrument.assetClass().name())).normalizedVenue();
     }
 
     private ProductVenue directVenueAlias(String exchangeKey, String venueKey) {

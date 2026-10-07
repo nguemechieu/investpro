@@ -249,7 +249,7 @@ public class InteractiveBrokers extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
-        if (modeRequestsPaperNetwork()) {
+        if (modeRequestsLocalPaper()) {
             return true;
         }
         return !modeRequestsLiveNetwork();

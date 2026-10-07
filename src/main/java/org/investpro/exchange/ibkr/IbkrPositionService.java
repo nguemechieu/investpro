@@ -32,7 +32,7 @@ public final class IbkrPositionService {
     }
 
     public void upsert(TradePair pair, Side side, double quantity, double fillPrice) {
-        positionsBySymbol.compute(pair.toString('/'), (key, existing) -> {
+        positionsBySymbol.compute(pair.toString('/'), (_, existing) -> {
             if (existing == null) {
                 return new Position(pair, side, quantity, fillPrice);
             }

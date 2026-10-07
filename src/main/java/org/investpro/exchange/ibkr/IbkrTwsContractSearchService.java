@@ -16,7 +16,7 @@ public final class IbkrTwsContractSearchService implements IbkrContractSearchSer
 
     @Override
     public CompletableFuture<List<IbkrContractCandidate>> search(String userSearchTerm, Duration timeout) {
-        if (connectionManager == null || !connectionManager.isConnected()) {
+        if (!connectionManager.isConnected()) {
             return CompletableFuture.failedFuture(new IllegalStateException("IBKR session is not connected."));
         }
         String normalized = IbkrContractResolver.normalizeSearchTerm(userSearchTerm);
