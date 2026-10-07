@@ -20,7 +20,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * MT4-style Data Window.
@@ -181,28 +180,7 @@ public class DataWindow extends VBox {
         });
     }
 
-    public void updateValues(Map<String, ?> values) {
-        runOnFx(() -> setRows(values));
-    }
 
-    public void putValue(String name, Object value) {
-        if (name == null || name.isBlank()) {
-            return;
-        }
-
-        runOnFx(() -> {
-            for (int i = 0; i < rows.size(); i++) {
-                DataRow row = rows.get(i);
-
-                if (Objects.equals(row.name(), name)) {
-                    rows.set(i, new DataRow(name, stringify(value)));
-                    return;
-                }
-            }
-
-            rows.add(new DataRow(name, stringify(value)));
-        });
-    }
 
     public void clearData() {
         runOnFx(() -> {

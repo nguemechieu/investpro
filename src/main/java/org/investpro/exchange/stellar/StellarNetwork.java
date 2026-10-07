@@ -3364,11 +3364,6 @@ public class StellarNetwork extends Exchange {
             return supplyAsyncIo(this::loadPreviousAggregatedCandlePage);
         }
 
-        @Override
-        public @NonNull List<CandleData> getPreviousCandleData() {
-            return loadPreviousAggregatedCandlePage();
-        }
-
         private @NonNull List<CandleData> loadPreviousAggregatedCandlePage() {
             int safeNumCandles = Math.max(1, Math.min(numCandles, MAX_CHART_CANDLES));
             long oldEnd = endTime.get();

@@ -5,17 +5,7 @@ import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.execution.TradeExecutionCoordinator;
 import org.investpro.core.agents.risk.RiskReviewResult;
-import org.investpro.core.pipeline.TradeRiskContextBuilder;
-import org.investpro.enums.CapitalProtection;
-import org.investpro.enums.ExecutionStrategy;
-import org.investpro.enums.LiquidityProfile;
-import org.investpro.enums.MarketBehavior;
-import org.investpro.enums.ProbabilityLevel;
-import org.investpro.enums.PsychologyProfile;
-import org.investpro.enums.RiskProfile;
-import org.investpro.enums.SystemDesign;
 import org.investpro.models.trading.TradePair;
-import org.investpro.models.Account;
 import org.investpro.risk.TradeRiskContext;
 import org.investpro.strategy.StrategySignal;
 
@@ -97,7 +87,7 @@ public class ExecutionAgent implements org.investpro.core.agents.Agent {
         }
     }
 
-    private void coordinateExecution(AgentEvent event) {
+    private void coordinateExecution(AgentEvent event) throws Exception {
         if (context == null || !context.isAutoTradingEnabled()) {
             log.info("ExecutionAgent blocked execution because auto trading is disabled.");
             return;
@@ -132,117 +122,14 @@ public class ExecutionAgent implements org.investpro.core.agents.Agent {
                 });
     }
 
-    private TradeRiskContext buildRiskContext(StrategySignal signal) {
-        Account account = resolveAccount();
-        if (context != null && context.getExchange() != null && account != null) {
-            double entryPrice = signal.getEntryPrice() > 0.0 ? signal.getEntryPrice() : 1.0;
-            double stopLoss = signal.getStopLossPrice() > 0.0 ? signal.getStopLossPrice() : entryPrice * 0.99;
-            double takeProfit = signal.getTakeProfitPrice() > 0.0 ? signal.getTakeProfitPrice() : entryPrice * 1.02;
-            return TradeRiskContextBuilder.fromSignal(
-                    signal.getSymbol(),
-                    1.0,
-                    entryPrice,
-                    stopLoss,
-                    takeProfit,
-                    context.getExchange(),
-                    account)
-                    .toBuilder()
-                    .expectedWinRate(signal.getWinProbability() > 0.0 ? signal.getWinProbability() : signal.getConfidence())
-                    .expectedRewardRiskRatio(signal.getRiskRewardRatio() > 0.0 ? signal.getRiskRewardRatio() : 2.0)
-                    .riskProfile(RiskProfile.CONSERVATIVE)
-                    .marketBehavior(signal.getMarketBehavior() == null ? MarketBehavior.RANGING : signal.getMarketBehavior())
-                    .executionStrategy(ExecutionStrategy.MARKET_ORDER)
-                    .psychologyProfile(PsychologyProfile.CAUTIOUS)
-                    .probabilityLevel(probabilityFromConfidence(signal.getConfidence()))
-                    .capitalProtection(CapitalProtection.STRICT_STOPS)
-                    .systemDesign(SystemDesign.TECHNICAL_ANALYSIS)
-                    .volatility(0.25)
-                    .build();
+    private TradeRiskContext buildRiskContext(StrategySignal signal) throws Exception {
+        if (context == null || context.getExchange() == null) {
+            throw new IllegalStateException("Execution exchange is unavailable");
         }
-
-        TradePair pair = context == null ? null : context.getSelectedTradePair();
-        if (pair == null) {
-            pair = parsePair(signal.getSymbol());
-        }
-        double entryPrice = signal.getEntryPrice() > 0.0 ? signal.getEntryPrice() : 1.0;
-        double stopLoss = signal.getStopLossPrice() > 0.0 ? signal.getStopLossPrice() : entryPrice * 0.99;
-        double takeProfit = signal.getTakeProfitPrice() > 0.0 ? signal.getTakeProfitPrice() : entryPrice * 1.02;
-
-        return TradeRiskContext.builder()
-                .symbol(pair)
-                .assetClass(pair == null ? "UNKNOWN" : String.valueOf(pair.getAssetClass()))
-                .contractType(pair == null ? "UNKNOWN" : String.valueOf(pair.getContractType()))
-                .broker(context == null || context.getExchange() == null ? "" : context.getExchange().getName())
-                .accountEquity(1000.0)
-                .availableCash(1000.0)
-                .currentOpenRisk(0.0)
-                .requestedPositionSize(1.0)
-                .requestedLeverage(1.0)
-                .entryPrice(entryPrice)
-                .stopLossPrice(stopLoss)
-                .takeProfitPrice(takeProfit)
-                .expectedWinRate(signal.getWinProbability() > 0.0 ? signal.getWinProbability() : signal.getConfidence())
-                .expectedRewardRiskRatio(signal.getRiskRewardRatio() > 0.0 ? signal.getRiskRewardRatio() : 2.0)
-                .riskProfile(RiskProfile.CONSERVATIVE)
-                .marketBehavior(signal.getMarketBehavior() == null ? MarketBehavior.RANGING : signal.getMarketBehavior())
-                .executionStrategy(ExecutionStrategy.MARKET_ORDER)
-                .liquidityProfile(pair == null || pair.getLiquidityProfile() == null
-                        ? LiquidityProfile.NORMAL
-                        : pair.getLiquidityProfile())
-                .psychologyProfile(PsychologyProfile.CAUTIOUS)
-                .probabilityLevel(probabilityFromConfidence(signal.getConfidence()))
-                .capitalProtection(CapitalProtection.STRICT_STOPS)
-                .systemDesign(SystemDesign.TECHNICAL_ANALYSIS)
-                .tradingSessionStatus(pair == null ? signal.getSessionStatus() : pair.getTradingSessionStatus())
-                .tradingSessionNotes(pair == null || pair.getTradingSession() == null
-                        ? signal.getSessionNotes()
-                        : pair.getTradingSession().getNotes())
-                .volatility(0.25)
-                .build();
-    }
-
-    private Account resolveAccount() {
-        if (context == null || context.getTradingService() == null) {
-            return null;
-        }
-        try {
-            return context.getTradingService().getAccount();
-        } catch (Exception exception) {
-            log.debug("Unable to resolve account for signal risk context", exception);
-            return null;
-        }
-    }
-
-    private TradePair parsePair(String symbol) {
-        if (symbol == null || symbol.isBlank()) {
-            return null;
-        }
-        String[] parts = symbol.replace('_', '/').replace('-', '/').split("/");
-        if (parts.length < 2) {
-            return null;
-        }
-        try {
-            return new TradePair(parts[0], parts[1]);
-        } catch (Exception exception) {
-            log.debug("Unable to parse TradePair from {}", symbol, exception);
-            return null;
-        }
-    }
-
-    private ProbabilityLevel probabilityFromConfidence(double confidence) {
-        if (confidence >= 0.90) {
-            return ProbabilityLevel.VERY_HIGH;
-        }
-        if (confidence >= 0.70) {
-            return ProbabilityLevel.HIGH;
-        }
-        if (confidence >= 0.50) {
-            return ProbabilityLevel.MODERATE;
-        }
-        if (confidence >= 0.30) {
-            return ProbabilityLevel.LOW;
-        }
-        return ProbabilityLevel.VERY_LOW;
+        TradePair pair = context.getExchange().getTradePairSymbol().stream()
+                .filter(candidate -> candidate.toString('/').equalsIgnoreCase(signal.getSymbol()))
+                .findFirst().orElseThrow(() -> new IllegalStateException("Signal instrument is not in the exchange catalog"));
+        return org.investpro.core.pipeline.BotRiskContextService.fromSignal(context.getExchange(), pair, signal);
     }
 
     private boolean isTrue(Object value) {

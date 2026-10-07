@@ -1,0 +1,6 @@
+org.investpro.strategy.providers.DefaultStrategyProvider
+org.investpro.strategy.providers.MovingAverageStrategyProvider
+org.investpro.strategy.providers.RsiStrategyProvider
+org.investpro.strategy.providers.MacdStrategyProvider
+org.investpro.strategy.providers.MeanReversionStrategyProvider
+org.investpro.strategy.providers.BreakoutStrategyProvider

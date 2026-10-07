@@ -95,6 +95,18 @@ public abstract class Exchange implements
         return localPaperExecution.provider();
     }
 
+    public List<Position> localPaperPositions() {
+        return localPaperExecution.positions();
+    }
+
+    public void updateLocalPaperMarketPrice(TradePair pair, double price) {
+        localPaperExecution.updateMarketPrice(pair, price);
+    }
+
+    public CompletableFuture<String> closeLocalPaperPosition(TradePair pair) {
+        return localPaperExecution.close(pair);
+    }
+
     public CompletableFuture<Account> tradingAccount() {
         return isPaperTrading() ? CompletableFuture.completedFuture(localPaperAccount()) : fetchAccount();
     }

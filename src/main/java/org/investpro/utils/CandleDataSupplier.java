@@ -75,10 +75,6 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
 
     public abstract List<CandleData> getCandleData();
 
-    public List<CandleData> getPreviousCandleData() {
-        return List.of();
-    }
-
     public Future<List<CandleData>> getPrevious() {
         return CompletableFuture.completedFuture(List.of());
     }

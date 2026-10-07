@@ -143,6 +143,9 @@ public class RiskAgent implements Agent {
 
     private Map<String, Object> applyReview(Map<String, Object> working, RiskReviewResult review) {
         working.put("trade_review", review);
+        if (review.getMetadata() != null && review.getMetadata().get("riskContext") instanceof org.investpro.risk.TradeRiskContext riskContext) {
+            working.put("risk_context", riskContext);
+        }
         if (!review.isApproved()) {
             String reason = firstText(review.getReason(), "Rejected by risk engine");
             block(working, reason);

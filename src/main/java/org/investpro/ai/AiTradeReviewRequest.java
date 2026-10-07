@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
  */
 @Slf4j
 @Value
-@Builder
+@Builder(toBuilder = true)
 @Data
 public class AiTradeReviewRequest {
     // =========================================================================
@@ -135,6 +135,10 @@ public class AiTradeReviewRequest {
         String signalReason = "No signal reason provided";
 
         return AiTradeReviewRequest.builder()
+                .symbol(riskContext.getSymbol())
+                .assetClass(riskContext.getAssetClass())
+                .contractType(riskContext.getContractType())
+                .broker(riskContext.getBroker())
                 // Market & signal context
                 .signalSide(String.valueOf(signal))
                 .signalConfidence(0.5)
@@ -167,6 +171,16 @@ public class AiTradeReviewRequest {
                 .newsContext(null)
                 .userNotes(null)
                 .createdAt(LocalDateTime.now())
+                .build();
+    }
+
+    public static AiTradeReviewRequest fromStrategySignal(org.investpro.strategy.StrategySignal signal,
+                                                          TradeRiskContext context, RiskDecision decision) {
+        java.util.Objects.requireNonNull(signal, "Strategy signal is required");
+        return from(signal.getSide(), context, decision).toBuilder()
+                .signalConfidence(signal.getConfidence())
+                .strategyName(signal.getStrategyName() == null ? signal.getStrategyId() : signal.getStrategyName())
+                .signalReason(signal.getReasons() == null ? "" : String.join("; ", signal.getReasons()))
                 .build();
     }
 

@@ -1212,6 +1212,9 @@ public class SystemCore {
 
             @Override
             public void onTicker(String exchangeName, TradePair tradePair, Ticker ticker) {
+                if (exchange != null && tradePair != null && ticker != null) {
+                    exchange.updateLocalPaperMarketPrice(tradePair, ticker.getLastPrice());
+                }
                 systemEventRecorder.recordMarketTick();
                 Map<String, Object> tickMeta = new java.util.LinkedHashMap<>();
                 tickMeta.put("tradePair", tradePairText(tradePair));

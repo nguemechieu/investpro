@@ -28,6 +28,48 @@ import java.lang.reflect.Field;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TradeExecutionCoordinatorTest {
+    @Test
+    void brokerOrderFailureBlocksAndReleasesLocksForNextSignal() {
+        var exchange = org.mockito.Mockito.mock(org.investpro.exchange.Exchange.class);
+        var provider = org.mockito.Mockito.mock(org.investpro.exchange.contracts.OrderExecutionProvider.class);
+        var engine = org.mockito.Mockito.mock(ExecutionEngine.class);
+        var ai = org.mockito.Mockito.mock(AiReasoningService.class);
+        org.mockito.Mockito.when(engine.getExchange()).thenReturn(exchange);
+        org.mockito.Mockito.when(exchange.getName()).thenReturn("failure-test");
+        org.mockito.Mockito.when(exchange.botOrderExecution()).thenReturn(provider);
+        org.mockito.Mockito.when(provider.fetchOpenOrders(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(new RuntimeException("broker offline")));
+        var coordinator = new TradeExecutionCoordinator(new RiskManagementSystem(), ai, engine);
+        var pair = org.mockito.Mockito.mock(TradePair.class);
+        org.mockito.Mockito.when(pair.toString('/')).thenReturn("BTC/USD");
+        var context = TradeRiskContext.builder().symbol(pair).build();
+        var first = coordinator.processSignal(Side.BUY, context).join();
+        var second = coordinator.processSignal(Side.BUY, context).join();
+        assertTrue(first.rejected());
+        assertTrue(second.message().contains("broker offline"));
+        org.mockito.Mockito.verifyNoInteractions(ai);
+    }
+
+    @Test
+    void brokerPositionFailureBlocksBeforeRiskAndAi() {
+        var exchange = org.mockito.Mockito.mock(org.investpro.exchange.Exchange.class);
+        var provider = org.mockito.Mockito.mock(org.investpro.exchange.contracts.OrderExecutionProvider.class);
+        var engine = org.mockito.Mockito.mock(ExecutionEngine.class);
+        var ai = org.mockito.Mockito.mock(AiReasoningService.class);
+        org.mockito.Mockito.when(engine.getExchange()).thenReturn(exchange);
+        org.mockito.Mockito.when(exchange.getName()).thenReturn("position-failure-test");
+        org.mockito.Mockito.when(exchange.botOrderExecution()).thenReturn(provider);
+        org.mockito.Mockito.when(provider.fetchOpenOrders(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(java.util.List.of()));
+        org.mockito.Mockito.when(exchange.fetchPosition(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(new RuntimeException("position unavailable")));
+        var coordinator = new TradeExecutionCoordinator(new RiskManagementSystem(), ai, engine);
+        var pair = org.mockito.Mockito.mock(TradePair.class);
+        org.mockito.Mockito.when(pair.toString('/')).thenReturn("BTC/USD");
+        var result = coordinator.processSignal(Side.BUY, TradeRiskContext.builder().symbol(pair).build()).join();
+        assertTrue(result.message().contains("position unavailable"));
+        org.mockito.Mockito.verifyNoInteractions(ai);
+    }
 
     @Test
     void processSignalBlocksWhenDecisionFilterRejectsAndSkipsExecutionEngine() throws Exception {

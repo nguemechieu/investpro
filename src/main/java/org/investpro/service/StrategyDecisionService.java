@@ -152,7 +152,7 @@ public class StrategyDecisionService {
                 warnings.add("No historical candles available");
             }
 
-            if (market.bid() >= market.ask()) {
+            if (!Double.isFinite(market.bid()) || !Double.isFinite(market.ask()) || market.bid() >= market.ask()) {
                 String reason = String.format(
                         "Invalid bid/ask spread: bid=%.8f, ask=%.8f",
                         market.bid(), market.ask());
@@ -160,7 +160,7 @@ public class StrategyDecisionService {
                 return StrategyDecisionResult.rejected(reason, warnings);
             }
 
-            if (market.bid() <= 0 || market.currentPrice() <= 0) {
+            if (market.bid() <= 0 || market.currentPrice() <= 0 || !Double.isFinite(market.currentPrice())) {
                 String reason = "Invalid price values (must be > 0)";
                 log.warn(reason);
                 return StrategyDecisionResult.rejected(reason, warnings);
@@ -308,12 +308,6 @@ public class StrategyDecisionService {
                 : latest == null ? 0.0 : latest.closePrice();
         double resolvedBid = bid;
         double resolvedAsk = ask;
-
-        if (resolvedCurrent > 0.0 && (resolvedBid <= 0.0 || resolvedAsk <= 0.0 || resolvedBid >= resolvedAsk)) {
-            double syntheticSpread = Math.max(resolvedCurrent * 0.0001, 0.00000001);
-            resolvedBid = resolvedCurrent - syntheticSpread / 2.0;
-            resolvedAsk = resolvedCurrent + syntheticSpread / 2.0;
-        }
 
         double resolvedVolume = averageVolume > 0.0
                 ? averageVolume

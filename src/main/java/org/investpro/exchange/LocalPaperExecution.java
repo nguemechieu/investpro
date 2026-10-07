@@ -14,6 +14,8 @@ public final class LocalPaperExecution {
     private final Map<String, Order> orders = new LinkedHashMap<>();
     private final Map<String, TradePair> pairs = new HashMap<>();
     private final Map<String, Double> holdings = new HashMap<>();
+    private final Map<String, Position> positions = new LinkedHashMap<>();
+    private final Map<String, Double> marketPrices = new HashMap<>();
     private double cash = 10_000;
     private long sequence;
     private final OrderExecutionProvider provider = (OrderExecutionProvider) Proxy.newProxyInstance(
@@ -50,11 +52,66 @@ public final class LocalPaperExecution {
         account.setConnected(true);
         account.setAvailableBalance(cash);
         account.setTotalBalance(cash);
+        double equity = cash + positions.values().stream().filter(Position::isOpen)
+                .mapToDouble(p -> p.getQuantity() * p.getCurrentPrice()).sum();
+        account.setEquity(equity);
+        account.setOpenPositionCount((int) positions.values().stream().filter(Position::isOpen).count());
         Map<String, Double> balances = new LinkedHashMap<>(holdings);
         balances.put("USD", cash);
         account.setBalances(balances);
         account.setAvailableBalances(balances);
         return account;
+    }
+
+    public synchronized List<Position> positions() {
+        return positions.values().stream().filter(Position::isOpen).map(p -> {
+            Position copy = new Position(p.getTradePair(), p.getSide(), p.getQuantity(), p.getEntryPrice());
+            copy.setPositionId(p.getPositionId());
+            copy.setCurrentPrice(p.getCurrentPrice());
+            copy.setStopLoss(p.getStopLoss());
+            copy.setTakeProfit(p.getTakeProfit());
+            return copy;
+        }).toList();
+    }
+
+    /** Local protective exits and pending entries react only to observed market prices. */
+    public synchronized void updateMarketPrice(TradePair pair, double price) {
+        if (!(price > 0) || !Double.isFinite(price)) return;
+        String symbol = pair.toString('/');
+        pair.setLast(price);
+        marketPrices.put(symbol, price);
+        pairs.put(symbol, pair);
+        for (Order order : new ArrayList<>(orders.values())) {
+            if (!symbol.equals(order.getSymbol()) || !"OPEN".equals(order.getStatus())) continue;
+            boolean limitReached = order.getSide() == Side.BUY ? price <= order.getPrice() : price >= order.getPrice();
+            if (("LIMIT".equals(order.getType()) || "BRACKET".equals(order.getType())) && limitReached) {
+                try {
+                    fill(order, price);
+                    order.setStatus("FILLED");
+                } catch (IllegalArgumentException error) {
+                    order.setStatus("REJECTED");
+                }
+            }
+        }
+        Position position = positions.get(symbol);
+        if (position == null || !position.isOpen()) return;
+        position.updateCurrentPrice(price);
+        if (position.getStopLoss() > 0 && price <= position.getStopLoss()
+                || position.getTakeProfit() > 0 && price >= position.getTakeProfit()) {
+            close(pair);
+        }
+    }
+
+    public synchronized CompletableFuture<String> close(TradePair pair) {
+        Position position = positions.get(pair.toString('/'));
+        if (position == null || !position.isOpen()) return CompletableFuture.failedFuture(
+                new IllegalStateException("No local paper position to close"));
+        Order exit = new Order();
+        exit.setSymbol(pair.toString('/'));
+        exit.setSide(Side.SELL);
+        exit.setType("MARKET");
+        exit.setQuantity(position.getQuantity());
+        return submit(exit);
     }
 
     private Object dispatch(String method, Object[] args) {
@@ -83,6 +140,10 @@ public final class LocalPaperExecution {
             order.setType(method.contains("Market") ? "MARKET" : method.contains("Limit") ? "LIMIT"
                     : method.contains("Bracket") ? "BRACKET" : method.contains("Trailing") ? "TRAILING_STOP" : "STOP");
             order.setPrice(args.length > 3 ? ((Number) args[3]).doubleValue() : pair.getLastPrice());
+            if (method.contains("Bracket")) {
+                order.setStopLoss(((Number) args[4]).doubleValue());
+                order.setTakeProfit(((Number) args[5]).doubleValue());
+            }
             return submit(order);
         }
         return switch (method) {
@@ -121,26 +182,18 @@ public final class LocalPaperExecution {
         if (order.getQuantity() <= 0 || !Double.isFinite(order.getQuantity()) || order.getSide() == null) {
             throw new IllegalArgumentException("Paper order requires a valid side and positive quantity.");
         }
-        boolean market = "MARKET".equalsIgnoreCase(order.getType());
+        boolean market = "MARKET".equalsIgnoreCase(order.getType())
+                || "BRACKET".equals(order.getType()) && order.getPrice() == 0;
         if (!market && (!(order.getPrice() > 0) || !Double.isFinite(order.getPrice()))) {
             throw new IllegalArgumentException("Pending paper order requires a positive price.");
         }
         if (market) {
             TradePair pair = pairs.get(order.getSymbol());
-            double price = pair == null ? order.getPrice() : pair.getLastPrice();
+            double price = marketPrices.getOrDefault(order.getSymbol(), pair == null ? order.getPrice() : pair.getLastPrice());
             if (!(price > 0) || !Double.isFinite(price)) {
                 throw new IllegalArgumentException("Paper market order requires a current market price.");
             }
-            double quantity = order.getQuantity();
-            double held = holdings.getOrDefault(order.getSymbol(), 0.0);
-            if (order.getSide() == Side.BUY && cash < price * quantity
-                    || order.getSide() == Side.SELL && held < quantity) {
-                throw new IllegalArgumentException("Insufficient local paper balance.");
-            }
-            double signed = order.getSide() == Side.BUY ? quantity : -quantity;
-            cash -= price * signed;
-            holdings.put(order.getSymbol(), held + signed);
-            order.setPrice(price);
+            fill(order, price);
         }
         order.setId(++sequence);
         order.setDate(new Date());
@@ -148,6 +201,32 @@ public final class LocalPaperExecution {
         String id = "paper-" + sequence;
         orders.put(id, order);
         return CompletableFuture.completedFuture(id);
+    }
+
+    private void fill(Order order, double price) {
+        double quantity = order.getQuantity();
+        double held = holdings.getOrDefault(order.getSymbol(), 0.0);
+        if (order.getSide() == Side.BUY && cash < price * quantity
+                || order.getSide() == Side.SELL && held < quantity) {
+            throw new IllegalArgumentException("Insufficient local paper balance.");
+        }
+        double signed = order.getSide() == Side.BUY ? quantity : -quantity;
+        cash -= price * signed;
+        holdings.put(order.getSymbol(), held + signed);
+        order.setPrice(price);
+        Position existing = positions.get(order.getSymbol());
+        if (order.getSide() == Side.BUY) {
+            double entry = existing != null && existing.isOpen()
+                    ? (existing.getEntryPrice() * held + price * quantity) / (held + quantity) : price;
+            Position position = new Position(pairs.get(order.getSymbol()), Side.BUY, held + quantity, entry);
+            position.setCurrentPrice(price);
+            position.setStopLoss(order.getStopLoss());
+            position.setTakeProfit(order.getTakeProfit());
+            positions.put(order.getSymbol(), position);
+        } else if (existing != null) {
+            existing.setQuantity(held - quantity);
+            existing.setOpen(held > quantity);
+        }
     }
 
     private String cancel(String id) {

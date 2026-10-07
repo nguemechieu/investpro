@@ -16,7 +16,7 @@ public final class CoinbaseCredentialDiagnostic {
 
     public record EndpointResult(String step, int statusCode, boolean passed) {}
 
-    public static void main(String[] args) {
+     static void main() {
         validateCredentials(setting("COINBASE_KEY_NAME"), setting("COINBASE_PRIVATE_KEY"));
     }
 

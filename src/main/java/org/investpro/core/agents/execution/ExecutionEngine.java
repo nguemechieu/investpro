@@ -72,6 +72,8 @@ public class ExecutionEngine {
     private BehaviourGuardService behaviourGuardService;
     private BehaviourGuardConfig behaviourGuardConfig;
     private UniversalTradabilityService universalTradabilityService;
+    private static final org.investpro.core.execution.BotOrderJournal orderJournal =
+            new org.investpro.core.execution.BotOrderJournal(java.nio.file.Path.of("data", "bot-order-intents"));
 
     public ExecutionEngine(
             @Nullable Exchange exchange,
@@ -534,7 +536,7 @@ public class ExecutionEngine {
                     : executeNewOrder(side, symbol, entryPrice, riskContext, finalDecision);
             return submission
                     .thenApply(orderId -> {
-                        log.info("ExecutionEngine: New order executed successfully. orderId={}", orderId);
+                        log.info("ExecutionEngine: New order submitted. orderId={} (fill not yet confirmed)", orderId);
                         return PositionExecutionResult.success(orderId);
                     })
                     .exceptionally(exception -> {
@@ -597,18 +599,69 @@ public class ExecutionEngine {
 
         double positionSize = finalDecision.getSuggestedPositionSize();
         String normalizedStrategy = executionStrategy.trim().toUpperCase(Locale.ROOT);
+        validateSubmissionPlan(exchange, side, entryPrice, riskContext, positionSize, normalizedStrategy);
+        boolean limit = normalizedStrategy.equals("LIMIT") || normalizedStrategy.equals("LIMIT_ORDER");
+        boolean protectedEntry = riskContext.getStopLossPrice() > 0 || riskContext.getTakeProfitPrice() > 0;
+        SymbolTradability tradability = recheckOrderTradability(symbol,
+                limit ? OpenOrder.OrderType.LIMIT : OpenOrder.OrderType.MARKET);
+        if (tradability == null || (exchange.isBotPaperTrading() ? !tradability.paperTradingAllowed()
+                : !tradability.orderSubmissionAllowed()
+                || (limit ? !tradability.limitOrderAllowed() : !tradability.marketOrderAllowed()))) {
+            throw new IllegalStateException("Order submission tradability recheck failed");
+        }
+        var provider = exchange.botOrderExecution();
+        String accountKey = exchange.getExchangeId() + ":" + riskContext.getExecutionAccountId()
+                + ":" + exchange.isBotPaperTrading();
+        // Paper orders are session-local; the durable barrier protects live broker submissions.
+        String intent = exchange.isBotPaperTrading() ? null
+                : orderJournal.begin(accountKey, toSymbolText(symbol), provider);
+        CompletableFuture<String> submitted = protectedEntry
+                ? provider.createBracketOrder(symbol, side, positionSize, limit ? entryPrice : 0,
+                        riskContext.getStopLossPrice(), riskContext.getTakeProfitPrice())
+                : limit ? provider.placeLimitOrder(symbol, side, positionSize, entryPrice)
+                : provider.placeMarketOrder(symbol, side, positionSize);
+        return submitted.orTimeout(15, TimeUnit.SECONDS).thenApply(orderId -> {
+            if (orderId == null || orderId.isBlank()) throw new IllegalStateException(
+                    "Broker returned no order ID; submission outcome is unknown");
+            if (intent != null) orderJournal.submitted(accountKey, intent, orderId);
+            return orderId;
+        });
+    }
 
-        return switch (normalizedStrategy) {
-            case "MARKET", "MARKET_ORDER" -> placeMarketOrder(side, symbol, positionSize);
-            case "LIMIT", "LIMIT_ORDER" -> placeLimitOrder(side, symbol, entryPrice, positionSize);
-            case "VWAP" -> placeVwapOrder(side, symbol, riskContext, positionSize);
-            case "TWAP" -> placeTwapOrder(side, symbol, riskContext, positionSize);
-            case "ICEBERG" -> placeIcebergOrder(side, symbol, riskContext, positionSize);
-            case "SCALED", "SCALED_ENTRY" -> placeScaledEntryOrder(side, symbol, riskContext, positionSize);
-            case "ALGORITHMIC", "ALGO" -> placeAlgorithmicOrder(side, symbol, riskContext, positionSize);
-            default -> CompletableFuture.failedFuture(
-                    new UnsupportedOperationException("Unsupported execution strategy: " + executionStrategy));
-        };
+    public void reconcileUnknownBotOrder(String accountId, String intentId, String brokerOrderId) {
+        requireExchange();
+        if (accountId == null || accountId.isBlank()) throw new IllegalArgumentException("Account ID is required");
+        if (exchange.isBotPaperTrading()) throw new IllegalStateException("Durable reconciliation is only for live orders");
+        orderJournal.reconcileUnknown(exchange.getExchangeId() + ":" + accountId + ":false",
+                intentId, brokerOrderId, exchange.botOrderExecution());
+    }
+
+    static void validateSubmissionPlan(Exchange exchange, Side side, double entry,
+                                       TradeRiskContext context, double quantity, String strategy) {
+        if (!java.util.Set.of("MARKET", "MARKET_ORDER", "LIMIT", "LIMIT_ORDER").contains(strategy)) {
+            throw new UnsupportedOperationException("Execution strategy " + strategy + " is not implemented; no order submitted");
+        }
+        if (!(entry > 0) || !Double.isFinite(entry) || !(quantity > 0) || !Double.isFinite(quantity)
+                || quantity > context.getRequestedPositionSize()) {
+            throw new IllegalArgumentException("Entry/quantity is invalid or exceeds the validated request");
+        }
+        if (!exchange.isBotPaperTrading() && context.getExecutionAccountId().isBlank()) {
+            throw new IllegalStateException("Reconciled account identity is required");
+        }
+        double stop = context.getStopLossPrice();
+        double target = context.getTakeProfitPrice();
+        boolean requiresStop = context.getCapitalProtection() != org.investpro.enums.CapitalProtection.NONE;
+        if (requiresStop && (!(stop > 0) || !Double.isFinite(stop))) {
+            throw new IllegalArgumentException("Capital protection requires an explicit valid stop loss");
+        }
+        if (!Double.isFinite(stop) || !Double.isFinite(target) || stop < 0 || target < 0
+                || stop > 0 && (side == Side.BUY ? stop >= entry : stop <= entry)
+                || target > 0 && (side == Side.BUY ? target <= entry : target >= entry)) {
+            throw new IllegalArgumentException("Protective prices are invalid for the entry side");
+        }
+        if ((stop > 0 || target > 0) && !exchange.isBotPaperTrading() && !exchange.supportsBracketOrders()) {
+            throw new UnsupportedOperationException("Exchange cannot submit a protected entry; no order submitted");
+        }
     }
 
     private CompletableFuture<String> placeMarketOrder(
@@ -666,7 +719,7 @@ public class ExecutionEngine {
 
         try {
             SymbolTradability status = universalTradabilityService
-                    .getTradability(symbol, TradabilityScope.ORDER_SUBMISSION, true)
+                    .getTradability(symbol, exchange.isBotPaperTrading() ? TradabilityScope.PAPER_TRADING : TradabilityScope.ORDER_SUBMISSION, true)
                     .get(5, TimeUnit.SECONDS);
             return status;
         } catch (Exception exception) {
@@ -674,113 +727,6 @@ public class ExecutionEngine {
             return null;
         }
     }
-
-    /**
-     * Placeholder until Exchange supports native VWAP execution.
-     * Currently falls back to MARKET order after logging execution intent.
-     */
-    private CompletableFuture<String> placeVwapOrder(
-            @NotNull Side side,
-            @NotNull TradePair symbol,
-            @NotNull TradeRiskContext riskContext,
-            double positionSize) {
-        log.info(
-                "ExecutionEngine: VWAP requested. Falling back to MARKET. symbol={} side={} size={}",
-                symbol,
-                side,
-                positionSize);
-
-        return placeMarketOrder(side, symbol, positionSize);
-    }
-
-    /**
-     * Placeholder until Exchange supports native TWAP execution.
-     * Currently falls back to MARKET order after logging execution intent.
-     */
-    private CompletableFuture<String> placeTwapOrder(
-            @NotNull Side side,
-            @NotNull TradePair symbol,
-            @NotNull TradeRiskContext riskContext,
-            double positionSize) {
-        log.info(
-                "ExecutionEngine: TWAP requested. Falling back to MARKET. symbol={} side={} size={}",
-                symbol,
-                side,
-                positionSize);
-
-        return placeMarketOrder(side, symbol, positionSize);
-    }
-
-    /**
-     * Placeholder until Exchange supports native ICEBERG execution.
-     * Currently falls back to LIMIT if entry price exists, otherwise MARKET.
-     */
-    private CompletableFuture<String> placeIcebergOrder(
-            @NotNull Side side,
-            @NotNull TradePair symbol,
-            @NotNull TradeRiskContext riskContext,
-            double positionSize) {
-        log.info(
-                "ExecutionEngine: ICEBERG requested. symbol={} side={} size={}",
-                symbol,
-                side,
-                positionSize);
-
-        double entryPrice = riskContext.getEntryPrice();
-        if (entryPrice > 0.0 && Double.isFinite(entryPrice)) {
-            return placeLimitOrder(side, symbol, entryPrice, positionSize);
-        }
-
-        return placeMarketOrder(side, symbol, positionSize);
-    }
-
-    /**
-     * Placeholder scaled-entry implementation.
-     * Currently places the first chunk as a market order.
-     */
-    private CompletableFuture<String> placeScaledEntryOrder(
-            @NotNull Side side,
-            @NotNull TradePair symbol,
-            @NotNull TradeRiskContext riskContext,
-            double positionSize) {
-        double firstChunk = positionSize / 3.0;
-
-        if (firstChunk <= 0.0 || !Double.isFinite(firstChunk)) {
-            return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("SCALED_ENTRY requires positive position size"));
-        }
-
-        log.info(
-                "ExecutionEngine: SCALED_ENTRY requested. Placing first chunk. symbol={} side={} chunk={} total={}",
-                symbol,
-                side,
-                firstChunk,
-                positionSize);
-
-        return placeMarketOrder(side, symbol, firstChunk);
-    }
-
-    /**
-     * Placeholder algorithmic order implementation.
-     * Currently falls back to MARKET order.
-     */
-    private CompletableFuture<String> placeAlgorithmicOrder(
-            @NotNull Side side,
-            @NotNull TradePair symbol,
-            @NotNull TradeRiskContext riskContext,
-            double positionSize) {
-        log.info(
-                "ExecutionEngine: ALGORITHMIC requested. Falling back to MARKET. symbol={} side={} size={} ,risk context={}",
-                symbol,
-                side,
-                positionSize, riskContext);
-
-        return placeMarketOrder(side, symbol, positionSize);
-    }
-
-    // =========================================================================
-    // Guard validation
-    // =========================================================================
 
     private @Nullable PositionExecutionResult validateBehaviourGuard(@NotNull String operationType) {
         if (behaviourGuardService == null) {
@@ -1010,7 +956,7 @@ public class ExecutionEngine {
 
         public @NotNull String statusMessage() {
             return success
-                    ? "Executed: %s".formatted(orderId)
+                    ? "Submitted: %s (fill confirmation pending)".formatted(orderId)
                     : "Failed: %s".formatted(errorMessage);
         }
     }

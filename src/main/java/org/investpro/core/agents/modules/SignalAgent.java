@@ -40,6 +40,7 @@ public class SignalAgent implements Agent {
     private AgentEventBus eventBus;
     private final StrategyDecisionService decisionService;
     private final Map<String, List<CandleData>> candleHistory = new ConcurrentHashMap<>();
+    private final Map<String, org.investpro.models.trading.Ticker> quotes = new ConcurrentHashMap<>();
     private static final int MAX_CANDLES_PER_CONTEXT = 500;
     private static final int MIN_SEEDED_CANDLES = 120;
 
@@ -75,6 +76,7 @@ public class SignalAgent implements Agent {
         this.running = false;
         this.context = null;
         this.eventBus = null;
+        quotes.clear();
 
         log.info("SignalAgent stopped");
     }
@@ -123,13 +125,21 @@ public class SignalAgent implements Agent {
             // Extract prices
             CandleData latest = candles.get(candles.size() - 1);
             Double current = number(metadata.get("current"), latest.closePrice());
-            Double bid = number(metadata.get("bid"), current > 0.0 ? current * 0.99995 : 0.0);
-            Double ask = number(metadata.get("ask"), current > 0.0 ? current * 1.00005 : 0.0);
+            org.investpro.models.trading.Ticker quote = quotes.get(symbol);
+            if (quote == null || System.currentTimeMillis() - quote.getTimestamp() > 30_000
+                    || quote.getTimestamp() > System.currentTimeMillis() + 1_000
+                    || !(quote.getBidPrice() > 0) || !(quote.getAskPrice() > quote.getBidPrice())) {
+                log.debug("Signal skipped for {}: fresh bid/ask quote unavailable", symbol);
+                return;
+            }
+            Double bid = quote.getBidPrice();
+            Double ask = quote.getAskPrice();
             Double volatility = number(metadata.get("volatility"), 0.0);
             Double volume = number(metadata.get("volume"), latest.volume());
 
             // Generate signal with correct StrategyDecisionService signature
-            MarketBehavior behavior = MarketBehavior.RANGING; // Default, can be enhanced
+            MarketBehavior behavior = MarketBehavior.valueOf(
+                    new org.investpro.strategy.auto.MarketRegimeDetector().detect(candles).name());
 
             StrategyDecisionResult result = decisionService.generateDecision(
                     symbol,
@@ -154,7 +164,10 @@ public class SignalAgent implements Agent {
                 return;
             }
 
-            StrategySignal signal = result.getSignal();
+            StrategySignal signal = result.getSignal().toBuilder()
+                    .metadata("bid", bid).metadata("ask", ask)
+                    .metadata("quote_timestamp", quote.getTimestamp())
+                    .metadata("volatility", volatility).build();
             publishSignal(signal, result);
 
             log.info("Strategy signal: {} {} at {} (confidence: {}, strategy: {})",
@@ -171,6 +184,10 @@ public class SignalAgent implements Agent {
      * Handle MARKET_TICK events - real-time price updates.
      */
     private void handleTickEvent(AgentEvent event) {
+        if (event.payload() instanceof org.investpro.models.trading.Ticker ticker) {
+            String symbol = resolveSymbol(event.metadata());
+            if (symbol != null) quotes.put(symbol, ticker);
+        }
         // Tick events are for real-time monitoring, not strategy signals
         log.trace("Received tick event for: {}", event.metadata().get("tradePair"));
     }
@@ -197,11 +214,16 @@ public class SignalAgent implements Agent {
                 metadata.put("assignment_score", result.getAssignment().getScoreAtAssignment());
                 metadata.put("assignment_mode", result.getAssignment().getMode());
             }
-            if (requiresPaperValidation()) {
+            if (requiresPaperValidation() && context != null && context.getExchange() != null
+                    && !context.getExchange().isBotPaperTrading()
+                    && !hasLiveApproval(result.getAssignment())) {
                 metadata.put("trade_allowed", false);
                 metadata.put("block_reason", "Paper trading validation required before live execution");
             }
-            TradePair pair = parsePair(signal.getSymbol());
+            TradePair pair = context == null || context.getExchange() == null ? null
+                    : context.getExchange().getTradePairSymbol().stream()
+                    .filter(candidate -> candidate.toString('/').equalsIgnoreCase(signal.getSymbol()))
+                    .findFirst().orElse(null);
             if (pair != null) {
                 metadata.put("tradePairObject", pair);
                 metadata.put("tradePair", pair);
@@ -229,6 +251,18 @@ public class SignalAgent implements Agent {
         return Boolean.parseBoolean(System.getProperty(
                 "investpro.strategy.requirePaperTradingBeforeLive",
                 "true"));
+    }
+
+    static boolean hasLiveApproval(org.investpro.strategy.StrategyAssignment assignment) {
+        if (assignment == null || !assignment.isValid()) return false;
+        return org.investpro.strategy.management.StrategyAssignmentManager.getInstance()
+                .getRecord(assignment.getAssignmentId())
+                .filter(record -> java.util.Objects.equals(record.getStrategyId(), assignment.getStrategyId())
+                        && java.util.Objects.equals(record.getSymbol(), assignment.getSymbol())
+                        && java.util.Objects.equals(record.getTimeframe(), assignment.getTimeframe().getCode())
+                        && org.investpro.strategy.management.StrategyAssignmentGatekeeper.getInstance()
+                        .canTrade(record).isAllowed())
+                .isPresent();
     }
 
     private String resolveSymbol(Map<String, Object> metadata) {

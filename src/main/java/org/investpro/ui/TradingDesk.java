@@ -6253,7 +6253,6 @@ public class TradingDesk extends BorderPane {
         }
 
         OpenOrder.OrderType mappedOrderType = switch (safe(orderType).toUpperCase(Locale.ROOT)) {
-            case "MARKET" -> OpenOrder.OrderType.MARKET;
             case "LIMIT" -> OpenOrder.OrderType.LIMIT;
             case "STOP", "BRACKET" -> OpenOrder.OrderType.STOP_LIMIT;
             case "TRAILING_STOP", "TRAILING STOP", "TRAIL" -> OpenOrder.OrderType.TRAILING_STOP;
@@ -7916,8 +7915,8 @@ public class TradingDesk extends BorderPane {
         return reconciled;
     }
 
-    private String buildTradabilityDiagnostics(TradePair pair, SymbolTradability status,
-            OpenOrder.OrderType orderType) {
+    private @NonNull String buildTradabilityDiagnostics(TradePair pair, SymbolTradability status,
+                                                        OpenOrder.OrderType orderType) {
         String symbol = pair == null ? "-" : pair.toString('/');
         String exchangeName = exchange == null ? "-" : exchange.getDisplayName();
 
@@ -10282,14 +10281,15 @@ public class TradingDesk extends BorderPane {
         title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
 
         ListView<String> reportsList = new ListView<>();
+        String date= String.valueOf(Date.from(Instant.now()));
         reportsList.getItems().addAll(
-                "[2026-05-07] Daily Market Summary - Tech stocks surge on earnings",
-                "[2026-05-06] Weekly Technical Analysis - S&P 500 breakout confirmed",
-                "[2026-05-05] Cryptocurrency Report - Bitcoin above $65K resistance",
-                "[2026-05-04] Forex Analysis - Dollar weakens amid rate cut expectations",
-                "[2026-05-03] Asset Class Review - Bonds show flight to safety",
-                "[2026-05-02] Economic Outlook - Fed signals potential rate cuts",
-                "[2026-05-01] Commodities Report - Oil rallies on geopolitical tensions");
+                "["+date+"] Daily Market Summary - Tech stocks surge on earnings",
+                "["+   date+"] Weekly Technical Analysis - S&P 500 breakout confirmed",
+                "["+  date+"] Cryptocurrency Report - Bitcoin above $65K resistance",
+                "["+  date+"] Forex Analysis - Dollar weakens amid rate cut expectations",
+                "["+  date+ "] Asset Class Review - Bonds show flight to safety",
+                "["+  date+ "] Economic Outlook - Fed signals potential rate cuts",
+                "["+ date+ "] Commodities Report - Oil rallies on geopolitical tensions");
         reportsList.setStyle("-fx-control-inner-background: #16213e; -fx-text-fill: #ffffff;");
         reportsList.setCellFactory(param -> new ReportListCell());
 
@@ -10695,9 +10695,8 @@ public class TradingDesk extends BorderPane {
         createIndependentWindow("Account Activity", buildAccountActivityPane(), 1100, 720);
         journal("Account Activity panel opened");
     }
-
     private @NotNull TableView<Trade> buildTradeTable(List<org.investpro.models.trading.Trade> data) {
-        TableView<org.investpro.models.trading.Trade> table = new TableView<>();
+        TableView<Trade> table = new TableView<>();
         table.setStyle("-fx-background-color: #16213e;");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.getColumns().addAll(
@@ -13101,6 +13100,7 @@ public class TradingDesk extends BorderPane {
         }
 
         if (exchange == null || !exchange.canSubmitBotOrders()) {
+            assert exchange != null;
             showWarning(
                     "Bot Trading",
                     "%s is connected, but this adapter cannot submit orders."

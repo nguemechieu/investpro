@@ -282,16 +282,8 @@ public class IbkrExchange extends InteractiveBrokers {
             double stopLoss,
             double takeProfit) {
         if (isPaperTrading()) return orderExecution().createBracketOrder(tradePair, side, amount, entryPrice, stopLoss, takeProfit);
-        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
-            return CompletableFuture.failedFuture(new UnsupportedOperationException(
-                    "IBKR native bracket transmission is not implemented; no orders were submitted."));
-        ensureResolvedContract(tradePair);
-        if (canTradeNow()) {
-            return CompletableFuture
-                    .failedFuture(new IllegalStateException("IBKR live trading gate denied bracket order"));
-        }
-        return CompletableFuture.completedFuture(
-                orderService.submitBracket(tradePair, side, amount, entryPrice, stopLoss, takeProfit));
+        return CompletableFuture.failedFuture(new UnsupportedOperationException(
+                "IBKR native bracket transmission is not implemented; no orders were submitted."));
     }
 
     @Override

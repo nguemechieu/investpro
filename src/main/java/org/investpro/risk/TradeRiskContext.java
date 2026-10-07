@@ -40,6 +40,10 @@ public class TradeRiskContext {
     /** Trading symbol/pair, for example BTC/USD, EUR/USD, AAPL/USD. */
     TradePair symbol;
 
+    /** Account whose reconciled balances authorize this execution. */
+    @Builder.Default
+    String executionAccountId = "";
+
     /** Asset class, for example CRYPTO, FOREX, STOCK, COMMODITY. */
     String assetClass;
 

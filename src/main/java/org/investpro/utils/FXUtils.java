@@ -1,13 +1,6 @@
 package org.investpro.utils;
 
-import javafx.geometry.Dimension2D;
-import javafx.scene.Group;
-import javafx.scene.Scene;
 import javafx.scene.text.Font;
-import javafx.scene.text.Text;
-import javafx.scene.text.TextBoundsType;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Locale;
@@ -62,40 +55,6 @@ public class FXUtils {
         return MONOSPACED_FONT;
     }
 
-    public static Dimension2D computeTextDimensions(String text) {
-        return computeTextDimensions(text, null, 0, null, "");
-    }
-
-
-    @Contract("_, _, _, _, _ -> new")
-    public static @NotNull Dimension2D computeTextDimensions(String text, Font font, double lineSpacing,
-                                                             TextBoundsType boundsType, String style) {
-        if (text.isEmpty()) {
-            return new Dimension2D(0, 0);
-        }
-
-        final Text textNode = new Text(text);
-
-        if (font != null) {
-            textNode.setFont(font);
-        }
-
-        if (boundsType != null) {
-            textNode.setBoundsType(boundsType);
-        }
-
-        if (!style.isEmpty()) {
-            textNode.setStyle(style);
-            // The scene is required because that is just the way the CSS processor works
-            // (it needs a node to be located in a Scene to be able to do its job) (re: jewelsea)
-            new Scene(new Group(textNode));
-            textNode.applyCss();
-        }
-
-        textNode.setLineSpacing(lineSpacing);
-
-        return new Dimension2D(textNode.getLayoutBounds().getWidth(), textNode.getLayoutBounds().getHeight());
-    }
 
     /**
      * @return true if the JVM we are running on is on Apple's Mac OS X, false otherwise

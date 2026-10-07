@@ -2,7 +2,6 @@ package org.investpro.utils;
 
 import lombok.extern.slf4j.Slf4j;
 
-import java.time.Instant;
 import java.util.*;
 
 /**
@@ -31,27 +30,8 @@ public class CandleAggregator {
                 }
             });
 
-    /**
-     * Calculates the bucket time (start of the time period) for a given timestamp.
-     *
-     * @param timestamp        the trade timestamp
-     * @param secondsPerCandle the candle duration in seconds
-     * @return the bucket time in epoch seconds
-     */
-    private static long getBucketTime(Instant timestamp, int secondsPerCandle) {
-        long epochSeconds = timestamp.getEpochSecond();
-        return (epochSeconds / secondsPerCandle) * secondsPerCandle;
-    }
 
-    /**
-     * Checks if a timeframe string is valid.
-     *
-     * @param timeframe the timeframe to validate
-     * @return true if the timeframe is supported
-     */
-    public static boolean isValidTimeframe(String timeframe) {
-        return TIMEFRAME_SECONDS.containsKey(timeframe);
-    }
+
 
     /**
      * Gets all supported timeframes.

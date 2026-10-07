@@ -143,7 +143,7 @@ public class StrategyLabPanel extends BorderPane {
     private static final String CLR_YELLOW = "#f59e0b";
     private static final String CLR_BORDER = "#1e293b";
 
-    private void initializeUI() throws SQLException, ClassNotFoundException {
+    private void initializeUI()  {
         getStyleClass().add("strategy-lab-panel");
         setStyle("-fx-background-color: " + BG_PANEL + ";");
 
@@ -163,7 +163,7 @@ public class StrategyLabPanel extends BorderPane {
         }
     }
 
-    private @NonNull VBox createControlsSection() throws SQLException, ClassNotFoundException {
+    private @NonNull VBox createControlsSection() {
         VBox box = new VBox(8);
         box.setPadding(new Insets(10));
         box.setStyle(

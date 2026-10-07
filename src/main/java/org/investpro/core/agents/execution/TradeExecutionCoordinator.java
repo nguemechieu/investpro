@@ -61,6 +61,8 @@ public class TradeExecutionCoordinator {
     private final PositionTransitionPolicy positionTransitionPolicy = new PositionTransitionPolicy();
     private final SymbolTradeLockManager symbolTradeLockManager = new SymbolTradeLockManager();
     private final ConcurrentHashMap<String, Instant> lastActionTimes = new ConcurrentHashMap<>();
+    // A portfolio snapshot and its submission form one transition across all symbols.
+    private static final ConcurrentHashMap<String, java.util.concurrent.Semaphore> portfolioLocks = new ConcurrentHashMap<>();
     private volatile SystemCore systemCore;
 
     private static final Duration TRANSITION_COOLDOWN = Duration.ofSeconds(10);
@@ -230,7 +232,17 @@ public class TradeExecutionCoordinator {
                     "Order blocked: another order transition is already running for " + symbolText));
         }
 
-        CompletableFuture<TradeExecutionResult> guardedExecution = hasPendingOrder(exchange, symbol)
+        java.util.concurrent.Semaphore portfolioLock = portfolioLocks.computeIfAbsent(
+                exchangeName + ":" + (exchange != null && exchange.isBotPaperTrading()),
+                _ -> new java.util.concurrent.Semaphore(1));
+        if (!portfolioLock.tryAcquire()) {
+            symbolTradeLockManager.unlock(exchangeName, symbolText);
+            return completed(TradeExecutionResult.rejected("Another portfolio transition is in progress; retry on the next signal"));
+        }
+
+        CompletableFuture<TradeExecutionResult> guardedExecution;
+        try {
+            guardedExecution = hasPendingOrder(exchange, symbol)
                 .thenCompose(hasPending -> {
                     if (hasPending) {
                         return completed(TradeExecutionResult.rejected(
@@ -267,15 +279,21 @@ public class TradeExecutionCoordinator {
                                     case OPEN_LONG, OPEN_SHORT -> continueRiskAiAndExecution(
                                             signal,
                                             side,
-                                            withCachedAccountSnapshot(exchange, riskContext),
+                                            org.investpro.core.pipeline.BotRiskContextService.refresh(exchange, riskContext),
                                             exchangeName,
                                             symbolText);
                                 };
                             });
                 })
                 .exceptionally(exception -> TradeExecutionResult.failed(rootMessage(exception)));
+        } catch (Exception exception) {
+            portfolioLock.release();
+            symbolTradeLockManager.unlock(exchangeName, symbolText);
+            return completed(TradeExecutionResult.failed(rootMessage(exception)));
+        }
 
         return guardedExecution.whenComplete((ignored, throwable) -> {
+            portfolioLock.release();
             symbolTradeLockManager.unlock(exchangeName, symbolText);
             log.info("TradeExecutionCoordinator: symbol lock released. exchange={} symbol={}", exchangeName,
                     symbolText);
@@ -302,10 +320,9 @@ public class TradeExecutionCoordinator {
                         "RiskManagementSystem returned null decision"));
             }
 
-            AiTradeReviewRequest aiRequest = AiTradeReviewRequest.from(
-                    side,
-                    validatedContext,
-                    riskDecision);
+            AiTradeReviewRequest aiRequest = signal == null
+                    ? AiTradeReviewRequest.from(side, validatedContext, riskDecision)
+                    : AiTradeReviewRequest.fromStrategySignal(signal, validatedContext, riskDecision);
 
             AiTradeReviewResponse aiResponse = aiReasoningService.reviewTrade(aiRequest);
 
@@ -328,7 +345,7 @@ public class TradeExecutionCoordinator {
                                 recordActionTime(exchangeName, symbolText);
                                 return TradeExecutionResult.executed(
                                         executionResult.orderId(),
-                                        finalDecision.getSummary(),
+                                        "Order submitted: " + executionResult.orderId() + "; fill confirmation pending. " + finalDecision.getSummary(),
                                         finalDecision.getExplanation());
                             }
 
@@ -606,19 +623,18 @@ public class TradeExecutionCoordinator {
                 positionId,
                 intent);
 
-        if (exchange.isBotPaperTrading()) {
-            return completed(TradeExecutionResult.rejected("Broker position closing is disabled in local paper mode."));
-        }
-        CompletableFuture<String> closeFuture = positionId == null || positionId.isBlank()
+        CompletableFuture<String> closeFuture = exchange.isBotPaperTrading() ? exchange.closeLocalPaperPosition(symbol)
+                : positionId == null || positionId.isBlank()
                 ? exchange.closePosition(symbol)
                 : exchange.closePosition(symbol, positionId);
 
         return closeFuture
                 .thenApply(orderId -> {
+                    if (orderId == null || orderId.isBlank()) throw new IllegalStateException("Close submission outcome is unknown");
                     recordActionTime(exchangeName, symbolText);
                     return TradeExecutionResult.executed(
                             orderId,
-                            "Closed existing position only for " + symbolText,
+                            "Submitted close of existing position only for " + symbolText + "; fill confirmation pending",
                             "Opposite signal produced " + intent
                                     + "; opening the opposite side is deferred to a later strategy cycle.");
                 })
@@ -627,18 +643,13 @@ public class TradeExecutionCoordinator {
 
     private CompletableFuture<Boolean> hasPendingOrder(@Nullable Exchange exchange, @Nullable TradePair symbol) {
         if (exchange == null || symbol == null) {
-            return CompletableFuture.completedFuture(false);
+            return CompletableFuture.failedFuture(new IllegalStateException("Execution exchange or symbol is unavailable"));
         }
 
         return exchange.botOrderExecution().fetchOpenOrders(symbol)
-                .thenApply(orders -> hasActiveOrderForSymbol(orders, symbol))
-                .exceptionally(exception -> {
-                    log.warn(
-                            "TradeExecutionCoordinator: pending order check failed for {}: {}",
-                            symbol,
-                            rootMessage(exception));
-                    return false;
-                });
+                .orTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .thenApply(orders -> hasActiveOrderForSymbol(Objects.requireNonNull(orders,
+                        "Broker returned no open-order snapshot"), symbol));
     }
 
     private boolean hasActiveOrderForSymbol(@Nullable List<OpenOrder> orders, @NotNull TradePair symbol) {
@@ -666,19 +677,19 @@ public class TradeExecutionCoordinator {
             @Nullable Exchange exchange,
             @Nullable TradePair symbol) {
         if (exchange == null || symbol == null) {
-            return CompletableFuture.completedFuture(Optional.empty());
+            return CompletableFuture.failedFuture(new IllegalStateException("Execution exchange or symbol is unavailable"));
+        }
+
+        if (exchange.isBotPaperTrading()) {
+            return CompletableFuture.completedFuture(exchange.localPaperPositions().stream()
+                    .filter(p -> Objects.equals(toSymbolText(p.getTradePair()), toSymbolText(symbol)))
+                    .filter(this::isOpenPosition).findFirst());
         }
 
         return exchange.fetchPosition(symbol)
+                .orTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
                 .thenApply(position -> position
-                        .filter(this::isOpenPosition))
-                .exceptionally(exception -> {
-                    log.warn(
-                            "TradeExecutionCoordinator: current position check failed for {}: {}",
-                            symbol,
-                            rootMessage(exception));
-                    return Optional.empty();
-                });
+                        .filter(this::isOpenPosition));
     }
 
     private boolean isOpenPosition(@Nullable Position position) {
@@ -686,92 +697,6 @@ public class TradeExecutionCoordinator {
                 && position.isOpen()
                 && position.getQuantity() > 0.0
                 && (position.getSide() == Side.BUY || position.getSide() == Side.SELL);
-    }
-
-    private TradeRiskContext withCachedAccountSnapshot(
-            @Nullable Exchange exchange,
-            @NotNull TradeRiskContext riskContext) {
-        if (exchange == null || !isOanda(exchange.getName())) {
-            return riskContext;
-        }
-        if (riskContext.getAccountBalance() > 0.0) {
-            return riskContext;
-        }
-
-        try {
-            Account account = exchange.isBotPaperTrading() ? exchange.localPaperAccount() : exchange.fetchAccount().get();
-            if (account == null) {
-                return riskContext;
-            }
-
-            double balance = firstPositive(account.getTotalBalance(), account.getAvailableBalance(),
-                    account.getEquity());
-            double equity = riskContext.getAccountEquity() > 0.0
-                    ? riskContext.getAccountEquity()
-                    : firstPositive(account.getEquity(), account.getTotalBalance(), account.getAvailableBalance());
-            if (balance <= 0.0 && equity <= 0.0) {
-                return riskContext;
-            }
-
-            log.info(
-                    "TradeExecutionCoordinator: cached account snapshot loaded for sizing. exchange={} balance={} equity={}",
-                    exchange.getName(),
-                    balance,
-                    equity);
-            return copyRiskContextWithAccountSnapshot(riskContext, balance, equity);
-        } catch (Exception exception) {
-            log.warn(
-                    "TradeExecutionCoordinator: cached account snapshot unavailable for {}: {}",
-                    riskContext.getSymbol(),
-                    rootMessage(exception));
-            return riskContext;
-        }
-    }
-
-    private TradeRiskContext copyRiskContextWithAccountSnapshot(
-            @NotNull TradeRiskContext source,
-            double accountBalance,
-            double accountEquity) {
-        return TradeRiskContext.builder()
-                .symbol(source.getSymbol())
-                .assetClass(source.getAssetClass())
-                .contractType(source.getContractType())
-                .broker(source.getBroker())
-                .accountEquity(accountEquity > 0.0 ? accountEquity : source.getAccountEquity())
-                .availableCash(source.getAvailableCash())
-                .currentOpenRisk(source.getCurrentOpenRisk())
-                .usedMargin(source.getUsedMargin())
-                .freeMargin(source.getFreeMargin())
-                .accountBalance(accountBalance)
-                .requestedPositionSize(source.getRequestedPositionSize())
-                .requestedLeverage(source.getRequestedLeverage())
-                .entryPrice(source.getEntryPrice())
-                .stopLossPrice(source.getStopLossPrice())
-                .takeProfitPrice(source.getTakeProfitPrice())
-                .bidPrice(source.getBidPrice())
-                .askPrice(source.getAskPrice())
-                .currentPrice(source.getCurrentPrice())
-                .expectedWinRate(source.getExpectedWinRate())
-                .expectedRewardRiskRatio(source.getExpectedRewardRiskRatio())
-                .expectedValue(source.getExpectedValue())
-                .riskProfile(source.getRiskProfile())
-                .marketBehavior(source.getMarketBehavior())
-                .executionStrategy(source.getExecutionStrategy())
-                .liquidityProfile(source.getLiquidityProfile())
-                .psychologyProfile(source.getPsychologyProfile())
-                .probabilityLevel(source.getProbabilityLevel())
-                .capitalProtection(source.getCapitalProtection())
-                .systemDesign(source.getSystemDesign())
-                .tradingSessionStatus(source.getTradingSessionStatus())
-                .tradingSessionNotes(source.getTradingSessionNotes())
-                .volatility(source.getVolatility())
-                .maxRiskPerTrade(source.getMaxRiskPerTrade())
-                .maxCumulativeRisk(source.getMaxCumulativeRisk())
-                .maxAllowedLeverage(source.getMaxAllowedLeverage())
-                .maxAllowedDrawdownPercent(source.getMaxAllowedDrawdownPercent())
-                .estimatedSlippagePercent(source.getEstimatedSlippagePercent())
-                .estimatedFee(source.getEstimatedFee())
-                .build();
     }
 
     private boolean isCooldownActive(@Nullable String exchangeName, @NotNull String symbolText) {

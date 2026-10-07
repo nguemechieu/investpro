@@ -7,6 +7,34 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class LocalPaperExecutionTest {
+    @Test
+    void protectedMarketEntryClosesAtObservedStopAndMarksEquity() {
+        LocalPaperExecution paper = new LocalPaperExecution();
+        TradePair pair = pair();
+        String entry = paper.provider().createBracketOrder(pair, Side.BUY, 2, 0, 90, 120).join();
+        assertEquals("FILLED", paper.provider().fetchOrder(entry).join().orElseThrow().getStatus());
+        assertEquals(90, paper.positions().getFirst().getStopLoss());
+        assertEquals(10000, paper.account("test").getEquity());
+        paper.updateMarketPrice(pair, 110);
+        assertEquals(10020, paper.account("test").getEquity());
+        paper.updateMarketPrice(pair, 89);
+        assertTrue(paper.positions().isEmpty());
+        assertEquals(9978, paper.account("test").getAvailableBalance());
+    }
+
+    @Test
+    void protectedLimitEntryWaitsThenFillsAndTakesProfitLocally() {
+        LocalPaperExecution paper = new LocalPaperExecution();
+        TradePair pair = pair();
+        String entry = paper.provider().createBracketOrder(pair, Side.BUY, 1, 95, 90, 120).join();
+        assertTrue(paper.positions().isEmpty());
+        paper.updateMarketPrice(pair, 94);
+        assertEquals("FILLED", paper.provider().fetchOrder(entry).join().orElseThrow().getStatus());
+        assertEquals(94, paper.positions().getFirst().getEntryPrice());
+        paper.updateMarketPrice(pair, 121);
+        assertTrue(paper.positions().isEmpty());
+        assertEquals(10027, paper.account("test").getAvailableBalance());
+    }
     private TradePair pair() {
         TradePair pair = mock(TradePair.class);
         when(pair.toString('/')).thenReturn("BTC/USD");

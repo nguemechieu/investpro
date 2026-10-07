@@ -48,7 +48,7 @@ public record MarketConfiguration(
     }
 
     @Override
-    public String toString() { return redactedSummary(); }
+    public @NonNull String toString() { return redactedSummary(); }
 
     public String telegramToken() {
         return telegramToken;

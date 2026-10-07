@@ -3,6 +3,7 @@ package org.investpro.ui.theme;
 import javafx.scene.Node;
 import javafx.scene.layout.Region;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
@@ -14,36 +15,33 @@ import java.util.Properties;
  * Manages application themes and visual preferences
  * Supports Dark Mode, Light Mode, and Custom themes with visibility controls
  */
+
+@Getter
 @Slf4j
 public class ThemeManager {
+
     public enum Theme {
         DARK_MODE("Dark Mode", ThemeMode.DARK),
         LIGHT_MODE("Light Mode", ThemeMode.LIGHT),
         SYSTEM_DEFAULT("System Default", ThemeMode.SYSTEM);
 
-        private final String displayName;
-        private final ThemeMode mode;
+        final String displayName;
+          final ThemeMode mode;
 
         Theme(String displayName, ThemeMode mode) {
             this.displayName = displayName;
             this.mode = mode;
         }
 
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public ThemeMode getMode() {
-            return mode;
-        }
     }
 
     public enum ThemeMode {
         DARK, LIGHT, SYSTEM
     }
-
+    @Setter
     @Getter
     public static class ThemeConfig {
+
         private Theme theme;
         private double opacity = 1.0; // 0.0 to 1.0
         private boolean useCompactLayout = false;
@@ -52,10 +50,6 @@ public class ThemeManager {
 
         public ThemeConfig() {
             this.theme = Theme.DARK_MODE;
-        }
-
-        public void setTheme(Theme theme) {
-            this.theme = theme;
         }
 
         public void setOpacity(double opacity) {
@@ -70,9 +64,6 @@ public class ThemeManager {
             this.useHighContrast = highContrast;
         }
 
-        public void setAccentColor(String color) {
-            this.accentColor = color;
-        }
     }
 
     private static final String CONFIG_FILE = System.getProperty("user.home") + "/.investpro/theme.properties";
@@ -170,47 +161,11 @@ public class ThemeManager {
      * Get the active color palette based on current theme
      */
     public Map<String, String> getActiveColors() {
-        return themeConfig.theme.getMode() == ThemeMode.DARK
+        return themeConfig.theme.mode == ThemeMode.DARK
                 ? darkThemeColors
                 : lightThemeColors;
     }
 
-    /**
-     * Get specific color from active theme
-     */
-    public String getColor(String colorKey) {
-        return getActiveColors().getOrDefault(colorKey, "#000000");
-    }
-
-    /**
-     * Get complete inline CSS style for a component
-     */
-    public String getComponentStyle(String componentType) {
-        Map<String, String> colors = getActiveColors();
-        String style = "";
-
-        switch (componentType.toLowerCase()) {
-            case "button" -> style = String.format(
-                    "-fx-background-color: %s; -fx-text-fill: %s; -fx-padding: 8px 16px; -fx-border-radius: 4;",
-                    colors.get("accent"), colors.get("primary-bg"));
-            case "text-input" -> style = String.format(
-                    "-fx-control-inner-background: %s; -fx-text-fill: %s; -fx-border-color: %s;",
-                    colors.get("secondary-bg"), colors.get("text-primary"), colors.get("border"));
-            case "panel" -> style = String.format(
-                    "-fx-background-color: %s; -fx-border-color: %s;",
-                    colors.get("secondary-bg"), colors.get("border"));
-            case "chart" -> style = String.format(
-                    "-fx-background-color: %s;",
-                    colors.get("primary-bg"));
-        }
-
-        // Apply opacity and contrast settings
-        if (themeConfig.useHighContrast) {
-            style += " -fx-font-weight: bold;";
-        }
-
-        return style;
-    }
 
     /**
      * Save current theme configuration to disk

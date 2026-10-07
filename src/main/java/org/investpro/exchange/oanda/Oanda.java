@@ -1533,10 +1533,12 @@ public class Oanda extends Exchange {
                 Map<String, Object> payload = new LinkedHashMap<>();
                 Map<String, Object> orderNode = new LinkedHashMap<>();
 
-                orderNode.put("type", "MARKET");
+                boolean limitOrder = "LIMIT".equals(type);
+                orderNode.put("type", limitOrder ? "LIMIT" : "MARKET");
                 orderNode.put("instrument", instrument);
                 orderNode.put("units", String.valueOf((long) signedUnits));
-                orderNode.put("timeInForce", "FOK");
+                orderNode.put("timeInForce", limitOrder ? "GTC" : "FOK");
+                if (limitOrder) orderNode.put("price", String.valueOf(order.getPrice()));
                 orderNode.put("positionFill", "DEFAULT");
 
                 if (order.getTakeProfit() > 0) {
@@ -1563,10 +1565,10 @@ public class Oanda extends Exchange {
 
                 JsonNode root = OBJECT_MAPPER.readTree(response.body());
 
-                String fillId = root.path("orderFillTransaction").path("id").asText("");
+                String fillId = root.path("orderFillTransaction").path("orderID").asText("");
                 String createId = root.path("orderCreateTransaction").path("id").asText("");
 
-                return !fillId.isBlank() ? fillId : createId;
+                return !createId.isBlank() ? createId : fillId;
 
             } catch (Exception exception) {
                 log.error("Failed to create OANDA order", exception);
@@ -1748,7 +1750,7 @@ public class Oanda extends Exchange {
             double entryPrice,
             double stopLoss,
             double takeProfit) {
-        Order order = createOrder(0, tradePair, "MARKET", entryPrice, amount, side, stopLoss, takeProfit, 0);
+        Order order = createOrder(0, tradePair, entryPrice > 0 ? "LIMIT" : "MARKET", entryPrice, amount, side, stopLoss, takeProfit, 0);
         return createOrder(order);
     }
 
@@ -1862,7 +1864,8 @@ public class Oanda extends Exchange {
     public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
         if (isPaperTrading()) return orderExecution().fetchOpenOrders(tradePair);
         return fetchAllOpenOrders()
-                .thenApply(orders -> orders.stream().toList());
+                .thenApply(orders -> orders.stream().filter(order -> tradePair == null
+                        || order.getTradePair() != null && order.getTradePair().toString('/').equals(tradePair.toString('/'))).toList());
     }
 
     @Override
@@ -1871,7 +1874,7 @@ public class Oanda extends Exchange {
         String account = resolveAccountId();
 
         if (account.isBlank()) {
-            return CompletableFuture.completedFuture(Collections.emptyList());
+            return failedFuture(new IllegalStateException("OANDA account is unavailable for order reconciliation"));
         }
 
         String url = oandaRoute(ACCOUNT_PENDING_ORDERS_ROUTE, account);
@@ -1884,7 +1887,7 @@ public class Oanda extends Exchange {
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         log.warn("OANDA open orders failed HTTP {}: {}", response.statusCode(), response.body());
-                        return Collections.emptyList();
+                        throw new IllegalStateException("OANDA order reconciliation failed HTTP " + response.statusCode());
                     }
 
                     return parseOandaAllOpenOrders(response.body());
@@ -1895,10 +1898,11 @@ public class Oanda extends Exchange {
         try {
             JsonNode root = OBJECT_MAPPER.readTree(body);
             JsonNode orders = root.path("orders");
+            if (!orders.isArray()) throw new IllegalArgumentException("OANDA order snapshot is missing");
             return parseOpenOrders(orders);
         } catch (Exception e) {
             log.warn("Failed to parse OANDA all open orders: {}", e.getMessage());
-            return Collections.emptyList();
+            throw new IllegalStateException("Unable to reconcile OANDA open orders", e);
         }
     }
 
@@ -2076,7 +2080,8 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<List<Position>> fetchPositions(TradePair tradePair) {
-        return fetchAllPositions();
+        return fetchAllPositions().thenApply(positions -> positions.stream().filter(position -> tradePair == null
+                || position.getTradePair().toString('/').equals(tradePair.toString('/'))).toList());
     }
 
     @Override
@@ -2091,7 +2096,7 @@ public class Oanda extends Exchange {
         String account = resolveAccountId();
 
         if (account.isBlank()) {
-            return CompletableFuture.completedFuture(Collections.emptyList());
+            return failedFuture(new IllegalStateException("OANDA account is unavailable for position reconciliation"));
         }
 
         String url = oandaRoute(ACCOUNT_OPEN_POSITIONS_ROUTE, account);
@@ -2104,7 +2109,7 @@ public class Oanda extends Exchange {
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
                         log.warn("OANDA positions failed HTTP {}: {}", response.statusCode(), response.body());
-                        return Collections.emptyList();
+                        throw new IllegalStateException("OANDA position reconciliation failed HTTP " + response.statusCode());
                     }
 
                     return parseOandaAllPositions(response.body());
@@ -2115,7 +2120,8 @@ public class Oanda extends Exchange {
         try {
             JsonNode positions = OBJECT_MAPPER.readTree(body).path("positions");
 
-            if (!positions.isArray() || positions.isEmpty()) {
+            if (!positions.isArray()) throw new IllegalArgumentException("OANDA position snapshot is missing");
+            if (positions.isEmpty()) {
                 return Collections.emptyList();
             }
 
@@ -2131,7 +2137,7 @@ public class Oanda extends Exchange {
 
         } catch (Exception exception) {
             logger.warn("Unable to parse OANDA positions", exception);
-            return Collections.emptyList();
+            throw new IllegalStateException("Unable to reconcile OANDA positions", exception);
         }
     }
 
@@ -2140,7 +2146,7 @@ public class Oanda extends Exchange {
         return fetchPositions(tradePair)
                 .thenApply(positions -> positions == null || positions.isEmpty()
                         ? Optional.empty()
-                        : Optional.ofNullable(positions.get(0)));
+                        : Optional.ofNullable(positions.getFirst()));
     }
 
     @Override
@@ -3832,6 +3838,10 @@ public class Oanda extends Exchange {
             int maxRetries,
             long initialDelayMs,
             long maxDelayMs) throws IOException, InterruptedException {
+
+        // A lost mutation response does not prove the broker rejected it. Never resend
+        // an order/close automatically; the execution journal owns reconciliation.
+        if (!"GET".equals(request.method()) && !"HEAD".equals(request.method())) maxRetries = 0;
 
         int attemptCount = 0;
         long lastLogTime = 0;

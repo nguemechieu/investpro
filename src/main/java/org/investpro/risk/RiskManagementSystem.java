@@ -314,7 +314,10 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
                 * (context.getRiskProfile().getMaxPositionSizePercent() / 100.0);
         double maxPositionUnits = maxPositionAmount / context.getEntryPrice();
 
-        return Math.min(adjusted, maxPositionUnits);
+        double availableUnits = context.getEntryPrice() > 0
+                ? context.getAvailableCash() * Math.max(1.0, context.getRequestedLeverage()) / context.getEntryPrice() : 0;
+        return Math.min(Math.min(adjusted, maxPositionUnits),
+                Math.min(context.getRequestedPositionSize(), availableUnits));
     }
 
     private static boolean isOanda(String exchangeName) {

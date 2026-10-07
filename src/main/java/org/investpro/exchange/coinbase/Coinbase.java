@@ -3017,11 +3017,12 @@ public class Coinbase extends Exchange {
             double entryPrice,
             double stopLoss,
             double takeProfit) {
-        if (entryPrice > 0) {
-            return createLimitOrder(tradePair, side, amount, entryPrice);
+        if (stopLoss == 0 && takeProfit == 0) {
+            return entryPrice > 0 ? createLimitOrder(tradePair, side, amount, entryPrice)
+                    : createMarketOrder(tradePair, side, amount);
         }
-
-        return createMarketOrder(tradePair, side, amount);
+        return failedFuture(new UnsupportedOperationException(
+                "Coinbase protective bracket submission is not implemented; no entry was submitted."));
     }
 
     public static String normalizeOrderPayload(JsonNode rawOrder) throws JsonProcessingException {
@@ -3407,7 +3408,7 @@ public class Coinbase extends Exchange {
                         "Coinbase open orders unavailable: credentials lack order-history access or are unauthorized.\n"
                                 + throwable);
             }
-            return Collections.emptyList();
+            throw new CompletionException(root);
         }
         throw new CompletionException(root);
     }

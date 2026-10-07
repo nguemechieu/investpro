@@ -1,6 +1,5 @@
 package org.investpro.utils;
 
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Locale;
@@ -20,15 +19,6 @@ public enum Side {
         } else {
             throw new IllegalArgumentException("unknown trade type: %s".formatted(type));
         }
-    }
-
-    @Contract(pure = true)
-    public static Side oppositeOf(@NotNull Side side) {
-        return switch (side) {
-            case BUY -> SELL;
-            case SELL -> BUY;
-            case HOLD -> HOLD;
-        };
     }
 
     @Override
