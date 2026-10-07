@@ -82,7 +82,8 @@ public class BotTradingConfig {
     private Set<String> allowedSignals;
     private long lastTradeTime = 0;
     private long minTimeBetweenTrades = 5000; // 5 seconds minimum between trades
-    
+
+    // Leverage settings
     // Leverage and margin settings
     private double leverage = 1.0; // 1x to 100x
     private MarginMode marginMode = MarginMode.NO_MARGIN;
@@ -143,17 +144,7 @@ public class BotTradingConfig {
         }
     }
     
-    public void removeTradingSymbol(TradePair symbol) {
-        tradingSymbols.remove(symbol);
-    }
-    
-    public SymbolTradingMode getSymbolTradingMode() {
-        return symbolTradingMode;
-    }
-    
-    public void setSymbolTradingMode(SymbolTradingMode mode) {
-        this.symbolTradingMode = mode != null ? mode : SymbolTradingMode.SELECTED_SYMBOLS;
-    }
+
 
 
 
@@ -172,83 +163,15 @@ public class BotTradingConfig {
         }
         return allowedSignals.contains(signal.toUpperCase().trim());
     }
-    
-    public long getLastTradeTime() {
-        return lastTradeTime;
-    }
-    
-    public void setLastTradeTime(long time) {
-        this.lastTradeTime = time;
-    }
-    
-    public long getMinTimeBetweenTrades() {
-        return minTimeBetweenTrades;
-    }
-    
-    public void setMinTimeBetweenTrades(long milliseconds) {
-        this.minTimeBetweenTrades = Math.max(1000, milliseconds);
-    }
-    
+
+
     public boolean canTrade() {
         return enabled && !tradingSymbols.isEmpty() && 
                (System.currentTimeMillis() - lastTradeTime) >= minTimeBetweenTrades;
     }
-    
-    // Leverage settings
-    public double getLeverage() {
-        return leverage;
-    }
-    
+
     public void setLeverage(double leverage) {
         this.leverage = Math.max(1.0, Math.min(100.0, leverage)); // Clamp between 1x and 100x
-    }
-    
-    public MarginMode getMarginMode() {
-        return marginMode;
-    }
-    
-    public void setMarginMode(MarginMode marginMode) {
-        this.marginMode = marginMode != null ? marginMode : MarginMode.NO_MARGIN;
-    }
-    
-    public double getMaxLeverageRisk() {
-        return maxLeverageRisk;
-    }
-    
-    public void setMaxLeverageRisk(double percent) {
-        this.maxLeverageRisk = Math.max(0, percent);
-    }
-    
-    // Backtesting settings
-    public double getBacktestRiskPercentPerTrade() {
-        return backtestRiskPercentPerTrade;
-    }
-    
-    public void setBacktestRiskPercentPerTrade(double percent) {
-        this.backtestRiskPercentPerTrade = Math.max(0.1, Math.min(5.0, percent)); // 0.1% to 5%
-    }
-    
-    public double getBacktestStartingBalance() {
-        return backtestStartingBalance;
-    }
-    
-
-    public void setBacktestMaxDrawdownPercent(double percent) {
-        this.backtestMaxDrawdownPercent = Math.max(1, Math.min(100, percent));
-    }
-
-
-    
-    public void setPositionSizePercent(double percent) {
-        this.positionSizePercent = Math.max(0.1, Math.min(50.0, percent));
-    }
-    
-    public PositionSizingStrategy getPositionSizingStrategy() {
-        return positionSizingStrategy;
-    }
-    
-    public void setPositionSizingStrategy(PositionSizingStrategy strategy) {
-        this.positionSizingStrategy = strategy != null ? strategy : PositionSizingStrategy.PERCENTAGE;
     }
 
 
@@ -340,69 +263,7 @@ public class BotTradingConfig {
             this.symbolTradingMode = SymbolTradingMode.SELECTED_SYMBOLS;
         }
     }
-    
-    /**
-     * Save all bot configuration to Java Preferences
-     * This is called whenever settings are modified and saved
-     */
-    public void saveToPreferences() {
-        Preferences prefs = Preferences.userNodeForPackage(BotTradingConfig.class);
-        
-        // Basic settings
-        prefs.putBoolean("bot_enabled", enabled);
-        prefs.putDouble("bot_trade_size", tradeSize);
-        prefs.putDouble("bot_stop_loss", stopLoss);
-        prefs.putDouble("bot_take_profit", takeProfit);
-        prefs.putDouble("bot_min_profit", minProfitPercent);
-        prefs.putDouble("bot_max_risk", maxPortfolioRiskPercent);
-        prefs.putLong("bot_min_time_between", minTimeBetweenTrades);
-        prefs.put("bot_allowed_signals", String.join(",", allowedSignals));
-        prefs.put("bot_trading_symbols", formatTradingSymbols());
-        
-        // Leverage and margin
-        prefs.putDouble("bot_leverage", leverage);
-        prefs.put("bot_margin_mode", marginMode.name());
-        prefs.putDouble("bot_max_leverage_risk", maxLeverageRisk);
-        
-        // Backtesting settings
-        prefs.putDouble("bot_backtest_risk", backtestRiskPercentPerTrade);
-        prefs.putDouble("bot_backtest_balance", backtestStartingBalance);
-        prefs.putDouble("bot_backtest_drawdown", backtestMaxDrawdownPercent);
-        prefs.putBoolean("bot_backtest_fees", backtestUseRealFees);
-        
-        // Streaming settings
-        prefs.put("bot_streaming_mode", streamingMode.name());
-        prefs.putBoolean("bot_streaming", streamingEnabled);
-        prefs.putLong("bot_stream_interval", streamingUpdateInterval);
-        prefs.putBoolean("bot_websockets", useWebsockets);
-        prefs.putInt("bot_max_websockets", maxWebsocketConnections);
-        
-        // Position management
-        prefs.putInt("bot_max_positions", maxOpenPositions);
-        prefs.putDouble("bot_max_daily_loss", maxDailyLosses);
-        prefs.putDouble("bot_position_size", positionSizePercent);
-        prefs.put("bot_position_strategy", positionSizingStrategy.name());
-        
-        // Risk management
-        prefs.putBoolean("bot_strict_mm", enableStrictMoneyManagement);
-        prefs.putBoolean("bot_dynamic_sizing", enableDynamicPositionSizing);
-        prefs.putDouble("bot_profit_taking", profitTakingPercent);
-        prefs.putLong("bot_trailing_stop_interval", trailingStopUpdateInterval);
-        prefs.putBoolean("bot_partial_profit", enablePartialProfitTaking);
-        prefs.putBoolean("bot_small_account_mode", smallAccountModeEnabled);
-        prefs.putDouble("bot_small_account_threshold", smallAccountBalanceThreshold);
-        prefs.putDouble("bot_small_account_oanda_units", smallAccountOandaUnits);
-        
-        // Symbol trading mode
-        prefs.put("bot_symbol_mode", symbolTradingMode.name());
-        
-        try {
-            prefs.sync();
-        } catch (Exception e) {
-            System.err.println("Failed to sync preferences: " + e.getMessage());
-        }
-    }
-    
+
     /**
      * Reset all settings to defaults
      */
@@ -470,7 +331,7 @@ public class BotTradingConfig {
         }
 
         for (String signal : rawSignals.split(",")) {
-            if (signal != null && !signal.isBlank()) {
+            if (!signal.isBlank()) {
                 parsedSignals.add(signal.trim().toUpperCase(Locale.ROOT));
             }
         }
@@ -484,7 +345,7 @@ public class BotTradingConfig {
         }
 
         for (String symbol : rawSymbols.split(",")) {
-            String normalized = symbol == null ? "" : symbol.trim();
+            String normalized = symbol.trim();
             if (normalized.isBlank()) {
                 continue;
             }

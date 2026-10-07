@@ -66,10 +66,6 @@ public class FXUtils {
         return computeTextDimensions(text, null, 0, null, "");
     }
 
-    public static Dimension2D computeTextDimensions(String text, Font font) {
-        return computeTextDimensions(text, font, 0, null, "");
-    }
-
 
     @Contract("_, _, _, _, _ -> new")
     public static @NotNull Dimension2D computeTextDimensions(String text, Font font, double lineSpacing,

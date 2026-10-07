@@ -163,7 +163,7 @@ public class IbkrSetupWizard extends VBox {
         return actions;
     }
 
-    private Label stepLabel(String text) {
+    private @NonNull Label stepLabel(String text) {
         Label label = new Label(text);
         label.setStyle("-fx-font-weight: bold; -fx-padding: 8 0 0 0;");
         return label;

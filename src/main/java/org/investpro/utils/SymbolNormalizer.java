@@ -1,5 +1,7 @@
 package org.investpro.utils;
 
+import org.jspecify.annotations.NonNull;
+
 import java.util.List;
 
 /**
@@ -38,23 +40,18 @@ public final class SymbolNormalizer {
         return splitCompact(s);
     }
 
-    /** Convert to "BASE/QUOTE" slash format. */
-    public static String toSlash(String symbol) {
-        return normalize(symbol);
-    }
-
     /** Convert to "BASE_QUOTE" underscore format (OANDA). */
-    public static String toUnderscore(String symbol) {
+    public static @NonNull String toUnderscore(String symbol) {
         return normalize(symbol).replace('/', '_');
     }
 
     /** Convert to "BASE-QUOTE" dash format (Coinbase). */
-    public static String toDash(String symbol) {
+    public static @NonNull String toDash(String symbol) {
         return normalize(symbol).replace('/', '-');
     }
 
     /** Convert to "BASEQUOTE" compact format (BinanceUS). */
-    public static String toCompact(String symbol) {
+    public static @NonNull String toCompact(String symbol) {
         return normalize(symbol).replace("/", "");
     }
 

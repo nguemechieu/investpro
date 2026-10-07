@@ -599,9 +599,7 @@ public class TradingSystemStatusPanel extends VBox {
                 -fx-text-fill: white;
                 -fx-cursor: hand;
                 """);
-        clearButton.setOnAction(e -> {
-            alertTable.getItems().removeIf(alert -> alert.severity() != SystemAlert.AlertSeverity.CRITICAL);
-        });
+        clearButton.setOnAction(e -> alertTable.getItems().removeIf(alert -> alert.severity() != SystemAlert.AlertSeverity.CRITICAL));
 
         buttonBox.getChildren().add(clearButton);
         content.getChildren().addAll(alertTable, buttonBox);

@@ -3,7 +3,6 @@ package org.investpro.ui.tools;
 import javafx.util.StringConverter;
 import lombok.Getter;
 import org.investpro.models.currency.Currency;
-import org.investpro.models.currency.DefaultMoney;
 import org.investpro.models.currency.FastMoneyFormatter;
 
 import java.math.BigDecimal;
@@ -52,7 +51,18 @@ public final class MoneyAxisFormatter extends StringConverter<Number> {
         BigDecimal value = toBigDecimal(number)
                 .setScale(effectivePrecision, RoundingMode.HALF_UP);
 
-        return formatter.format(DefaultMoney.of(value,currency));
+        // A quoted instrument price is not a cash amount: USD's two currency
+        // fraction digits must not truncate a crypto or FX price's precision.
+        java.text.NumberFormat priceFormat = java.text.NumberFormat.getNumberInstance();
+        priceFormat.setMinimumFractionDigits(effectivePrecision);
+        priceFormat.setMaximumFractionDigits(effectivePrecision);
+        if (currency.getCurrencyType() == org.investpro.models.currency.CurrencyType.FIAT) {
+            String symbol = currency.getSymbol();
+            if (symbol == null || symbol.isBlank()) return priceFormat.format(value) + " " + currency.getCode();
+            return (value.signum() < 0 ? "-" : "") + symbol + priceFormat.format(value.abs());
+        }
+        priceFormat.setMinimumFractionDigits(0);
+        return priceFormat.format(value) + " " + currency.getCode();
     }
 
     @Override
