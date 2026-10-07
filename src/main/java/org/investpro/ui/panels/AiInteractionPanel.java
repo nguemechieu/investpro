@@ -25,6 +25,10 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         Thread thread = new Thread(r, "DesktopAssistant"); thread.setDaemon(true); return thread;
     });
     private volatile boolean closed;
+    private final ExecutorService speechWorker = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "AssistantReplyPlayback"); thread.setDaemon(true); return thread;
+    });
+    private volatile long speechRequest;
     private final org.investpro.ai.AssistantVoice voice;
     private final Button microphone = new Button("Speak");
     private final CheckBox speakReplies = new CheckBox("Read replies aloud");
@@ -38,6 +42,7 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
     public AiInteractionPanel(AssistantRuntime assistant) {
         this.assistant = assistant;
         voice = assistant.createVoice();
+        speakReplies.setSelected(true);
         setPadding(new Insets(20));
         getStyleClass().add("ai-interaction-panel");
         Label title = new Label("Your trading & investment assistant");
@@ -69,7 +74,7 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         clear.setOnAction(_ -> { assistant.reset(conversation); voice.stopSpeaking(); clearScreenshot(); lastReply = ""; replay.setDisable(true); messages.getChildren().clear(); welcome(); });
         microphone.setOnAction(_ -> toggleRecording());
         replay.setDisable(true); replay.setOnAction(_ -> speak(lastReply));
-        Button stopAudio = new Button("Stop audio"); stopAudio.setOnAction(_ -> voice.stopSpeaking());
+        Button stopAudio = new Button("Stop audio"); stopAudio.setOnAction(_ -> { speechRequest++; voice.stopSpeaking(); status.setText("Audio stopped."); });
         Button capture = new Button("Take screenshot");
         capture.setOnAction(_ -> {
             capture.setDisable(true); status.setText("Capturing InvestPro…");
@@ -149,10 +154,10 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
                 reply.setText(completed); send.setDisable(false); clear.setDisable(false);
                 if (png != null && attachedScreenshot == png) clearScreenshot();
                 lastReply = completed; replay.setDisable(completed.isBlank());
-                if (speakReplies.isSelected()) speak(completed);
                 progress.setVisible(false); progress.setManaged(false);
                 status.setText(assistant.isConfigured() ? "Ready · OpenAI" : "Set OPENAI_API_KEY to enable answers");
                 question.requestFocus();
+                if (speakReplies.isSelected()) speak(completed);
             });
         });
     }
@@ -173,17 +178,27 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
     }
     private void speak(String text) {
         if (text.isBlank()) return;
-        worker.execute(() -> {
-            try { if (!closed) voice.speak(text); }
-            catch (Exception error) { Platform.runLater(() -> { if (!closed) status.setText("Spoken reply unavailable. The text reply is still available."); }); }
+        long request = ++speechRequest;
+        voice.stopSpeaking(); status.setText("Preparing spoken reply…");
+        speechWorker.execute(() -> {
+            try {
+                if (!closed && request == speechRequest) voice.speak(text);
+                Platform.runLater(() -> { if (!closed && request == speechRequest) status.setText("Spoken reply finished."); });
+            } catch (Exception error) {
+                String reason = error instanceof javax.sound.sampled.LineUnavailableException || error instanceof IllegalArgumentException
+                        ? "Speaker output unavailable. Check your default audio device and volume."
+                        : error instanceof java.io.IOException || error instanceof IllegalStateException ? error.getMessage()
+                        : "Speech playback failed (" + error.getClass().getSimpleName() + ").";
+                Platform.runLater(() -> { if (!closed && request == speechRequest) status.setText(reason); });
+            }
         });
     }
     public void stopAudio() {
-        voice.stopRecording(); voice.stopSpeaking(); recording = false; microphone.setText("Speak");
+        speechRequest++; voice.stopRecording(); voice.stopSpeaking(); recording = false; microphone.setText("Speak");
     }
     private void clearScreenshot() {
         attachedScreenshot = null; screenshotPreview.setImage(null); screenshotPreview.setVisible(false);
         screenshotPreview.setManaged(false); telegramScreenshot.setDisable(true);
     }
-    @Override public void close() { closed = true; voice.close(); worker.shutdownNow(); assistant.reset(conversation); }
+    @Override public void close() { closed = true; voice.close(); speechWorker.shutdownNow(); worker.shutdownNow(); assistant.reset(conversation); }
 }

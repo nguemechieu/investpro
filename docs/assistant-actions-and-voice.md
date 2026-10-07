@@ -14,8 +14,8 @@ Existing authentication, trading mode and local paper execution rules apply.
 
 Click **Speak**, then **Finish recording** to upload microphone audio to OpenAI transcription.
 Recording is capped at 60 seconds. Review/edit the transcript and click Send; transcription never automatically sends a command.
-**Listen to reply** plays the last reply; **Read replies aloud** enables automatic playback; **Stop audio** stops playback.
-Audio uses the configured OpenAI key, `gpt-4o-mini-transcribe`, and `gpt-4o-mini-tts` with WAV output and the coral voice.
+**Listen to reply** plays the last reply; **Read replies aloud** enables automatic playback (on by default); **Stop audio** stops playback.
+Audio uses the configured OpenAI key, `gpt-4o-mini-transcribe`, and `gpt-4o-mini-tts` with PCM output and the coral voice.
 The voice is AI-generated. Speech services need account access to these models and a working microphone/speaker.
 Audio remains in memory; no local recording files are written. Spoken output is limited to the first 4,000 characters.
 Voice controls are in the desktop panel; Telegram supports text commands and natural-language action requests.

@@ -16,11 +16,16 @@ public final class AssistantVoice implements AutoCloseable {
     private final HttpClient client;
     private final Supplier<String> apiKey;
     private volatile TargetDataLine microphone;
-    private volatile Clip playback;
+    private volatile SourceDataLine playback;
+    @FunctionalInterface interface SpeakerFactory { SourceDataLine create(AudioFormat format) throws LineUnavailableException; }
+    private final SpeakerFactory speakers;
     private CompletableFuture<byte[]> recording;
     private volatile boolean closed;
     private final java.util.concurrent.atomic.AtomicLong playbackGeneration = new java.util.concurrent.atomic.AtomicLong();
-    public AssistantVoice(HttpClient client, Supplier<String> apiKey) { this.client = client; this.apiKey = apiKey; }
+    public AssistantVoice(HttpClient client, Supplier<String> apiKey) { this(client, apiKey, AudioSystem::getSourceDataLine); }
+    AssistantVoice(HttpClient client, Supplier<String> apiKey, SpeakerFactory speakers) {
+        this.client = client; this.apiKey = apiKey; this.speakers = speakers;
+    }
 
     public synchronized void startRecording() throws Exception {
         if (closed) throw new IllegalStateException("Voice panel closed");
@@ -67,24 +72,41 @@ public final class AssistantVoice implements AutoCloseable {
     }
 
     public void speak(String text) throws Exception {
-        if (closed) return;
+        if (closed || text == null || text.isBlank()) return;
         stopSpeaking();
         long generation = playbackGeneration.get();
         var json = new ObjectMapper();
         var body = json.createObjectNode().put("model", "gpt-4o-mini-tts").put("voice", "coral")
-                .put("input", text.substring(0, Math.min(text.length(), 4000))).put("response_format", "wav");
-        byte[] wave = send("speech", "application/json", json.writeValueAsBytes(body));
+                .put("input", text.substring(0, Math.min(text.length(), 4000))).put("response_format", "pcm");
+        byte[] pcm = send("speech", "application/json", json.writeValueAsBytes(body));
         if (closed || generation != playbackGeneration.get()) return;
-        try (var input = AudioSystem.getAudioInputStream(new ByteArrayInputStream(wave))) {
-            Clip clip = AudioSystem.getClip();
-            try {
-                clip.open(input);
-                clip.addLineListener(event -> { if (event.getType() == LineEvent.Type.STOP) clip.close(); });
-                synchronized (this) {
-                    if (closed || generation != playbackGeneration.get()) { clip.close(); return; }
-                    playback = clip; clip.start();
+        if (pcm.length == 0 || pcm.length % 2 != 0) throw new IOException("OpenAI returned empty or invalid speech audio.");
+        AudioFormat format = new AudioFormat(24000, 16, 1, true, false);
+        SourceDataLine line = speakers.create(format);
+        try {
+            line.open(format);
+            if (line.isControlSupported(BooleanControl.Type.MUTE))
+                ((BooleanControl) line.getControl(BooleanControl.Type.MUTE)).setValue(false);
+            if (line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+                FloatControl gain = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
+                gain.setValue(Math.clamp(0f, gain.getMinimum(), gain.getMaximum()));
+            }
+            synchronized (this) {
+                if (closed || generation != playbackGeneration.get()) return;
+                playback = line; line.start();
+            }
+            for (int offset = 0; offset < pcm.length && !closed && generation == playbackGeneration.get();) {
+                int written = line.write(pcm, offset, Math.min(8192, pcm.length - offset));
+                if (written <= 0) {
+                    if (generation != playbackGeneration.get() || closed) return;
+                    throw new IOException("Audio output stopped before playback completed.");
                 }
-            } catch (Exception error) { clip.close(); throw error; }
+                offset += written;
+            }
+            if (!closed && generation == playbackGeneration.get()) line.drain();
+        } finally {
+            synchronized (this) { if (playback == line) playback = null; }
+            line.close();
         }
     }
     private byte[] send(String operation, String contentType, byte[] body) throws Exception {
@@ -94,10 +116,15 @@ public final class AssistantVoice implements AutoCloseable {
                 .timeout(Duration.ofSeconds(45)).header("Authorization", "Bearer " + key)
                 .header("Content-Type", contentType).POST(HttpRequest.BodyPublishers.ofByteArray(body)).build();
         var response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        if (response.statusCode() != 200) throw new IOException("OpenAI audio request failed (HTTP " + response.statusCode() + ")");
+        if (response.statusCode() != 200) throw new IOException(switch (response.statusCode()) {
+            case 401 -> "OpenAI speech authentication failed. Check OPENAI_API_KEY (HTTP 401).";
+            case 403 -> "OpenAI speech access denied. Check audio model permissions (HTTP 403).";
+            case 429 -> "OpenAI speech usage limit reached. Check quota or try again later (HTTP 429).";
+            default -> "OpenAI audio request failed (HTTP " + response.statusCode() + ").";
+        });
         return response.body();
     }
     public void stopRecording() { TargetDataLine line = microphone; microphone = null; if (line != null) { line.stop(); line.close(); } }
-    public synchronized void stopSpeaking() { playbackGeneration.incrementAndGet(); Clip clip = playback; playback = null; if (clip != null) { clip.stop(); clip.close(); } }
+    public synchronized void stopSpeaking() { playbackGeneration.incrementAndGet(); SourceDataLine line = playback; playback = null; if (line != null) { line.stop(); line.flush(); line.close(); } }
     @Override public void close() { closed = true; stopRecording(); stopSpeaking(); }
 }

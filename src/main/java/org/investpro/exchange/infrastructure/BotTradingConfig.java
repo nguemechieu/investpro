@@ -232,79 +232,12 @@ public class BotTradingConfig {
         return backtestStartingBalance;
     }
     
-    public void setBacktestStartingBalance(double balance) {
-        this.backtestStartingBalance = Math.max(100, balance);
-    }
-    
-    public double getBacktestMaxDrawdownPercent() {
-        return backtestMaxDrawdownPercent;
-    }
-    
+
     public void setBacktestMaxDrawdownPercent(double percent) {
         this.backtestMaxDrawdownPercent = Math.max(1, Math.min(100, percent));
     }
-    
-    public boolean isBacktestUseRealFees() {
-        return backtestUseRealFees;
-    }
-    
-    public void setBacktestUseRealFees(boolean useRealFees) {
-        this.backtestUseRealFees = useRealFees;
-    }
-    
-    // Streaming settings
-    public boolean isStreamingEnabled() {
-        return streamingEnabled;
-    }
-    
-    public void setStreamingEnabled(boolean enabled) {
-        this.streamingEnabled = enabled;
-    }
-    
-    public long getStreamingUpdateInterval() {
-        return streamingUpdateInterval;
-    }
-    
-    public void setStreamingUpdateInterval(long intervalMs) {
-        this.streamingUpdateInterval = Math.max(100, intervalMs);
-    }
-    
-    public boolean isUseWebsockets() {
-        return useWebsockets;
-    }
-    
-    public void setUseWebsockets(boolean useWebsockets) {
-        this.useWebsockets = useWebsockets;
-    }
-    
-    public int getMaxWebsocketConnections() {
-        return maxWebsocketConnections;
-    }
-    
-    public void setMaxWebsocketConnections(int max) {
-        this.maxWebsocketConnections = Math.max(1, Math.min(20, max));
-    }
-    
-    // Position management
-    public int getMaxOpenPositions() {
-        return maxOpenPositions;
-    }
-    
-    public void setMaxOpenPositions(int max) {
-        this.maxOpenPositions = Math.max(1, max);
-    }
-    
-    public double getMaxDailyLosses() {
-        return maxDailyLosses;
-    }
-    
-    public void setMaxDailyLosses(double percent) {
-        this.maxDailyLosses = Math.max(0, percent);
-    }
-    
-    public double getPositionSizePercent() {
-        return positionSizePercent;
-    }
+
+
     
     public void setPositionSizePercent(double percent) {
         this.positionSizePercent = Math.max(0.1, Math.min(50.0, percent));
