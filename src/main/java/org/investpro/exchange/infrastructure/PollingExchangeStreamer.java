@@ -198,6 +198,7 @@ public class PollingExchangeStreamer {
         }
 
         accountTask = scheduleAtFixedRate(() -> {
+            if (!canStart(ExchangeFeature.ACCOUNT_INFO)) return;
             try {
                 exchange.fetchAccount()
                         .exceptionally(ex -> {
@@ -236,6 +237,7 @@ public class PollingExchangeStreamer {
         }
 
         ordersTask = scheduleAtFixedRate(() -> {
+            if (!canStart(ExchangeFeature.OPEN_ORDERS)) return;
             try {
                 exchange.fetchAllOpenOrders()
                         .thenAccept(orders -> consumer.onOpenOrders(exchange.getName(), orders))
@@ -258,6 +260,7 @@ public class PollingExchangeStreamer {
         }
 
         positionsTask = scheduleAtFixedRate(() -> {
+            if (!canStart(ExchangeFeature.POSITIONS)) return;
             try {
                 exchange.fetchAllPositions()
                         .thenAccept(positions -> consumer.onPositions(exchange.getName(), positions))

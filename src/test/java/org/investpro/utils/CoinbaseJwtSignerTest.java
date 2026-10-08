@@ -28,11 +28,13 @@ class CoinbaseJwtSignerTest {
     private static final String TEST_KEY_NAME = "organizations/test-org/apiKeys/test-key";
 
     @Test
-    void preservesRawQueryExactly() throws Exception {
+    void signsEndpointPathWithoutQueryParameters() throws Exception {
         CoinbaseJwtSigner signer = new CoinbaseJwtSigner(TEST_KEY_NAME, toPem(generateEcKeyPair()));
         String path = "/api/v3/brokerage/products?product_type=SPOT&cursor=a%2Fb%20c&x=1&x=2";
         SignedJWT jwt = SignedJWT.parse(signer.buildRestJwtForUrl("GET", "https://api.coinbase.com" + path));
-        assertEquals("GET api.coinbase.com" + path, jwt.getJWTClaimsSet().getStringClaim("uri"));
+        assertEquals("GET api.coinbase.com/api/v3/brokerage/products", jwt.getJWTClaimsSet().getStringClaim("uri"));
+        SignedJWT direct = SignedJWT.parse(signer.buildRestJwt("GET", path));
+        assertEquals(jwt.getJWTClaimsSet().getStringClaim("uri"), direct.getJWTClaimsSet().getStringClaim("uri"));
     }
 
     @Test

@@ -128,6 +128,7 @@ public class OnboardingDesk extends StackPane {
     private final ComboBox<String> underlyingAssetBox = new ComboBox<>();
     private final ComboBox<String> marketTypeBox = new ComboBox<>();
     private final ComboBox<String> venueBox = new ComboBox<>();
+    private boolean updatingProductVenues;
     private final ComboBox<String> exchangeBox = new ComboBox<>();
 
     private final Label statusLabel = new Label();
@@ -1441,7 +1442,32 @@ public class OnboardingDesk extends StackPane {
 
     private void refreshProductVenues(String savedVenue) {
         if (exchangeBox.getValue() == null) return;
+        if (updatingProductVenues) return;
+        updatingProductVenues = true;
+        try {
         SupportedExchange selected = SupportedExchange.fromDisplayName(exchangeBox.getValue());
+        if (selected == SupportedExchange.OANDA) {
+            if (!marketGroupBox.getItems().equals(List.of("Derivatives"))) {
+                marketGroupBox.getItems().setAll("Derivatives");
+                marketGroupBox.setValue("Derivatives");
+            }
+            List<String> assets = List.of("FX", "Metals", "Indices", "Commodities");
+            if (!underlyingAssetBox.getItems().equals(assets)) {
+                String previousAsset = underlyingAssetBox.getValue();
+                underlyingAssetBox.getItems().setAll(assets);
+                underlyingAssetBox.setValue(assets.contains(previousAsset) ? previousAsset : "FX");
+            }
+            String contract = "FX".equals(underlyingAssetBox.getValue()) ? "Margin FX" : "CFDs";
+            if (!marketTypeBox.getItems().equals(List.of(contract))) {
+                marketTypeBox.getItems().setAll(contract);
+                marketTypeBox.setValue(contract);
+            }
+        } else if (marketGroupBox.getItems().size() == 1) {
+            marketGroupBox.getItems().setAll("Spot", "Derivatives");
+            underlyingAssetBox.getItems().setAll("Crypto", "FX", "Stocks", "ETFs", "Indices", "Commodities", "Metals", "Bonds", "Funds");
+            marketTypeBox.getItems().setAll("Perpetuals", "Futures", "Options", "CFDs", "Forwards", "Swaps");
+            marketTypeBox.getSelectionModel().selectFirst();
+        }
         MarketConfiguration selection = new MarketConfiguration("", marketTypeBox.getValue(), savedVenue,
                 selected.getFactoryKey(), "", "", "", "", "", null, null, "PAPER", marketSelectionParams(Map.of()));
         var options = MarketConfiguration.availableVenues(selected.getFactoryKey());
@@ -1449,6 +1475,9 @@ public class OnboardingDesk extends StackPane {
         String resolved = selection.normalizedVenue().displayName();
         if (venueBox.getItems().contains(resolved)) venueBox.setValue(resolved);
         else venueBox.getSelectionModel().selectFirst();
+        } finally {
+            updatingProductVenues = false;
+        }
     }
     private String resolveExchangeDisplayName(String savedExchange) {
         if (savedExchange == null || savedExchange.isBlank()) {
@@ -1551,8 +1580,11 @@ public class OnboardingDesk extends StackPane {
         ExchangeFactory exchangeFactory = new ExchangeFactory(credentialProvider);
 
         Exchange exchange = exchangeFactory.create(exchangeId);
-        exchange.setUserSelectedTradingMode(tradingMode);
-        exchange.connect();
+        exchange.setBotTradingMode(tradingMode);
+        // Coinbase account validation uses the live API even when the bot simulates locally.
+        exchange.setUserSelectedTradingMode(exchange instanceof org.investpro.exchange.coinbase.Coinbase
+                ? "LIVE" : tradingMode);
+        if (!(exchange instanceof org.investpro.exchange.coinbase.Coinbase)) exchange.connect();
 
         return exchange;
     }

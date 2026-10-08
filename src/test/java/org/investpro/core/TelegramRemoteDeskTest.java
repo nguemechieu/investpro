@@ -13,6 +13,64 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class TelegramRemoteDeskTest {
+    @Test
+    void repliesUseIncoming64BitChatIdInsteadOfConfiguredTargetOrSenderId() throws Exception {
+        var bot = spy(new TelegramNotifier(""));
+        Properties config = new Properties();
+        config.setProperty("TELEGRAM_ALLOWED_USER_IDS", "123,456");
+        config.setProperty("TELEGRAM_CHAT_ID", "999");
+        bot.configureRemoteAccess(config);
+        doNothing().when(bot).sendChatAction(anyString(), any());
+        doNothing().when(bot).sendMessageToChat(anyString(), anyString());
+        doReturn("First answer").when(bot).askAI("4500000000001:123", "First question");
+        doReturn("Second answer").when(bot).askAI("4500000000002:456", "Second question");
+        try {
+            bot.processUpdates(new ObjectMapper().readTree("""
+                    {"ok":true,"result":[
+                    {"update_id":1,"message":{"from":{"id":123},"chat":{"id":4500000000001,"type":"private"},"text":"First question"}},
+                    {"update_id":2,"message":{"from":{"id":456},"chat":{"id":4500000000002,"type":"private"},"text":"Second question"}}]}
+                    """));
+            verify(bot, timeout(5000)).sendMessageToChat("4500000000001", "First answer");
+            verify(bot, timeout(5000)).sendMessageToChat("4500000000002", "Second answer");
+            verify(bot, never()).sendMessageToChat(eq("999"), anyString());
+            verify(bot, never()).sendMessageToChat(eq("123"), anyString());
+        } finally { bot.close(); }
+    }
+
+    @Test
+    void malformedChatIdsCannotDiscoverATargetOrDispatchQuestions() throws Exception {
+        var bot = spy(new TelegramNotifier(""));
+        Properties config = new Properties();
+        config.setProperty("TELEGRAM_ALLOWED_USER_IDS", "123");
+        bot.configureRemoteAccess(config);
+        try {
+            bot.processUpdates(new ObjectMapper().readTree("""
+                    {"ok":true,"result":[
+                    {"update_id":1,"message":{"from":{"id":123},"chat":{"id":0,"type":"private"},"text":"Question"}},
+                    {"update_id":2,"message":{"from":{"id":123},"chat":{"id":"@user","type":"private"},"text":"Question"}},
+                    {"update_id":3,"message":{"from":{"id":123},"chat":{"id":1.5,"type":"private"},"text":"Question"}},
+                    {"update_id":4,"message":{"from":{"id":123},"chat":{"id":9223372036854775808,"type":"private"},"text":"Question"}},
+                    {"update_id":5,"message":{"from":{"id":123},"chat":{"username":"user","type":"private"},"text":"Question"}}]}
+                    """));
+            assertNull(bot.getChatId());
+            assertFalse(bot.hasTargetChat());
+            verify(bot, never()).askAI(anyString(), anyString());
+            verify(bot, never()).sendMessageToChat(anyString(), anyString());
+        } finally { bot.close(); }
+    }
+
+    @Test
+    void invalidReplyDestinationsNeverReachTelegramTransport() throws Exception {
+        var client = mock(java.net.http.HttpClient.class);
+        var bot = new TelegramNotifier("test-token", client);
+        try {
+            for (String chat : java.util.List.of("", "0", "@username", "9223372036854775808")) {
+                bot.sendMessageToChat(chat, "Answer");
+                assertFalse(bot.sendPhotoToChat(chat, java.nio.file.Path.of("missing.png"), "Chart"));
+            }
+            verifyNoInteractions(client);
+        } finally { bot.close(); }
+    }
     @Test void notificationChatIsDiscoveredFromAuthorizedGetUpdatesInsteadOfGuessed() throws Exception {
         var client = mock(java.net.http.HttpClient.class);
         java.net.http.HttpResponse<String> response = mock(java.net.http.HttpResponse.class);

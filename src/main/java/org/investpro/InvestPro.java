@@ -83,7 +83,7 @@ public class InvestPro extends Application {
     private ScreenManager screenManager;
     private org.investpro.ai.AssistantRuntime assistantRuntime;
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         initializeGlobalExceptionHandling();
         launch(args);
     }

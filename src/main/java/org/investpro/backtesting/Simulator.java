@@ -43,22 +43,31 @@ public class Simulator {
         if (historicalData == null || historicalData.isEmpty()) {
             throw new IllegalArgumentException("Historical data cannot be empty");
         }
+        if (!Double.isFinite(config.getInitialBalance()) || config.getInitialBalance() <= 0
+                || !Double.isFinite(config.getCommissionPercent()) || config.getCommissionPercent() < 0) {
+            throw new IllegalArgumentException("Initial balance must be positive and commission must be nonnegative and finite");
+        }
 
         // Initialize strategy
         strategy.initialize(historicalData);
 
         // Process data and get signals
         List<BacktestStrategy.SignalEvent> signals = strategy.processData();
+        Map<Integer, List<BacktestStrategy.SignalEvent>> signalsByCandle = new HashMap<>();
+        for (BacktestStrategy.SignalEvent signal : signals) {
+            signalsByCandle.computeIfAbsent(signal.candleIndex(), ignored -> new ArrayList<>()).add(signal);
+        }
+        equityCurve.add(config.getInitialBalance());
 
         // Execute trades based on signals
-        for (BacktestStrategy.SignalEvent signal : signals) {
-            int idx = signal.candleIndex();
-            if (idx < 0 || idx >= historicalData.size())
-                continue;
-
+        for (int idx = 0; idx < historicalData.size(); idx++) {
             CandleData candle = historicalData.get(idx);
             double price = candle.closePrice();
+            if (!Double.isFinite(price) || price <= 0) {
+                throw new IllegalArgumentException("Historical candle close must be positive and finite");
+            }
 
+            for (BacktestStrategy.SignalEvent signal : signalsByCandle.getOrDefault(idx, List.of())) {
             switch (signal.type()) {
                 case BUY:
                     if (portfolioState.getCash() > 0 && !portfolioState.hasPosition()) {
@@ -73,6 +82,7 @@ public class Simulator {
                 default:
                     break;
             }
+            }
 
             // Record equity at each candle
             equityCurve.add(portfolioState.getTotalEquity(price));
@@ -83,6 +93,7 @@ public class Simulator {
             int lastIdx = historicalData.size() - 1;
             CandleData lastCandle = historicalData.get(lastIdx);
             executeSell(lastIdx, lastCandle.closePrice(), null);
+            equityCurve.set(equityCurve.size() - 1, portfolioState.getCash());
         }
 
         long duration = System.currentTimeMillis() - startTime;
@@ -90,8 +101,8 @@ public class Simulator {
     }
 
     private void executeBuy(int candleIndex, double price, BacktestStrategy.SignalEvent signal) {
-        double commission = price * portfolioState.getCash() * config.getCommissionPercent() / 100.0;
-        double investAmount = portfolioState.getCash() - commission;
+        double investAmount = portfolioState.getCash() / (1 + config.getCommissionPercent() / 100.0);
+        double commission = investAmount * config.getCommissionPercent() / 100.0;
         double quantity = investAmount / price;
 
         portfolioState.enterPosition(quantity, price, commission);
@@ -113,7 +124,7 @@ public class Simulator {
         if (trade != null) {
             double exitCommission = price * portfolioState.getQuantity() * config.getCommissionPercent() / 100.0;
             double proceeds = portfolioState.getQuantity() * price - exitCommission;
-            double profit = proceeds - (trade.getEntryPrice() * portfolioState.getQuantity());
+            double profit = proceeds - (trade.getEntryPrice() * portfolioState.getQuantity()) - trade.getFee();
 
             trade.setExitTime(candleIndex);
             trade.setExitPrice(price);

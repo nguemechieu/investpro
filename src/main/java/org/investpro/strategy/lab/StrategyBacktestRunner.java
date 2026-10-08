@@ -186,10 +186,10 @@ public class StrategyBacktestRunner {
                             .timeframe(request.getTimeframe())
                             .side(signal.getSide())
                             .entryPrice(candle.closePrice()) // Use candle close as entry
-                            .quantity(calculateQuantity(equity, request.getInitialCapital()))
+                            .quantity(calculateQuantity(equity, candle.closePrice()))
                             .confidence(signal.getConfidence())
                             .entryReason(String.join(", ", signal.getReasons()))
-                            .entryTime(Instant.now())
+                            .entryTime(Instant.ofEpochSecond(candle.openTime()))
                             .build();
 
                     inTrade = true;
@@ -732,7 +732,7 @@ public class StrategyBacktestRunner {
 
         return trade.toBuilder()
                 .exitPrice(exitPrice)
-                .exitTime(Instant.ofEpochMilli(exitTimestamp))
+                .exitTime(Instant.ofEpochSecond(exitTimestamp))
                 .exitReason(exitReason)
                 .profitLoss(profitLoss)
                 .profitLossPercent(profitLossPercent)
@@ -741,11 +741,11 @@ public class StrategyBacktestRunner {
     }
 
     /**
-     * Calculate quantity based on equity and Kelly criterion.
+     * Allocate the existing fixed fraction of equity at the actual entry price.
      */
-    private double calculateQuantity(double currentEquity, double initialCapital) {
+    private double calculateQuantity(double currentEquity, double entryPrice) {
         // Use fixed fraction of current equity (e.g., 1%)
-        return (currentEquity * 0.01) / 100.0; // Assume 100 as price
+        return (currentEquity * 0.01) / entryPrice;
     }
 
     /**

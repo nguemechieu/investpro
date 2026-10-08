@@ -117,6 +117,7 @@ class CoinbaseRestDiscoveryTest {
         assertEquals(ExchangeCapabilityStatus.PERMISSION_REQUIRED, exchange.getPerpetualsAccess());
         assertEquals(ExchangeCapabilityStatus.PERMISSION_REQUIRED, exchange.getExpiringFuturesAccess());
         assertEquals(ExchangeCapabilityStatus.AVAILABLE, exchange.getSpotProductsAccess());
+        assertTrue(exchange.hasPrivateAuthentication(), "Derivative discovery denial must not revoke spot account access");
 
         List<Coinbase.RestAuthDiagnostic> diagnosis = exchange.diagnoseRestAuthentication();
         assertEquals(List.of(new Coinbase.RestAuthDiagnostic("accounts without query", false)), diagnosis);

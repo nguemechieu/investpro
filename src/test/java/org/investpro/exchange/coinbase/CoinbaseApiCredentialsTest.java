@@ -54,23 +54,31 @@ class CoinbaseApiCredentialsTest {
         assertThrows(IllegalArgumentException.class, () -> new CoinbaseJwtSigner(KEY, pem));
     }
     private static Coinbase exchange(KeyPair key, int status, String body) throws Exception {
+        return exchange(key, status, body, 200, "{\"can_view\":true,\"can_trade\":true}");
+    }
+    private static Coinbase exchange(KeyPair key, int status, String body, int permissionStatus, String permissions) throws Exception {
         Coinbase exchange = new Coinbase(new ExchangeCredentials("coinbase", KEY, seed(key), null, null, null, null, true));
         HttpClient client = mock(HttpClient.class);
         HttpResponse<byte[]> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(status);
         when(response.body()).thenReturn(body.getBytes(StandardCharsets.UTF_8));
         when(response.headers()).thenReturn(HttpHeaders.of(Map.of(), (_, _) -> true));
+        HttpResponse<byte[]> permissionResponse = mock(HttpResponse.class);
+        when(permissionResponse.statusCode()).thenReturn(permissionStatus);
+        when(permissionResponse.body()).thenReturn(permissions.getBytes(StandardCharsets.UTF_8));
+        when(permissionResponse.headers()).thenReturn(HttpHeaders.of(Map.of(), (_, _) -> true));
         when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenAnswer(invocation -> {
             HttpRequest request = invocation.getArgument(0);
-            assertEquals("/api/v3/brokerage/accounts", request.uri().getPath());
+            String path = request.uri().getPath();
+            assertTrue(path.equals("/api/v3/brokerage/accounts") || path.equals("/api/v3/brokerage/key_permissions"));
             assertEquals("GET", request.method());
             assertNull(request.uri().getQuery());
             SignedJWT jwt = SignedJWT.parse(request.headers().firstValue("Authorization").orElseThrow().substring(7));
-            assertEquals("GET api.coinbase.com/api/v3/brokerage/accounts", jwt.getJWTClaimsSet().getStringClaim("uri"));
+            assertEquals("GET api.coinbase.com" + path, jwt.getJWTClaimsSet().getStringClaim("uri"));
             Signature verifier = Signature.getInstance("Ed25519");
             verifier.initVerify(key.getPublic()); verifier.update(jwt.getSigningInput());
             assertTrue(verifier.verify(jwt.getSignature().decode()));
-            return response;
+            return path.endsWith("key_permissions") ? permissionResponse : response;
         });
         Field field = Coinbase.class.getDeclaredField("httpClient");
         field.setAccessible(true); field.set(exchange, client);
@@ -93,5 +101,105 @@ class CoinbaseApiCredentialsTest {
     }
     @Test void rejectsMalformedSuccessResponse() throws Exception {
         assertFalse(exchange(edKey(), 200, "{}").checkAuthentication().isSuccess());
+    }
+    @Test void validatedRestSessionCanTradeWithoutMarketWebSocket() throws Exception {
+        Coinbase exchange = exchange(edKey(), 200, "{\"accounts\":[]}");
+        exchange.setUserSelectedTradingMode("LIVE");
+        exchange.setBotTradingMode("LIVE");
+        assertTrue(exchange.checkAuthentication().isSuccess());
+        assertFalse(exchange.canSubmitBotOrders(), "Account access alone does not verify Trade permission");
+        assertTrue(exchange.AuthCheckResult("coinbase").success());
+        assertTrue(exchange.isAuthenticatedSessionConnected());
+        assertTrue(exchange.isConnected());
+        assertTrue(exchange.canSubmitBotOrders());
+        assertFalse(exchange.isDeskPaperTrading());
+        exchange.disconnect();
+        assertFalse(exchange.isAuthenticatedSessionConnected());
+        assertFalse(exchange.canSubmitBotOrders());
+    }
+    @Test void synchronousUnauthorizedResponseRevokesValidatedSession() throws Exception {
+        Coinbase exchange = exchange(edKey(), 401, "Unauthorized");
+        exchange.setUserSelectedTradingMode("LIVE");
+        exchange.setAuthenticatedSessionConnected(true);
+        assertThrows(RuntimeException.class, exchange::getUserAccountDetails);
+        assertTrue(exchange.isAuthenticationRejected());
+        assertFalse(exchange.isAuthenticatedSessionConnected());
+        assertFalse(exchange.hasPrivateAuthentication());
+    }
+    @Test void accountReconnectRevalidatesRejectedSession() throws Exception {
+        Coinbase exchange = exchange(edKey(), 200,
+                "{\"accounts\":[{\"uuid\":\"account\",\"currency\":\"USD\",\"available_balance\":{\"value\":\"10\"}}]}");
+        exchange.setUserSelectedTradingMode("LIVE");
+        exchange.setBotTradingMode("LIVE");
+        Field rejected = Coinbase.class.getDeclaredField("privateAuthenticationRejected");
+        rejected.setAccessible(true);
+        rejected.set(exchange, true);
+        assertNotNull(exchange.fetchAccount().join());
+        assertFalse(exchange.isAuthenticationRejected());
+        assertFalse(exchange.canSubmitBotOrders());
+        assertTrue(exchange.AuthCheckResult("coinbase").success());
+        assertTrue(exchange.canSubmitBotOrders());
+    }
+    @Test void refreshedRequestKeepsOrderBodyAndUsesNewJwt() throws Exception {
+        Coinbase exchange = exchange(edKey(), 200, "{\"accounts\":[]}");
+        var method = Coinbase.class.getDeclaredMethod("refreshRequestAuthentication", HttpRequest.class);
+        method.setAccessible(true);
+        var body = HttpRequest.BodyPublishers.ofString("{\"client_order_id\":\"test\"}");
+        HttpRequest original = HttpRequest.newBuilder(java.net.URI.create("https://api.coinbase.com/api/v3/brokerage/orders"))
+                .header("Authorization", "Bearer expired").header("Content-Type", "application/json").POST(body).build();
+        HttpRequest refreshed = (HttpRequest) method.invoke(exchange, original);
+        assertSame(body, refreshed.bodyPublisher().orElseThrow());
+        assertEquals("POST", refreshed.method());
+        assertEquals(original.uri(), refreshed.uri());
+        SignedJWT jwt = SignedJWT.parse(refreshed.headers().firstValue("Authorization").orElseThrow().substring(7));
+        assertEquals("POST api.coinbase.com/api/v3/brokerage/orders", jwt.getJWTClaimsSet().getStringClaim("uri"));
+        assertEquals(1, refreshed.headers().allValues("Authorization").size());
+    }
+    @Test void accountValidationCannotRestoreAccessRejectedDuringAccountEnrichment() throws Exception {
+        Coinbase exchange = spy(exchange(edKey(), 200, "{\"accounts\":[]}"));
+        exchange.setUserSelectedTradingMode("LIVE");
+        Field rejected = Coinbase.class.getDeclaredField("privateAuthenticationRejected");
+        rejected.setAccessible(true);
+        doAnswer(_ -> {
+            rejected.set(exchange, true);
+            return org.investpro.models.Account.coinbase("account", "USD");
+        }).when(exchange).getUserAccountDetails();
+        assertThrows(java.util.concurrent.CompletionException.class, () -> exchange.fetchAccount().join());
+        assertFalse(exchange.isAuthenticatedSessionConnected());
+    }
+    @Test void readOnlyKeyIsAuthenticatedButCannotEnableLiveOrders() throws Exception {
+        Coinbase exchange = exchange(edKey(), 200, "{\"accounts\":[]}", 200,
+                "{\"can_view\":true,\"can_trade\":false}");
+        exchange.setUserSelectedTradingMode("LIVE");
+        exchange.setBotTradingMode("LIVE");
+        var result = exchange.AuthCheckResult("coinbase");
+        assertFalse(result.success());
+        assertTrue(result.message().contains("authenticated the key"));
+        assertTrue(exchange.hasPrivateAuthentication());
+        assertFalse(exchange.isAuthenticationRejected());
+        assertFalse(exchange.canSubmitLiveOrders());
+        assertFalse(exchange.canSubmitBotOrders());
+    }
+    @Test void unavailablePermissionCheckDoesNotMislabelValidKey() throws Exception {
+        Coinbase exchange = exchange(edKey(), 200, "{\"accounts\":[]}", 403, "Forbidden");
+        exchange.setUserSelectedTradingMode("LIVE");
+        var result = exchange.AuthCheckResult("coinbase");
+        assertFalse(result.success());
+        assertTrue(result.message().contains("authentication succeeded"));
+        assertFalse(exchange.isAuthenticationRejected());
+        assertFalse(exchange.canSubmitLiveOrders());
+    }
+    @Test void missingPermissionFieldsFailClosed() throws Exception {
+        Coinbase exchange = exchange(edKey(), 200, "{\"accounts\":[]}", 200, "{}");
+        exchange.setUserSelectedTradingMode("LIVE");
+        assertFalse(exchange.AuthCheckResult("coinbase").success());
+        assertFalse(exchange.canSubmitLiveOrders());
+    }
+    @Test void permissionEndpointUnauthorizedRevokesAccountSession() throws Exception {
+        Coinbase exchange = exchange(edKey(), 200, "{\"accounts\":[]}", 401, "Unauthorized");
+        exchange.setUserSelectedTradingMode("LIVE");
+        assertFalse(exchange.AuthCheckResult("coinbase").success());
+        assertTrue(exchange.isAuthenticationRejected());
+        assertFalse(exchange.isAuthenticatedSessionConnected());
     }
 }

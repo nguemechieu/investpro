@@ -104,7 +104,10 @@ public class ExecutionAgent implements Agent {
 
             context.getExchange().botOrderExecution().createOrder(order)
                     .thenAccept(response -> context.getEventBus()
-                            .publishAsync(AgentEvent.execution(AgentEvent.ORDER_SUBMITTED, name(), response)))
+                            .publishAsync(new AgentEvent(AgentEvent.ORDER_SUBMITTED, name(), response,
+                                    java.time.Instant.now(), java.util.Map.of(
+                                            "tradePairObject", signal.getTradePair(),
+                                            "paperTrading", context.getExchange().isBotPaperTrading()))))
                     .exceptionally(exception -> {
                         context.getEventBus()
                                 .publishAsync(AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), exception));

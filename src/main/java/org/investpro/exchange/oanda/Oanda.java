@@ -100,6 +100,21 @@ public class Oanda extends Exchange {
     private static final long PRICING_CONNECTIVITY_FAILURE_TTL_MS = 15_000L;
 
     private final HttpClient httpClient;
+    private final Map<String, Map<String, Object>> instrumentSpecifications = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public Map<String, Object> instrumentSpecification(TradePair pair) {
+        return pair == null ? Map.of() : instrumentSpecifications.getOrDefault(toInstrument(pair), Map.of());
+    }
+
+    @Override
+    public CompletableFuture<List<org.investpro.models.market.MarketInstrument>> fetchMarketInstruments() {
+        return CompletableFuture.supplyAsync(this::getTradePairSymbol)
+                .thenCompose(pairs -> fetchTradabilityStatus(pairs).thenApply(statuses ->
+                        pairs.stream().map(pair -> org.investpro.trading.market.OandaInstrumentPolicy.map(
+                                pair, instrumentSpecification(pair), statuses.stream()
+                                        .filter(status -> pair.equals(status.tradePair()))
+                                        .findFirst().orElse(null))).toList()));
+    }
     private final PollingExchangeStreamer pollingStreamer;
 
     private OandaWebSocketClient websocketClient;
@@ -283,16 +298,14 @@ public class Oanda extends Exchange {
 
     @Override
     public boolean supportsMarketType(MARKET_TYPES marketType) {
-        return marketType == MARKET_TYPES.FOREX
-                || marketType == MARKET_TYPES.CFD
-                || marketType == MARKET_TYPES.METAL
-                || marketType == MARKET_TYPES.INDEX;
+        return marketType == MARKET_TYPES.FOREX || marketType == MARKET_TYPES.CFD
+                || marketType == MARKET_TYPES.METAL || marketType == MARKET_TYPES.INDEX;
     }
 
     @Override
     public List<MARKET_TYPES> getSupportedMarketTypes() {
         return List.of(
-                MARKET_TYPES.FOREX);
+                MARKET_TYPES.FOREX, MARKET_TYPES.CFD, MARKET_TYPES.METAL, MARKET_TYPES.INDEX);
     }
 
     @Override
@@ -305,9 +318,9 @@ public class Oanda extends Exchange {
                 .webSocketBaseUrl(oandaStreamUrl())
                 .authenticationType("API_KEY")
 
-                // Market coverage - OANDA specializes in forex and CFD
+                // Account-enabled v20 currency, metal, and CFD instruments.
                 .supportsCrypto(false)
-                .supportsSpot(true)
+                .supportsSpot(false)
                 .supportsFutures(false)
                 .supportsDerivatives(true)
                 .supportsForex(true)
@@ -372,10 +385,10 @@ public class Oanda extends Exchange {
 
                 // Notes
                 .notes("""
-                        OANDA Forex & CFD Trading capability profile.
-                        Specializes in currency pairs (forex), indices, commodities, and CFD instruments.
+                        OANDA v20 currency, metal, and CFD capability profile.
+                        Availability is determined by the account instruments endpoint.
                         Supports live accounts and local paper simulation.
-                        High leverage available (up to 50:1 depending on regulatory region).
+                        Margin and leverage depend on the account and instrument.
                         Streaming prices and candles via REST API with polling support.
                         Account, order, position, and balance data require authenticated API access.
                         """)
@@ -555,6 +568,9 @@ public class Oanda extends Exchange {
             List<TradePair> pairs = new ArrayList<>();
 
             for (JsonNode instrument : instruments) {
+                if (!Set.of("CURRENCY", "METAL", "CFD").contains(instrument.path("type").asText())) {
+                    continue;
+                }
                 String name = instrument.path("name").asText("");
 
                 if (name.isBlank() || !name.contains("_")) {
@@ -568,6 +584,9 @@ public class Oanda extends Exchange {
 
                 try {
                     TradePair pair = TradePair.fromSymbol(name);
+                    Map<String, Object> specification = OBJECT_MAPPER.convertValue(instrument,
+                            new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+                    instrumentSpecifications.put(name, java.util.Collections.unmodifiableMap(specification));
                     pair.setNativeSymbol(name);
                     pair.setTradingSession(OandaTradingSessionFactory.forInstrument(name));
                     pairs.add(pair);
@@ -1514,7 +1533,11 @@ public class Oanda extends Exchange {
                 String instrument = safe(order.getSymbol()).replace("/", "_").replace("-", "_")
                         .toUpperCase(Locale.ROOT);
                 if (instrument.isBlank()) {
-                    instrument = tradePair == null ? "EUR_USD" : toInstrument(tradePair);
+                    instrument = tradePair == null ? "" : toInstrument(tradePair);
+                }
+                String requestedInstrument = instrument;
+                if (getTradePairSymbol().stream().noneMatch(pair -> toInstrument(pair).equals(requestedInstrument))) {
+                    throw new IllegalArgumentException("Instrument is not enabled for this OANDA account");
                 }
 
                 double normalizedUnits = normalizeAmount(tradePair, order.getQuantity());

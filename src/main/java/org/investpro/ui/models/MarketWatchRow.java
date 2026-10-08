@@ -488,7 +488,9 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
         // Show signal text (▲ BUY 0.82 / ▼ SELL 0.65)
         lastSignal.set(state.getSignalText());
 
-        if (state.isLiveAllowed()) {
+        if (state.getMarketDataStatus() != null) {
+            issue.set(state.getMarketDataStatus());
+        } else if (state.isLiveAllowed()) {
             issue.set("");
         } else {
             String blockReason = state.getLiveBlockedReason();

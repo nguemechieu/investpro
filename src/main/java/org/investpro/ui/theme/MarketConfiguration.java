@@ -95,7 +95,7 @@ public record MarketConfiguration(
 
             case "PERPETUAL", "PERPETUALS", "PERP", "PERPS", "FUTURE", "FUTURES", "US_FUTURES", "OPTION", "OPTIONS", "CFD", "CFDS", "FORWARD", "FORWARDS", "SWAP", "SWAPS",
                     "INDEX", "INDICES", "COMMODITY", "COMMODITIES" -> MarketType.DERIVATIVES;
-            case "FOREX", "FX" -> MarketType.DERIVATIVE;
+            case "FOREX", "FX", "MARGIN_FX" -> MarketType.DERIVATIVE;
             default -> MarketType.UNKNOWN;
         };
     }
@@ -110,7 +110,7 @@ public record MarketConfiguration(
             case "CFD", "CFDS" -> InstrumentType.CFD;
             case "FORWARD", "FORWARDS" -> InstrumentType.FORWARD;
             case "SWAP", "SWAPS" -> InstrumentType.SWAP;
-            case "FOREX", "FX" -> InstrumentType.FOREX;
+            case "FOREX", "FX", "MARGIN_FX" -> InstrumentType.FOREX;
             case "STOCK", "STOCKS", "EQUITY", "EQUITIES" -> InstrumentType.STOCK;
             case "ETF", "ETFS" -> InstrumentType.ETF;
             case "INDEX", "INDICES" -> InstrumentType.INDEX;
@@ -142,7 +142,7 @@ public record MarketConfiguration(
         return switch (normalized) {
             case "CRYPTO", "CRYPTO_SPOT", "SPOT", "PERPETUAL", "PERPETUALS", "PERP", "PERPS", "FUTURE", "FUTURES",
                     "US_FUTURES", "OPTION", "OPTIONS" -> AssetClass.CRYPTO;
-            case "FOREX", "FX" -> AssetClass.FIAT;
+            case "FOREX", "FX", "MARGIN_FX" -> AssetClass.FIAT;
             case "STOCK", "STOCKS", "EQUITY", "EQUITIES" -> AssetClass.EQUITY;
             case "INDEX", "INDICES" -> AssetClass.INDEX;
             case "COMMODITY", "COMMODITIES" -> AssetClass.COMMODITY;
@@ -164,7 +164,7 @@ public record MarketConfiguration(
             case "CFD", "CFDS" -> ContractType.CFD;
             case "FORWARD", "FORWARDS" -> ContractType.FORWARD;
             case "SWAP", "SWAPS" -> ContractType.SWAP;
-            case "FOREX", "FX" -> ContractType.CFD;
+            case "FOREX", "FX", "MARGIN_FX" -> ContractType.MARGIN;
             default -> ContractType.UNKNOWN;
         };
     }

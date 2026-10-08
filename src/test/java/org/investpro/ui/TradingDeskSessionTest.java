@@ -7,6 +7,31 @@ import static org.mockito.Mockito.*;
 
 class TradingDeskSessionTest {
     @Test
+    void rejectedCoinbaseSessionCannotBeRestoredFromCachedAccess() {
+        var exchange = mock(org.investpro.exchange.coinbase.Coinbase.class);
+        when(exchange.isAuthenticationRejected()).thenReturn(true);
+        when(exchange.isAuthenticatedSessionConnected()).thenReturn(true);
+        when(exchange.isDeskPaperTrading()).thenReturn(true);
+        assertFalse(TradingDesk.canReuseBrokerSession(exchange, true));
+    }
+    @Test
+    void botAcceptsOrderReadyRestSessionWithoutMarketWebSocket() {
+        Exchange exchange = mock(Exchange.class);
+        when(exchange.canSubmitBotOrders()).thenReturn(true);
+        when(exchange.isConnected()).thenReturn(false);
+        assertTrue(TradingDesk.isBotSessionReady(exchange, true));
+        assertFalse(TradingDesk.isBotSessionReady(exchange, false));
+    }
+
+    @Test
+    void publicMarketConnectionDoesNotGrantBotOrderAccess() {
+        Exchange exchange = mock(Exchange.class);
+        when(exchange.isConnected()).thenReturn(true);
+        assertFalse(TradingDesk.isBotSessionReady(exchange, true));
+        assertFalse(TradingDesk.isBotSessionReady(null, true));
+    }
+
+    @Test
     void emptyVisibleMarketDoesNotSelectARememberedHiddenSymbol() {
         assertNull(TradingDesk.selectMarketWatchSymbol(java.util.List.of(), "BTC/USD"));
         assertNull(TradingDesk.selectMarketWatchSymbol(java.util.List.of(), ""));

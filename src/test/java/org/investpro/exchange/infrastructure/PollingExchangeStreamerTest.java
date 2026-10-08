@@ -37,6 +37,56 @@ import static org.mockito.Mockito.*;
 
 class PollingExchangeStreamerTest {
     @Test
+    void private401RevokesAccessAndSuccessfulAuthenticationRestoresIt() throws Exception {
+        Coinbase exchange = coinbase(true, false);
+        HttpClient client = mock(HttpClient.class);
+        HttpResponse<byte[]> rejected = mock(HttpResponse.class);
+        when(rejected.statusCode()).thenReturn(401);
+        when(rejected.headers()).thenReturn(HttpHeaders.of(Map.of(), (name, value) -> true));
+        when(rejected.body()).thenReturn("{}".getBytes(StandardCharsets.UTF_8));
+        doReturn(CompletableFuture.completedFuture(rejected)).when(client)
+                .sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        setField(exchange, "httpClient", client);
+        var send = Coinbase.class.getDeclaredMethod("sendAsyncWithRetry", HttpRequest.class, int.class, int.class);
+        send.setAccessible(true);
+        var response = (CompletableFuture<?>) send.invoke(exchange, HttpRequest.newBuilder(
+                java.net.URI.create("https://api.coinbase.com/api/v3/brokerage/orders/historical/batch")).GET().build(), 0, 3);
+        assertThrows(java.util.concurrent.CompletionException.class, response::join);
+        assertFalse(exchange.hasPrivateAuthentication());
+        assertFalse(exchange.canUseCapability(ExchangeFeature.OPEN_ORDERS));
+        assertTrue(exchange.canUseCapability(ExchangeFeature.TICKER));
+        HttpResponse<byte[]> accepted = mock(HttpResponse.class);
+        when(accepted.statusCode()).thenReturn(200);
+        when(accepted.headers()).thenReturn(HttpHeaders.of(Map.of(), (name, value) -> true));
+        when(accepted.body()).thenReturn("{\"accounts\":[]}".getBytes(StandardCharsets.UTF_8));
+        doReturn(accepted).when(client).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        doCallRealMethod().when(exchange).checkAuthentication();
+        assertTrue(exchange.checkAuthentication().isSuccess());
+        assertTrue(exchange.hasPrivateAuthentication());
+    }
+
+    @Test
+    void privatePollerRechecksAuthenticationAndResumesAfterRecovery() throws Exception {
+        Coinbase exchange = coinbase(true, false);
+        when(exchange.fetchAllOpenOrders()).thenReturn(CompletableFuture.completedFuture(List.of()));
+        ScheduledExecutorService scheduler = scheduler(mock(ScheduledFuture.class));
+        PollingExchangeStreamer streamer = new PollingExchangeStreamer(exchange, () -> scheduler);
+        streamer.streamOrders(mock(ExchangeStreamConsumer.class));
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        verify(scheduler).scheduleAtFixedRate(task.capture(), eq(0L), anyLong(), eq(TimeUnit.SECONDS));
+        task.getValue().run();
+        setField(exchange, "privateAuthenticationRejected", true);
+        assertFalse(exchange.hasPrivateAuthentication());
+        assertTrue(exchange.canUseCapability(ExchangeFeature.TICKER));
+        task.getValue().run();
+        verify(exchange, times(1)).fetchAllOpenOrders();
+        setField(exchange, "privateAuthenticationRejected", false);
+        task.getValue().run();
+        verify(exchange, times(2)).fetchAllOpenOrders();
+        streamer.stopAll();
+    }
+
+    @Test
     void realCoinbaseInitializesAndDiscoversProductsWithoutPrivateCredentials() throws Exception {
         Coinbase exchange = new Coinbase(new ExchangeCredentials("coinbase", "", "", null, null, null, null, false));
         try {

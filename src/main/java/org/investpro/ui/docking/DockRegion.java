@@ -49,16 +49,16 @@ public final class DockRegion extends BorderPane {
 
     public void addPane(DockablePane pane) {
         Objects.requireNonNull(pane, "pane must not be null");
-        if (containsPane(pane.getId())) {
+        if (containsPane(pane.id())) {
             return;
         }
 
-        Tab tab = new Tab(pane.getTitle(), pane.getView());
+        Tab tab = new Tab(pane.title(), pane.view());
         tab.setClosable(false);
-        tab.setGraphic(createDraggableTabHeader(pane.getId(), pane.getTitle()));
+        tab.setGraphic(createDraggableTabHeader(pane.id(), pane.title()));
         tab.setText(null);
-        panesById.put(pane.getId(), pane);
-        tabsById.put(pane.getId(), tab);
+        panesById.put(pane.id(), pane);
+        tabsById.put(pane.id(), tab);
         tabPane.getTabs().add(tab);
         pane.onAttach();
     }

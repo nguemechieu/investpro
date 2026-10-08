@@ -16,6 +16,10 @@ public final class AssistantRuntime implements AutoCloseable {
     private record DeskContext(Exchange exchange, org.investpro.models.trading.TradePair symbol) { }
     private volatile DeskContext deskContext = new DeskContext(null, null);
     private volatile java.util.function.Supplier<javafx.scene.Scene> screenshotSource = () -> null;
+    private volatile java.util.function.Supplier<javafx.scene.Node> chartScreenshotSource = () -> null;
+    public void setChartScreenshotSource(java.util.function.Supplier<javafx.scene.Node> source) {
+        chartScreenshotSource = java.util.Objects.requireNonNull(source);
+    }
     public void setScreenshotSource(java.util.function.Supplier<javafx.scene.Scene> source) { screenshotSource = java.util.Objects.requireNonNull(source); }
     public byte[] captureScreenshot() throws Exception { return AppScreenshot.capture(screenshotSource); }
     public boolean sendScreenshot(byte[] png) throws java.io.IOException {
@@ -37,6 +41,8 @@ public final class AssistantRuntime implements AutoCloseable {
 
     AssistantRuntime(TelegramNotifier transport) {
         notifier = java.util.Objects.requireNonNull(transport);
+        notifier.setScreenshotCapture(chart -> chart
+                ? AppScreenshot.captureNode(chartScreenshotSource) : captureScreenshot());
         notifier.setQuestionContext(this::contextFor);
     }
 

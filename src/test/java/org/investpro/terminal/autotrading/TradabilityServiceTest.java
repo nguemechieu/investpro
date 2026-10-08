@@ -244,18 +244,18 @@ class TradabilityServiceTest {
         private Instrument instrument = TradabilityServiceTest.this.instrument("BTC/USD", AssetClass.CRYPTO, Map.of());
         private SymbolTradingPolicy policy = TradabilityServiceTest.this.policy();
         private ExchangeConnectionState connectionState = ExchangeConnectionState.CONNECTED;
-        private boolean reconciliationComplete = true;
+        private final boolean reconciliationComplete = true;
         private MarketQualitySnapshot marketQuality = market();
-        private boolean accountSupportsProduct = true;
-        private boolean permissionsAllowProduct = true;
+        private final boolean accountSupportsProduct = true;
+        private final boolean permissionsAllowProduct = true;
         private boolean riskAllowed = true;
         private boolean strategyAssigned = true;
-        private boolean strategyDataReady = true;
+        private final boolean strategyDataReady = true;
         private StrategySignal latestSignal = signal("BUY");
-        private int openOrders = 0;
-        private int openPositions = 0;
+        private final int openOrders = 0;
+        private final int openPositions = 0;
         private boolean duplicateOrderExists = false;
-        private boolean disabledByUser = false;
+        private final boolean disabledByUser = false;
 
         ContextBuilder instrument(Instrument value) {
             this.instrument = value;

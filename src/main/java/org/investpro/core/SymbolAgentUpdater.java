@@ -44,7 +44,7 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
     /**
      * Start listening to all agent events
      */
-    public void start() {
+    public synchronized void start() {
         if (listening) {
             log.warn("SymbolAgentUpdater is already listening");
             return;
@@ -62,12 +62,13 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
     /**
      * Stop listening to agent events
      */
-    public void stop() {
+    public synchronized void stop() {
         if (!listening) {
             return;
         }
 
         listening = false;
+        eventBus.unsubscribeAll(this);
         log.info("SymbolAgentUpdater stopped");
     }
 
@@ -111,6 +112,7 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
         if (!(payload instanceof Ticker ticker)) return;
 
         SymbolAgentState state = symbolAgentManager.ensureSymbol(symbol);
+        state.setMarketDataStatus(null);
         state.setBidPrice(ticker.getBidPrice());
         state.setAskPrice(ticker.getAskPrice());
         if (ticker.getAskPrice() > 0) {
@@ -221,8 +223,9 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
             }
 
             SymbolAgentState state = symbolAgentManager.ensureSymbol(symbol);
-            state.setState(SymbolEvaluationState.LIVE_TRADING);
-            state.setCanTradeLive(true);
+            if (Boolean.FALSE.equals(event.metadata().get("paperTrading")) && state.isLiveAllowed()) {
+                state.setState(SymbolEvaluationState.LIVE_TRADING);
+            }
 
             symbolAgentManager.updateState(symbol, state);
             log.debug("Symbol {} now live trading", symbol);
@@ -246,8 +249,9 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
             double pnlPercent = getDoubleAttribute(event, "pnl_percent");
 
             SymbolAgentState state = symbolAgentManager.ensureSymbol(symbol);
-            state.setState(SymbolEvaluationState.LIVE_READY);
-            state.setCanTradeLive(true);
+            if (Boolean.FALSE.equals(event.metadata().get("paperTrading")) && state.isLiveAllowed()) {
+                state.setState(SymbolEvaluationState.LIVE_READY);
+            }
 
             symbolAgentManager.updateState(symbol, state);
             log.debug("Symbol {} position closed: pnl={} ({}%)", symbol, pnl, pnlPercent);

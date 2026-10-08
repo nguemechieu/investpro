@@ -448,6 +448,12 @@ public class Coinbase extends Exchange {
                         response.headers().firstValue("Content-Encoding").orElse("")));
                 success = body != null && body.path("accounts").isArray();
             }
+            if (success) {
+                privateAuthenticationRejected = false;
+                setAuthenticatedSessionConnected(true);
+            } else if (status == 401) {
+                rejectPrivateAuthentication();
+            }
             String message = success ? "Coinbase API key and secret verified through the accounts API."
                     : switch (status) {
                         case 401 -> "Coinbase rejected the API key/secret. Check the key pair, IP restrictions and system clock.";
@@ -527,6 +533,8 @@ public class Coinbase extends Exchange {
 
     @Override
     public void disconnect() {
+        tradePermissionVerified = false;
+        setAuthenticatedSessionConnected(false);
         stopAllStreams();
 
         try {
@@ -554,6 +562,7 @@ public class Coinbase extends Exchange {
 
     @Override
     public Boolean isConnected() {
+        if (isAuthenticatedSessionConnected() && hasPrivateEndpointAuth()) return true;
         try {
             return websocketClient != null
                     && websocketClient.connectionEstablished != null
@@ -762,8 +771,27 @@ public class Coinbase extends Exchange {
         return "";
     }
 
+    private volatile boolean privateAuthenticationRejected;
+    private volatile boolean tradePermissionVerified;
+    private void rejectPrivateAuthentication() {
+        privateAuthenticationRejected = true;
+        tradePermissionVerified = false;
+        setAuthenticatedSessionConnected(false);
+    }
+
+    public boolean isAuthenticationRejected() {
+        return privateAuthenticationRejected;
+    }
+
+    private HttpRequest refreshRequestAuthentication(HttpRequest request) {
+        if (jwtSigner == null || request.headers().firstValue("Authorization").isEmpty()) return request;
+        return HttpRequest.newBuilder(request, (name, _) -> !name.equalsIgnoreCase("Authorization"))
+                .header("Authorization", authorizationHeader(request.method(), request.uri().toString()))
+                .build();
+    }
+
     private boolean hasPrivateEndpointAuth() {
-        return !isPaperTrading() && (jwtSigner != null || !bearerToken().isBlank());
+        return !privateAuthenticationRejected && !isPaperTrading() && (jwtSigner != null || !bearerToken().isBlank());
     }
 
     @Override
@@ -885,7 +913,7 @@ public class Coinbase extends Exchange {
             }
 
             HttpResponse<byte[]> httpResponse = httpClient.send(
-                    request,
+                    refreshRequestAuthentication(request),
                     HttpResponse.BodyHandlers.ofByteArray());
 
             String contentEncoding = httpResponse.headers()
@@ -913,6 +941,10 @@ public class Coinbase extends Exchange {
             }
 
             if (httpResponse.statusCode() >= 400) {
+                if (httpResponse.statusCode() == 401 && !marketRequest
+                        && !"/api/v3/brokerage/products".equals(request.uri().getPath())) {
+                    rejectPrivateAuthentication();
+                }
                 if (marketRequest && httpResponse.statusCode() != 429) {
                     marketRestLimiter.onNonRateLimitFailure();
                 }
@@ -1006,7 +1038,7 @@ public class Coinbase extends Exchange {
         });
 
         return permitFuture
-                .thenCompose(ignored -> httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
+                .thenCompose(ignored -> httpClient.sendAsync(refreshRequestAuthentication(request), HttpResponse.BodyHandlers.ofByteArray())
                         .thenCompose(httpResponse -> {
                             String contentEncoding = httpResponse.headers()
                                     .firstValue("Content-Encoding")
@@ -1034,6 +1066,10 @@ public class Coinbase extends Exchange {
                             }
 
                             if (httpResponse.statusCode() >= 400) {
+                                if (httpResponse.statusCode() == 401 && !marketRequest
+                                        && !"/api/v3/brokerage/products".equals(request.uri().getPath())) {
+                                    rejectPrivateAuthentication();
+                                }
                                 if (marketRequest && httpResponse.statusCode() != 429) {
                                     marketRestLimiter.onNonRateLimitFailure();
                                 }
@@ -2610,7 +2646,20 @@ public class Coinbase extends Exchange {
     @Override
     public CompletableFuture<Account> fetchAccount() {
         try {
-            return CompletableFuture.completedFuture(getUserAccountDetails());
+            // A reconnect must be able to recover after a private endpoint rejected the session.
+            if (privateAuthenticationRejected) {
+                AuthCheckResult validation = checkAuthentication();
+                if (!validation.isSuccess()) return failedFuture(new IllegalStateException(validation.getMessage()));
+            }
+            Account account = getUserAccountDetails();
+            if (!account.isPaperTrading()) {
+                if (privateAuthenticationRejected) {
+                    return failedFuture(new IllegalStateException(
+                            "Coinbase rejected private API access during account validation. Reconnect and verify the API key permissions."));
+                }
+                setAuthenticatedSessionConnected(true);
+            }
+            return CompletableFuture.completedFuture(account);
         } catch (Exception exception) {
             return failedFuture(exception);
         }
@@ -3600,8 +3649,38 @@ public class Coinbase extends Exchange {
 
     @Override
     public AuthResult AuthCheckResult(String selectedExchange) {
+        tradePermissionVerified = false;
         AuthCheckResult result = checkAuthentication();
-        return result.isSuccess() ? AuthResult.success(result.getMessage()) : AuthResult.failure(result.getMessage());
+        if (!result.isSuccess()) return AuthResult.failure(result.getMessage());
+        String permissionsUrl = "https://api.coinbase.com/api/v3/brokerage/key_permissions";
+        try {
+            HttpResponse<byte[]> response = httpClient.send(
+                    authenticatedRequest("GET", permissionsUrl).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+            int status = response.statusCode();
+            if (status == 401) {
+                rejectPrivateAuthentication();
+                return AuthResult.failure("Coinbase rejected authentication for the API key permissions endpoint. Check the key pair, IP restrictions and system clock.");
+            }
+            if (status < 200 || status >= 300) {
+                return AuthResult.failure("Coinbase account authentication succeeded, but API key permissions could not be verified (HTTP "
+                        + status + "). Live trading remains disabled; check View permission and retry.");
+            }
+            JsonNode permissions = readJson(decodeBody(response.body(),
+                    response.headers().firstValue("Content-Encoding").orElse("")));
+            if (!permissions.path("can_view").isBoolean() || !permissions.path("can_trade").isBoolean()) {
+                return AuthResult.failure("Coinbase returned an incomplete API key permissions response. Live trading remains disabled; retry connection validation.");
+            }
+            if (!permissions.path("can_view").asBoolean() || !permissions.path("can_trade").asBoolean()) {
+                return AuthResult.failure("Coinbase authenticated the key, but this portfolio's API key requires both View and Trade permissions for live trading. Update its permissions and reconnect.");
+            }
+            tradePermissionVerified = true;
+            return AuthResult.success("Coinbase account authentication and API key View/Trade permissions verified.");
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            return AuthResult.failure("Coinbase API key permission verification was interrupted. Retry connection validation.");
+        } catch (Exception error) {
+            return AuthResult.failure("Coinbase account authentication succeeded, but API key permissions could not be verified. Check connectivity and retry.");
+        }
     }
     @Override
     public CompletableFuture<Boolean> validateOrder(
@@ -3992,6 +4071,11 @@ public class Coinbase extends Exchange {
     @Override
     public boolean supportsLiveTrading() {
         return !isPaperTrading() && hasPrivateEndpointAuth();
+    }
+
+    @Override
+    public boolean canSubmitLiveOrders() {
+        return tradePermissionVerified && super.canSubmitLiveOrders();
     }
 
     @Override
@@ -4658,7 +4742,7 @@ public class Coinbase extends Exchange {
         PERMISSION_REQUIRED,
         REGION_RESTRICTED,
         NOT_SUPPORTED,
-        UNKNOWN;
+        UNKNOWN
     }
 
     private enum CoinbaseProductDiscoverySegment {

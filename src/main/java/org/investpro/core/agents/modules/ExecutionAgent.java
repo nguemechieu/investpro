@@ -115,7 +115,15 @@ public class ExecutionAgent implements org.investpro.core.agents.Agent {
                 : buildRiskContext(signal);
 
         tradeExecutionCoordinator.processReviewedSignal(signal, riskContext, review)
-                .thenAccept(result -> log.info("ExecutionAgent execution result: {}", result.message()))
+                .thenAccept(result -> {
+                    log.info("ExecutionAgent execution result: {}", result.message());
+                    if (result.executed()) {
+                        context.getEventBus().publishAsync(new AgentEvent(
+                                AgentEvent.ORDER_SUBMITTED, name(), result, java.time.Instant.now(),
+                                Map.of("tradePairObject", riskContext.getTradePair(),
+                                        "paperTrading", context.getExchange().isBotPaperTrading())));
+                    }
+                })
                 .exceptionally(exception -> {
                     log.error("ExecutionAgent failed to coordinate execution", exception);
                     return null;

@@ -201,6 +201,9 @@ public record MarketInstrument(
             ContractType contractType,
             AssetClass assetClass) {
         ContractType contract = contractType == null ? ContractType.UNKNOWN : contractType;
+        if (contract == ContractType.MARGIN && assetClass == AssetClass.FIAT) {
+            return InstrumentType.FOREX;
+        }
         switch (contract) {
             case FUTURE:
                 return InstrumentType.FUTURE;

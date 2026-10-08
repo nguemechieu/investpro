@@ -707,16 +707,10 @@ public class StrategyDeveloperPanel extends VBox {
             name.set(value == null ? "" : value);
         }
 
-        public String getSourceJar() {
-            return sourceJar.get();
-        }
+
 
         public void setSourceJar(String value) {
             sourceJar.set(value == null ? "" : value);
-        }
-
-        public int getWarmupBars() {
-            return warmupBars.get();
         }
 
         public void setWarmupBars(int value) {

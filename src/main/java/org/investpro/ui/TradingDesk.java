@@ -648,7 +648,10 @@ public class TradingDesk extends BorderPane {
             return;
         }
         initialized = true;
-        if (assistantRuntime != null) assistantRuntime.setScreenshotSource(this::getScene);
+        if (assistantRuntime != null) {
+            assistantRuntime.setScreenshotSource(this::getScene);
+            assistantRuntime.setChartScreenshotSource(this::getActiveChart);
+        }
         if (assistantRuntime != null) assistantRuntime.setBotControl(action -> {
             Exchange requestedExchange = exchange;
             Platform.runLater(() -> {
@@ -2863,7 +2866,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private @NotNull Node createChartWorkspace() {
-        Node workspace = dockableChartPanel.getView();
+        Node workspace = dockableChartPanel.view();
         updateChartHeader();
         return workspace;
     }
@@ -5406,6 +5409,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private boolean hasBrokerAccess() {
+        if (exchange instanceof Coinbase coinbase && coinbase.isAuthenticationRejected()) return false;
         return exchange != null && (brokerAccessGranted || exchange.isAuthenticatedSessionConnected());
     }
 
@@ -5431,7 +5435,7 @@ public class TradingDesk extends BorderPane {
         }
 
         if (exchange != null
-                && (exchange.isAuthenticatedSessionConnected() || Boolean.TRUE.equals(exchange.isConnected()) || exchange.isDeskPaperTrading())
+                && hasBrokerAccess()
                 && Objects.equals(normalizeExchangeName(firstNonBlank(
                         exchange.getName(),
                         exchange.getExchangeId(),
@@ -5442,9 +5446,7 @@ public class TradingDesk extends BorderPane {
 
         BrokerSession session = findBrokerSession(normalized);
         return session != null
-                && session.accessGranted()
-                && session.exchange() != null
-                && (session.exchange().isAuthenticatedSessionConnected() || Boolean.TRUE.equals(session.exchange().isConnected()) || session.exchange().isDeskPaperTrading());
+                && canReuseBrokerSession(session.exchange(), session.accessGranted());
     }
 
     private @NotNull String brokerSessionKey(String exchangeName) {
@@ -5834,6 +5836,7 @@ public class TradingDesk extends BorderPane {
     }
 
     static boolean canReuseBrokerSession(Exchange candidate, boolean accessGranted) {
+        if (candidate instanceof Coinbase coinbase && coinbase.isAuthenticationRejected()) return false;
         return candidate != null && (candidate.isAuthenticatedSessionConnected()
                 || (accessGranted && (candidate.isDeskPaperTrading() || Boolean.TRUE.equals(candidate.isConnected()))));
     }
@@ -5946,6 +5949,10 @@ public class TradingDesk extends BorderPane {
                             && safe(credentials.accessToken()).isBlank()
                             && safe(credentials.accountId()).isBlank())) {
                         return CompletableFuture.completedFuture(connectingExchange.localPaperAccount());
+                    }
+                    if (connectingExchange instanceof Coinbase coinbase) {
+                        var validation = coinbase.AuthCheckResult(coinbase.getName());
+                        if (!validation.success()) throw new IllegalStateException(validation.message());
                     }
                     CompletableFuture<Account> accountFuture = connectingExchange.fetchAccount();
                     if (accountFuture == null) {
@@ -6169,7 +6176,7 @@ public class TradingDesk extends BorderPane {
         log.warn("Broker credential validation failed for {}: {}", exchangeSelector.getValue(), rootMessage(throwable));
         showWarning(
                 "Connection Failed",
-                "Broker credentials were rejected for %s: %s".formatted(exchangeSelector.getValue(),
+                "Broker connection validation failed for %s: %s".formatted(exchangeSelector.getValue(),
                         rootMessage(throwable)));
     }
 
@@ -9238,7 +9245,7 @@ public class TradingDesk extends BorderPane {
                         .thenApply(globalOrders -> globalOrders.isEmpty() ? openOrders : globalOrders);
             }).exceptionally(ex -> {
                 log.debug("Open orders workspace refresh failed", ex);
-                return List.<OpenOrder>of();
+                return List.of();
             });
         }
 
@@ -13225,7 +13232,7 @@ public class TradingDesk extends BorderPane {
         if (sessions.isEmpty()) {
             botTradingOperationInFlight.set(false);
             botTradeButton.setDisable(false);
-            showWarning("Bot Trading", "No connected exchanges are available for multi-exchange bot trading.");
+            showWarning("Bot Trading", "No exchange is ready for bot orders. Check Coinbase authentication and trading permissions, or select local paper trading. Receiving public market data does not confirm private order access.");
             refreshBotTradeButton();
             return;
         }
@@ -13620,14 +13627,13 @@ public class TradingDesk extends BorderPane {
     private List<BrokerSession> connectedBotSessions() {
         return brokerSessions.values().stream()
                 .filter(Objects::nonNull)
-                .filter(BrokerSession::accessGranted)
-                .filter(session -> session.exchange() != null)
-                .filter(session -> {
-                    Exchange sessionExchange = session.exchange();
-                    return Boolean.TRUE.equals(sessionExchange.isConnected()) || sessionExchange.isDeskPaperTrading();
-                })
-                .filter(session -> session.exchange().canSubmitBotOrders())
+                // Bot readiness supports authenticated REST sessions; a market WebSocket is not required.
+                .filter(session -> isBotSessionReady(session.exchange(), session.accessGranted()))
                 .toList();
+    }
+
+    static boolean isBotSessionReady(Exchange target, boolean accessGranted) {
+        return accessGranted && target != null && target.canSubmitBotOrders();
     }
 
     private List<TradePair> connectedBotSymbols() {

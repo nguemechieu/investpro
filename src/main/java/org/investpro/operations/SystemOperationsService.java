@@ -297,7 +297,7 @@ public class SystemOperationsService {
             // Use reflection to call isConnected() if available
             var method = exchange.getClass().getMethod("isConnected");
             Object result = method.invoke(exchange);
-            return result instanceof Boolean ? (Boolean) result : false;
+            return result instanceof Boolean && (Boolean) result;
         } catch (Exception e) {
             return false; // Default to disconnected if unable to determine
         }

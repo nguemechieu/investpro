@@ -144,13 +144,13 @@ public class StrategyAssignmentPanel extends VBox{
                 takeProfitPercentSpinner.getValueFactory().setValue(5.0);
 
                 if (!entrySignalCombo.getItems().isEmpty()) {
-                        entrySignalCombo.setValue(entrySignalCombo.getItems().get(0));
+                        entrySignalCombo.setValue(entrySignalCombo.getItems().getFirst());
                 }
                 if (!exitSignalCombo.getItems().isEmpty()) {
-                        exitSignalCombo.setValue(exitSignalCombo.getItems().get(0));
+                        exitSignalCombo.setValue(exitSignalCombo.getItems().getFirst());
                 }
                 if (!stopLossTypeCombo.getItems().isEmpty()) {
-                        stopLossTypeCombo.setValue(stopLossTypeCombo.getItems().get(0));
+                        stopLossTypeCombo.setValue(stopLossTypeCombo.getItems().getFirst());
                 }
         }
 
@@ -620,17 +620,17 @@ public class StrategyAssignmentPanel extends VBox{
                 stopLossPercentSpinner.getValueFactory().setValue(2.0);
                 takeProfitPercentSpinner.getValueFactory().setValue(5.0);
                 if (!entrySignalCombo.getItems().isEmpty()) {
-                        entrySignalCombo.setValue(entrySignalCombo.getItems().get(0));
+                        entrySignalCombo.setValue(entrySignalCombo.getItems().getFirst());
                 } else {
                         entrySignalCombo.setValue(null);
                 }
                 if (!exitSignalCombo.getItems().isEmpty()) {
-                        exitSignalCombo.setValue(exitSignalCombo.getItems().get(0));
+                        exitSignalCombo.setValue(exitSignalCombo.getItems().getFirst());
                 } else {
                         exitSignalCombo.setValue(null);
                 }
                 if (!stopLossTypeCombo.getItems().isEmpty()) {
-                        stopLossTypeCombo.setValue(stopLossTypeCombo.getItems().get(0));
+                        stopLossTypeCombo.setValue(stopLossTypeCombo.getItems().getFirst());
                 } else {
                         stopLossTypeCombo.setValue(null);
                 }

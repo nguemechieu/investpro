@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.core.pipeline.BotRiskContextServiceTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.632 s -- in org.investpro.core.pipeline.BotRiskContextServiceTest

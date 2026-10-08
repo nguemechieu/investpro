@@ -710,6 +710,7 @@ public class SystemCore {
         selectTradePair(selectedPairs.iterator().next());
 
         activeSubscription = buildSubscription(selectedPairs, safeMode);
+        symbolAgentManager.updateMarketDataCoverage(selectedPairs);
         streamConsumer = createAgentStreamConsumer();
 
         try {
@@ -769,6 +770,7 @@ public class SystemCore {
         selectTradePair(resolvedPair);
 
         activeSubscription = buildSubscription(resolvedPair, safeMode);
+        symbolAgentManager.updateMarketDataCoverage(Set.of(resolvedPair));
         streamConsumer = createAgentStreamConsumer();
 
         try {
@@ -886,6 +888,9 @@ public class SystemCore {
     }
 
     public void stopStreaming() {
+        if (symbolAgentManager != null) {
+            symbolAgentManager.updateMarketDataCoverage(java.util.List.of());
+        }
         if (activeSubscription == null) {
             streaming.set(false);
             return;

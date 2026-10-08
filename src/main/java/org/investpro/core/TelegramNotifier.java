@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit;
  * Features:
  * <ul>
  *   <li>Autodetects chat_id/channel_id from {@code getUpdates}</li>
- *   <li>Supports explicit chat id or @channelusername</li>
+ *   <li>Verifies the preferred notification destination against authorized API updates</li>
  *   <li>Sends text messages</li>
  *   <li>Sends photos</li>
  *   <li>Sends documents</li>
@@ -50,10 +50,8 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * For private chat: open the bot in Telegram and press Start or send any message.
  * <p>
- * For group: add the bot to the group and send a message in the group.
- * <p>
- * For channel: add the bot as channel admin and either use explicit @channelusername
- * or make sure updates reach the bot.
+ * Assistant replies require an authorized private-chat user. Each reply uses that
+ * incoming message's numeric chat ID, independently of the notification destination.
  */
 @Getter
 @Setter
@@ -94,7 +92,6 @@ public class TelegramNotifier {
     private volatile boolean pollingEnabled = false;
     private volatile Thread pollingThread;
 
-        // Guard against concurrent getUpdates calls (Telegram HTTP 409)
     // Guard against concurrent getUpdates calls (Telegram HTTP 409)
     private final AtomicBoolean getUpdatesInFlight = new AtomicBoolean(false);
     private volatile long lastDetectionAttemptMs = 0L;
@@ -121,7 +118,7 @@ public class TelegramNotifier {
     }
 
     public boolean hasTargetChat() {
-        return chatId != null && !chatId.isBlank();
+        return isValidChatId(chatId);
     }
 
     /**
@@ -131,9 +128,9 @@ public class TelegramNotifier {
      */
     public Optional<String> detectAndUseLatestChatId() {
         if (allowedUsers.isEmpty()) return Optional.empty();
-        if (discoveredChatId != null) return Optional.of(discoveredChatId);
+        if (isValidChatId(discoveredChatId)) return Optional.of(discoveredChatId);
         detectChatIds();
-        if (discoveredChatId != null) return Optional.of(discoveredChatId);
+        if (isValidChatId(discoveredChatId)) return Optional.of(discoveredChatId);
         // Only processUpdates may select an authorized chat observed in an API update.
         return Optional.empty();
 
@@ -303,7 +300,7 @@ public class TelegramNotifier {
      * Useful for long-running operations to give visual feedback.
      */
     public void sendChatAction(String targetChatId, ENUM_CHAT_ACTION action) {
-        if (targetChatId == null || targetChatId.isBlank() || action == null) {
+        if (!isValidChatId(targetChatId) || action == null) {
             return;
         }
 
@@ -335,10 +332,16 @@ public class TelegramNotifier {
             return false;
         }
 
+        return sendPhotoToChat(target.get(), photoPath, caption);
+    }
+
+    protected boolean sendPhotoToChat(String targetChatId, Path photoPath, String caption) {
+        if (!isValidChatId(targetChatId)) return false;
+
         try {
             return postMultipart(
                     "sendPhoto",
-                    target.get(),
+                    targetChatId,
                     "photo",
                     photoPath,
                     caption);
@@ -432,7 +435,7 @@ public class TelegramNotifier {
             return Optional.empty();
         }
 
-        if (discoveredChatId != null) {
+        if (isValidChatId(discoveredChatId)) {
             return Optional.of(discoveredChatId);
         }
 
@@ -460,36 +463,24 @@ public class TelegramNotifier {
         for (String path : paths) {
             JsonNode value = update.at(path);
 
-            if (!value.isMissingNode() && !value.isNull()) {
-                String id = value.asText("").trim();
-
-                if (!id.isBlank()) {
-                    return Optional.of(id);
-                }
-            }
-        }
-
-        /*
-         * If a public channel username is visible, sending by @username can work.
-         */
-        String[] usernamePaths = {
-                "/channel_post/chat/username",
-                "/message/chat/username"
-        };
-
-        for (String path : usernamePaths) {
-            JsonNode value = update.at(path);
-
-            if (!value.isMissingNode() && !value.isNull()) {
-                String username = value.asText("").trim();
-
-                if (!username.isBlank()) {
-                    return Optional.of("@%s".formatted(username.replace("@", "")));
-                }
-            }
+            Optional<String> id = numericChatId(value);
+            if (id.isPresent()) return id;
         }
 
         return Optional.empty();
+    }
+
+    private static Optional<String> numericChatId(JsonNode value) {
+        if (!value.isIntegralNumber() || !value.canConvertToLong() || value.longValue() == 0) {
+            return Optional.empty();
+        }
+        return Optional.of(Long.toString(value.longValue()));
+    }
+
+    private static boolean isValidChatId(String value) {
+        if (value == null || !value.matches("-?\\d+")) return false;
+        try { return Long.parseLong(value) != 0; }
+        catch (NumberFormatException invalid) { return false; }
     }
 
     private boolean postForm(String method, String body) {
@@ -743,7 +734,7 @@ public class TelegramNotifier {
     }
 
     boolean isAuthorized(String user, String chat, String chatType) {
-        return "private".equals(chatType) && allowedUsers.contains(user)
+        return isValidChatId(chat) && "private".equals(chatType) && allowedUsers.contains(user)
                 && (allowedChats.isEmpty() || allowedChats.contains(chat));
     }
 
@@ -771,7 +762,9 @@ public class TelegramNotifier {
             lastUpdateId = id; // Never replay an action after an uncertain broker response.
             JsonNode message = update.path("message");
             String user = message.path("from").path("id").asText("");
-            String chat = message.path("chat").path("id").asText("");
+            Optional<String> replyChat = numericChatId(message.path("chat").path("id"));
+            if (replyChat.isEmpty()) continue;
+            String chat = replyChat.get();
             if (isAuthorized(user, chat, message.path("chat").path("type").asText())
                     && !message.path("from").path("is_bot").asBoolean()
                     && (preferredChatId.isBlank() || preferredChatId.equals(chat)
@@ -818,7 +811,11 @@ public class TelegramNotifier {
         sendChatAction(message.chatId, ENUM_CHAT_ACTION.typing);
         String key = message.chatId + ":" + message.userId;
         TelegramCommandHandler handler = commandHandler;
-        String response = message.text.startsWith("/")
+        String command = message.text.startsWith("/")
+                ? message.text.substring(1).split("\\s+", 2)[0].split("@", 2)[0].toLowerCase(Locale.ROOT) : "";
+        String response = "screenshot".equals(command) || "chart".equals(command)
+                ? screenshotForChat(message.chatId, message.text)
+                : message.text.startsWith("/")
                 ? handler == null ? assistantCommand(key, message.text) : handler.handleCommand(message.text, key)
                 : askAI(key, message.text);
         if (response != null && !response.isBlank()) sendMessageToChat(message.chatId, response);
@@ -826,11 +823,44 @@ public class TelegramNotifier {
     }
 
     protected void sendMessageToChat(String targetChatId, String text) {
+        if (!isValidChatId(targetChatId) || text == null || text.isBlank()) return;
         for (int start = 0; start < text.length();) {
             int end = Math.min(start + 3800, text.length());
             if (end < text.length() && Character.isHighSurrogate(text.charAt(end - 1))) end--;
             postForm("sendMessage", "chat_id=" + encode(targetChatId) + "&text=" + encode(text.substring(start, end)));
             start = end;
+        }
+    }
+
+    @FunctionalInterface
+    public interface ScreenshotCapture { byte[] capture(boolean chart) throws Exception; }
+    private volatile ScreenshotCapture screenshotCapture;
+
+    public void setScreenshotCapture(ScreenshotCapture capture) {
+        screenshotCapture = Objects.requireNonNull(capture);
+    }
+
+    private String screenshotForChat(String chat, String request) {
+        String[] parts = request.trim().split("\\s+", 2);
+        String mode = parts.length > 1 ? parts[1].trim().toLowerCase(Locale.ROOT) : "chart";
+        if (!"chart".equals(mode) && !"app".equals(mode)) return "Usage: /screenshot [chart|app] or /chart";
+        ScreenshotCapture capture = screenshotCapture;
+        if (capture == null) return "Screenshots are unavailable. Open the InvestPro desktop and a chart.";
+        Path file = null;
+        try {
+            byte[] png = capture.capture("chart".equals(mode));
+            file = Files.createTempFile("investpro-telegram-", ".png");
+            Files.write(file, png);
+            return sendPhotoToChat(chat, file, "InvestPro " + mode + " screenshot")
+                    ? "Screenshot sent." : "Screenshot upload failed. Please try again.";
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return "Screenshot interrupted.";
+        } catch (Exception error) {
+            return "Screenshot unavailable. Open the InvestPro desktop and the chart you want to capture.";
+        } finally {
+            if (file != null) try { Files.deleteIfExists(file); }
+            catch (IOException error) { log.debug("Unable to remove Telegram screenshot temporary file"); }
         }
     }
     public void resetConversation(String user) { assistantService.resetConversation(user); }
@@ -848,7 +878,7 @@ public class TelegramNotifier {
         String[] parts = text.substring(1).trim().split("\\s+", 2);
         String command = parts[0].split("@", 2)[0].toLowerCase(Locale.ROOT);
         return switch (command) {
-            case "start", "help" -> "InvestPro assistant is available even when trading is stopped. Send a question or /ask QUESTION. /reset clears your conversation. Connect an exchange in the desktop app for account commands.";
+            case "start", "help" -> "InvestPro assistant is available even when trading is stopped. Send a question or /ask QUESTION. /chart or /screenshot captures the active desktop chart; /screenshot app captures the app. /reset clears your conversation. Connect an exchange in the desktop app for account commands.";
             case "reset" -> { resetConversation(user); yield "AI conversation cleared."; }
             case "ask", "learn", "invest", "compare", "news" -> parts.length < 2
                     ? "Usage: /" + command + " QUESTION" : askAI(user, parts[1]);
@@ -863,7 +893,7 @@ public class TelegramNotifier {
         ArrayNode commands = OBJECT_MAPPER.createArrayNode();
         for (String command : List.of("help", "status", "balance", "portfolio", "positions", "orders", "history",
                 "quote", "analyze", "watch", "unwatch", "watchlist", "buy", "sell", "limit", "cancel", "confirm",
-                "abort", "pause", "resume", "mode", "exchange", "risk", "strategy", "health", "screenshot",
+                "abort", "pause", "resume", "mode", "exchange", "risk", "strategy", "health", "screenshot", "chart",
                 "size", "ask", "invest", "compare", "learn", "news", "reset")) {
             commands.addObject().put("command", command).put("description", switch (command) {
                 case "buy", "sell", "limit", "cancel", "resume" -> "Preview " + command + " action; confirmation required";

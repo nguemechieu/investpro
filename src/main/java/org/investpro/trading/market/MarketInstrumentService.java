@@ -167,6 +167,10 @@ public class MarketInstrumentService {
                         "Tradability was ignored"
                 );
             }
+            if (exchange instanceof org.investpro.exchange.oanda.Oanda oanda) {
+                result.add(OandaInstrumentPolicy.map(pair, oanda.instrumentSpecification(pair), tradability));
+                continue;
+            }
             result.add(new MarketInstrument(
                     exchangeId,
                     pair.getNativeSymbol() == null || pair.getNativeSymbol().isBlank()

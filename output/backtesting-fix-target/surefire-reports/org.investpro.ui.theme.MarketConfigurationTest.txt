@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.ui.theme.MarketConfigurationTest
+-------------------------------------------------------------------------------
+Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in org.investpro.ui.theme.MarketConfigurationTest

@@ -5,8 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.EnumSet;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 class IndicatorDefinitionRegistryTest {
 
@@ -26,7 +25,7 @@ class IndicatorDefinitionRegistryTest {
         for (INDICATORS indicator : INDICATORS.values()) {
             // UNKNOWN represents invalid input, not a selectable catalog indicator.
             if (indicator == INDICATORS.UNKNOWN) continue;
-            assertFalse(!seen.contains(indicator), indicator.name() + " is missing metadata");
+            assertTrue(seen.contains(indicator), indicator.name() + " is missing metadata");
         }
     }
 
@@ -43,6 +42,6 @@ class IndicatorDefinitionRegistryTest {
         boolean found = definition.parameters().stream()
                 .anyMatch(parameter -> parameter.name().equals(name)
                         && parameter.defaultValue().equals(defaultValue));
-        assertFalse(!found, indicator.name() + " missing " + name);
+        assertTrue(found, indicator.name() + " missing " + name);
     }
 }

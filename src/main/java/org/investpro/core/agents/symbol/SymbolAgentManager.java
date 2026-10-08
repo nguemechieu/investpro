@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SymbolAgentManager {
 
     private final Map<String, SymbolAgentState> symbolStates = new ConcurrentHashMap<>();
+    private volatile Set<String> subscribedSymbolKeys = Set.of();
 
     /**
      * Get the current state of a symbol.
@@ -164,6 +165,17 @@ public class SymbolAgentManager {
         symbolStates.clear();
     }
 
+    /** Report subscription coverage without changing validated strategy readiness. */
+    public void updateMarketDataCoverage(Collection<TradePair> subscribedSymbols) {
+        Set<String> subscribed = new HashSet<>();
+        subscribedSymbols.forEach(pair -> subscribed.add(symbolKey(pair)));
+        subscribedSymbolKeys = Set.copyOf(subscribed);
+        for (SymbolAgentState state : getAllStates()) {
+            state.setMarketDataStatus(subscribed.contains(symbolKey(state.getSymbol()))
+                    ? "Waiting for market ticks" : "Not subscribed to market data");
+        }
+    }
+
     private static @NotNull String symbolKey(@NotNull TradePair symbol) {
         return symbol.toString('/').trim().toUpperCase(Locale.ROOT);
     }
@@ -186,6 +198,8 @@ public class SymbolAgentManager {
                 .symbol(symbol)
                 .state(SymbolEvaluationState.NOT_STARTED)
                 .canTradeLive(false)
+                .marketDataStatus(subscribedSymbolKeys.contains(symbolKey(symbol))
+                        ? "Waiting for market ticks" : "Not subscribed to market data")
                 .lastIssue("Waiting for strategy evaluation")
                 .build();
         state.updateTimestamp();

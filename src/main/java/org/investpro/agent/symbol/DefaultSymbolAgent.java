@@ -283,11 +283,8 @@ public class DefaultSymbolAgent implements SymbolAgent {
             log.info("SymbolAgent duplicate order protection skipped evaluation. exchange={} symbol={} reason={}", exchangeId, symbol(), reason);
             return false;
         }
-        if (lastEvaluationStartedAt != null
-                && Duration.between(lastEvaluationStartedAt, LocalDateTime.now()).compareTo(config.evaluationCooldown()) < 0) {
-            return false;
-        }
-        return true;
+        return lastEvaluationStartedAt == null
+                || Duration.between(lastEvaluationStartedAt, LocalDateTime.now()).compareTo(config.evaluationCooldown()) >= 0;
     }
 
     private void refreshReadiness() {

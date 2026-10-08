@@ -4,9 +4,10 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.models.ExchangeCapability;
-import org.investpro.exchange.normalization.NormalizedMarketSnapshot;
 import org.investpro.exchange.registry.ExchangeCapabilityRegistry;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Objects;
 
 /**
  * Migration bridge that integrates legacy {@link Exchange} subclasses with the
@@ -25,7 +26,7 @@ import org.jetbrains.annotations.NotNull;
  * <pre>{@code
  *   Exchange legacy = new CoinbaseSpotExchange(credentials);
  *   ExchangeAdapterMigrationBridge bridge = ExchangeAdapterMigrationBridge.wrap(legacy);
- *   bridge.registerWith(registry);
+ *   registry.register(bridge.getCapability().getExchangeName(), bridge.getCapability());
  * }</pre>
  *
  * <h3>Backward compatibility guarantee</h3>
@@ -49,22 +50,20 @@ public final class ExchangeAdapterMigrationBridge {
     @Getter
     private final ExchangeCapability capability;
 
-    /** Per-exchange stale snapshot holder for normalization layer integration. */
-    private volatile NormalizedMarketSnapshot lastSnapshot;
 
     private ExchangeAdapterMigrationBridge(
             @NotNull Exchange delegate,
             @NotNull ExchangeCapability capability
     ) {
-        this.delegate = delegate;
-        this.capability = capability;
+        this.delegate = Objects.requireNonNull(delegate, "exchange must not be null");
+        this.capability = Objects.requireNonNull(capability, "capability must not be null");
     }
 
     /**
      * Wraps a legacy exchange using an auto-detected capability profile.
      *
-     * <p>The profile is built from the exchange's own {@code supports*()} methods
-     * declared in {@link org.investpro.exchange.contracts.ExchangeCapabilities}.
+     * <p>Uses the exchange's declared complete profile, preserving endpoint,
+     * market, order, authentication, and transport metadata.
      *
      * @param exchange the legacy exchange to wrap
      * @return migration bridge instance
@@ -91,70 +90,24 @@ public final class ExchangeAdapterMigrationBridge {
         return new ExchangeAdapterMigrationBridge(exchange, capability);
     }
 
-    /**
-     * Registers this bridge with an {@link ExchangeCapabilityRegistry}.
-     *
-     * <p>After registration, the exchange is visible to capability queries
-     * ({@code findByFeature}, {@code findSupporting}, etc.).
-     *
-     * @param registry the target registry
-     */
-    public void registerWith(@NotNull ExchangeCapabilityRegistry registry) {
-        registry.register(capability.getExchangeName(), capability);
-        log.info("[MigrationBridge] Registered legacy exchange '{}' with capability registry",
-                capability.getExchangeName());
-    }
 
-    /**
-     * Caches the latest normalized snapshot for integration with
-     * {@link org.investpro.exchange.normalization.MarketDataNormalizationLayer}.
-     *
-     * @param snapshot the latest snapshot
-     */
-    public void updateSnapshot(@NotNull NormalizedMarketSnapshot snapshot) {
-        this.lastSnapshot = snapshot;
-    }
-
-    /**
-     * Returns the last cached normalized snapshot, or a stale placeholder if none.
-     *
-     * @param symbol the symbol this snapshot is for
-     * @return current or stale snapshot
-     */
-    public NormalizedMarketSnapshot lastSnapshot(@NotNull String symbol) {
-        NormalizedMarketSnapshot s = lastSnapshot;
-        if (s != null) return s;
-        return NormalizedMarketSnapshot.stale(capability.getExchangeName(), symbol);
-    }
 
     // ── Private helpers ─────────────────────────────────────────────────────────
 
     /**
-     * Detects capabilities from the legacy exchange's contract methods.
+     * Detects capabilities from the legacy exchange's declared profile.
      *
-     * <p>Maps legacy boolean contract methods to the new {@link ExchangeCapability}
-     * model. Fields not expressible via the contract default to sensible values.
+     * <p>Streaming support does not imply WebSocket transport, and order-book
+     * support does not imply full depth. Keep these distinctions as declared by
+     * the adapter. Static support does not grant account or product permission.
      */
     private static ExchangeCapability detectCapability(@NotNull Exchange exchange) {
-        String name = exchange.getClass().getSimpleName();
-        return ExchangeCapability.builder()
-                .exchangeName(name)
-                .exchangeId(name.toLowerCase())
-                .displayName(name)
-                .supportsSpot(exchange.supportsCrypto() || exchange.supportsStocks())
-                .supportsForex(exchange.supportsForex())
-                .supportsCrypto(exchange.supportsCrypto())
-                .supportsDerivatives(exchange.supportsDerivatives())
-                .supportsLiveTrading(exchange.supportsLiveTrading())
-                .supportsPaperTradingMode(exchange.supportsPaperTradingMode())
-                .supportsOrderBook(exchange.supportsOrderBook())
-                .supportsStopLossTakeProfit(exchange.supportsStopLossTakeProfit())
-                .supportsMarginTrading(exchange.supportsLeverage())
-                .supportsWebSocket(exchange.supportsAccountStreaming()
-                        || exchange.supportsOrderStreaming()
-                        || exchange.supportsTickerStreaming())
-                .supportsPositions(exchange.supportsPositions())
-                .supportsAccountTrades(exchange.supportsAccountTrades())
+        Objects.requireNonNull(exchange, "exchange must not be null");
+        return Objects.requireNonNull(exchange.getCapability(), "exchange capability profile must not be null")
+                .toBuilder()
+                .exchangeName(exchange.getName())
+                .exchangeId(exchange.getExchangeId())
+                .displayName(exchange.getDisplayName())
                 .build();
     }
 }

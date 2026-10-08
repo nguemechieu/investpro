@@ -71,12 +71,12 @@ public final class DockManager {
         Objects.requireNonNull(pane, "pane must not be null");
         Objects.requireNonNull(initialRegion, "initialRegion must not be null");
 
-        if (panesById.containsKey(pane.getId())) {
+        if (panesById.containsKey(pane.id())) {
             return;
         }
 
-        panesById.put(pane.getId(), pane);
-        attachPane(pane.getId(), initialRegion);
+        panesById.put(pane.id(), pane);
+        attachPane(pane.id(), initialRegion);
     }
 
     public void movePane(String paneId, DockRegionType fromRegion, DockRegionType toRegion) {

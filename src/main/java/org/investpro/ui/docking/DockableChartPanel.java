@@ -66,17 +66,17 @@ public final class DockableChartPanel implements DockablePane {
     }
 
     @Override
-    public String getId() {
+    public String id() {
         return id;
     }
 
     @Override
-    public String getTitle() {
+    public String title() {
         return title;
     }
 
     @Override
-    public Node getView() {
+    public Node view() {
         ensureInitialized();
         return workspace;
     }

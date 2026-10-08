@@ -3,6 +3,10 @@ package org.investpro.utils;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.coinbase.CoinbaseCredentialInput;
 import org.investpro.exchange.coinbase.CoinbaseJwtSigner;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Unmodifiable;
+import org.jspecify.annotations.NonNull;
+
 import java.net.URI;
 import java.net.http.*;
 import java.time.Duration;
@@ -29,14 +33,14 @@ public final class CoinbaseCredentialDiagnostic {
         diagnose(keyName, privateKey, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build());
     }
 
-    public static List<EndpointResult> diagnose(String keyName, String privateKey, HttpClient client) {
+    public static @NonNull @Unmodifiable List<EndpointResult> diagnose(String keyName, String privateKey, HttpClient client) {
         CoinbaseJwtSigner signer = null;
         try {
             var normalized = CoinbaseCredentialInput.normalize(keyName, privateKey);
             signer = new CoinbaseJwtSigner(normalized.keyName(), normalized.privateKey());
             log.info("Coinbase credentials parsed; local JWT generation is not proof of REST authentication.");
         } catch (IllegalArgumentException invalidCredentials) {
-            log.warn("Coinbase credential parsing failed. Use a complete ECDSA/ES256 PEM key and CDP key name; raw Ed25519 keys are unsupported.");
+            log.warn("Coinbase credential parsing failed. Use the matching CDP key name and a supported ECDSA/ES256 PEM or Ed25519 private key.");
         }
         List<EndpointResult> results = new ArrayList<>();
         results.add(test(client, null, BASE + "/market/products", "public products"));
@@ -54,7 +58,8 @@ public final class CoinbaseCredentialDiagnostic {
         return List.copyOf(results);
     }
 
-    private static EndpointResult test(HttpClient client, CoinbaseJwtSigner signer, String url, String step) {
+    @Contract("_, _, _, _ -> new")
+    private static @NonNull EndpointResult test(HttpClient client, CoinbaseJwtSigner signer, String url, String step) {
         try {
             HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                     .timeout(Duration.ofSeconds(20)).header("Accept", "application/json")

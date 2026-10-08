@@ -36,8 +36,7 @@ class CoinbaseCredentialDiagnosticTest {
         for (HttpRequest request : requests.subList(1, requests.size())) {
             String token = request.headers().firstValue("Authorization").orElseThrow().substring(7);
             assertTrue(tokens.add(token));
-            String query = request.uri().getRawQuery();
-            assertEquals("GET api.coinbase.com" + request.uri().getRawPath() + (query == null ? "" : "?" + query),
+            assertEquals("GET api.coinbase.com" + request.uri().getRawPath(),
                     SignedJWT.parse(token).getJWTClaimsSet().getStringClaim("uri"));
         }
     }

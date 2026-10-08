@@ -18,8 +18,8 @@ public final class FloatingWindow {
         this.pane = Objects.requireNonNull(pane, "pane must not be null");
         this.stage = new Stage();
 
-        BorderPane root = new BorderPane(pane.getView());
-        stage.setTitle(pane.getTitle());
+        BorderPane root = new BorderPane(pane.view());
+        stage.setTitle(pane.title());
         stage.setScene(new Scene(root, 920, 620));
         stage.setOnHidden(event -> {
             if (reattachOnHide && onClose != null) {

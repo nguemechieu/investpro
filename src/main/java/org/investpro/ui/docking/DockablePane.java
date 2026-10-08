@@ -8,11 +8,11 @@ import java.util.Map;
  * Contract for panes managed by the docking system.
  */
 public interface DockablePane {
-    String getId();
+    String id();
 
-    String getTitle();
+    String title();
 
-    Node getView();
+    Node view();
 
     default void onAttach() {
     }

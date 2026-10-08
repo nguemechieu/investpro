@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.ui.panels.MarketWatchCsvTest
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.109 s -- in org.investpro.ui.panels.MarketWatchCsvTest

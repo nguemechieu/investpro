@@ -276,7 +276,7 @@ public class SettingsPanel extends StackPane {
         grid.add(streamingModeDescriptionLabel, 0, 2, 2, 1);
         grid.add(new Separator(), 0, 3, 2, 1);
         grid.add(streamControlBox, 0, 4, 2, 1);
-        addRow(grid, 5, "Status:", streamingStatusLabel);
+        addRow(grid, streamingStatusLabel);
 
         return new VBox(8, sectionTitle, grid);
     }
@@ -650,7 +650,7 @@ public class SettingsPanel extends StackPane {
                 () -> {
                     updateStreamingStatusUI(systemCore.isStreaming());
                     if (systemCore.getSelectedTradePair() == null) {
-                        setStatusWarning("Streaming mode set, but no trading pair is selected");
+                        setStatusWarning();
                         showAlert(Alert.AlertType.INFORMATION, t("common.info"),
                                 "Please select a trading symbol first.\nStreaming mode set to " + finalMode.name());
                     } else {
@@ -992,11 +992,11 @@ public class SettingsPanel extends StackPane {
         grid.add(control, 1, row);
     }
 
-    private void addRow(@NonNull GridPane grid, int row, String label, Label valueLabel) {
-        Label labelNode = new Label(label);
+    private void addRow(@NonNull GridPane grid, Label valueLabel) {
+        Label labelNode = new Label("Status:");
         labelNode.setStyle("-fx-text-fill: " + COLOR_MUTED + ";");
-        grid.add(labelNode, 0, row);
-        grid.add(valueLabel, 1, row);
+        grid.add(labelNode, 0, 5);
+        grid.add(valueLabel, 1, 5);
     }
 
     private Label sectionTitle(String text, String color) {
@@ -1064,8 +1064,8 @@ public class SettingsPanel extends StackPane {
         setStatus(text, COLOR_ERROR);
     }
 
-    private void setStatusWarning(String text) {
-        setStatus(text, COLOR_WARNING);
+    private void setStatusWarning() {
+        setStatus("Streaming mode set, but no trading pair is selected", COLOR_WARNING);
     }
 
     private void setStatusNeutral(String text) {

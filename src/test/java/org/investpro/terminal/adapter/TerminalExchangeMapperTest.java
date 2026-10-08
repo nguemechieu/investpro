@@ -4,18 +4,13 @@ import org.investpro.data.CandleData;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.TradePair;
-import org.investpro.terminal.domain.Candle;
-import org.investpro.terminal.domain.InstrumentId;
-import org.investpro.terminal.domain.MarketTick;
-import org.investpro.terminal.domain.OrderBookSnapshot;
+import org.investpro.terminal.domain.*;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class TerminalExchangeMapperTest {
 
@@ -73,7 +68,6 @@ class TerminalExchangeMapperTest {
         assertEquals(
                 org.investpro.terminal.domain.AssetClass.FOREX,
                 TerminalExchangeMapper.inferAssetClass("EUR", "USD", "oanda"));
-        assertFalse(TerminalExchangeMapper.inferAssetClass("AAPL", "USD", "alpaca")
-                == org.investpro.terminal.domain.AssetClass.UNKNOWN);
+        assertNotSame(TerminalExchangeMapper.inferAssetClass("AAPL", "USD", "alpaca"), AssetClass.UNKNOWN);
     }
 }

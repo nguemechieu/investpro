@@ -52,6 +52,10 @@ public class SymbolAgentState {
 
     private long lastUpdated;
 
+    /** Feed coverage issue, separate from strategy readiness. Null after receiving a tick. */
+    @Nullable
+    private String marketDataStatus;
+
     // Live market data (updated from MARKET_TICK events)
     private double bidPrice;
     private double askPrice;

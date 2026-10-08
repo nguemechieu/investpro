@@ -31,7 +31,6 @@ import java.awt.Desktop;
 import java.net.URI;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
-import java.util.stream.Collectors;
 
 @Slf4j
 public class NewsPanel extends BorderPane {
@@ -156,9 +155,9 @@ public class NewsPanel extends BorderPane {
         detailSummary.setWrapText(true);
         detailSummary.setPrefWidth(340);
 
-        Button openLink = new Button("Open Link");
+        Button openLink ,markImportant;openLink= new Button("Open Link");
         openLink.setOnAction(event -> openSelectedLink());
-        Button markImportant = new Button("Mark Important");
+         markImportant = new Button("Mark Important");
         markImportant.setOnAction(event -> {
             if (selectedItem != null) {
                 newsService.repository().markImportant(selectedItem.id(), true);
@@ -195,7 +194,7 @@ public class NewsPanel extends BorderPane {
                 .filter(name -> name != null && !name.isBlank())
                 .distinct()
                 .sorted()
-                .collect(Collectors.toList()));
+                .toList());
         sourceFilter.setValue("All Sources");
         applyFilters();
     }

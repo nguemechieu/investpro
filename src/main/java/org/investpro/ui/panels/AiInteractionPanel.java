@@ -123,7 +123,21 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
     private Label message(String author, String text) {
         Label heading = new Label(author); heading.setStyle("-fx-font-weight: bold;");
         Label body = new Label(text); body.setWrapText(true); body.setMaxWidth(Double.MAX_VALUE);
-        VBox card = new VBox(7, heading, body); card.setPadding(new Insets(14));
+        Runnable copyText = () -> {
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(body.getText());
+            javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+        };
+        Button copy = new Button("Copy text");
+        copy.setAccessibleText("Copy " + author + " message");
+        copy.setOnAction(_ -> copyText.run());
+        MenuItem copyItem = new MenuItem("Copy text");
+        copyItem.setOnAction(_ -> copyText.run());
+        body.setContextMenu(new ContextMenu(copyItem));
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox messageHeader = new HBox(8, heading, spacer, copy);
+        VBox card = new VBox(7, messageHeader, body); card.setPadding(new Insets(14));
         card.setStyle("-fx-border-color: -fx-box-border; -fx-border-radius: 8; -fx-background-radius: 8;");
         messages.getChildren().add(card); return body;
     }

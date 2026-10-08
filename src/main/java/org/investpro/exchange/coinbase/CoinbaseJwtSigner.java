@@ -42,7 +42,7 @@ import java.util.*;
  * - sub: API key name
  * - nbf: now epoch seconds
  * - exp: now + 120 seconds
- * - uri: METHOD api.coinbase.com/path?query
+ * - uri: METHOD api.coinbase.com/path (query parameters are excluded)
  * <p>
  * WebSocket JWT format:
  * - same signing format, but no uri claim.
@@ -111,10 +111,6 @@ public record CoinbaseJwtSigner(String keyName, String privateKeyPem, PrivateKey
         URI uri = URI.create(fullUrl);
         String host = uri.getHost();
         String path = uri.getRawPath();
-
-        if (uri.getRawQuery() != null && !uri.getRawQuery().isBlank()) {
-            path += "?%s".formatted(uri.getRawQuery());
-        }
 
         return buildRestJwt(method, host, path);
     }
@@ -346,10 +342,12 @@ public record CoinbaseJwtSigner(String keyName, String privateKeyPem, PrivateKey
             URI uri = URI.create(value);
             value = uri.getRawPath();
 
-            if (uri.getRawQuery() != null && !uri.getRawQuery().isBlank()) {
-                value += "?" + uri.getRawQuery();
-            }
         }
+
+        int queryIndex = value.indexOf('?');
+        if (queryIndex >= 0) value = value.substring(0, queryIndex);
+        int fragmentIndex = value.indexOf('#');
+        if (fragmentIndex >= 0) value = value.substring(0, fragmentIndex);
 
         if (!value.startsWith("/")) {
             value = "/" + value;

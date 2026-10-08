@@ -86,8 +86,8 @@ public class AnalysisPanel extends VBox{
 
     private boolean showingLiveMetrics = false;
     private boolean wasBotRunning = false;
-    private String currentLiveStrategy = null;
-    private String currentLiveSymbol = null;
+    private String currentLiveStrategy = "N/A";
+    private String currentLiveSymbol = "XXX_XXX";
 
     private ComboBox<String> strategyCombo;
     private ComboBox<String> pairCombo;
