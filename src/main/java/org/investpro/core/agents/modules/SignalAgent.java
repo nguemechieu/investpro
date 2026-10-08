@@ -41,11 +41,16 @@ public class SignalAgent implements Agent {
     private final StrategyDecisionService decisionService;
     private final Map<String, List<CandleData>> candleHistory = new ConcurrentHashMap<>();
     private final Map<String, org.investpro.models.trading.Ticker> quotes = new ConcurrentHashMap<>();
+    private final Map<String, Integer> publishedBars = new ConcurrentHashMap<>();
     private static final int MAX_CANDLES_PER_CONTEXT = 500;
     private static final int MIN_SEEDED_CANDLES = 120;
 
     public SignalAgent() {
-        this.decisionService = new StrategyDecisionService();
+        this(new StrategyDecisionService());
+    }
+
+    SignalAgent(StrategyDecisionService decisionService) {
+        this.decisionService = java.util.Objects.requireNonNull(decisionService);
     }
 
     @Override
@@ -77,6 +82,7 @@ public class SignalAgent implements Agent {
         this.context = null;
         this.eventBus = null;
         quotes.clear();
+        publishedBars.clear();
 
         log.info("SignalAgent stopped");
     }
@@ -126,7 +132,8 @@ public class SignalAgent implements Agent {
             CandleData latest = candles.get(candles.size() - 1);
             Double current = number(metadata.get("current"), latest.closePrice());
             org.investpro.models.trading.Ticker quote = quotes.get(symbol);
-            if (quote == null || System.currentTimeMillis() - quote.getTimestamp() > 30_000
+            if (quote == null || quote.getQuoteType() != org.investpro.models.trading.Ticker.QuoteType.LIVE
+                    || System.currentTimeMillis() - quote.getTimestamp() > 30_000
                     || quote.getTimestamp() > System.currentTimeMillis() + 1_000
                     || !(quote.getBidPrice() > 0) || !(quote.getAskPrice() > quote.getBidPrice())) {
                 log.debug("Signal skipped for {}: fresh bid/ask quote unavailable", symbol);
@@ -168,7 +175,21 @@ public class SignalAgent implements Agent {
                     .metadata("bid", bid).metadata("ask", ask)
                     .metadata("quote_timestamp", quote.getTimestamp())
                     .metadata("volatility", volatility).build();
-            publishSignal(signal, result);
+            String publicationKey = symbol + "_" + timeframe + "_" + (result.getAssignment() == null
+                    ? signal.getStrategyId() : result.getAssignment().getAssignmentId());
+            var publish = new java.util.concurrent.atomic.AtomicBoolean(false);
+            publishedBars.compute(publicationKey, (_, previous) -> {
+                if (previous == null || latest.openTime() > previous) {
+                    publish.set(true);
+                    return latest.openTime();
+                }
+                return previous;
+            });
+            if (!publish.get()) return;
+            if (!publishSignal(signal, result, tradePair)) {
+                publishedBars.remove(publicationKey, latest.openTime());
+                return;
+            }
 
             log.info("Strategy signal: {} {} at {} (confidence: {}, strategy: {})",
                     signal.getSide(), symbol, timeframe,
@@ -195,10 +216,10 @@ public class SignalAgent implements Agent {
     /**
      * Publish strategy signal to the event bus.
      */
-    private void publishSignal(@NotNull StrategySignal signal, @NotNull StrategyDecisionResult result) {
+    private boolean publishSignal(@NotNull StrategySignal signal, @NotNull StrategyDecisionResult result, TradePair pair) {
         if (eventBus == null) {
             log.warn("Event bus not available for publishing signal");
-            return;
+            return false;
         }
 
         try {
@@ -220,10 +241,6 @@ public class SignalAgent implements Agent {
                 metadata.put("trade_allowed", false);
                 metadata.put("block_reason", "Paper trading validation required before live execution");
             }
-            TradePair pair = context == null || context.getExchange() == null ? null
-                    : context.getExchange().getTradePairSymbol().stream()
-                    .filter(candidate -> candidate.toString('/').equalsIgnoreCase(signal.getSymbol()))
-                    .findFirst().orElse(null);
             if (pair != null) {
                 metadata.put("tradePairObject", pair);
                 metadata.put("tradePair", pair);
@@ -241,9 +258,11 @@ public class SignalAgent implements Agent {
             log.debug("Signal published: {} {} (confidence: {})",
                     signal.getSide(), signal.getSymbol(),
                     String.format("%.2f", signal.getConfidence()));
+            return true;
 
         } catch (Exception e) {
             log.error("Failed to publish signal event", e);
+            return false;
         }
     }
 
@@ -365,7 +384,10 @@ public class SignalAgent implements Agent {
                 return currentCandles;
             }
 
-            List<CandleData> merged = new ArrayList<>(seeded);
+            int latestRequestedBar = currentCandles.isEmpty() ? Integer.MAX_VALUE
+                    : currentCandles.getLast().openTime();
+            List<CandleData> merged = new ArrayList<>(seeded.stream().filter(java.util.Objects::nonNull)
+                    .filter(candle -> candle.openTime() <= latestRequestedBar).toList());
             merged.addAll(currentCandles);
             List<CandleData> sorted = merged.stream()
                     .filter(java.util.Objects::nonNull)

@@ -2559,7 +2559,7 @@ public class Oanda extends Exchange {
             }
 
             if (subscription.isCandles()) {
-                streamCandles(pair, 60, consumer);
+                streamCandles(pair, subscription.getSecondsPerCandle(), consumer);
             }
         }
 
@@ -2602,7 +2602,7 @@ public class Oanda extends Exchange {
                 stopTradesStream(pair);
             }
             if (subscription.isCandles()) {
-                stopCandlesStream(pair, 60);
+                stopCandlesStream(pair, subscription.getSecondsPerCandle());
             }
         }
 

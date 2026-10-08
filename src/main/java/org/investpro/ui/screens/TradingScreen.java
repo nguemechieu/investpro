@@ -26,11 +26,18 @@ public class TradingScreen implements Screen {
     public TradingScreen(MarketConfiguration configuration, TradeRepository tradeRepository,
                          OrderRepository orderRepository, CurrencyRepository currencyRepository,
                          org.investpro.ai.AssistantRuntime assistantRuntime) {
+        this(configuration, tradeRepository, orderRepository, currencyRepository, assistantRuntime, null);
+    }
+
+    public TradingScreen(MarketConfiguration configuration, TradeRepository tradeRepository,
+                         OrderRepository orderRepository, CurrencyRepository currencyRepository,
+                         org.investpro.ai.AssistantRuntime assistantRuntime,
+                         org.investpro.exchange.Exchange authenticatedExchange) {
         this.tradingDesk = new TradingDesk(
                 Objects.requireNonNull(configuration, "configuration must not be null"),
                 Objects.requireNonNull(tradeRepository, "tradeRepository must not be null"),
                 Objects.requireNonNull(orderRepository, "orderRepository must not be null"),
-                Objects.requireNonNull(currencyRepository, "currencyRepository must not be null"), assistantRuntime);
+                Objects.requireNonNull(currencyRepository, "currencyRepository must not be null"), assistantRuntime, authenticatedExchange);
         this.view = tradingDesk.getView();
     }
 

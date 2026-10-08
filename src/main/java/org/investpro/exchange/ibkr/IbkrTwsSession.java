@@ -27,6 +27,7 @@ public class IbkrTwsSession {
     private final ConcurrentHashMap<Integer, double[]> quotes = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Integer> quoteIds = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, CompletableFuture<Ticker>> quoteWaiters = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, Integer> quoteTypes = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Map<String, Double>> summaries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, List<org.investpro.data.CandleData>> bars = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, CompletableFuture<List<org.investpro.data.CandleData>>> histories = new ConcurrentHashMap<>();
@@ -153,6 +154,7 @@ public class IbkrTwsSession {
         quotes.clear();
         quoteIds.clear();
         quoteWaiters.clear();
+        quoteTypes.clear();
         summaries.clear();
         snapshot = null;
     }
@@ -197,15 +199,19 @@ public class IbkrTwsSession {
             int request = requestIds.incrementAndGet();
             quotes.put(request, new double[4]);
             quoteWaiters.put(request, new CompletableFuture<>());
+            // TWS automatically supplies live data when entitled, otherwise delayed data.
+            quoteTypes.put(request, 3);
+            call(current, "reqMarketDataType", 3);
             call(current, "reqMktData", request, contract(contract), "", false, false, List.of());
             return request;
         });
         double[] prices = quotes.get(id);
         synchronized (prices) {
-            Ticker available = ticker(prices);
+            Ticker available = ticker(id, prices);
             if (available != null) return CompletableFuture.completedFuture(available);
         }
-        return quoteWaiters.get(id).orTimeout(12, TimeUnit.SECONDS);
+        // A caller timing out must not permanently poison the streaming subscription.
+        return quoteWaiters.get(id).thenApply(ticker -> ticker).orTimeout(12, TimeUnit.SECONDS);
     }
 
     public CompletableFuture<String> submit(IbkrResolvedContract contract, Side side, double quantity,
@@ -396,17 +402,20 @@ public class IbkrTwsSession {
                         }
                     }
                 }
+                case "marketDataType" -> updateQuoteType((Integer) args[0], (Integer) args[1]);
                 case "tickPrice" -> {
                     int id = (Integer) args[0], field = (Integer) args[1];
                     double price = (Double) args[2];
                     double[] prices = quotes.get(id);
                     if (prices != null && price > 0 && Double.isFinite(price)) synchronized (prices) {
+                        if (field == 66 || field == 67 || field == 68)
+                            quoteTypes.compute(id, (_, type) -> type != null && type == 4 ? 4 : 3);
                         if (field == 1 || field == 66) prices[0] = price;
                         if (field == 2 || field == 67) prices[1] = price;
                         if (field == 4 || field == 68) prices[2] = price;
                         if (field == 1 || field == 2 || field == 4 || field == 66 || field == 67 || field == 68)
                             prices[3] = System.currentTimeMillis();
-                        Ticker ticker = ticker(prices);
+                        Ticker ticker = ticker(id, prices);
                         if (ticker != null) quoteWaiters.get(id).complete(ticker);
                     }
                 }
@@ -447,17 +456,27 @@ public class IbkrTwsSession {
                 quotes.clear();
                 quoteIds.clear();
                 quoteWaiters.clear();
+                quoteTypes.clear();
             }
             apiAvailable = orderIds.get() >= 0 && !accounts.isEmpty();
             failure = message;
         }
         if (code >= 2100 && code <= 2199) return;
+        if (code == 10089 && quoteWaiters.containsKey(id)
+                && String.valueOf(args[codeIndex + 1]).toLowerCase(java.util.Locale.ROOT)
+                .contains("delayed market data is available")) {
+            updateQuoteType(id, 3);
+            return; // Keep waiting for the delayed ticks requested by reqMarketDataType(3).
+        }
         CompletableFuture<String> order = pendingOrders.get(id);
         if (order != null) order.completeExceptionally(new IllegalStateException(message));
         CompletableFuture<Ticker> quote = quoteWaiters.get(id);
-        if (quote != null) quote.completeExceptionally(new IllegalStateException(message));
+        String reason = String.valueOf(args[codeIndex + 1]);
+        IllegalStateException dataError = IbkrMarketDataException.isSubscriptionError(code, reason)
+                ? new IbkrMarketDataException(code, reason) : new IllegalStateException(message);
+        if (quote != null) quote.completeExceptionally(dataError);
         CompletableFuture<List<org.investpro.data.CandleData>> history = histories.get(id);
-        if (history != null) history.completeExceptionally(new IllegalStateException(message));
+        if (history != null) history.completeExceptionally(dataError);
         if (id == summaryRequest && summaryFuture != null) summaryFuture.completeExceptionally(new IllegalStateException(message));
     }
 
@@ -506,9 +525,30 @@ public class IbkrTwsSession {
         if (openOrderFuture != null) openOrderFuture.completeExceptionally(error);
     }
 
-    private static Ticker ticker(double[] prices) {
+    private void updateQuoteType(int id, int type) {
+        double[] prices = quotes.get(id);
+        if (prices == null) return;
+        synchronized (prices) {
+            Integer previous = quoteTypes.put(id, type);
+            if (previous != null && previous != type) {
+                Arrays.fill(prices, 0);
+                quoteWaiters.compute(id, (_, waiter) -> waiter == null || waiter.isDone()
+                        ? new CompletableFuture<>() : waiter);
+            }
+        }
+    }
+
+    private Ticker ticker(int id, double[] prices) {
         double mid = prices[2] > 0 ? prices[2] : prices[0] > 0 && prices[1] > 0 ? (prices[0] + prices[1]) / 2 : 0;
-        return mid > 0 ? new Ticker(mid, prices[0], prices[1], mid, mid, mid, 0, (long) prices[3]) : null;
+        if (mid <= 0) return null;
+        Ticker ticker = new Ticker(mid, prices[0], prices[1], mid, mid, mid, 0, (long) prices[3]);
+        ticker.setQuoteType(switch (quoteTypes.getOrDefault(id, 1)) {
+            case 2 -> Ticker.QuoteType.FROZEN;
+            case 3 -> Ticker.QuoteType.DELAYED;
+            case 4 -> Ticker.QuoteType.DELAYED_FROZEN;
+            default -> Ticker.QuoteType.LIVE;
+        });
+        return ticker;
     }
 
     public static Object call(Object target, String name, Object... args) {

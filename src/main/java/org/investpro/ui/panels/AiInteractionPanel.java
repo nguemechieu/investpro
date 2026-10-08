@@ -29,6 +29,7 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         Thread thread = new Thread(r, "AssistantReplyPlayback"); thread.setDaemon(true); return thread;
     });
     private volatile long speechRequest;
+    private java.util.concurrent.Future<?> speechTask;
     private final org.investpro.ai.AssistantVoice voice;
     private final Button microphone = new Button("Speak");
     private final CheckBox speakReplies = new CheckBox("Read replies aloud");
@@ -53,7 +54,7 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         progress.setPrefSize(18, 18); progress.setVisible(false); progress.setManaged(false);
         HBox state = new HBox(10, progress, status);
         FlowPane prompts = new FlowPane(8, 8);
-        for (String prompt : new String[]{"Compare spot and perpetual futures", "How do fees affect profitability?", "Explain my account balance", "Help assess my portfolio risk"}) {
+        for (String prompt : new String[]{"Analyze my selected market using recent candles and quotes", "Summarize recent news for Charles Schwab (SCHW) with sources and dates", "Show connected venues and account balances", "Assess my positions and open-order risk", "Pause my trading bot"}) {
             Button suggestion = new Button(prompt);
             suggestion.setOnAction(_ -> { question.setText(prompt); question.requestFocus(); });
             prompts.getChildren().add(suggestion);
@@ -71,10 +72,10 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
             if (event.isControlDown() && event.getCode() == KeyCode.ENTER) { submit(); event.consume(); }
         });
         send.setOnAction(_ -> submit());
-        clear.setOnAction(_ -> { assistant.reset(conversation); voice.stopSpeaking(); clearScreenshot(); lastReply = ""; replay.setDisable(true); messages.getChildren().clear(); welcome(); });
+        clear.setOnAction(_ -> { assistant.reset(conversation); cancelSpeech(); clearScreenshot(); lastReply = ""; replay.setDisable(true); messages.getChildren().clear(); welcome(); });
         microphone.setOnAction(_ -> toggleRecording());
         replay.setDisable(true); replay.setOnAction(_ -> speak(lastReply));
-        Button stopAudio = new Button("Stop audio"); stopAudio.setOnAction(_ -> { speechRequest++; voice.stopSpeaking(); status.setText("Audio stopped."); });
+        Button stopAudio = new Button("Stop audio"); stopAudio.setOnAction(_ -> { cancelSpeech(); status.setText("Audio stopped."); });
         Button capture = new Button("Take screenshot");
         capture.setOnAction(_ -> {
             capture.setDisable(true); status.setText("Capturing InvestPro…");
@@ -117,7 +118,9 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
     }
 
     private void welcome() {
-        message("InvestPro", "What would you like to understand? Ask about market opportunities, costs, risk or your account. For current market analysis, supply the symbol and data you want assessed.");
+        message("InvestPro", "Ask me to inspect connected venues, quotes, recent candles, order books, balances, positions, orders and strategies. "
+                + "I can prepare trades and operate bot controls on your selected exchange. Trades require your /confirm CODE. "
+                + "Tell me the venue and symbol for market analysis; I will retrieve available app data.");
     }
 
     private Label message(String author, String text) {
@@ -148,6 +151,7 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         if (prompt.isBlank() && png != null) prompt = "Explain what is visible in this InvestPro screenshot.";
         if (closed || send.isDisabled() || prompt.isBlank()) return;
         if (prompt.length() > 6000) { status.setText("Please shorten your question to 6000 characters."); return; }
+        cancelSpeech();
         message("You", prompt); question.clear();
         Label reply = message("InvestPro", "Connecting…");
         send.setDisable(true); clear.setDisable(true);
@@ -179,7 +183,7 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
     private void toggleRecording() {
         if (!recording) {
             if (!assistant.isConfigured()) { status.setText("Configure OpenAI before using speech."); return; }
-            try { voice.stopSpeaking(); voice.startRecording(); recording = true; microphone.setText("Finish recording"); status.setText("Listening (up to 60 seconds)…"); }
+            try { cancelSpeech(); voice.startRecording(); recording = true; microphone.setText("Finish recording"); status.setText("Listening (up to 60 seconds)…"); }
             catch (Exception error) { status.setText("Microphone unavailable. Check your audio device and microphone permissions."); }
         } else {
             recording = false; microphone.setDisable(true); microphone.setText("Speak"); status.setText("Transcribing…");
@@ -192,11 +196,14 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
     }
     private void speak(String text) {
         if (text.isBlank()) return;
-        long request = ++speechRequest;
-        voice.stopSpeaking(); status.setText("Preparing spoken reply…");
-        speechWorker.execute(() -> {
+        cancelSpeech();
+        long request = speechRequest;
+        status.setText("Preparing spoken reply…");
+        speechTask = speechWorker.submit(() -> {
             try {
-                if (!closed && request == speechRequest) voice.speak(text);
+                if (!closed && request == speechRequest) voice.speak(text, () -> Platform.runLater(() -> {
+                    if (!closed && request == speechRequest) status.setText("Reading reply aloud…");
+                }));
                 Platform.runLater(() -> { if (!closed && request == speechRequest) status.setText("Spoken reply finished."); });
             } catch (Exception error) {
                 String reason = error instanceof javax.sound.sampled.LineUnavailableException || error instanceof IllegalArgumentException
@@ -208,7 +215,12 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         });
     }
     public void stopAudio() {
-        speechRequest++; voice.stopRecording(); voice.stopSpeaking(); recording = false; microphone.setText("Speak");
+        cancelSpeech(); voice.stopRecording(); recording = false; microphone.setText("Speak");
+    }
+    private void cancelSpeech() {
+        speechRequest++;
+        if (speechTask != null) { speechTask.cancel(true); speechTask = null; }
+        voice.stopSpeaking();
     }
     private void clearScreenshot() {
         attachedScreenshot = null; screenshotPreview.setImage(null); screenshotPreview.setVisible(false);

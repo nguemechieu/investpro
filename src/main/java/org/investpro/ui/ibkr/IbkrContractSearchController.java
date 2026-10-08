@@ -36,27 +36,41 @@ public final class IbkrContractSearchController {
     }
 
     public void searchAndResolve(String query) {
+        searchAndResolve(query, this::addResolvedContract);
+    }
+
+    public void searchAndResolve(String query, Consumer<IbkrResolvedContract> onResolved) {
         if (ibkrExchange == null) {
             showError("IBKR session is not connected.");
             return;
         }
 
-        ibkrExchange.searchContracts(query)
-                .thenCompose(candidates -> selectCandidate(candidates)
-                        .map(ibkrExchange::resolveContract)
-                        .orElseGet(() -> CompletableFuture.failedFuture(
-                                new IllegalStateException("Contract is ambiguous."))))
-                .thenAccept(contract -> Platform.runLater(() -> addResolvedContract(contract)))
+        CompletableFuture.supplyAsync(() -> ibkrExchange.searchContracts(query))
+                .thenCompose(future -> future)
+                .thenCompose(candidates -> {
+                    if (candidates == null || candidates.isEmpty()) {
+                        return CompletableFuture.failedFuture(new IllegalStateException("No matching IBKR contract found for " + query + "."));
+                    }
+                    return selectCandidate(candidates).thenCompose(selected -> selected
+                            .map(ibkrExchange::resolveContract)
+                            .orElseGet(() -> CompletableFuture.completedFuture(null)));
+                })
+                .thenAccept(contract -> {
+                    if (contract != null) Platform.runLater(() -> onResolved.accept(contract));
+                })
                 .exceptionally(error -> {
                     Platform.runLater(() -> showError(cleanMessage(error)));
                     return null;
                 });
     }
 
-    private Optional<IbkrContractCandidate> selectCandidate(List<IbkrContractCandidate> candidates) {
+    private CompletableFuture<Optional<IbkrContractCandidate>> selectCandidate(List<IbkrContractCandidate> candidates) {
         CompletableFuture<Optional<IbkrContractCandidate>> selected = new CompletableFuture<>();
-        Platform.runLater(() -> selected.complete(IbkrContractSelectionDialog.show(candidates)));
-        return selected.join();
+        Platform.runLater(() -> {
+            try { selected.complete(IbkrContractSelectionDialog.show(candidates)); }
+            catch (RuntimeException error) { selected.completeExceptionally(error); }
+        });
+        return selected;
     }
 
     private void addResolvedContract(IbkrResolvedContract contract) {

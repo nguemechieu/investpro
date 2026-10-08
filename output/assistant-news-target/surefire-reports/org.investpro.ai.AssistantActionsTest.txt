@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.ai.AssistantActionsTest
+-------------------------------------------------------------------------------
+Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.317 s -- in org.investpro.ai.AssistantActionsTest

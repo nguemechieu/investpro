@@ -75,6 +75,10 @@ public class TelegramNotifier {
     private final Set<String> allowedUsers = ConcurrentHashMap.newKeySet();
     private final Set<String> allowedChats = ConcurrentHashMap.newKeySet();
     private volatile Function<String, String> questionContext = question -> "";
+    private volatile java.util.function.Supplier<java.util.function.BiFunction<String, String, String>> assistantCommandExecutorFactory;
+    public void setAssistantCommandExecutorFactory(java.util.function.Supplier<java.util.function.BiFunction<String, String, String>> factory) {
+        assistantCommandExecutorFactory = factory;
+    }
     private final Set<String> pendingConversations = ConcurrentHashMap.newKeySet();
     private final ThreadPoolExecutor questionWorkers = new ThreadPoolExecutor(4, 4, 0, TimeUnit.SECONDS,
             new ArrayBlockingQueue<>(32), r -> {
@@ -816,7 +820,8 @@ public class TelegramNotifier {
         String response = "screenshot".equals(command) || "chart".equals(command)
                 ? screenshotForChat(message.chatId, message.text)
                 : message.text.startsWith("/")
-                ? handler == null ? assistantCommand(key, message.text) : handler.handleCommand(message.text, key)
+                ? assistantCommandExecutorFactory != null ? askAI(key, message.text)
+                    : handler == null ? assistantCommand(key, message.text) : handler.handleCommand(message.text, key)
                 : askAI(key, message.text);
         if (response != null && !response.isBlank()) sendMessageToChat(message.chatId, response);
         context.lastProcessedUpdate = message.timestamp;
@@ -867,12 +872,13 @@ public class TelegramNotifier {
     public String askAI(String user, String prompt) { return askAI(user, prompt, null); }
     public String askAI(String user, String prompt, java.util.function.Consumer<String> onDelta) {
         TelegramCommandHandler handler = commandHandler;
-        if (prompt.startsWith("/") && handler != null) return handler.handleCommand(prompt, user);
-        assistantService.setCommandExecutor(handler == null ? null : (who, command) -> {
+        var factory = assistantCommandExecutorFactory;
+        java.util.function.BiFunction<String, String, String> executor = factory != null ? factory.get() : handler == null ? null : (who, command) -> {
             if (commandHandler != handler) return "Selected trading session changed. Request the action again.";
             return handler.handleCommand(command, who);
-        });
-        return assistantService.askAI(user, questionContext.apply(prompt) + prompt, onDelta);
+        };
+        if (prompt.startsWith("/") && executor != null) return executor.apply(user, prompt);
+        return assistantService.askAI(user, questionContext.apply(prompt) + prompt, null, onDelta, executor);
     }
     private String assistantCommand(String user, String text) {
         String[] parts = text.substring(1).trim().split("\\s+", 2);

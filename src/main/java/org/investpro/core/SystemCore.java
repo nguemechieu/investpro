@@ -1257,7 +1257,8 @@ public class SystemCore {
                                 "tradePair", tradePairText(tradePair),
                                 "tradePairObject", tradePair,
                                 "symbol", tradePairText(tradePair),
-                                "timeframe", "1h",
+                                "timeframe", org.investpro.enums.timeframe.Timeframe.fromSeconds(
+                                        activeSubscription == null ? 3600 : activeSubscription.getSecondsPerCandle()).getCode(),
                                 "current", candleData == null ? 0.0 : candleData.closePrice(),
                                 "volume", candleData == null ? 0.0 : candleData.volume())));
             }

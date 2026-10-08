@@ -16,6 +16,10 @@ public class OnboardingScreen implements Screen {
         this.view = new OnboardingDesk(Objects.requireNonNull(onReady, "onReady must not be null"));
     }
 
+    public OnboardingScreen(java.util.function.BiConsumer<MarketConfiguration, org.investpro.exchange.Exchange> onReady) {
+        this.view = new OnboardingDesk(Objects.requireNonNull(onReady, "onReady must not be null"));
+    }
+
     @Override
     public Parent getView() {
         return view;

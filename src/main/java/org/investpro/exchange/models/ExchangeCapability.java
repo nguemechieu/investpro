@@ -243,15 +243,6 @@ public class ExchangeCapability {
     }
 
     /**
-     * Safe getter for supported order types.
-     */
-    public Set<String> getSupportedOrderTypes() {
-        return supportedOrderTypes == null
-                ? Collections.emptySet()
-                : Collections.unmodifiableSet(supportedOrderTypes);
-    }
-
-    /**
      * Safe getter for supported market types.
      */
     public Set<String> getSupportedMarketTypes() {
@@ -260,50 +251,4 @@ public class ExchangeCapability {
                 : Collections.unmodifiableSet(supportedMarketTypes);
     }
 
-    /**
-     * Useful for UI display.
-     */
-    public boolean hasAnyStreamingSupport() {
-        return supportsWebSocketStreaming
-                || supportsNativeWebSocket
-                || supportsHttpStreaming
-                || supportsTickerStreaming
-                || supportsOrderBookStreaming
-                || supportsTradeStreaming
-                || supportsCandleStreaming
-                || supportsAccountStreaming
-                || supportsOrderStreaming
-                || supportsFillStreaming
-                || supportsPositionStreaming
-                || supportsBalanceStreaming;
-    }
-
-    /**
-     * Useful for execution engine checks.
-     */
-    public boolean hasAnyTradingSupport() {
-        return supportsLiveTrading
-                || supportsPaperTradingMode
-                || supportsMarketOrders
-                || supportsLimitOrders
-                || supportsStopOrders
-                || supportsBracketOrders;
-    }
-
-    /**
-     * Useful for market selector UI.
-     */
-    public boolean hasAnyMarketSupport() {
-        return supportsSpot
-                || supportsForex
-                || supportsCrypto
-                || supportsEquities
-                || supportsStocks
-                || supportsDerivatives
-                || supportsFutures
-                || supportsPerpetuals
-                || supportsOptions
-                || supportsIndices
-                || supportsCommodities;
-    }
 }

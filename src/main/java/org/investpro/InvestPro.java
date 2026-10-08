@@ -184,7 +184,7 @@ public class InvestPro extends Application {
         primaryStage.setTitle(buildWindowTitle("Onboarding"));
     }
 
-    private void showTradingTerminal(MarketConfiguration configuration) {
+    private void showTradingTerminal(MarketConfiguration configuration, org.investpro.exchange.Exchange authenticatedExchange) {
         Objects.requireNonNull(configuration, "configuration must not be null");
 
         if (!openingTradingTerminal.compareAndSet(false, true)) {
@@ -204,7 +204,7 @@ public class InvestPro extends Application {
                     configuration,
                     tradeRepository,
                     orderRepository,
-                    currencyRepository, assistantRuntime);
+                    currencyRepository, assistantRuntime, authenticatedExchange);
             screenManager.show(tradingScreen);
 
             primaryStage.setTitle(buildWindowTitle("Trading Desk"));

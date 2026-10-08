@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.ui.tools.MoneyAxisFormatterTest
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.836 s -- in org.investpro.ui.tools.MoneyAxisFormatterTest

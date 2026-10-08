@@ -1647,7 +1647,7 @@ public class AnalysisPanel extends VBox{
                     true);
         }
 
-        private Object findAnalysisObject(String strategyName, String pairSymbol) {
+        private @org.jspecify.annotations.Nullable Object findAnalysisObject(String strategyName, String pairSymbol) {
             Object direct = firstNonNull(
                     () -> invoke(systemCore, "analyzeStrategy", strategyName, pairSymbol),
                     () -> invoke(systemCore, "getStrategyAnalysis", strategyName, pairSymbol),
@@ -1718,7 +1718,7 @@ public class AnalysisPanel extends VBox{
             return value.contains("_") ? value.replace("_", "/") : value;
         }
 
-        private Double compositeScore(Double... scores) {
+        private @org.jspecify.annotations.Nullable Double compositeScore(Double... scores) {
             List<Double> valid = new ArrayList<>();
             for (Double score : scores) {
                 if (isFinite(score)) {
@@ -2015,7 +2015,7 @@ public class AnalysisPanel extends VBox{
                         return value;
                     }
                 } catch (Exception ignored) {
-                    // Continue.
+
                 }
             }
             return null;

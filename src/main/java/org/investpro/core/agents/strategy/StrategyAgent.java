@@ -76,7 +76,8 @@ public class StrategyAgent implements Agent {
         metadata.put("side", signal.getSide());
         metadata.put("confidence", signal.getConfidence());
         metadata.put("strategy_name", signal.getStrategyName());
-        TradePair pair = parsePair(signal.getSymbol());
+        TradePair pair = metadata.get("tradePairObject") instanceof TradePair original
+                ? original : parsePair(signal.getSymbol());
         if (pair != null) {
             metadata.put("tradePairObject", pair);
             metadata.put("tradePair", pair);

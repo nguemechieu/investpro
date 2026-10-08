@@ -21,14 +21,16 @@ class AssistantActionsTest {
     }
     @Test void speechHttpFailureDoesNotAttemptAudioPlayback() throws Exception {
         HttpClient client = mock(HttpClient.class);
-        HttpResponse<byte[]> response = mock(HttpResponse.class);
+        HttpResponse<java.io.InputStream> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(403);
-        when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+        when(response.body()).thenReturn(new java.io.ByteArrayInputStream(new byte[0]));
+        when(client.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(response));
         try (var voice = new AssistantVoice(client, () -> "test")) {
             assertThrows(java.io.IOException.class, () -> voice.speak("Account response"));
         }
         var requests = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
-        verify(client).send(requests.capture(), any(HttpResponse.BodyHandler.class));
+        verify(client).sendAsync(requests.capture(), any(HttpResponse.BodyHandler.class));
         assertEquals("/v1/audio/speech", requests.getValue().uri().getPath());
     }
     @Test void modelCanPreviewButCannotConfirmOrRunMultipleActions() throws Exception {

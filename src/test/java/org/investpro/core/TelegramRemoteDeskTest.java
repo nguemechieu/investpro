@@ -13,6 +13,27 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class TelegramRemoteDeskTest {
+    @Test @SuppressWarnings("unchecked")
+    void sharedAgentCommandsAreAvailableWhileStoppedAndRemainAuthorized() throws Exception {
+        var bot = spy(new TelegramNotifier(""));
+        var config = new Properties(); config.setProperty("TELEGRAM_ALLOWED_USER_IDS", "123");
+        bot.configureRemoteAccess(config);
+        doNothing().when(bot).sendChatAction(anyString(), any());
+        doNothing().when(bot).sendMessageToChat(anyString(), anyString());
+        java.util.function.BiFunction<String, String, String> executor = mock(java.util.function.BiFunction.class);
+        when(executor.apply("900:123", "/venues")).thenReturn("Connected venue snapshot");
+        bot.setAssistantCommandExecutorFactory(() -> executor);
+        try {
+            bot.processUpdates(new ObjectMapper().readTree("""
+                    {"ok":true,"result":[
+                    {"update_id":1,"message":{"from":{"id":123},"chat":{"id":900,"type":"private"},"text":"/venues"}},
+                    {"update_id":2,"message":{"from":{"id":456},"chat":{"id":901,"type":"private"},"text":"/venues"}}]}
+                    """));
+            verify(bot, timeout(5000)).sendMessageToChat("900", "Connected venue snapshot");
+            verify(executor, times(1)).apply("900:123", "/venues");
+            verify(executor, never()).apply("901:456", "/venues");
+        } finally { bot.close(); }
+    }
     @Test
     void repliesUseIncoming64BitChatIdInsteadOfConfiguredTargetOrSenderId() throws Exception {
         var bot = spy(new TelegramNotifier(""));

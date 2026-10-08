@@ -1034,6 +1034,23 @@ public class CandleStickChart extends Region {
                     if (disposed)
                         return;
                     if (throwable != null) {
+                        Throwable cause = throwable;
+                        while (cause.getCause() != null) cause = cause.getCause();
+                        if (cause instanceof org.investpro.exchange.ibkr.IbkrMarketDataException subscription) {
+                            log.warn("IBKR chart data unavailable for {}: {}", tradePair, subscription.getMessage());
+                            showErrorMessage("Market-data subscription required for " + tradePair + ". See subscription details.");
+                            runOnFx(() -> {
+                                if (disposed) return;
+                                javafx.scene.control.Alert notice = new javafx.scene.control.Alert(
+                                        javafx.scene.control.Alert.AlertType.INFORMATION);
+                                notice.setTitle("IBKR Market-Data Subscription Required");
+                                notice.setHeaderText("Chart data is unavailable for " + tradePair);
+                                notice.setContentText(subscription.getMessage());
+                                notice.getDialogPane().setPrefWidth(640);
+                                notice.show();
+                            });
+                            return;
+                        }
                         log.error("Error loading chart data for {}", tradePair, throwable);
                         showErrorMessage("Failed to load chart data: " + rootMessage(throwable));
                     }

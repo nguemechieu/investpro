@@ -54,12 +54,13 @@ public class UiCredentialProvider implements CredentialProvider {
 
         switch (prefix) {
             case "coinbase" -> {
-                put("COINBASE_API_KEY", apiKey);
-                put("COINBASE_API_SECRET", apiSecret);
+                var normalized = org.investpro.exchange.coinbase.CoinbaseCredentialInput.normalize(apiKey, apiSecret);
+                put("COINBASE_API_KEY", normalized.keyName());
+                put("COINBASE_API_SECRET", normalized.privateKey());
 
                 // If user pastes Advanced Trade key name/private key into these fields.
-                put("COINBASE_KEY_NAME", apiKey);
-                put("COINBASE_PRIVATE_KEY", apiSecret);
+                put("COINBASE_KEY_NAME", normalized.keyName());
+                put("COINBASE_PRIVATE_KEY", normalized.privateKey());
             }
 
             case "binance" -> {

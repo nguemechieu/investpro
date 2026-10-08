@@ -339,7 +339,7 @@ public class Binance extends Exchange {
                 streamOrderBook(pair, consumer);
             }
             if (subscription.isCandles()) {
-                streamCandles(pair, 60, consumer);
+                streamCandles(pair, subscription.getSecondsPerCandle(), consumer);
             }
         }
 
@@ -379,7 +379,7 @@ public class Binance extends Exchange {
                 stopOrderBookStream(pair);
             }
             if (subscription.isCandles()) {
-                stopCandlesStream(pair, 60);
+                stopCandlesStream(pair, subscription.getSecondsPerCandle());
             }
         }
 

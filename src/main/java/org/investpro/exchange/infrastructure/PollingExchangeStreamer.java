@@ -34,6 +34,8 @@ public class PollingExchangeStreamer {
     private final Map<TradePair, ScheduledFuture<?>> tickerTasks = new ConcurrentHashMap<>();
     private final Map<TradePair, AtomicInteger> tickerCycles = new ConcurrentHashMap<>();
     private final Map<TradePair, AtomicInteger> orderBookCycles = new ConcurrentHashMap<>();
+    private record CandleKey(TradePair pair, int seconds) {}
+    private final Map<CandleKey, ScheduledFuture<?>> candleTasks = new ConcurrentHashMap<>();
 
     @Override
     public String toString() {
@@ -68,7 +70,9 @@ public class PollingExchangeStreamer {
                     int n = cycle.incrementAndGet();
 
                     var snapshot = coinbase.getLatestSnapshot(pair);
-                    if (snapshot.ticker() != null) {
+                    if (snapshot.ticker() != null
+                            && System.currentTimeMillis() - snapshot.ticker().getTimestamp() <= 25_000
+                            && snapshot.ticker().getTimestamp() <= System.currentTimeMillis() + 1_000) {
                         consumer.onTicker(exchange.getName(), pair, snapshot.ticker());
                         return;
                     }
@@ -279,6 +283,34 @@ public class PollingExchangeStreamer {
         tickerCycles.remove(tradePair);
     }
 
+    public synchronized void streamCandles(TradePair pair, int seconds, ExchangeStreamConsumer consumer) {
+        if (seconds <= 0) throw new IllegalArgumentException("Candle duration must be positive");
+        candleTasks.computeIfAbsent(new CandleKey(pair, seconds), _ -> scheduleAtFixedRate(() -> {
+            try {
+                var supplier = exchange.getCandleDataSupplier(seconds, pair);
+                if (supplier == null) throw new IllegalStateException("Candle supplier unavailable");
+                var candles = supplier.get().get(15, TimeUnit.SECONDS);
+                long now = java.time.Instant.now().getEpochSecond();
+                var latest = candles.stream().filter(java.util.Objects::nonNull)
+                        .filter(candle -> (long) candle.openTime() + seconds <= now)
+                        .max(java.util.Comparator.comparingInt(org.investpro.data.CandleData::openTime));
+                if (latest.isPresent()) {
+                    // Quotes must reach the signal agent before the candle is evaluated.
+                    consumer.onTicker(exchange.getName(), pair, exchange.getLivePrice(pair));
+                    consumer.onCandle(exchange.getName(), pair, latest.get());
+                }
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+            } catch (Exception error) {
+                consumer.onError(exchange.getName(), unwrap(error));
+            }
+        }, 60));
+    }
+
+    public synchronized void stopCandles(TradePair pair, int seconds) {
+        cancel(candleTasks.remove(new CandleKey(pair, seconds)));
+    }
+
     public synchronized void stopOrderBook(TradePair tradePair) {
         cancel(orderBookTasks.remove(tradePair));
         orderBookCycles.remove(tradePair);
@@ -306,6 +338,8 @@ public class PollingExchangeStreamer {
     }
 
     public synchronized void stopAll() {
+        candleTasks.values().forEach(this::cancel);
+        candleTasks.clear();
         tickerTasks.values().forEach(this::cancel);
         orderBookTasks.values().forEach(this::cancel);
         tickerTasks.clear();

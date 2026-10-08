@@ -48,6 +48,57 @@ class CoinbaseCredentialInputTest {
         }
     }
     @Test
+    void acceptsIndividuallyPastedJsonFields() {
+        assertEquals(NAME, CoinbaseCredentialInput.normalize("\"name\": \"" + NAME + "\",",
+                "\"privateKey\": " + JSONObject.quote(PEM) + ",").keyName());
+        assertEquals(PEM, CoinbaseCredentialInput.normalize("\"name\": \"" + NAME + "\",",
+                "\"privateKey\": " + JSONObject.quote(PEM) + ",").privateKey());
+        assertEquals(PEM, CoinbaseCredentialInput.normalize("\"name\": \"" + NAME + "\"",
+                "\"privateKey\": " + JSONObject.quote(PEM)).privateKey());
+    }
+
+    @Test
+    void restoresBarePkcs8KeyAndProducesVerifiableCoinbaseJwt() throws Exception {
+        var generator = java.security.KeyPairGenerator.getInstance("EC");
+        generator.initialize(new java.security.spec.ECGenParameterSpec("secp256r1"));
+        var pair = generator.generateKeyPair();
+        String body = java.util.Base64.getEncoder().encodeToString(pair.getPrivate().getEncoded());
+        var normalized = CoinbaseCredentialInput.normalize(NAME, body);
+        assertTrue(normalized.privateKey().startsWith("-----BEGIN PRIVATE KEY-----"));
+        var signer = new CoinbaseJwtSigner(normalized.keyName(), normalized.privateKey());
+        var jwt = com.nimbusds.jwt.SignedJWT.parse(signer.buildRestJwt("GET", "api.coinbase.com", "/api/v3/brokerage/accounts"));
+        assertTrue(jwt.verify(new com.nimbusds.jose.crypto.ECDSAVerifier((java.security.interfaces.ECPublicKey) pair.getPublic())));
+    }
+
+    @Test
+    void handlesDoublyEscapedPemWithoutChangingKeyMaterial() {
+        assertEquals(PEM, CoinbaseCredentialInput.normalize(NAME, PEM.replace("\n", "\\\\n")).privateKey());
+    }
+
+    @Test
+    void uiCredentialsOverrideStaleAliasesAndRemainPaired() {
+        var provider = new org.investpro.exchange.providers.UiCredentialProvider("coinbase", NAME,
+                PEM.replace('\n', ' '), "", "LIVE", "", java.util.Map.of(
+                "COINBASE_KEY_NAME", "stale-name", "COINBASE_PRIVATE_KEY", "stale-secret"));
+        var credentials = new org.investpro.exchange.credentials.ExchangeCredentialResolver(provider).resolve("coinbase");
+        assertEquals(NAME, credentials.keyName());
+        assertEquals(PEM, credentials.privateKey());
+        assertEquals(NAME, credentials.apiKey());
+        assertEquals(PEM, credentials.apiSecret());
+    }
+
+    @Test
+    void sharedUiValidationAcceptsRawEd25519AndRejectsInvalidSecretsSafely() throws Exception {
+        var pair = java.security.KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        byte[] pkcs8 = pair.getPrivate().getEncoded();
+        String secret = java.util.Base64.getEncoder().encodeToString(java.util.Arrays.copyOfRange(pkcs8, pkcs8.length - 32, pkcs8.length));
+        assertNull(CoinbaseCredentialInput.validationError(NAME, secret));
+        String error = CoinbaseCredentialInput.validationError(NAME, "sensitive-malformed-secret");
+        assertNotNull(error);
+        assertFalse(error.contains("sensitive-malformed-secret"));
+    }
+
+    @Test
     void doesNotInventMissingDataOrExposeMalformedExport() {
         assertEquals("short-id", CoinbaseCredentialInput.normalize("short-id", "").keyName());
         assertEquals("", CoinbaseCredentialInput.normalize("", "").privateKey());

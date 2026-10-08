@@ -215,11 +215,6 @@ public class TradingDesk extends BorderPane {
     private static final String DOCK_CENTER_CHARTS_ID = "dock.center.charts";
     private static final String DOCK_RIGHT_ORDERBOOK_ID = "dock.right.orderbook";
     private static final String DOCK_LAYOUT_PREF_PREFIX = "dock.layout.";
-    private static final String PEM_EC_BEGIN = "-----BEGIN EC PRIVATE " + "KEY-----";
-    private static final String PEM_EC_END = "-----END EC PRIVATE " + "KEY-----";
-    private static final String PEM_PKCS8_BEGIN = "-----BEGIN PRIVATE " + "KEY-----";
-    private static final String PEM_PKCS8_END = "-----END PRIVATE " + "KEY-----";
-    private static final String PEM_KEY_MARKER = "PRIVATE " + "KEY";
     private static final List<Timeframe> MT5_TIMEFRAMES = List.of(
             Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.M30, Timeframe.H1,
             Timeframe.H4, Timeframe.D1, Timeframe.W1, Timeframe.MN);
@@ -470,6 +465,7 @@ public class TradingDesk extends BorderPane {
     private IbkrConnectionPanel ibkrConnectionPanel;
     private boolean ibkrDeskBlocked;
     private MarketWatchPanel symbolAgentMarketWatch; // Symbol-level trading status (from SymbolAgentManager)
+    private org.investpro.ui.panels.ConnectedMarketWatchPanel connectedMarketWatch;
     private Navigation navigationPanel; // Exchange navigator
     private DataWindow dataWindow; // Data window for OHLCV display
     private AnalysisPanel analysisPanel; // Institutional analysis with backtesting/live metrics switching
@@ -540,6 +536,12 @@ public class TradingDesk extends BorderPane {
     public TradingDesk(MarketConfiguration configuration, TradeRepository tradeRepository,
                        OrderRepository orderRepository, CurrencyRepository currencyRepository,
                        org.investpro.ai.AssistantRuntime applicationAssistant) {
+        this(configuration, tradeRepository, orderRepository, currencyRepository, applicationAssistant, null);
+    }
+
+    public TradingDesk(MarketConfiguration configuration, TradeRepository tradeRepository,
+                       OrderRepository orderRepository, CurrencyRepository currencyRepository,
+                       org.investpro.ai.AssistantRuntime applicationAssistant, Exchange authenticatedExchange) {
         assistantRuntime = applicationAssistant;
         ownsAssistantRuntime = applicationAssistant == null;
         this.tradeRepository = Objects.requireNonNull(tradeRepository, "tradeRepository must not be null");
@@ -567,6 +569,9 @@ public class TradingDesk extends BorderPane {
         SystemOperationsService.getInstance().setExchangeService(exchangeService);
         initializeTradingDeskModules();
 
+        if (authenticatedExchange instanceof IbkrExchange ibkr && ibkr.ibkrSessionState().connectionSuccessful()) {
+            brokerSessions.put(brokerSessionKey(configuration.exchange()), new BrokerSession(ibkr, true, null));
+        }
         initialize(configuration);
         installTradingDeskStateBindings();
         setupUI();
@@ -651,6 +656,31 @@ public class TradingDesk extends BorderPane {
         if (assistantRuntime != null) {
             assistantRuntime.setScreenshotSource(this::getScene);
             assistantRuntime.setChartScreenshotSource(this::getActiveChart);
+            assistantRuntime.setAppControl(command -> {
+                Exchange target = exchange;
+                String[] args = command.trim().split("\\s+");
+                args[0] = args[0].toLowerCase(Locale.ROOT);
+                try {
+                    TradePair pair = args[0].equals("/openchart") && args.length == 2 ? TradePair.fromSymbol(args[1]) : null;
+                    int timeframe = args[0].equals("/charttimeframe") && args.length == 2 ? Integer.parseInt(args[1]) : 0;
+                    if ((args[0].equals("/openchart") && pair == null)
+                            || (args[0].equals("/charttimeframe") && timeframe <= 0)) return "Specify a valid symbol or timeframe in seconds.";
+                    Platform.runLater(() -> {
+                        if (exchange != target) { journal("AI chart request canceled: selected exchange changed."); return; }
+                        switch (args[0]) {
+                            case "/openchart" -> openSymbolChart(target, pair);
+                            case "/charttimeframe" -> {
+                                Tab tab = chartTabPane.getSelectionModel().getSelectedItem();
+                                if (tab != null && tab.getContent() instanceof ChartContainer container) container.setSecondsPerCandle(timeframe);
+                            }
+                            case "/refreshchart" -> withActiveChart(CandleStickChart::refreshChart);
+                            case "/resetzoom" -> withActiveChart(CandleStickChart::fitChart);
+                            default -> { }
+                        }
+                    });
+                    return "Chart action requested: " + command + ". Check the desktop chart for the outcome.";
+                } catch (Exception error) { return "Invalid chart arguments. Use a pair/native symbol or a positive timeframe in seconds."; }
+            });
         }
         if (assistantRuntime != null) assistantRuntime.setBotControl(action -> {
             Exchange requestedExchange = exchange;
@@ -1490,7 +1520,24 @@ public class TradingDesk extends BorderPane {
     }
 
     private @NotNull VBox createMarketWatchPaneSurface() {
-        return useLegacyWorkbenchLayout() ? createMarketWatchPaneLegacy() : createMarketWatchPane();
+        VBox selectedVenue = useLegacyWorkbenchLayout() ? createMarketWatchPaneLegacy() : createMarketWatchPane();
+        if (connectedMarketWatch == null) {
+            connectedMarketWatch = new org.investpro.ui.panels.ConnectedMarketWatchPanel(() -> {
+                Map<String, Exchange> venues = new LinkedHashMap<>();
+                for (ConnectedExchangeView view : connectedPortfolioExchanges()) {
+                    if (view.exchange().isAuthenticatedSessionConnected() || Boolean.TRUE.equals(view.exchange().isConnected()))
+                        venues.put(view.exchangeName(), view.exchange());
+                }
+                return venues;
+            }, this::openSymbolChart);
+        }
+        Tab all = new Tab("All connected", connectedMarketWatch);
+        Tab selected = new Tab("Selected exchange", selectedVenue);
+        all.setClosable(false);
+        selected.setClosable(false);
+        TabPane tabs = new TabPane(all, selected);
+        VBox.setVgrow(tabs, Priority.ALWAYS);
+        return new VBox(tabs);
     }
 
     private @NotNull VBox createOrderBookPaneSurface() {
@@ -5217,6 +5264,13 @@ public class TradingDesk extends BorderPane {
     }
 
     private void updateConnectionStatus() {
+        if (assistantRuntime != null) {
+            Map<String, Exchange> assistantVenues = new LinkedHashMap<>();
+            connectedPortfolioExchanges().forEach(view -> assistantVenues.put(view.exchangeName(), view.exchange()));
+            assistantRuntime.updateVenues(assistantVenues);
+            assistantRuntime.selectExchange(exchange);
+            assistantRuntime.selectSymbol(symbolSelector.getValue());
+        }
         boolean connected;
         try {
             connected = hasBrokerAccess();
@@ -5726,11 +5780,14 @@ public class TradingDesk extends BorderPane {
                 && canReuseBrokerSession(existingSession.exchange(), existingSession.accessGranted())) {
             exchange = existingSession.exchange();
             brokerAccessGranted = true;
+            exchange.setMarketDataEngine(marketDataEngine);
+            exchange.setBotTradingMode(configuredBotTradingMode);
             setTelegramToken(telegramToken);
             ensureTradabilityService();
             updateConnectionStatus();
             updateExchangeVenueLabel();
             refreshOrderTypeOptions();
+            if (exchange instanceof IbkrExchange) onIbkrControlPanelStateChanged();
             return;
         }
 
@@ -8563,8 +8620,37 @@ public class TradingDesk extends BorderPane {
             showWarning("Chart", "Select a symbol before opening a chart.");
             return;
         }
+        openSymbolChart(exchange, selected);
+    }
+
+    private void openSymbolChart(Exchange exchange, TradePair selected) {
         if (exchange == null) {
             showWarning("Chart", "No exchange is available.");
+            return;
+        }
+        if (exchange instanceof IbkrExchange ibkr && ibkr.cachedContract(selected).isEmpty()) {
+            if (!ibkr.ibkrSessionState().connectionSuccessful()) {
+                showWarning("IBKR Chart", "Connect to your IBKR gateway before resolving " + selected + ".");
+                return;
+            }
+            ButtonType resolve = new ButtonType("Resolve contract", ButtonBar.ButtonData.OK_DONE);
+            Alert prompt = new Alert(Alert.AlertType.INFORMATION,
+                    "InvestPro needs IBKR's contract details for " + selected + " before opening its chart. "
+                            + "This is not a subscription error. Resolve the contract first; IBKR will then confirm data access.",
+                    resolve, ButtonType.CANCEL);
+            prompt.setTitle("IBKR Contract Required");
+            prompt.setHeaderText("Resolve " + selected + " to open the chart");
+            if (prompt.showAndWait().orElse(ButtonType.CANCEL) == resolve) {
+                new IbkrContractSearchController(ibkr, this::addResolvedIbkrPairToMarketWatch)
+                        .searchAndResolve(selected.getBaseCode(), _ -> {
+                            if (ibkr.cachedContract(selected).isEmpty()) {
+                                showWarning("IBKR Contract", "The chosen contract does not match " + selected
+                                        + ". Select the matching symbol and currency.");
+                                return;
+                            }
+                            openSymbolChart(ibkr, selected);
+                        });
+            }
             return;
         }
         if (!exchange.getCapability().isSupportsHistoricalCandles()) {
@@ -8596,7 +8682,14 @@ public class TradingDesk extends BorderPane {
         }
 
         // Create chart container
-        ChartContainer container = getChartContainer(selected);
+        ChartContainer container;
+        try {
+            container = getChartContainer(exchange, selected);
+        } catch (RuntimeException error) {
+            journal("Unable to open " + selected + ": " + rootMessage(error));
+            showWarning("Chart unavailable", "Unable to open " + selected + ": " + rootMessage(error));
+            return;
+        }
 
         // Create and add chart tab to chart pane (not terminal pane)
         Tab tab = createChartTab(tabTitle, container);
@@ -8791,7 +8884,12 @@ public class TradingDesk extends BorderPane {
     }
 
     private @NotNull ChartContainer getChartContainer(TradePair selected) {
-        ChartContainer container = new ChartContainer(exchange, selected, true, telegramToken, tradingService);
+        return getChartContainer(exchange, selected);
+    }
+
+    private @NotNull ChartContainer getChartContainer(Exchange target, TradePair selected) {
+        ChartContainer container = new ChartContainer(target, selected, true, telegramToken,
+                target == exchange ? tradingService : null);
         container.setOnChartError(this::journal);
         applyNewsEventsToChart(container.getChart());
 
@@ -11896,7 +11994,7 @@ public class TradingDesk extends BorderPane {
         pemArea = new TextArea();
         if (isCoinbase) {
             pemArea.setText(configuredApiSecret);
-            pemArea.setPromptText("%s%n...%n%s".formatted(PEM_EC_BEGIN, PEM_EC_END));
+            pemArea.setPromptText("Paste Coinbase JSON, an ECDSA PEM, or an Ed25519 secret");
             pemArea.setPrefRowCount(6);
             pemArea.setWrapText(true);
             pemArea.setStyle("""
@@ -12128,67 +12226,8 @@ public class TradingDesk extends BorderPane {
     }
 
     private String validateCoinbaseCredentials(String apiKey, String apiSecret) {
-        // Check if both fields are provided
-        if (apiKey == null || apiKey.isBlank()) {
-            return """
-                    API Key (CDP Key Name) cannot be empty.
-
-                    Format: organizations/{org_id}/apiKeys/{key_id}
-
-                    Get this from Coinbase → Developer → API Keys → Copy the key name.""";
-        }
-
-        if (apiSecret == null || apiSecret.isBlank()) {
-            return """
-                    API Secret (EC Private Key) cannot be empty.
-
-                    This should be the EC private key in PEM format, starting with:
-                    %s
-                    or
-                    %s""".formatted(PEM_EC_BEGIN, PEM_PKCS8_BEGIN);
-        }
-
-        // Validate API Key format
-        if (!apiKey.contains("organizations/") || !apiKey.contains("/apiKeys/")) {
-            return """
-                    Invalid API Key format.
-
-                    Expected format: organizations/{org_id}/apiKeys/{key_id}
-
-                    Example: organizations/12345678-1234-5678-1234-567812345678/apiKeys/87654321-4321-8765-4321-876543218765""";
-        }
-
-        // Validate Private Key format
-        String keyTrimmed = apiSecret.trim();
-        if (!keyTrimmed.contains("BEGIN") || !keyTrimmed.contains(PEM_KEY_MARKER)) {
-            return """
-                    Invalid Private Key format.
-
-                    The private key should be in PEM format, containing:
-                    • %s (or %s)
-                    • Base64 encoded key content
-                    • %s (or %s)
-
-                    Get this from Coinbase → Developer → API Keys → Download the private key file."""
-                    .formatted(PEM_EC_BEGIN, PEM_PKCS8_BEGIN, PEM_EC_END, PEM_PKCS8_END);
-        }
-
-        // Validate that it looks like a complete key
-        if (keyTrimmed.split("\n").length < 3) {
-            return """
-                    Private Key appears incomplete.
-
-                    Make sure you've copied the ENTIRE private key, including:
-                    • The BEGIN line
-                    • All content in the middle
-                    • The END line
-
-                    Tip: Open the .pem file in a text editor and copy the entire contents.""";
-        }
-
-        return null; // Validation passed
+        return org.investpro.exchange.coinbase.CoinbaseCredentialInput.validationError(apiKey, apiSecret);
     }
-
     private String validateStellarCredentials(String accountId, String secretSeed, boolean liveMode) {
         String normalizedAccountId = safe(accountId).trim().toUpperCase(Locale.ROOT);
         String normalizedSecretSeed = safe(secretSeed).trim().toUpperCase(Locale.ROOT);
@@ -14046,6 +14085,7 @@ public class TradingDesk extends BorderPane {
      */
 
     public void shutdown() {
+        if (connectedMarketWatch != null) connectedMarketWatch.close();
         if (aiInteractionPanel != null) aiInteractionPanel.close();
         if (aiInteractionStage != null) aiInteractionStage.close();
         aiInteractionPanel = null;

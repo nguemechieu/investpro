@@ -50,9 +50,15 @@ public class IbkrSetupWizard extends VBox {
     private final ListView<String> diagnosticsList = new ListView<>();
     private final ListView<String> featureList = new ListView<>();
     private final Label statusLabel = new Label("Not connected");
+    private final Label accountLabel = new Label();
+    private final Label marketDataLabel = new Label();
+    private final Button connectButton = new Button("Connect");
+    private final Button disconnectButton = new Button("Disconnect");
+    private javafx.scene.control.TitledPane setupPane;
 
     private IbkrConnectionProfile profile;
     private IbkrSessionState sessionState;
+    private boolean applyingProfile;
 
     public IbkrSetupWizard(
             IbkrConnectionService connectionService,
@@ -77,16 +83,18 @@ public class IbkrSetupWizard extends VBox {
         setPadding(new Insets(16));
         setPrefWidth(680);
 
-        profile = loadProfile();
-        sessionState = IbkrSessionState.disconnected(profile, "No IBKR session has been started yet.");
+        sessionState = connectionService.getSessionState();
+        profile = sessionState.connectionSuccessful()
+                ? new IbkrConnectionProfile(sessionState.mode(), sessionState.host(), sessionState.port(),
+                    sessionState.clientId(), sessionState.paper(), false, null, sessionState.connectedAt())
+                : loadProfile();
         buildUi();
         applyProfile(profile);
-        refreshDetection();
-        refreshDiagnostics();
+        refreshSessionSummary();
     }
 
     private void buildUi() {
-        Label title = new Label("IBKR Gateway Setup");
+        Label title = new Label("IBKR Account & Connection");
         title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
 
         Label requirement = new Label(
@@ -98,6 +106,7 @@ public class IbkrSetupWizard extends VBox {
                 "Future Cloud/OAuth");
         modeSelector.setMaxWidth(Double.MAX_VALUE);
         modeSelector.setOnAction(event -> {
+            if (applyingProfile) return;
             profile = currentProfile().withMode(modeFromSelection());
             applyProfile(profile);
             refreshDetection();
@@ -129,8 +138,7 @@ public class IbkrSetupWizard extends VBox {
         diagnosticsList.setPrefHeight(190);
         featureList.setPrefHeight(110);
 
-        getChildren().addAll(
-                title,
+        VBox setup = new VBox(8,
                 requirement,
                 stepLabel("1. Choose connection mode"),
                 form,
@@ -140,25 +148,30 @@ public class IbkrSetupWizard extends VBox {
                 diagnosticsList,
                 stepLabel("4. Feature availability"),
                 featureList,
-                statusLabel,
-                actions);
+                setupActions);
+        setupPane = new javafx.scene.control.TitledPane("Connection settings & diagnostics", setup);
+        setupPane.setExpanded(!sessionState.connectionSuccessful());
+        marketDataLabel.setWrapText(true);
+        getChildren().addAll(title, statusLabel, accountLabel, marketDataLabel, actions, setupPane);
     }
 
     private @NonNull HBox getActions() {
         Button detectButton = new Button("Auto-detect");
-        Button connectButton = new Button("Connect");
         Button saveButton = new Button("Save profile");
-        Button disconnectButton = new Button("Disconnect");
-        detectButton.setOnAction(event -> refreshDetection());
+        Button refreshButton = new Button("Refresh status");
+        refreshButton.setOnAction(_ -> refreshSessionSummary());
         connectButton.setOnAction(event -> connect());
         saveButton.setOnAction(event -> saveProfile(currentProfile()));
         disconnectButton.setOnAction(event -> {
             connectionService.disconnect();
             sessionState = IbkrSessionState.disconnected(currentProfile(), "Disconnected.");
-            refreshDiagnostics();
+            refreshSessionSummary();
             notifySessionStateChanged();
         });
-        HBox actions = new HBox(8, detectButton, connectButton, saveButton, disconnectButton);
+        HBox actions = new HBox(8, refreshButton, connectButton, disconnectButton);
+        // Setup actions stay with the optional connection settings.
+        detectButton.setOnAction(_ -> { refreshDetection(); refreshDiagnostics(); });
+        setupActions = new HBox(8, detectButton, saveButton);
         actions.setAlignment(Pos.CENTER_LEFT);
         return actions;
     }
@@ -170,26 +183,30 @@ public class IbkrSetupWizard extends VBox {
     }
 
     private void connect() {
+        if (connectionService.getSessionState().connectionSuccessful()) {
+            refreshSessionSummary();
+            return;
+        }
         IbkrConnectionProfile selected = currentProfile();
         if (selected.mode() == IbkrConnectionMode.CLOUD_OAUTH_FUTURE) {
             statusLabel.setText("Future Cloud/OAuth is a placeholder. InvestPro will not collect IBKR credentials.");
             return;
         }
 
-        try {
-            sessionState = connectionService.connect(selected);
+        connectButton.setDisable(true);
+        disconnectButton.setDisable(true);
+        statusLabel.setText("Connecting to IBKR gateway...");
+        java.util.concurrent.CompletableFuture.supplyAsync(() -> connectionService.connect(selected))
+                .whenComplete((state, error) -> javafx.application.Platform.runLater(() -> {
+            sessionState = error == null ? state : IbkrSessionState.disconnected(selected, clearError(error));
             if (sessionState.connectionSuccessful()) {
-                selected = selected.markSuccessful(Instant.now());
-                saveProfile(selected);
-                profile = selected;
+                profile = selected.markSuccessful(Instant.now());
+                saveProfile(profile);
             }
-            statusLabel.setText(sessionState.message());
-        } catch (Exception exception) {
-            sessionState = IbkrSessionState.disconnected(selected, clearError(exception));
-            statusLabel.setText(sessionState.message());
-        }
-        refreshDiagnostics();
-        notifySessionStateChanged();
+            refreshSessionSummary();
+            if (error != null) statusLabel.setText(clearError(error));
+            notifySessionStateChanged();
+        }));
     }
 
     private void refreshDetection() {
@@ -220,6 +237,25 @@ public class IbkrSetupWizard extends VBox {
                 "Trading enabled: " + yesNo(availability.tradingEnabled()));
     }
 
+    private HBox setupActions;
+
+    private void refreshSessionSummary() {
+        sessionState = connectionService.getSessionState();
+        boolean connected = sessionState.connectionSuccessful();
+        statusLabel.setText(connected
+                ? "Connected to " + sessionState.host() + ":" + sessionState.port()
+                    + " · Client ID " + sessionState.clientId()
+                : sessionState.message());
+        accountLabel.setText("Accounts: " + (sessionState.managedAccounts().isEmpty()
+                ? "Not available" : String.join(", ", sessionState.managedAccounts())));
+        marketDataLabel.setText("Market-data subscriptions are separate from your gateway connection. "
+                + "Availability depends on the instrument and your IBKR entitlements. "
+                + "Delayed data is used when available; automated strategies require live quotes.");
+        connectButton.setDisable(connected);
+        disconnectButton.setDisable(!sessionState.socketConnected());
+        if (connected) setupPane.setExpanded(false);
+    }
+
     private IbkrConnectionProfile currentProfile() {
         return new IbkrConnectionProfile(
                 modeFromSelection(),
@@ -243,11 +279,12 @@ public class IbkrSetupWizard extends VBox {
 
         autoDetectCheck.setSelected(selected.autoDetect());
 
-        switch (selected.mode()) {
+        applyingProfile = true;
+        try { switch (selected.mode()) {
             case CLIENT_PORTAL_GATEWAY -> modeSelector.setValue("Client Portal Gateway");
             case CLOUD_OAUTH_FUTURE -> modeSelector.setValue("Future Cloud/OAuth");
             case TWS_API -> modeSelector.setValue(selected.autoDetect() ? "Not sure / Auto-detect" : "TWS / IB Gateway");
-        }
+        } } finally { applyingProfile = false; }
     }
 
     private IbkrConnectionMode modeFromSelection() {

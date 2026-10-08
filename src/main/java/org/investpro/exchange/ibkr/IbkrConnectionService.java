@@ -29,6 +29,13 @@ public final class IbkrConnectionService {
         if (connection == null) {
             throw new IllegalStateException("No IBKR connection adapter is registered for " + safe.mode());
         }
+        IbkrSessionState state = getSessionState();
+        if (activeConnection == connection && state.connectionSuccessful()
+                && state.mode() == safe.mode() && state.host().equals(safe.host())
+                && state.port() == safe.port() && state.clientId() == safe.clientId()
+                && state.paper() == safe.paper()) {
+            return state;
+        }
         if (activeConnection != null) activeConnection.disconnect();
         activeConnection = null;
         connection.connect(safe);

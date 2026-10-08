@@ -393,7 +393,7 @@ public class Alpaca extends Exchange {
                 streamTrades(pair, consumer);
             }
             if (subscription.isCandles()) {
-                streamCandles(pair, 60, consumer);
+                streamCandles(pair, subscription.getSecondsPerCandle(), consumer);
             }
         }
         if (subscription.isAccount()) {

@@ -214,6 +214,8 @@ public record CoinbaseJwtSigner(String keyName, String privateKeyPem, PrivateKey
          * Coinbase examples show replacing "\\n" with real newlines before parsing.
          */
         value = stripWrappingQuotes(value);
+        // Copying JSON through another escaped string can add a second layer of escaping.
+        value = value.replace("\\\\r\\\\n", "\\r\\n").replace("\\\\n", "\\n").replace("\\\\r", "\\r");
         value = value
                 .replace("\\r\\n", "\n")
                 .replace("\\n", "\n")

@@ -9,7 +9,6 @@ import org.investpro.agent.symbol.StrategyEvaluator;
 import org.investpro.agent.symbol.SymbolAgent;
 import org.investpro.agent.symbol.SymbolAgentConfig;
 import org.investpro.agent.symbol.SymbolAgentMode;
-import org.investpro.agent.symbol.SymbolAgentState;
 import org.investpro.agent.symbol.SymbolAgentStateRepository;
 import org.investpro.agent.symbol.SymbolExecutionEngine;
 import org.investpro.agent.symbol.SymbolRiskEvaluator;
@@ -18,7 +17,6 @@ import org.investpro.agent.symbol.TradabilityDecision;
 import org.investpro.config.AppConfig;
 import org.investpro.models.trading.TradePair;
 import org.investpro.news.NewsContextService;
-import org.investpro.strategy.StrategyDefinition;
 import org.investpro.strategy.auto.AutoStrategyLab;
 import org.investpro.agent.symbol.InMemorySymbolAgentStateRepository;
 
@@ -67,7 +65,7 @@ public class TradingAgentManager {
                 new DefaultStrategyEvaluator(),
                 new SafeDefaultRiskEvaluator(),
                 new LoggingExecutionEngine(),
-                (exchangeId, pair, mode) -> TradabilityDecision.allowed(),
+                (_, _, _) -> TradabilityDecision.allowed(),
                 null,
                 null,
                 SymbolAgentConfig.defaults());
@@ -131,27 +129,6 @@ public class TradingAgentManager {
         }
     }
 
-    public void pauseAgent(String exchangeId, TradePair pair) {
-        getAgent(exchangeId, pair).ifPresent(agent -> {
-            agent.pause();
-            stateRepository.saveState(agent.state());
-        });
-    }
-
-    public void resumeAgent(String exchangeId, TradePair pair) {
-        getAgent(exchangeId, pair).ifPresent(agent -> {
-            agent.resume();
-            stateRepository.saveState(agent.state());
-        });
-    }
-
-    public void assignStrategy(String exchangeId, TradePair pair, StrategyDefinition strategy) {
-        getAgent(exchangeId, pair).ifPresent(agent -> {
-            agent.assignStrategy(strategy);
-            stateRepository.saveState(agent.state());
-        });
-    }
-
     public Optional<SymbolAgent> getAgent(String exchangeId, TradePair pair) {
         return Optional.ofNullable(agents.get(AgentKey.of(exchangeId, pair)));
     }
@@ -166,14 +143,6 @@ public class TradingAgentManager {
         scheduler.shutdownNow();
     }
 
-    public MarketDataRouter marketDataRouter() {
-        return marketDataRouter;
-    }
-
-    public SymbolAgentStateRepository stateRepository() {
-        return stateRepository;
-    }
-
     private void startHealthPersistence() {
         scheduler.scheduleWithFixedDelay(() -> {
             for (SymbolAgent agent : agents.values()) {
@@ -186,7 +155,4 @@ public class TradingAgentManager {
         }, 30, 30, TimeUnit.SECONDS);
     }
 
-    public List<SymbolAgentState> restorePausedStates() {
-        return stateRepository.findAllActiveStates();
-    }
 }

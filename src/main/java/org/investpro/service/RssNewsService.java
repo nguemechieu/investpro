@@ -146,7 +146,8 @@ public class RssNewsService {
             Map.entry("GOOG", "Alphabet stock"),
             Map.entry("META", "Meta stock"),
             Map.entry("AMD", "AMD stock"),
-            Map.entry("COIN", "Coinbase stock"));
+            Map.entry("COIN", "Coinbase stock"),
+            Map.entry("SCHW", "Charles Schwab"));
 
     private static final Set<String> STABLE_QUOTES = Set.of("USDT", "USD", "USDC", "BUSD", "DAI", "FDUSD", "TUSD");
 
@@ -276,15 +277,15 @@ public class RssNewsService {
                     base, baseAlias, base, base);
         }
 
+        // A bare stock ticker has no quote currency; classify stocks before crypto.
+        if (brokerLower.matches("(stock|stocks|equity|alpaca)")) {
+            return String.format("\"%s\" OR \"%s\" stock earnings", base, baseAlias);
+        }
+
         // Crypto pair
         if (quote.isEmpty() || STABLE_QUOTES.contains(quote)
                 || brokerLower.matches("(crypto|ccxt|binance|coinbase|kraken)")) {
             return String.format("\"%s\" OR \"%s price\" OR \"%s crypto\"", baseAlias, base, base);
-        }
-
-        // Stock-like symbols
-        if (brokerLower.matches("(stock|stocks|equity|alpaca)")) {
-            return String.format("\"%s\" OR \"%s\" stock earnings", base, baseAlias);
         }
 
         String result = String.format("\"%s\" OR \"%s\"", base, baseAlias);
@@ -548,6 +549,7 @@ public class RssNewsService {
                 eventMap.put("url", link);
                 eventMap.put("source", !source.isEmpty() ? source : "News Feed");
                 eventMap.put("timestamp", timestamp.toInstant().toString());
+                eventMap.put("publication_date", getElementText(item, "pubDate"));
                 eventMap.put("sentiment_score", sentimentScore);
                 eventMap.put("impact", impact);
                 eventMap.put("age_hours", Math.round(ageHours * 10000.0) / 10000.0);

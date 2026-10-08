@@ -61,6 +61,12 @@ public class CandleDataPager {
                 log.debug("Candle data fetch interrupted (likely during shutdown)", ex);
                 return;
             } catch (ExecutionException ex) {
+                Throwable cause = ex;
+                while (cause.getCause() != null) cause = cause.getCause();
+                if (cause instanceof org.investpro.exchange.ibkr.IbkrMarketDataException) {
+                    // Let the chart show subscription guidance instead of silently ending loading.
+                    throw new java.util.concurrent.CompletionException(cause);
+                }
                 // Future failed with an exception
                 log.error("Error fetching candle data from supplier: ", ex);
                 return;

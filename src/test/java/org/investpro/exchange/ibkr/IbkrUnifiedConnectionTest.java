@@ -6,6 +6,22 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class IbkrUnifiedConnectionTest {
+    @Test void openingTheDeskOrRecheckingTheSameProfileDoesNotReconnect() {
+        StubIbkrTwsSession session = new StubIbkrTwsSession();
+        IbkrExchange exchange = new IbkrExchange(credentials(), session);
+        try {
+            assertTrue(exchange.AuthCheckResult("ibkr").success());
+            var state = exchange.getConnectionService().getSessionState();
+            var profile = new IbkrConnectionProfile(state.mode(), state.host(), state.port(), state.clientId(),
+                    state.paper(), false, "Desk profile", null);
+            assertTrue(exchange.getConnectionService().connect(profile).connectionSuccessful());
+            assertEquals(1, session.connections);
+            assertEquals("DU123456", exchange.fetchAccount().join().getAccountId());
+            session.disconnect();
+            assertTrue(exchange.getConnectionService().connect(profile).connectionSuccessful());
+            assertEquals(2, session.connections);
+        } finally { exchange.getConnectionManager().shutdown(); }
+    }
     private static ExchangeCredentials credentials() {
         return new ExchangeCredentials("interactive_brokers", null, null, null, null, null, null,
                 false, Map.of("host", "192.0.2.5", "port", "7496", "clientId", "42", "watchlist", ""));

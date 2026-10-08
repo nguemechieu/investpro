@@ -61,7 +61,7 @@ class TradingAgentManagerTest {
                         org.investpro.agent.symbol.SignalType.NEUTRAL, 0.0, "test", java.util.Map.of()),
                 (intent, state, context) -> org.investpro.agent.symbol.RiskDecision.rejected("test"),
                 (intent, decision) -> { },
-                (exchangeId, pair, mode) -> org.investpro.agent.symbol.TradabilityDecision.allowed(),
+                (_, _, _) -> org.investpro.agent.symbol.TradabilityDecision.allowed(),
                 null,
                 null,
                 new SymbolAgentConfig(2, 20, false, false, false, true, true,

@@ -18,7 +18,7 @@ public final class IbkrConnectionDiagnosticsService {
                 : sessionState;
 
         List<DiagnosticItem> items = new ArrayList<>();
-        boolean reachable = detector.isReachable(safeProfile.host(), safeProfile.port());
+        boolean reachable = state.socketConnected() || detector.isReachable(safeProfile.host(), safeProfile.port());
         items.add(new DiagnosticItem("TWS/Gateway detected", reachable,
                 reachable ? "Local IBKR listener detected." : "TWS or IB Gateway is not running."));
         items.add(new DiagnosticItem("Socket port reachable", reachable,
@@ -42,7 +42,7 @@ public final class IbkrConnectionDiagnosticsService {
         items.add(new DiagnosticItem("Market data permission status", state.marketDataPermissionAvailable(),
                 state.marketDataPermissionAvailable()
                         ? "Top-of-book market data is available."
-                        : "Market data permission is missing for this contract."));
+                        : "Live market-data entitlement has not been confirmed; it depends on the requested contract."));
         items.add(new DiagnosticItem("Depth/orderbook permission status", state.marketDepthPermissionAvailable(),
                 state.marketDepthPermissionAvailable()
                         ? "Level II/orderbook data is available."

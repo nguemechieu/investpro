@@ -8,17 +8,18 @@ import lombok.Getter;
  * AI may recommend these actions, but RiskManagementSystem and FinalRiskGate retain final authority.
  * AI cannot directly execute these actions. Only approved PositionActionIntent objects are executed.
  */
+@Getter
 public enum AiPositionAction {
 
     /**
      * Hold the position. Current levels are acceptable.
      */
-    HOLD("Hold position", false, false, false, false, false, false),
+    HOLD("Hold your position", false, false, false, false, false, false),
 
     /**
      * Reduce position size. Lowers risk exposure while keeping the position alive.
      */
-    REDUCE_SIZE("Reduce position size", true, false, false, false, false, false),
+    REDUCE_SIZE("Reduce your position size", true, false, false, false, false, false),
 
     /**
      * Take partial profit. Closes a portion of the position.
@@ -62,7 +63,7 @@ public enum AiPositionAction {
      */
     ESCALATE_TO_MANUAL_REVIEW("Escalate to manual review", false, false, false, false, true, false);
 
-    @Getter
+
     private final String description;
 
     private final boolean reducesRisk;
@@ -90,45 +91,7 @@ public enum AiPositionAction {
         this.increasesComplexity = increasesComplexity;
     }
 
-    public boolean reducesRisk() {
-        return reducesRisk;
-    }
 
-    public boolean modifiesStop() {
-        return modifiesStop;
-    }
 
-    public boolean closesPosition() {
-        return closesPosition;
-    }
 
-    public boolean affectsProfit() {
-        return affectsProfit;
-    }
-
-    public boolean requiresManualApproval() {
-        return requiresManualApproval;
-    }
-
-    public boolean increasesComplexity() {
-        return increasesComplexity;
-    }
-
-    /**
-     * Returns true when this action is defensive and can generally be considered
-     * safer than adding risk, assuming FinalRiskGate approves it.
-     */
-    public boolean isDefensiveAction() {
-        return reducesRisk || closesPosition || this == TRAIL_STOP || this == TAKE_PARTIAL_PROFIT;
-    }
-
-    /**
-     * Returns true when this action should never be auto-executed without extra validation.
-     */
-    public boolean requiresStrictValidation() {
-        return this == MOVE_STOP_LOSS
-                || this == MOVE_TAKE_PROFIT
-                || this == HEDGE
-                || requiresManualApproval;
-    }
 }

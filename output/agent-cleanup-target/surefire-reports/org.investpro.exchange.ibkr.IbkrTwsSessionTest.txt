@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.exchange.ibkr.IbkrTwsSessionTest
+-------------------------------------------------------------------------------
+Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.207 s -- in org.investpro.exchange.ibkr.IbkrTwsSessionTest

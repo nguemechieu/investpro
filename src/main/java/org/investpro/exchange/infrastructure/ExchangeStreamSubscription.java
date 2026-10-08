@@ -15,7 +15,7 @@ import java.util.Set;
  * <ul>
  *   <li><b>ticker</b> - Real-time price updates (bid/ask/last price)</li>
  *   <li><b>trades</b> - Individual trade executions as they occur</li>
- *   <li><b>candles</b> - Aggregated OHLCV (1-minute candles)</li>
+ *   <li><b>candles</b> - Aggregated OHLCV at secondsPerCandle (hourly by default)</li>
  *   <li><b>orderBook</b> - Order book depth updates</li>
  *   <li><b>account</b> - Account status changes (equity, margin, etc.)</li>
  *   <li><b>orders</b> - Open order updates (new, updated, cancelled)</li>
@@ -75,6 +75,7 @@ public class ExchangeStreamSubscription {
     private boolean ticker;
     private boolean trades;
     private boolean candles;
+    private int secondsPerCandle = 3600;
     private boolean orderBook;
     private boolean account;
     private boolean orders;

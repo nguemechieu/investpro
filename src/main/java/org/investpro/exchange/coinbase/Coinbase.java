@@ -2412,7 +2412,8 @@ public class Coinbase extends Exchange {
             if (root.has("trades") && root.get("trades").isArray() && !root.get("trades").isEmpty()) {
                 JsonNode firstTrade = root.get("trades").get(0);
                 ticker.setVolume(parseDouble(firstTrade.path("size").asText(null), 0.0));
-                ticker.setTimestamp(parseInstantMillis(firstTrade.path("time").asText(null)));
+                // This timestamp describes the observed bid/ask quote, not the last trade.
+                ticker.setTimestamp(System.currentTimeMillis());
                 ticker.setLastPrice(parseDouble(firstTrade.path("price").asText(null), 0.0));
             } else {
                 ticker.setVolume(0.0);
@@ -4200,7 +4201,7 @@ public class Coinbase extends Exchange {
             }
 
             if (subscription.isCandles()) {
-                streamCandles(pair, 60, consumer);
+                streamCandles(pair, subscription.getSecondsPerCandle(), consumer);
             }
         }
 
@@ -4243,7 +4244,7 @@ public class Coinbase extends Exchange {
                 stopOrderBookStream(pair);
             }
             if (subscription.isCandles()) {
-                stopCandlesStream(pair, 60);
+                stopCandlesStream(pair, subscription.getSecondsPerCandle());
             }
         }
 
@@ -4327,7 +4328,7 @@ public class Coinbase extends Exchange {
             TradePair tradePair,
             int secondsPerCandle,
             ExchangeStreamConsumer consumer) {
-        log.debug("Coinbase streamCandles currently no-op for {} {}", tradePair, secondsPerCandle);
+        pollingStreamer.streamCandles(tradePair, secondsPerCandle, consumer);
     }
 
     @Override
@@ -4374,7 +4375,7 @@ public class Coinbase extends Exchange {
 
     @Override
     public void stopCandlesStream(TradePair tradePair, int secondsPerCandle) {
-        log.debug("Coinbase stopCandlesStream no-op for {} {}", tradePair, secondsPerCandle);
+        pollingStreamer.stopCandles(tradePair, secondsPerCandle);
     }
 
     @Override

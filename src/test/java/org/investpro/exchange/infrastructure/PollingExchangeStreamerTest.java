@@ -37,6 +37,36 @@ import static org.mockito.Mockito.*;
 
 class PollingExchangeStreamerTest {
     @Test
+    void candlePollingDeliversQuoteBeforeLatestClosedCandleAndStopsCleanly() throws Exception {
+        Exchange exchange = mock(Exchange.class);
+        TradePair pair = new TradePair("BTC", "USD");
+        when(exchange.getName()).thenReturn("Test");
+        var supplier = mock(org.investpro.utils.CandleDataSupplier.class);
+        when(exchange.getCandleDataSupplier(3600, pair)).thenReturn(supplier);
+        int now = (int) Instant.now().getEpochSecond();
+        var closed = new org.investpro.data.CandleData(100, 101, 102, 99, now - 7200, 10);
+        var forming = new org.investpro.data.CandleData(101, 102, 103, 100, now - 100, 10);
+        when(supplier.get()).thenReturn(CompletableFuture.completedFuture(List.of(forming, closed)));
+        Ticker quote = new Ticker();
+        when(exchange.getLivePrice(pair)).thenReturn(quote);
+        ScheduledFuture<?> task = mock(ScheduledFuture.class);
+        ScheduledExecutorService scheduler = scheduler(task);
+        var streamer = new PollingExchangeStreamer(exchange, () -> scheduler);
+        var consumer = mock(ExchangeStreamConsumer.class);
+        streamer.streamCandles(pair, 3600, consumer);
+        streamer.streamCandles(pair, 3600, consumer);
+        ArgumentCaptor<Runnable> poll = ArgumentCaptor.forClass(Runnable.class);
+        verify(scheduler).scheduleAtFixedRate(poll.capture(), eq(0L), eq(60L), eq(TimeUnit.SECONDS));
+        poll.getValue().run();
+        var order = inOrder(consumer);
+        order.verify(consumer).onTicker("Test", pair, quote);
+        order.verify(consumer).onCandle("Test", pair, closed);
+        verify(consumer, never()).onCandle("Test", pair, forming);
+        streamer.stopCandles(pair, 3600);
+        verify(task).cancel(false);
+        streamer.stopAll();
+    }
+    @Test
     void private401RevokesAccessAndSuccessfulAuthenticationRestoresIt() throws Exception {
         Coinbase exchange = coinbase(true, false);
         HttpClient client = mock(HttpClient.class);

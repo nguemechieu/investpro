@@ -7,14 +7,30 @@ import org.investpro.exchange.providers.EnvironmentCredentialProvider;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /** Application-owned assistant. Trading cores borrow its Telegram transport, never own its lifecycle. */
 public final class AssistantRuntime implements AutoCloseable {
     private final TelegramNotifier notifier;
+    private final AssistantNewsData news = new AssistantNewsData(new org.investpro.service.RssNewsService());
     private record DeskContext(Exchange exchange, org.investpro.models.trading.TradePair symbol) { }
     private volatile DeskContext deskContext = new DeskContext(null, null);
+    private volatile java.util.Map<String, Exchange> venues = java.util.Map.of();
+    private volatile java.util.function.Function<String, String> appControl;
+    public void setAppControl(java.util.function.Function<String, String> control) { appControl = control; }
+
+    public void updateVenues(java.util.Map<String, Exchange> sources) {
+        var snapshot = new java.util.LinkedHashMap<String, Exchange>();
+        sources.forEach((name, exchange) -> snapshot.put(AssistantAppData.venueId(name), exchange));
+        venues = java.util.Collections.unmodifiableMap(snapshot);
+    }
+
+    public synchronized void selectExchange(Exchange exchange) {
+        if (deskContext.exchange() != exchange) {
+            deskContext = new DeskContext(exchange, null);
+            notifier.setCommandHandler(null);
+        }
+    }
     private volatile java.util.function.Supplier<javafx.scene.Scene> screenshotSource = () -> null;
     private volatile java.util.function.Supplier<javafx.scene.Node> chartScreenshotSource = () -> null;
     public void setChartScreenshotSource(java.util.function.Supplier<javafx.scene.Node> source) {
@@ -44,6 +60,7 @@ public final class AssistantRuntime implements AutoCloseable {
         notifier.setScreenshotCapture(chart -> chart
                 ? AppScreenshot.captureNode(chartScreenshotSource) : captureScreenshot());
         notifier.setQuestionContext(this::contextFor);
+        notifier.setAssistantCommandExecutorFactory(this::commandExecutor);
     }
 
     public static AssistantRuntime fromEnvironment(String token, String key) {
@@ -88,28 +105,31 @@ public final class AssistantRuntime implements AutoCloseable {
         String context = "Desktop exchange: " + exchange.getName() + "; mode: " + exchange.getResolvedTradingMode()
                 + "; connected=" + exchange.isConnected() + "; snapshot time: " + Instant.now()
                 + ". Bot start/stop does not determine account connectivity.\n";
-        String lower = question.toLowerCase(Locale.ROOT);
-        if (lower.matches("(?s).*(account|balance|equity|portfolio|position|profit|margin).*")) {
-            try {
-                var account = exchange.tradingAccount().get(5, TimeUnit.SECONDS);
-                if (account != null) context += "Account snapshot: total balance=" + account.getTotalBalance()
-                        + ", equity=" + account.getEquity() + ", used margin=" + account.getMarginUsed()
-                        + ", available margin=" + account.getMarginAvailable() + ". Amounts use the account's currency; currency and individual holdings are not supplied.\n";
-                else context += "Account snapshot unavailable.\n";
-            } catch (InterruptedException error) { Thread.currentThread().interrupt(); context += "Account lookup interrupted.\n"; }
-            catch (Exception error) { context += "Account snapshot unavailable; do not assume balances or positions.\n"; }
-        }
         var symbol = snapshot.symbol();
-        if (symbol != null && lower.matches("(?s).*(market|price|profit|return|strategy|risk|" + java.util.regex.Pattern.quote(symbol.toSlashSymbol().toLowerCase(Locale.ROOT)) + ").*")) {
-            try {
-                var ticker = exchange.fetchTicker(symbol).get(5, TimeUnit.SECONDS);
-                if (ticker != null) context += "Selected market snapshot: " + symbol.toSlashSymbol()
-                        + "; bid=" + ticker.getBidPrice() + ", ask=" + ticker.getAskPrice() + ". Historical returns, fees and news are not supplied.\n";
-            } catch (InterruptedException error) { Thread.currentThread().interrupt(); }
-            catch (Exception error) { context += "Selected market quote unavailable.\n"; }
-        }
-        return context;
+        if (symbol != null) context += "Selected symbol: " + symbol.toSlashSymbol() + "; native ID: " + symbol.getNativeSymbol() + ".\n";
+        return context + "Available venue IDs: " + venues.keySet()
+                + ". Use app data tools for current figures. Action commands operate on the selected desktop exchange only.\n";
     }
 
-    @Override public void close() { attach(null); notifier.close(); }
+    private java.util.function.BiFunction<String, String, String> commandExecutor() {
+        var snapshot = deskContext;
+        var sources = venues;
+        var handler = notifier.getCommandHandler();
+        var controls = appControl;
+        return (user, command) -> {
+            String[] parts = command.substring(1).split("\\s+", 2);
+              String name = parts[0].split("@", 2)[0].toLowerCase(Locale.ROOT);
+              if (name.equals("news")) return news.execute("/news" + (parts.length > 1 ? " " + parts[1] : ""));
+            if (name.equals("venues") || name.equals("data"))
+                return AssistantAppData.execute("/" + name + (parts.length > 1 ? " " + parts[1] : ""), sources);
+            if (deskContext.exchange() != snapshot.exchange() || notifier.getCommandHandler() != handler)
+                return "Selected trading session changed. Request the action again.";
+            if (java.util.Set.of("openchart", "charttimeframe", "refreshchart", "resetzoom").contains(name))
+                return controls == null ? "Desktop chart controls unavailable." : controls.apply(command);
+            if (handler == null) return "Trading controls are unavailable. Connect an exchange; market analysis remains available through /venues and /data.";
+            return handler.handleCommand(command, user);
+        };
+    }
+
+    @Override public void close() { venues = java.util.Map.of(); attach(null); notifier.close(); }
 }

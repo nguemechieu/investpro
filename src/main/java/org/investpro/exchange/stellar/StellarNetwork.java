@@ -15,6 +15,7 @@ import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.exchange.infrastructure.StreamTransport;
+import org.investpro.exchange.infrastructure.PollingExchangeStreamer;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.MarketDepthType;
@@ -136,6 +137,7 @@ public class StellarNetwork extends Exchange {
     private final List<Trade> tradeHistory = new CopyOnWriteArrayList<>();
     private final AtomicLong nextOrderId = new AtomicLong(1000);
     private final Object pairDiscoveryLock = new Object();
+    private final PollingExchangeStreamer pollingStreamer = new PollingExchangeStreamer(this);
     private final ExecutorService ioExecutor = Executors.newFixedThreadPool(
             Math.max(2, Math.min(6, Runtime.getRuntime().availableProcessors())),
             new ThreadFactory() {
@@ -354,6 +356,7 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public void disconnect() {
+        stopAllStreams();
         connected = false;
         websocketAvailable = false;
         orders.clear();
@@ -1904,45 +1907,17 @@ public class StellarNetwork extends Exchange {
 
     private Ticker safeTicker(TradePair tradePair) {
         TradePair pair = pairOrDefault(tradePair);
-
-        if (isPaperTrading()) {
-            Ticker ticker = new Ticker(
-                    DEFAULT_XLM_USDC_PRICE,
-                    DEFAULT_XLM_USDC_PRICE * 0.999,
-                    DEFAULT_XLM_USDC_PRICE * 1.001,
-                    0.0,
-                    System.currentTimeMillis());
-            ticker.setTradePair(pair);
-            return ticker;
+        OrderBook orderBook = fetchStellarOrderBook(pair);
+        double bid = orderBook.getBestBid() == null ? 0.0 : orderBook.getBestBid().getPrice();
+        double ask = orderBook.getBestAsk() == null ? 0.0 : orderBook.getBestAsk().getPrice();
+        if (bid <= 0 && ask <= 0) {
+            throw new IllegalStateException("No Stellar market quotes available for " + pair);
         }
-
-        try {
-            OrderBook orderBook = fetchStellarOrderBook(pair);
-            double bid = orderBook.getBestBid() == null ? 0.0 : orderBook.getBestBid().getPrice();
-            double ask = orderBook.getBestAsk() == null ? 0.0 : orderBook.getBestAsk().getPrice();
-
-            if (bid <= 0 && ask <= 0) {
-                bid = DEFAULT_XLM_USDC_PRICE * 0.999;
-                ask = DEFAULT_XLM_USDC_PRICE * 1.001;
-            } else if (bid <= 0) {
-                bid = ask * 0.999;
-            } else if (ask <= 0) {
-                ask = bid * 1.001;
-            }
-
-            double mid = (bid + ask) / 2.0;
-            Ticker ticker = new Ticker(mid, bid, ask, 0.0, System.currentTimeMillis());
-            ticker.setTradePair(pair);
-            return ticker;
-        } catch (Exception exception) {
-            log.debug("Unable to fetch Stellar ticker for {}: {}", pair, exception.getMessage());
-            Ticker ticker = new Ticker(DEFAULT_XLM_USDC_PRICE, DEFAULT_XLM_USDC_PRICE * 0.999,
-                    DEFAULT_XLM_USDC_PRICE * 1.001, 0.0, System.currentTimeMillis());
-            ticker.setTradePair(pair);
-            return ticker;
-        }
+        double price = bid > 0 && ask > 0 ? (bid + ask) / 2.0 : Math.max(bid, ask);
+        Ticker ticker = new Ticker(price, bid, ask, 0.0, System.currentTimeMillis());
+        ticker.setTradePair(pair);
+        return ticker;
     }
-
     @Override
     public CompletableFuture<?> getOrderBook(TradePair tradePair) {
         return fetchOrderBook(tradePair);
@@ -2003,13 +1978,13 @@ public class StellarNetwork extends Exchange {
     private @NonNull OrderBook fetchStellarOrderBook(TradePair tradePair) {
         TradePair pair = pairOrDefault(tradePair);
         if (!supportsTradePair(pair)) {
-            return syntheticOrderBook(pair);
+            throw new IllegalStateException("No Stellar order book available for " + pair);
         }
 
         try {
-            var orderBookRequest = activeServer().orderBook()
-                    .sellingAsset(toStellarAsset(pair.getBaseCode()))
-                    .buyingAsset(toStellarAsset(pair.getCounterCode()));
+            var orderBookRequest = activeMarketDataServer().orderBook()
+                    .sellingAsset(toStellarMarketDataAsset(pair.getBaseCode()))
+                    .buyingAsset(toStellarMarketDataAsset(pair.getCounterCode()));
             orderBookRequest.limit(DEFAULT_ORDER_BOOK_LIMIT);
             OrderBookResponse response = orderBookRequest.execute();
 
@@ -2037,7 +2012,7 @@ public class StellarNetwork extends Exchange {
             }
 
             if (bids.isEmpty() && asks.isEmpty()) {
-                return syntheticOrderBook(pair);
+                throw new IllegalStateException("No Stellar order book available for " + pair);
             }
 
             bids.sort(Comparator.comparingDouble(OrderBook.PriceLevel::getPrice).reversed());
@@ -2047,22 +2022,9 @@ public class StellarNetwork extends Exchange {
             orderBook.setTimestamp(Instant.now());
             return orderBook;
         } catch (Exception exception) {
-            log.debug("Falling back to synthetic Stellar order book for {}: {}", pair, exception.getMessage());
-            return syntheticOrderBook(pair);
+            log.debug("Unable to fetch Stellar order book for {}: {}", pair, exception.getMessage());
+            throw new IllegalStateException("Unable to fetch Stellar order book for " + pair, exception);
         }
-    }
-
-    private OrderBook syntheticOrderBook(TradePair pair) {
-        double price = DEFAULT_XLM_USDC_PRICE;
-        OrderBook orderBook = new OrderBook(pair,
-                List.of(
-                        new OrderBook.PriceLevel(price * 0.999, 5_000.0),
-                        new OrderBook.PriceLevel(price * 0.995, 10_000.0)),
-                List.of(
-                        new OrderBook.PriceLevel(price * 1.001, 5_000.0),
-                        new OrderBook.PriceLevel(price * 1.005, 10_000.0)));
-        orderBook.setTimestamp(Instant.now());
-        return orderBook;
     }
 
     @Override
@@ -2225,15 +2187,13 @@ public class StellarNetwork extends Exchange {
 
             case 86_400 -> "D1";
             case 604_800 -> "W1";
-            case 2_419_200 -> "MN";
             default -> "N/A";
         };
     }
 
     @Override
     public List<Timeframe> getSupportedTimeframes() {
-        return List.of(Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.D1, Timeframe.W1,
-                Timeframe.MN);
+        return List.of(Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.D1, Timeframe.W1);
     }
 
     private List<CandleData> buildCandlesFromTrades(
@@ -2299,7 +2259,7 @@ public class StellarNetwork extends Exchange {
                         counter,
                         start,
                         end,
-                        resolution);
+                        resolution, safeLimit);
                 boolean inverted = false;
 
                 if (records.isEmpty()) {
@@ -2308,7 +2268,7 @@ public class StellarNetwork extends Exchange {
                             base,
                             start,
                             end,
-                            resolution);
+                            resolution, safeLimit);
                     inverted = !records.isEmpty();
                 }
 
@@ -2359,6 +2319,7 @@ public class StellarNetwork extends Exchange {
 
         if (lastFailure != null) {
             log.warn("No Stellar aggregation candles loaded after retries: {}", lastFailure.getMessage());
+            if (accumulatedCandles.isEmpty()) throw lastFailure;
         }
 
         return normalizeCandlePage(new ArrayList<>(accumulatedCandles.values()), safeLimit);
@@ -2391,23 +2352,30 @@ public class StellarNetwork extends Exchange {
             Asset counter,
             long startSeconds,
             long endSeconds,
-            long resolution) {
+            long resolution, int limit) {
         try {
-            Page<TradeAggregationResponse> page = activeMarketDataServer()
-                    .tradeAggregations(
-                            base,
-                            counter,
-                            startSeconds * 1000L,
-                            endSeconds * 1000L,
-                            resolution,
-                            0L)
-                    .execute();
-
-            if (page == null || page.getRecords() == null) {
-                return List.of();
+            List<TradeAggregationResponse> records = new ArrayList<>();
+            long endMillis = endSeconds * 1000L;
+            long startMillis = startSeconds * 1000L;
+            while (records.size() < limit && endMillis > startMillis) {
+                var request = activeMarketDataServer().tradeAggregations(
+                        base, counter, startMillis, endMillis, resolution, 0L);
+                request.order(RequestBuilder.Order.DESC);
+                request.limit(Math.min(200, limit - records.size()));
+                Page<TradeAggregationResponse> page = request.execute();
+                if (page == null || page.getRecords() == null || page.getRecords().isEmpty()) break;
+                final long pageEnd = endMillis;
+                var valid = page.getRecords().stream()
+                        .filter(record -> record != null && record.getTimestamp() != null)
+                        .filter(record -> record.getTimestamp() >= startMillis && record.getTimestamp() < pageEnd)
+                        .toList();
+                if (valid.isEmpty()) break;
+                long nextEnd = valid.stream().mapToLong(TradeAggregationResponse::getTimestamp).min().orElse(endMillis);
+                if (nextEnd >= endMillis) break;
+                records.addAll(valid);
+                endMillis = nextEnd;
             }
-
-            return page.getRecords()
+            return records
                     .stream()
                     .filter(record -> record != null && record.getTimestamp() != null)
                     .sorted(Comparator.comparingLong(TradeAggregationResponse::getTimestamp))
@@ -2564,8 +2532,8 @@ public class StellarNetwork extends Exchange {
 
     private long aggregationResolutionMillis(int secondsPerCandle) {
         return switch (secondsPerCandle) {
-            case 60, 300, 900, 3_600, 86_400, 604_800, 2_419_200 -> secondsPerCandle * 1000L;
-            default -> -60;
+            case 60, 300, 900, 3_600, 86_400, 604_800 -> secondsPerCandle * 1000L;
+            default -> -1;
         };
     }
 
@@ -2632,21 +2600,25 @@ public class StellarNetwork extends Exchange {
             long resolution,
             boolean inverse) {
         try {
-            Page<TradeAggregationResponse> page = activeMarketDataServer().tradeAggregations(
+            var request = activeMarketDataServer().tradeAggregations(
                     toStellarMarketDataAsset(inverse ? pair.getCounterCode() : pair.getBaseCode()),
                     toStellarMarketDataAsset(inverse ? pair.getBaseCode() : pair.getCounterCode()),
-0L,
-//                    openSeconds * 1000L,
+                    openSeconds * 1000L,
                     currentTill * 1000L,
                     resolution,
-                    0L).execute();
+                    0L);
+            request.order(RequestBuilder.Order.DESC);
+            request.limit(1);
+            Page<TradeAggregationResponse> page = request.execute();
 
             if (page == null || page.getRecords() == null || page.getRecords().isEmpty()) {
                 return Optional.empty();
             }
 
             TradeAggregationResponse record = page.getRecords().stream()
-                    .filter(aggregation -> aggregation.getTimestamp() != null)
+                    .filter(aggregation -> aggregation.getTimestamp() != null
+                            && aggregation.getTimestamp() >= openSeconds * 1000L
+                            && aggregation.getTimestamp() < currentTill * 1000L)
                     .max(Comparator.comparingLong(TradeAggregationResponse::getTimestamp))
                     .orElse(null);
 
@@ -2683,13 +2655,16 @@ public class StellarNetwork extends Exchange {
         }
 
         try {
-            Page<TradeAggregationResponse> page = activeMarketDataServer().tradeAggregations(
+            var request = activeMarketDataServer().tradeAggregations(
                     toStellarMarketDataAsset(inverse ? pair.getCounterCode() : pair.getBaseCode()),
                     toStellarMarketDataAsset(inverse ? pair.getBaseCode() : pair.getCounterCode()),
                     startSeconds * 1000L,
                     openSeconds * 1000L,
                     resolution,
-                    0L).execute();
+                    0L);
+            request.order(RequestBuilder.Order.DESC);
+            request.limit(1);
+            Page<TradeAggregationResponse> page = request.execute();
 
             if (page == null || page.getRecords() == null || page.getRecords().isEmpty()) {
                 return Optional.empty();
@@ -2789,20 +2764,36 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public void stream(ExchangeStreamSubscription subscription, ExchangeStreamConsumer consumer) {
-        log.debug("Stellar generic streaming requested; this adapter is SDK polling-first.");
+        if (subscription == null || consumer == null) return;
+        for (TradePair pair : subscription.getTradePairs()) {
+            if (subscription.isTicker()) streamTicker(pair, consumer);
+            if (subscription.isOrderBook()) streamOrderBook(pair, consumer);
+            if (subscription.isCandles()) streamCandles(pair, subscription.getSecondsPerCandle(), consumer);
+        }
+        if (subscription.isAccount() || subscription.isBalances()) streamAccount(consumer);
+        if (subscription.isOrders() || subscription.isFills()) streamOrders(consumer);
     }
 
     @Override
     public void stopStreaming(ExchangeStreamSubscription subscription) {
+        if (subscription == null) return;
+        for (TradePair pair : subscription.getTradePairs()) {
+            if (subscription.isTicker()) stopTickerStream(pair);
+            if (subscription.isOrderBook()) stopOrderBookStream(pair);
+            if (subscription.isCandles()) stopCandlesStream(pair, subscription.getSecondsPerCandle());
+        }
+        if (subscription.isAccount() || subscription.isBalances()) stopAccountStream();
+        if (subscription.isOrders() || subscription.isFills()) stopOrdersStream();
     }
 
     @Override
     public void stopAllStreams() {
+        pollingStreamer.stopAll();
     }
 
     @Override
     public void streamTicker(TradePair tradePair, ExchangeStreamConsumer consumer) {
-        log.debug("Stellar ticker streaming unavailable; use polling fetchTicker.");
+        pollingStreamer.streamTicker(tradePair, consumer);
     }
 
     @Override
@@ -2817,32 +2808,35 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public void streamOrderBook(TradePair tradePair, ExchangeStreamConsumer consumer) {
-        log.debug("Stellar order-book streaming unavailable; use fetchOrderBook polling.");
+        pollingStreamer.streamOrderBook(tradePair, consumer);
     }
 
     @Override
     public void streamCandles(TradePair tradePair, int secondsPerCandle, ExchangeStreamConsumer consumer) {
-        log.debug("Stellar candle streaming unavailable; use CandleDataSupplier polling.");
+        if (aggregationResolutionMillis(secondsPerCandle) <= 0) {
+            throw new IllegalArgumentException("Unsupported Stellar candle resolution: " + secondsPerCandle);
+        }
+        pollingStreamer.streamCandles(tradePair, secondsPerCandle, consumer);
     }
 
     @Override
     public void streamAccount(ExchangeStreamConsumer consumer) {
-        log.debug("Stellar account streaming unavailable.");
+        pollingStreamer.streamAccount(consumer);
     }
 
     @Override
     public void streamBalances(ExchangeStreamConsumer consumer) {
-        log.debug("Stellar balance streaming unavailable.");
+        streamAccount(consumer);
     }
 
     @Override
     public void streamOrders(ExchangeStreamConsumer consumer) {
-        log.debug("Stellar order streaming unavailable.");
+        pollingStreamer.streamOrders(consumer);
     }
 
     @Override
     public void streamFills(ExchangeStreamConsumer consumer) {
-        log.debug("Stellar fill streaming unavailable.");
+        streamOrders(consumer);
     }
 
     @Override
@@ -2852,6 +2846,7 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public void stopTickerStream(TradePair tradePair) {
+        pollingStreamer.stopTicker(tradePair);
     }
 
     @Override
@@ -2860,26 +2855,32 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public void stopOrderBookStream(TradePair tradePair) {
+        pollingStreamer.stopOrderBook(tradePair);
     }
 
     @Override
     public void stopCandlesStream(TradePair tradePair, int secondsPerCandle) {
+        pollingStreamer.stopCandles(tradePair, secondsPerCandle);
     }
 
     @Override
     public void stopAccountStream() {
+        pollingStreamer.stopAccount();
     }
 
     @Override
     public void stopBalancesStream() {
+        stopAccountStream();
     }
 
     @Override
     public void stopOrdersStream() {
+        pollingStreamer.stopOrders();
     }
 
     @Override
     public void stopFillsStream() {
+        stopOrdersStream();
     }
 
     @Override
@@ -3322,7 +3323,7 @@ public class StellarNetwork extends Exchange {
         @Contract(value = " -> new", pure = true)
         @Override
         public @NonNull @Unmodifiable Set<Integer> getSupportedGranularities() {
-            return Set.of(60, 300, 900, 3_600, 86_400, 604_800, 2_419_200);
+            return Set.of(60, 300, 900, 3_600, 86_400, 604_800);
         }
 
         @Override
@@ -3349,6 +3350,8 @@ public class StellarNetwork extends Exchange {
                             null,
                             end),
                     safeNumCandles);
+
+            if (!candles.isEmpty()) endTime.set(candles.getFirst().openTime());
 
             log.debug(
                     "stellar.candles.latest.loaded pair={} timeframe={} count={} end={}",
@@ -3391,7 +3394,8 @@ public class StellarNetwork extends Exchange {
                         .min()
                         .orElse((int) oldEnd);
 
-                newEnd = Math.max(0, firstOpenTime - 1);
+                // Horizon end times are exclusive and aligned to the candle boundary.
+                newEnd = Math.max(0, firstOpenTime);
                 endTime.set((int) newEnd);
             }
 

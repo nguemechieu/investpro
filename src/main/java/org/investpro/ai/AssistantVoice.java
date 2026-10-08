@@ -17,6 +17,8 @@ public final class AssistantVoice implements AutoCloseable {
     private final Supplier<String> apiKey;
     private volatile TargetDataLine microphone;
     private volatile SourceDataLine playback;
+    private CompletableFuture<HttpResponse<InputStream>> speechRequest;
+    private InputStream speechStream;
     @FunctionalInterface interface SpeakerFactory { SourceDataLine create(AudioFormat format) throws LineUnavailableException; }
     private final SpeakerFactory speakers;
     private CompletableFuture<byte[]> recording;
@@ -71,60 +73,115 @@ public final class AssistantVoice implements AutoCloseable {
         return new ObjectMapper().readTree(result).path("text").asText();
     }
 
-    public void speak(String text) throws Exception {
-        if (closed || text == null || text.isBlank()) return;
-        stopSpeaking();
-        long generation = playbackGeneration.get();
+    public void speak(String text) throws Exception { speak(text, () -> { }); }
+
+    public void speak(String text, Runnable onPlaybackStarted) throws Exception {
+        if (closed || Thread.currentThread().isInterrupted() || text == null || text.isBlank()) return;
         var json = new ObjectMapper();
         var body = json.createObjectNode().put("model", "gpt-4o-mini-tts").put("voice", "coral")
                 .put("input", text.substring(0, Math.min(text.length(), 4000))).put("response_format", "pcm");
-        byte[] pcm = send("speech", "application/json", json.writeValueAsBytes(body));
-        if (closed || generation != playbackGeneration.get()) return;
-        if (pcm.length == 0 || pcm.length % 2 != 0) throw new IOException("OpenAI returned empty or invalid speech audio.");
-        AudioFormat format = new AudioFormat(24000, 16, 1, true, false);
-        SourceDataLine line = speakers.create(format);
+        var request = audioRequest("speech", "application/json", json.writeValueAsBytes(body));
+        long generation;
+        CompletableFuture<HttpResponse<InputStream>> pending;
+        synchronized (this) {
+            if (closed || Thread.currentThread().isInterrupted()) return;
+            stopSpeaking();
+            generation = playbackGeneration.get();
+            pending = client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream());
+            speechRequest = pending;
+        }
+        SourceDataLine line = null;
+        InputStream stream = null;
         try {
-            line.open(format);
-            if (line.isControlSupported(BooleanControl.Type.MUTE))
-                ((BooleanControl) line.getControl(BooleanControl.Type.MUTE)).setValue(false);
-            if (line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-                FloatControl gain = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
-                gain.setValue(Math.clamp(0f, gain.getMinimum(), gain.getMaximum()));
-            }
+            var response = pending.get();
+            stream = response.body();
             synchronized (this) {
                 if (closed || generation != playbackGeneration.get()) return;
-                playback = line; line.start();
+                speechStream = stream;
             }
-            for (int offset = 0; offset < pcm.length && !closed && generation == playbackGeneration.get();) {
-                int written = line.write(pcm, offset, Math.min(8192, pcm.length - offset));
-                if (written <= 0) {
-                    if (generation != playbackGeneration.get() || closed) return;
-                    throw new IOException("Audio output stopped before playback completed.");
+            checkStatus(response.statusCode());
+            byte[] pcm = new byte[8192];
+            int carry = 0;
+            boolean played = false;
+            while (!closed && generation == playbackGeneration.get()) {
+                int count = stream.read(pcm, carry, pcm.length - carry);
+                if (count < 0) break;
+                if (count == 0) continue;
+                int available = carry + count;
+                int length = available & ~1; // A network chunk may split a 16-bit sample.
+                if (length > 0 && line == null) {
+                    AudioFormat format = new AudioFormat(24000, 16, 1, true, false);
+                    line = speakers.create(format);
+                    line.open(format);
+                    if (line.isControlSupported(BooleanControl.Type.MUTE))
+                        ((BooleanControl) line.getControl(BooleanControl.Type.MUTE)).setValue(false);
+                    if (line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+                        FloatControl gain = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
+                        gain.setValue(Math.clamp(0f, gain.getMinimum(), gain.getMaximum()));
+                    }
+                    synchronized (this) {
+                        if (closed || generation != playbackGeneration.get()) return;
+                        playback = line; line.start();
+                    }
                 }
-                offset += written;
+                for (int offset = 0; offset < length;) {
+                    if (closed || generation != playbackGeneration.get()) return;
+                    int written = line.write(pcm, offset, length - offset);
+                    if (written <= 0) {
+                        if (generation != playbackGeneration.get() || closed) return;
+                        throw new IOException("Audio output stopped before playback completed.");
+                    }
+                    offset += written;
+                    if (!played) { played = true; onPlaybackStarted.run(); }
+                }
+                carry = available - length;
+                if (carry > 0) pcm[0] = pcm[length];
             }
-            if (!closed && generation == playbackGeneration.get()) line.drain();
+            if (!closed && generation == playbackGeneration.get()) {
+                if (!played || carry != 0) throw new IOException("OpenAI returned empty or invalid speech audio.");
+                line.drain();
+            }
+        } catch (Exception error) {
+            if (!closed && generation == playbackGeneration.get()) throw error;
         } finally {
-            synchronized (this) { if (playback == line) playback = null; }
-            line.close();
+            pending.cancel(true);
+            synchronized (this) {
+                if (speechRequest == pending) speechRequest = null;
+                if (speechStream == stream) speechStream = null;
+                if (playback == line) playback = null;
+            }
+            if (stream != null) try { stream.close(); } catch (IOException ignored) { }
+            if (line != null) line.close();
         }
     }
-    private byte[] send(String operation, String contentType, byte[] body) throws Exception {
+    private HttpRequest audioRequest(String operation, String contentType, byte[] body) {
         String key = apiKey.get();
         if (key == null || key.isBlank()) throw new IllegalStateException("OpenAI is not configured");
-        var request = HttpRequest.newBuilder(URI.create("https://api.openai.com/v1/audio/" + operation))
+        return HttpRequest.newBuilder(URI.create("https://api.openai.com/v1/audio/" + operation))
                 .timeout(Duration.ofSeconds(45)).header("Authorization", "Bearer " + key)
                 .header("Content-Type", contentType).POST(HttpRequest.BodyPublishers.ofByteArray(body)).build();
-        var response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        if (response.statusCode() != 200) throw new IOException(switch (response.statusCode()) {
+    }
+    private static void checkStatus(int status) throws IOException {
+        if (status != 200) throw new IOException(switch (status) {
             case 401 -> "OpenAI speech authentication failed. Check OPENAI_API_KEY (HTTP 401).";
             case 403 -> "OpenAI speech access denied. Check audio model permissions (HTTP 403).";
             case 429 -> "OpenAI speech usage limit reached. Check quota or try again later (HTTP 429).";
-            default -> "OpenAI audio request failed (HTTP " + response.statusCode() + ").";
+            default -> "OpenAI audio request failed (HTTP " + status + ").";
         });
+    }
+    private byte[] send(String operation, String contentType, byte[] body) throws Exception {
+        var response = client.send(audioRequest(operation, contentType, body), HttpResponse.BodyHandlers.ofByteArray());
+        checkStatus(response.statusCode());
         return response.body();
     }
     public void stopRecording() { TargetDataLine line = microphone; microphone = null; if (line != null) { line.stop(); line.close(); } }
-    public synchronized void stopSpeaking() { playbackGeneration.incrementAndGet(); SourceDataLine line = playback; playback = null; if (line != null) { line.stop(); line.flush(); line.close(); } }
+    public synchronized void stopSpeaking() {
+        playbackGeneration.incrementAndGet();
+        if (speechRequest != null) { speechRequest.cancel(true); speechRequest = null; }
+        SourceDataLine line = playback; playback = null;
+        if (line != null) { line.stop(); line.flush(); line.close(); }
+        InputStream stream = speechStream; speechStream = null;
+        if (stream != null) try { stream.close(); } catch (IOException ignored) { }
+    }
     @Override public void close() { closed = true; stopRecording(); stopSpeaking(); }
 }

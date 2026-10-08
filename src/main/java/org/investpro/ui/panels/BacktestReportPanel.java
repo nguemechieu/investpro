@@ -188,7 +188,7 @@ public class BacktestReportPanel extends ScrollPane {
         addMetricRow(grid, row++, "VaR (95%)", createMetricValueColored(formatCurrency(metrics.getVar95()),
                 metrics.getVar95() >= 0));
 
-        addMetricRow(grid, row++, "CVaR (95%)", createMetricValueColored(formatCurrency(metrics.getCvar95()),
+        addMetricRow(grid, row+1, "CVaR (95%)", createMetricValueColored(formatCurrency(metrics.getCvar95()),
                 metrics.getCvar95() >= 0));
 
         section.getChildren().addAll(title, grid);

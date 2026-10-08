@@ -116,7 +116,8 @@ public class OnboardingDesk extends StackPane {
             -fx-font-size: 12;
             """;
 
-    private final Consumer<MarketConfiguration> onReady;
+    private final java.util.function.BiConsumer<MarketConfiguration, Exchange> onReady;
+    private IbkrExchange authenticatedIbkr;
     private final UserAuthService authService = new UserAuthService();
 
     private final TextField usernameField = new TextField();
@@ -141,6 +142,10 @@ public class OnboardingDesk extends StackPane {
     private MarketConfiguration configuration;
 
     public OnboardingDesk(Consumer<MarketConfiguration> onReady) {
+        this((configuration, _) -> onReady.accept(configuration));
+    }
+
+    public OnboardingDesk(java.util.function.BiConsumer<MarketConfiguration, Exchange> onReady) {
         this.onReady = Objects.requireNonNull(onReady, "onReady must not be null");
 
         setPrefSize(DEFAULT_WIDTH, DEFAULT_HEIGHT);
@@ -906,6 +911,11 @@ public class OnboardingDesk extends StackPane {
                 apiSecret = normalized.privateKey();
                 apiKeyField.setText(apiKey);
                 apiSecretField.setText(apiSecret);
+                String inputError = org.investpro.exchange.coinbase.CoinbaseCredentialInput.validationError(apiKey, apiSecret);
+                if (inputError != null) {
+                    validation.setText(inputError);
+                    return;
+                }
             } catch (IllegalArgumentException invalidInput) {
                 validation.setText(invalidInput.getMessage());
                 return;
@@ -1219,7 +1229,8 @@ public class OnboardingDesk extends StackPane {
 
         Runnable transition = () -> {
             try {
-                onReady.accept(configuration);
+                onReady.accept(configuration, authenticatedIbkr);
+                authenticatedIbkr = null; // The trading desk now owns the connection.
             } catch (Exception exception) {
                 log.error("Failed to open trading desk from onboarding", exception);
                 resetLoadingState("Failed to open trading desk. Please try again.");
@@ -1755,6 +1766,10 @@ public class OnboardingDesk extends StackPane {
             Map<String, String> exchangeParams) {
         Exchange exchange = null;
         try {
+            if (authenticatedIbkr != null) {
+                authenticatedIbkr.disconnect();
+                authenticatedIbkr = null;
+            }
             exchange = createExchange(selectedExchange, apiKey, apiSecret, accountId, twoFactorCode,
                     tradingMode, exchangeParams);
             AuthResult authResult = exchange.AuthCheckResult(selectedExchange);
@@ -1765,6 +1780,11 @@ public class OnboardingDesk extends StackPane {
             AuthResult accountValidation = validateAccountAccess(exchange, selectedExchange);
             if (!accountValidation.success()) {
                 return accountValidation;
+            }
+
+            if (exchange instanceof IbkrExchange ibkr && ibkr.ibkrSessionState().connectionSuccessful()) {
+                authenticatedIbkr = ibkr;
+                ibkr.setAuthenticatedSessionConnected(true);
             }
 
             if (authResult != null) {
@@ -1780,7 +1800,7 @@ public class OnboardingDesk extends StackPane {
             return AuthResult
                     .failure("Authentication failed for %s: %s".formatted(selectedExchange, rootMessage(throwable)));
         } finally {
-            if (exchange instanceof IbkrExchange ibkr) ibkr.disconnect();
+            if (exchange instanceof IbkrExchange ibkr && ibkr != authenticatedIbkr) ibkr.disconnect();
         }
     }
 
