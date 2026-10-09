@@ -1,0 +1,5 @@
+org\investpro\exchange\consumers\LatestUiUpdates.class
+org\investpro\ui\charts\ChartContainer$PreparedChart.class
+org\investpro\ui\TradingDesk$MarketWatchCatalogSnapshot.class
+org\investpro\ui\utils\UiBackgroundTasks.class
+org\investpro\ui\TradingDesk$PreparedManualOrder.class

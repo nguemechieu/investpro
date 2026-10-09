@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="maven-antrun-" default="main">
+  <target name="main">
+    <echo level="warning">SpotBugs skipped: the configured SpotBugs version cannot parse Java 27 class files. Upgrade SpotBugs to a version supporting Java 27 before enabling this check.</echo>
+  </target>
+</project>

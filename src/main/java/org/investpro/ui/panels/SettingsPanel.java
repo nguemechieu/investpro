@@ -314,10 +314,10 @@ public class SettingsPanel extends StackPane {
     }
 
     private VBox createTelegramSection() {
-        Label sectionTitle = sectionTitle("Telegram Notifications", COLOR_INFO);
+        Label sectionTitle = sectionTitle("Telegram Assistant & Notifications", COLOR_INFO);
         GridPane grid = sectionGrid(COLOR_INFO);
 
-        enableTelegramCheckbox = styledCheckBox("Enable Telegram Notifications", false);
+        enableTelegramCheckbox = styledCheckBox("Enable Telegram Assistant & Notifications", false);
 
         telegramBotTokenField = new PasswordField();
         telegramBotTokenField.setStyle(inputStyle());
@@ -335,6 +335,10 @@ public class SettingsPanel extends StackPane {
         addRow(grid, 1, "Bot Token:", telegramBotTokenField);
         addRow(grid, 2, "Chat ID:", telegramChatIdField);
         grid.add(testTelegramButton, 1, 3);
+
+        Label telegramHelp = new Label("Saved token and chat ID are used by the AI integration on app startup. Restart after changes. Assistant replies also require authorized Telegram user IDs.");
+        telegramHelp.setWrapText(true);
+        grid.add(telegramHelp, 0, 4, 2, 1);
 
         return new VBox(8, sectionTitle, grid);
     }

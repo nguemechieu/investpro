@@ -46,12 +46,6 @@ public class AlpacaCredProvider {
     }
 
     public void logCredentialStatus() {
-        log.info("OANDA Credential Status:");
-        log.info("  Advanced Trade EC Key: {}", hasAdvancedTradeCredentials() ? "CONFIGURED" : "NOT CONFIGURED");
-        log.info("  Legacy REST API: {}", hasLegacyCredentials() ? "CONFIGURED" : "NOT CONFIGURED");
-
-        if (credentials.keyName() != null) {
-            log.info("  Key Name: {}...", credentials.keyName().substring(0, Math.min(30, credentials.keyName().length())));
-        }
+        log.info("Alpaca API key and secret: {}", hasLegacyCredentials() ? "CONFIGURED" : "NOT CONFIGURED");
     }
 }

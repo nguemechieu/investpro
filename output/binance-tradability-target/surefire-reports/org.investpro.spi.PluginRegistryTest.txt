@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.spi.PluginRegistryTest
+-------------------------------------------------------------------------------
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.166 s -- in org.investpro.spi.PluginRegistryTest

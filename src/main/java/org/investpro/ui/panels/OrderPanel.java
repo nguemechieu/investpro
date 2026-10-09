@@ -104,18 +104,24 @@ public class OrderPanel extends VBox {
         TradePair initial = selectedTradePair != null
                 ? selectedTradePair
                 : systemCore.getSelectedTradePair();
-        List<TradePair> symbols = loadSymbols(initial);
-        if (initial == null && !symbols.isEmpty()) initial = symbols.getFirst();
-
-        if (initial != null) {
-            try {
-                updatePricesFromOrderBook(systemCore.getExchange().fetchOrderBook(initial).get(3, TimeUnit.SECONDS));
-            } catch (Exception e) {
-                log.warn("OrderPanel: could not fetch initial order book", e);
-            }
-        }
-
-        buildUI(symbols, initial);
+        TradePair preferred = initial;
+        buildUI(initial == null ? List.of() : List.of(initial), initial);
+        placeOrderButton.setDisable(true);
+        org.investpro.ui.utils.UiBackgroundTasks.submit(() -> loadSymbols(preferred))
+                .orTimeout(20, TimeUnit.SECONDS).whenComplete((symbols, error) -> javafx.application.Platform.runLater(() -> {
+                    if (error != null) {
+                        log.warn("OrderPanel symbol loading failed", error);
+                        showError("Unable to load order symbols. Please reopen the ticket to retry.");
+                        return;
+                    }
+                    String selected = symbolCombo.getValue();
+                    symbolCombo.getItems().setAll(symbols.stream().map(this::displaySymbol).toList());
+                    if (selected != null && symbolCombo.getItems().contains(selected)) symbolCombo.setValue(selected);
+                    else if (!symbols.isEmpty()) symbolCombo.setValue(displaySymbol(symbols.getFirst()));
+                    placeOrderButton.setDisable(symbols.isEmpty());
+                    TradePair quotePair = symbols.stream().filter(pair -> displaySymbol(pair).equals(symbolCombo.getValue())).findFirst().orElse(null);
+                    if (quotePair != null) loadInitialQuote(quotePair);
+                }));
 
         try { LocalizationService.applyTranslations(this); }
         catch (Exception e) { log.debug("Localization skipped: {}", e.getMessage()); }
@@ -155,6 +161,15 @@ public class OrderPanel extends VBox {
             log.error("OrderPanel: failed to load symbols", e);
             return List.of();
         }
+    }
+
+    private void loadInitialQuote(TradePair pair) {
+        org.investpro.ui.utils.UiBackgroundTasks.submit(() -> systemCore.getExchange().fetchOrderBook(pair))
+                .thenCompose(java.util.function.Function.identity()).orTimeout(3, TimeUnit.SECONDS)
+                .whenComplete((book, error) -> javafx.application.Platform.runLater(() -> {
+                    if (error != null) { log.debug("OrderPanel initial quote unavailable", error); return; }
+                    if (displaySymbol(pair).equals(symbolCombo.getValue())) updatePricesFromOrderBook(book);
+                }));
     }
 
     private boolean canOpenManualOrder(SymbolTradability status) {

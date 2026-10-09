@@ -21,7 +21,7 @@ import org.investpro.service.NewsDataProvider;
 import java.awt.Desktop;
 import java.net.URI;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
+
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
@@ -122,6 +122,7 @@ public class MarketInfoPanel extends ScrollPane {
         statusLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #94a3b8;");
         statusLabel.setWrapText(true);
 
+        updateMetrics(currentMetrics);
         headerBox.getChildren().setAll(topLine, symbolLabel, nameLabel, priceLabel, statusLabel);
     }
 
@@ -959,7 +960,7 @@ public class MarketInfoPanel extends ScrollPane {
         return balances.entrySet().stream()
                 .filter(entry -> entry.getKey() != null && entry.getValue() != null)
                 .filter(entry -> Double.isFinite(entry.getValue()) && Math.abs(entry.getValue()) > 0.0)
-                .sorted(Comparator.comparing(Map.Entry::getKey))
+                .sorted(Map.Entry.comparingByKey())
                 .limit(8)
                 .map(entry -> "%s %s".formatted(formatBalanceAmount(entry.getValue()), entry.getKey().toUpperCase(Locale.ROOT)))
                 .reduce((left, right) -> left + ", " + right)

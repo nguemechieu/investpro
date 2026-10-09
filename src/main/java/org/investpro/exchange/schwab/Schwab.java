@@ -7,7 +7,6 @@ import javafx.beans.property.SimpleIntegerProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.ToString;
 import org.investpro.data.CandleData;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.enums.timeframe.Timeframe;
@@ -50,22 +49,92 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @EqualsAndHashCode(callSuper = true)
 @Getter
 @Setter
-@ToString(callSuper = true)
+@lombok.extern.slf4j.Slf4j
 public class Schwab extends Exchange {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
     private static final DateTimeFormatter ISO_UTC = DateTimeFormatter.ISO_INSTANT.withZone(ZoneOffset.UTC);
 
     private final SchwabApiConfig config;
-    private final SchwabOAuthTokenService tokenService;
+    private final SchwabTokenManager tokenService;
+    private final java.util.concurrent.atomic.AtomicLong connectionGeneration = new java.util.concurrent.atomic.AtomicLong();
     private final SchwabApiClient apiClient;
+    private final java.util.concurrent.ExecutorService brokerWorkers = new java.util.concurrent.ThreadPoolExecutor(4, 4,
+            0, java.util.concurrent.TimeUnit.SECONDS, new java.util.concurrent.ArrayBlockingQueue<>(64), runnable -> {
+        Thread thread = new Thread(runnable, "SchwabBroker"); thread.setDaemon(true); return thread;
+    });
+    private final SchwabAuthorizationFlow authorization;
     private final AtomicBoolean connected = new AtomicBoolean(false);
 
     public Schwab(@NotNull ExchangeCredentials credentials) {
         super(credentials);
         this.config = SchwabApiConfig.from(credentials);
-        this.tokenService = new SchwabOAuthTokenService(config);
-        this.apiClient = new SchwabApiClient(config, tokenService);
+        var http = java.net.http.HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(15))
+                .followRedirects(java.net.http.HttpClient.Redirect.NEVER).build();
+        var clock = java.time.Clock.systemUTC();
+        var oauth = new SchwabOAuthClient(config, http, MAPPER, clock);
+        String partition;
+        try { partition = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest((config.clientId() + ":" + config.accountId()).getBytes(java.nio.charset.StandardCharsets.UTF_8))).substring(0, 24); }
+        catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 unavailable"); }
+        var path = java.nio.file.Path.of(org.investpro.config.AppConfig.get("SCHWAB_TOKEN_PATH",
+                java.nio.file.Path.of(System.getProperty("user.home"), ".investpro", "schwab", partition + ".tokens").toString()));
+        this.tokenService = new SchwabTokenManager(oauth, new SchwabEncryptedTokenStore(path,
+                () -> org.investpro.config.AppConfig.get("SCHWAB_TOKEN_STORE_PASSWORD"), MAPPER), clock);
+        this.apiClient = new SchwabApiClient(config, tokenService, http);
+        this.authorization = new SchwabAuthorizationFlow(config, oauth, tokenService, brokerWorkers);
     }
+
+    private <T> CompletableFuture<T> brokerTask(java.util.function.Supplier<T> operation) {
+        try { return CompletableFuture.supplyAsync(operation, brokerWorkers); }
+        catch (java.util.concurrent.RejectedExecutionException error) {
+            return CompletableFuture.failedFuture(new java.io.IOException("Schwab request queue is busy. Try again later."));
+        }
+    }
+
+    public CompletableFuture<Void> connectAsync() {
+        connected.set(false); setAuthenticatedSessionConnected(false);
+        long expected = connectionGeneration.get();
+        return brokerTask(() -> {
+            synchronized (this) {
+                if (expected != connectionGeneration.get()) throw new java.util.concurrent.CompletionException(new SchwabAuthenticationException("Schwab connection cancelled."));
+                tokenService.connect();
+                return tokenService.getValidAccessToken();
+            }
+        }).thenCompose(future -> future).thenCompose(_ -> getAccountNumbers()).thenRun(() -> markConnected(expected));
+    }
+    public CompletableFuture<Void> reauthorize() {
+        long expected = connectionGeneration.incrementAndGet();
+        connected.set(false);
+        setAuthenticatedSessionConnected(false);
+        return authorization.start().thenCompose(_ -> getAccountNumbers()).thenRun(() -> markConnected(expected));
+    }
+    private synchronized void markConnected(long expected) {
+        if (expected != connectionGeneration.get() || "Disconnected".equals(authenticationStatus()))
+            throw new java.util.concurrent.CompletionException(new SchwabAuthenticationException("Schwab connection cancelled."));
+        connected.set(true); setAuthenticatedSessionConnected(true);
+        log.info("schwab.connection.connected");
+    }
+    public CompletableFuture<JsonNode> getAccountNumbers() {
+        return brokerTask(() -> {
+            try {
+                JsonNode accounts = apiClient.fetchAccountNumbers();
+                if (!accounts.isArray() || accounts.isEmpty()) throw new SchwabAuthenticationException("No Schwab accounts were authorized.");
+                return accounts;
+            } catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
+        });
+    }
+    public void unlinkAccount() throws java.io.IOException { disconnect(); tokenService.unlink(); }
+    public CompletableFuture<Void> unlinkAsync() {
+        return brokerTask(() -> {
+            try { unlinkAccount(); return null; } catch (java.io.IOException error) { throw new java.util.concurrent.CompletionException(error); }
+        });
+    }
+    @Override public boolean hasPrivateAuthentication() { return Boolean.TRUE.equals(isConnected()); }
+    public String authenticationStatus() {
+        String status = tokenService.status();
+        return "Connected".equals(status) && !connected.get() ? "Authentication Error" : status;
+    }
+    @Override public String toString() { return "Schwab[credentials=<redacted>]"; }
 
     @Override
     public void buy(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss,
@@ -85,7 +154,7 @@ public class Schwab extends Exchange {
             tokenService.getAccessToken();
             return AuthResult.success("Schwab OAuth authentication succeeded");
         } catch (Exception exception) {
-            return AuthResult.failure("Schwab OAuth authentication failed: " + exception.getMessage());
+            return AuthResult.failure("Schwab authentication unavailable. Connect or reauthorize in the Schwab panel.");
         }
     }
 
@@ -97,9 +166,10 @@ public class Schwab extends Exchange {
     @Override
     public CompletableFuture<Account> fetchAccount() {
         if (isPaperTrading()) return CompletableFuture.completedFuture(localPaperAccount());
-        return CompletableFuture.supplyAsync(() -> {
+        return brokerTask(() -> {
             try {
-                JsonNode root = apiClient.fetchAccounts();
+                String resolvedAccountId = resolveAccountId();
+                JsonNode root = apiClient.fetchAccount(resolvedAccountId);
                 Account account = new Account();
                 account.setBrokerName(getDisplayName());
                 account.setExchangeId(getExchangeId());
@@ -107,10 +177,6 @@ public class Schwab extends Exchange {
                 account.setSandbox(isSandbox());
                 account.setPaperTrading(isPaperTrading());
                 account.setUpdatedAt(Instant.now());
-
-                String configuredAccountId = config.accountId();
-                String resolvedAccountId = !configuredAccountId.isBlank() ? configuredAccountId
-                        : extractAccountId(root);
                 account.setAccountId(resolvedAccountId);
                 account.setAccount(resolvedAccountId);
 
@@ -175,12 +241,12 @@ public class Schwab extends Exchange {
 
     @Override
     public boolean supportsPositions() {
-        return true;
+        return false;
     }
 
     @Override
     public boolean supportsAccountTrades() {
-        return true;
+        return false;
     }
 
     @Override
@@ -265,12 +331,20 @@ public class Schwab extends Exchange {
 
     @Override
     public void connect() {
-        connected.set(checkAuthentication().isSuccess());
+        try { connectAsync().get(70, java.util.concurrent.TimeUnit.SECONDS); }
+        catch (InterruptedException error) { Thread.currentThread().interrupt(); connected.set(false); setAuthenticatedSessionConnected(false); }
+        catch (ExecutionException | java.util.concurrent.TimeoutException error) { connected.set(false); setAuthenticatedSessionConnected(false); }
     }
 
     @Override
     public void disconnect() {
-        connected.set(false);
+        synchronized (this) {
+            connectionGeneration.incrementAndGet();
+            connected.set(false); setAuthenticatedSessionConnected(false);
+        }
+        authorization.cancel();
+        tokenService.disconnect();
+        log.info("schwab.connection.disconnected");
     }
 
     @Override
@@ -281,8 +355,10 @@ public class Schwab extends Exchange {
 
     @Override
     public Boolean isConnected() {
-        return connected.get();
+        return connected.get() && java.util.Set.of("Connected", "Connecting", "Token Refreshing").contains(tokenService.status());
     }
+
+    @Override public boolean isAuthenticatedSessionConnected() { return isConnected(); }
 
     @Override
     public ExchangeWebSocketClient getWebsocketClient() {
@@ -379,10 +455,10 @@ public class Schwab extends Exchange {
                 .supportsPollingFallback(true)
                 .supportsAccountInfo(true)
                 .supportsBalances(true)
-                .supportsPositions(true)
-                .supportsOpenOrders(true)
-                .supportsOrderHistory(true)
-                .supportsAccountTrades(true)
+                .supportsPositions(false)
+                .supportsOpenOrders(false)
+                .supportsOrderHistory(false)
+                .supportsAccountTrades(false)
                 .requiresAuthenticationForTrading(true)
                 .requiresAuthenticationForAccountInfo(true)
                 .requiresAuthenticationForMarketData(true)
@@ -400,13 +476,13 @@ public class Schwab extends Exchange {
                     .credentialSource("ENV_VAR_OR_PARAMS")
                     .endpointTested(config.oauthTokenUrl())
                     .httpStatus(200)
-                    .message("Schwab OAuth token refresh succeeded")
+                    .message("Schwab OAuth access token is available")
                     .credentialIssue(false)
                     .checkedAt(Instant.now())
-                    .metadata(Map.of("authFlow", "refresh_token", "mode", getResolvedTradingMode()))
+                    .metadata(Map.of("authFlow", "authorization_code", "mode", getResolvedTradingMode()))
                     .build();
         } catch (Exception exception) {
-            String message = exception.getMessage() == null ? "authentication failure" : exception.getMessage();
+            String message = "Schwab authentication unavailable. Connect or reauthorize in the Schwab panel.";
             return AuthCheckResult.builder()
                     .exchangeName(getName())
                     .success(false)
@@ -416,7 +492,7 @@ public class Schwab extends Exchange {
                     .message(message)
                     .credentialIssue(true)
                     .checkedAt(Instant.now())
-                    .metadata(Map.of("authFlow", "refresh_token", "mode", getResolvedTradingMode()))
+                    .metadata(Map.of("authFlow", "authorization_code", "mode", getResolvedTradingMode()))
                     .build();
         }
     }
@@ -465,7 +541,7 @@ public class Schwab extends Exchange {
 
     @Override
     public CompletableFuture<Ticker> fetchTicker(TradePair tradePair) {
-        return CompletableFuture.supplyAsync(() -> {
+        return brokerTask(() -> {
             try {
                 String symbol = toSchwabSymbol(tradePair);
                 JsonNode root = apiClient.fetchQuote(symbol);
@@ -492,12 +568,9 @@ public class Schwab extends Exchange {
             return CompletableFuture.completedFuture(List.of());
         }
 
-        CompletableFuture<?>[] futures = tradePairs.stream()
-                .map(this::fetchTicker)
-                .toArray(CompletableFuture[]::new);
-
-        return CompletableFuture.allOf(futures)
-                .thenApply(ignored -> tradePairs.stream().map(this::fetchTicker).map(CompletableFuture::join).toList());
+        List<CompletableFuture<Ticker>> futures = tradePairs.stream().map(this::fetchTicker).toList();
+        return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
+                .thenApply(_ -> futures.stream().map(CompletableFuture::join).toList());
     }
 
     @Override
@@ -651,7 +724,7 @@ public class Schwab extends Exchange {
     @Override
     public CompletableFuture<String> cancelOrder(String orderId) {
         if (isPaperTrading()) return orderExecution().cancelOrder(orderId);
-        return CompletableFuture.supplyAsync(() -> {
+        return brokerTask(() -> {
             try {
                 boolean cancelled = apiClient.cancelOrder(resolveAccountId(), orderId);
                 if (!cancelled) {
@@ -684,40 +757,40 @@ public class Schwab extends Exchange {
     @Override
     public CompletableFuture<Optional<Order>> fetchOrder(String orderId) {
         if (isPaperTrading()) return orderExecution().fetchOrder(orderId);
-        return CompletableFuture.completedFuture(Optional.empty());
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Schwab live retrieval is not mapped for this operation."));
     }
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
         if (isPaperTrading()) return orderExecution().fetchOpenOrders(tradePair);
-        return CompletableFuture.completedFuture(List.of());
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Schwab live retrieval is not mapped for this operation."));
     }
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
         if (isPaperTrading()) return orderExecution().fetchAllOpenOrders();
-        return CompletableFuture.completedFuture(List.of());
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Schwab live retrieval is not mapped for this operation."));
     }
 
     @Override
     public CompletableFuture<List<Order>> fetchOrderHistory(TradePair tradePair, Instant since) {
         if (isPaperTrading()) return orderExecution().fetchOrderHistory(tradePair, since);
-        return CompletableFuture.completedFuture(List.of());
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Schwab live retrieval is not mapped for this operation."));
     }
 
     @Override
     public CompletableFuture<List<Position>> fetchPositions(TradePair tradePair) {
-        return CompletableFuture.completedFuture(List.of());
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Schwab live retrieval is not mapped for this operation."));
     }
 
     @Override
     public CompletableFuture<List<Position>> fetchAllPositions() {
-        return CompletableFuture.completedFuture(List.of());
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Schwab live retrieval is not mapped for this operation."));
     }
 
     @Override
     public CompletableFuture<Optional<Position>> fetchPosition(TradePair tradePair) {
-        return CompletableFuture.completedFuture(Optional.empty());
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Schwab live retrieval is not mapped for this operation."));
     }
 
     @Override
@@ -932,22 +1005,22 @@ public class Schwab extends Exchange {
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTrades(TradePair tradePair) {
-        return CompletableFuture.completedFuture(List.of());
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Schwab live retrieval is not mapped for this operation."));
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTradesSince(TradePair tradePair, Instant since) {
-        return CompletableFuture.completedFuture(List.of());
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Schwab live retrieval is not mapped for this operation."));
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTradesBetween(TradePair tradePair, Instant from, Instant to) {
-        return CompletableFuture.completedFuture(List.of());
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Schwab live retrieval is not mapped for this operation."));
     }
 
     private CompletableFuture<String> submitOrder(JsonNode payload) {
         if (isPaperTrading()) return CompletableFuture.failedFuture(new IllegalStateException("Broker submissions are disabled in local paper mode."));
-        return CompletableFuture.supplyAsync(() -> {
+        return brokerTask(() -> {
             try {
                 return apiClient.placeOrder(resolveAccountId(), payload);
             } catch (Exception exception) {
@@ -957,16 +1030,18 @@ public class Schwab extends Exchange {
     }
 
     private String resolveAccountId() {
-        if (config.accountId() != null && !config.accountId().isBlank()) {
-            return config.accountId();
-        }
         try {
-            JsonNode root = apiClient.fetchAccounts();
-            String extracted = extractAccountId(root);
-            if (extracted == null || extracted.isBlank()) {
-                throw new IllegalStateException("SCHWAB_ACCOUNT_ID is required when account lookup fails");
+            JsonNode root = apiClient.fetchAccountNumbers();
+            if (!root.isArray() || root.isEmpty()) throw new SchwabAuthenticationException("No Schwab accounts were authorized.");
+            if (config.accountId().isBlank() && root.size() != 1) {
+                throw new SchwabAuthenticationException("Multiple Schwab accounts are authorized. Select SCHWAB_ACCOUNT_ID before trading.");
             }
-            return extracted;
+            for (JsonNode entry : root) {
+                String hash = entry.path("hashValue").asText("");
+                if (!hash.isBlank() && (config.accountId().isBlank() || config.accountId().equals(hash)
+                        || config.accountId().equals(entry.path("accountNumber").asText()))) return hash;
+            }
+            throw new SchwabAuthenticationException("The selected Schwab account was not authorized.");
         } catch (Exception exception) {
             throw new IllegalStateException("Unable to resolve Schwab account id", exception);
         }
@@ -1004,29 +1079,6 @@ public class Schwab extends Exchange {
         String text = String.valueOf(tradePair);
         int slash = text.indexOf('/');
         return (slash > 0 ? text.substring(0, slash) : text).toUpperCase(Locale.ROOT);
-    }
-
-    private static String extractAccountId(JsonNode root) {
-        if (root == null || root.isMissingNode()) {
-            return "";
-        }
-        if (root.isArray() && !root.isEmpty()) {
-            JsonNode first = root.get(0);
-            String id = first.path("hashValue").asText("");
-            if (!id.isBlank()) {
-                return id;
-            }
-            return first.path("accountNumber").asText("");
-        }
-        if (root.has("accounts") && root.path("accounts").isArray() && !root.path("accounts").isEmpty()) {
-            JsonNode first = root.path("accounts").get(0);
-            String id = first.path("hashValue").asText("");
-            if (!id.isBlank()) {
-                return id;
-            }
-            return first.path("accountNumber").asText("");
-        }
-        return root.path("hashValue").asText(root.path("accountNumber").asText(""));
     }
 
     private static JsonNode extractBalances(JsonNode root) {

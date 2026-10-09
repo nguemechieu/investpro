@@ -160,7 +160,33 @@ public final class CurrencyIconLoader {
      * @param currencyCode ISO 4217 fiat code or crypto symbol
      * @return Image, or fallback if not found
      */
+    private static final java.util.concurrent.ThreadPoolExecutor ICON_WORKERS = new java.util.concurrent.ThreadPoolExecutor(
+            2, 2, 30, TimeUnit.SECONDS, new java.util.concurrent.ArrayBlockingQueue<>(128), runnable -> {
+                Thread thread = new Thread(runnable, "currency-icon-load"); thread.setDaemon(true); return thread;
+            }, new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
+    private static final ConcurrentHashMap<String, java.util.concurrent.CompletableFuture<Image>> ICON_LOADS = new ConcurrentHashMap<>();
+
     public static Image loadCurrencyIcon(String currencyCode) {
+        if (!javafx.application.Platform.isFxApplicationThread()) return loadCurrencyIconBlocking(currencyCode);
+        String code = currencyCode == null ? "" : currencyCode.strip().toUpperCase(Locale.ROOT);
+        Image cached = CACHE.get(code);
+        if (cached != null) return cached;
+        loadCurrencyIconAsync(code);
+        return loadFallback();
+    }
+
+    public static java.util.concurrent.CompletableFuture<Image> loadCurrencyIconAsync(String currencyCode) {
+        String code = currencyCode == null ? "" : currencyCode.strip().toUpperCase(Locale.ROOT);
+        Image cached = CACHE.get(code);
+        if (cached != null) return java.util.concurrent.CompletableFuture.completedFuture(cached);
+        if (code.isBlank()) return java.util.concurrent.CompletableFuture.completedFuture(loadFallback());
+        var result = ICON_LOADS.computeIfAbsent(code, key -> UiBackgroundTasks.submit(ICON_WORKERS,
+                () -> loadCurrencyIconBlocking(key)));
+        result.whenComplete((_, _) -> ICON_LOADS.remove(code, result));
+        return result;
+    }
+
+    private static Image loadCurrencyIconBlocking(String currencyCode) {
         if (currencyCode == null || currencyCode.isBlank()) {
             return loadFallback();
         }

@@ -1,0 +1,10 @@
+org.investpro.indicators.providers.SmaProvider
+org.investpro.indicators.providers.EmaProvider
+org.investpro.indicators.providers.RsiProvider
+org.investpro.indicators.providers.MacdProvider
+org.investpro.indicators.providers.BollingerBandsProvider
+org.investpro.indicators.providers.AtrProvider
+org.investpro.indicators.providers.VwapProvider
+org.investpro.indicators.providers.MomentumProvider
+org.investpro.indicators.providers.WilliamsRProvider
+org.investpro.indicators.providers.DonchianChannelProvider

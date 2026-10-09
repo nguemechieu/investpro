@@ -1750,26 +1750,6 @@ public class SystemCore {
     }
 
     /**
-     * Start Telegram message polling
-     */
-    public void startTelegramPolling() {
-        if (telegramNotifier != null) {
-            telegramNotifier.startPolling();
-            log.info("Telegram message polling started");
-        }
-    }
-
-    /**
-     * Stop Telegram message polling
-     */
-    public void stopTelegramPolling() {
-        if (telegramNotifier != null) {
-            telegramNotifier.stopPolling();
-            log.info("Telegram message polling stopped");
-        }
-    }
-
-    /**
      * Check if Telegram polling is active
      */
     public boolean isTelegramPollingActive() {

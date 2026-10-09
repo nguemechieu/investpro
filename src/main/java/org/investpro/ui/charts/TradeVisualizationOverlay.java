@@ -369,7 +369,11 @@ public class TradeVisualizationOverlay {
             }
         }
 
-        int nearest = Math.clamp(candles.size() - 1, 0, low);
+        int nearest = Math.clamp(
+                low,
+                0,
+                candles.size() - 1
+        );
 
         if (nearest > 0) {
             long previousTime = normalizeTimestampMillis(candles.get(nearest - 1).getOpenTime());
@@ -413,26 +417,44 @@ public class TradeVisualizationOverlay {
         return info.toString();
     }
 
+
     private static String formatPrice(double value) {
         if (!Double.isFinite(value)) {
             return "-";
         }
 
         double abs = Math.abs(value);
+
         if (abs == 0.0) {
             return "0";
         }
+
         if (abs >= 1_000.0) {
-            return String.format("%.2f", value);
-        }
-        if (abs >= 1.0) {
-            return String.format("%.4f", value);
+            return String.format(java.util.Locale.ROOT, "%.2f", value);
         }
 
-        int precision = Math.clamp((int) Math.ceil(-Math.log10(abs)) + 2, 2, 12);
-        return String.format("%" + precision + "f", value);
+        if (abs >= 1.0) {
+            return String.format(java.util.Locale.ROOT, "%.4f", value);
+        }
+
+        int precision = Math.clamp(
+                (int) Math.ceil(-Math.log10(abs)) + 2,
+                2,
+                12
+        );
+
+        return java.math.BigDecimal.valueOf(value)
+                .setScale(precision, java.math.RoundingMode.HALF_UP)
+                .toPlainString();
     }
 
+    private int clampIndex(int index, int size) {
+        if (size <= 0) {
+            return 0;
+        }
+
+        return Math.clamp(index, 0, size - 1);
+    }
     private void recalculateCandleWidth() {
         int visibleCount = getVisibleCandleCount();
         if (visibleCount <= 0) {
@@ -471,12 +493,6 @@ public class TradeVisualizationOverlay {
         return candidate;
     }
 
-    private int clampIndex(int index, int size) {
-        if (size <= 0) {
-            return 0;
-        }
-        return Math.clamp(size - 1, 0, index);
-    }
 
     private long normalizeTimestampMillis(long timestamp) {
         return timestamp < 10_000_000_000L ? timestamp * 1000L : timestamp;

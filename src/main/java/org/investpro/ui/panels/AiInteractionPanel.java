@@ -24,10 +24,12 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "DesktopAssistant"); thread.setDaemon(true); return thread;
     });
+     final FlowPane actions;
     private volatile boolean closed;
-    private final ExecutorService speechWorker = Executors.newSingleThreadExecutor(r -> {
-        Thread thread = new Thread(r, "AssistantReplyPlayback"); thread.setDaemon(true); return thread;
-    });
+    private final java.util.concurrent.ThreadPoolExecutor speechWorker = new java.util.concurrent.ThreadPoolExecutor(
+            1, 1, 0, java.util.concurrent.TimeUnit.SECONDS, new java.util.concurrent.ArrayBlockingQueue<>(1), r -> {
+                Thread thread = new Thread(r, "AssistantReplyPlayback"); thread.setDaemon(true); return thread;
+            }, new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
     private volatile long speechRequest;
     private java.util.concurrent.Future<?> speechTask;
     private final org.investpro.ai.AssistantVoice voice;
@@ -41,8 +43,26 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
     private final Button telegramScreenshot = new Button("Send screenshot to Telegram");
 
     public AiInteractionPanel(AssistantRuntime assistant) {
+        this(assistant, java.util.prefs.Preferences.userNodeForPackage(AiInteractionPanel.class));
+    }
+
+    AiInteractionPanel(AssistantRuntime assistant, java.util.prefs.Preferences preferences) {
         this.assistant = assistant;
         voice = assistant.createVoice();
+        double savedGain = preferences.getDouble("voicePlaybackGainDb", 4.0);
+        voice.setPlaybackGainDb((float) (Double.isFinite(savedGain) ? Math.clamp(savedGain, -12.0, 12.0) : 4.0));
+        Slider volume = new Slider(-12, 12, voice.getPlaybackGainDb());
+        volume.setId("voice-volume"); volume.setAccessibleText("Voice Volume in decibels");
+        volume.setPrefWidth(130); volume.setBlockIncrement(1);
+        Label volumeValue = new Label();
+        volumeValue.textProperty().bind(javafx.beans.binding.Bindings.format(java.util.Locale.ROOT, "%+.0f dB", volume.valueProperty()));
+        volume.valueProperty().addListener((_, _, gain) -> {
+            voice.setPlaybackGainDb(gain.floatValue());
+            preferences.putDouble("voicePlaybackGainDb", gain.doubleValue());
+        });
+        HBox volumeControl = new HBox(6, new Label("Voice Volume"), volume, volumeValue);
+        volumeControl.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        Tooltip.install(volumeControl, new Tooltip("Playback gain, limited to your audio device capabilities. 0 dB is unchanged volume."));
         speakReplies.setSelected(true);
         setPadding(new Insets(20));
         getStyleClass().add("ai-interaction-panel");
@@ -75,8 +95,9 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         clear.setOnAction(_ -> { assistant.reset(conversation); cancelSpeech(); clearScreenshot(); lastReply = ""; replay.setDisable(true); messages.getChildren().clear(); welcome(); });
         microphone.setOnAction(_ -> toggleRecording());
         replay.setDisable(true); replay.setOnAction(_ -> speak(lastReply));
-        Button stopAudio = new Button("Stop audio"); stopAudio.setOnAction(_ -> { cancelSpeech(); status.setText("Audio stopped."); });
-        Button capture = new Button("Take screenshot");
+        Button stopAudio ,capture;
+        stopAudio= new Button("Stop audio"); stopAudio.setOnAction(_ -> { cancelSpeech(); status.setText("Audio stopped."); });
+        capture = new Button("Take screenshot");
         capture.setOnAction(_ -> {
             capture.setDisable(true); status.setText("Capturing InvestPro…");
             worker.execute(() -> {
@@ -109,7 +130,7 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         Button removeScreenshot = new Button("Remove screenshot"); removeScreenshot.setOnAction(_ -> clearScreenshot());
         screenshotPreview.setFitWidth(300); screenshotPreview.setFitHeight(150); screenshotPreview.setPreserveRatio(true);
         screenshotPreview.setVisible(false); screenshotPreview.setManaged(false);
-        FlowPane actions = new FlowPane(10, 8, send, clear, microphone, speakReplies, replay, stopAudio, capture, telegramScreenshot, removeScreenshot);
+        actions = new FlowPane(10, 8, send, clear, microphone, speakReplies, volumeControl, replay, stopAudio, capture, telegramScreenshot, removeScreenshot);
         Label context = new Label("Ask for trades, order cancellation or bot pause/resume. Review the action, then enter /confirm CODE to execute. Speak records up to 60 seconds; the transcript is editable before sending. Voice is AI-generated.");
         context.setWrapText(true);
         VBox composer = new VBox(9, screenshotPreview, question, actions, context);
@@ -195,7 +216,7 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         }
     }
     private void speak(String text) {
-        if (text.isBlank()) return;
+        if (closed || text == null || text.isBlank()) return;
         cancelSpeech();
         long request = speechRequest;
         status.setText("Preparing spoken reply…");
@@ -220,6 +241,7 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
     private void cancelSpeech() {
         speechRequest++;
         if (speechTask != null) { speechTask.cancel(true); speechTask = null; }
+        speechWorker.purge();
         voice.stopSpeaking();
     }
     private void clearScreenshot() {

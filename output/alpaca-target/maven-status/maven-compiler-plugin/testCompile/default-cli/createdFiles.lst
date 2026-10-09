@@ -1,0 +1,4 @@
+org\investpro\ui\utils\UiBackgroundTasksTest.class
+org\investpro\ai\AssistantVoicePlaybackTest$2.class
+org\investpro\ui\UiLoadingResponsivenessTest.class
+org\investpro\exchange\consumers\LatestUiUpdatesTest.class

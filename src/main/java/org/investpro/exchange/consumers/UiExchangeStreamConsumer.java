@@ -43,6 +43,7 @@ import java.util.function.Consumer;
 @Slf4j
 @Getter
 public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
+    private final LatestUiUpdates displayUpdates = new LatestUiUpdates(this::queueOnFx);
 
     private static final int MAX_RECENT_TRADES = 500;
     private static final int MAX_RECENT_FILLS = 500;
@@ -173,11 +174,11 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         tickerEvents.incrementAndGet();
         latestTickers.put(key(exchangeName, tradePair), ticker);
 
-        runOnFx(() -> {
+        displayUpdates.submit("ticker:" + key(exchangeName, tradePair), () -> safeRun(() -> {
             if (tickerHandler != null) {
                 tickerHandler.accept(ticker);
             }
-        });
+        }));
     }
 
     @Override
@@ -226,11 +227,11 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         orderBookEvents.incrementAndGet();
         latestOrderBooks.put(key(exchangeName, tradePair), orderBook);
 
-        runOnFx(() -> {
+        displayUpdates.submit("book:" + key(exchangeName, tradePair), () -> safeRun(() -> {
             if (orderBookHandler != null) {
                 orderBookHandler.accept(orderBook);
             }
-        });
+        }));
     }
 
     @Override
@@ -683,6 +684,11 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         } catch (IllegalStateException exception) {
             safeRun(runnable);
         }
+    }
+
+    private void queueOnFx(Runnable runnable) {
+        try { Platform.runLater(() -> safeRun(runnable)); }
+        catch (IllegalStateException exception) { safeRun(runnable); }
     }
 
     private void safeRun(Runnable runnable) {

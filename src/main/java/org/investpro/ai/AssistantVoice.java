@@ -17,6 +17,7 @@ public final class AssistantVoice implements AutoCloseable {
     private final Supplier<String> apiKey;
     private volatile TargetDataLine microphone;
     private volatile SourceDataLine playback;
+    private volatile float playbackGainDb = 4.0f;
     private CompletableFuture<HttpResponse<InputStream>> speechRequest;
     private InputStream speechStream;
     @FunctionalInterface interface SpeakerFactory { SourceDataLine create(AudioFormat format) throws LineUnavailableException; }
@@ -77,16 +78,119 @@ public final class AssistantVoice implements AutoCloseable {
 
     public void speak(String text, Runnable onPlaybackStarted) throws Exception {
         if (closed || Thread.currentThread().isInterrupted() || text == null || text.isBlank()) return;
-        var json = new ObjectMapper();
-        var body = json.createObjectNode().put("model", "gpt-4o-mini-tts").put("voice", "coral")
-                .put("input", text.substring(0, Math.min(text.length(), 4000))).put("response_format", "pcm");
-        var request = audioRequest("speech", "application/json", json.writeValueAsBytes(body));
         long generation;
-        CompletableFuture<HttpResponse<InputStream>> pending;
         synchronized (this) {
             if (closed || Thread.currentThread().isInterrupted()) return;
             stopSpeaking();
             generation = playbackGeneration.get();
+        }
+        String spokenText = sanitizeForSpeech(text);
+        if (spokenText.isBlank()) return;
+        var started = new java.util.concurrent.atomic.AtomicBoolean();
+        for (String chunk : speechChunks(spokenText)) {
+            if (closed || Thread.currentThread().isInterrupted() || generation != playbackGeneration.get()) return;
+            if (chunk.isBlank()) continue;
+            speakChunk(chunk, generation, () -> {
+                if (started.compareAndSet(false, true)) onPlaybackStarted.run();
+            });
+        }
+    }
+
+    public float getPlaybackGainDb() { return playbackGainDb; }
+
+    public synchronized void setPlaybackGainDb(float gainDb) {
+        if (!Float.isFinite(gainDb)) throw new IllegalArgumentException("Playback gain must be finite");
+        playbackGainDb = gainDb;
+        if (playback != null && playback.isOpen()) applyPlaybackGain(playback);
+    }
+
+    private void applyPlaybackGain(SourceDataLine line) {
+        if (line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+            FloatControl gain = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
+            gain.setValue(Math.clamp(playbackGainDb, gain.getMinimum(), gain.getMaximum()));
+        }
+    }
+
+    /** Remove prose formatting while retaining code, link destinations and all readable content. */
+    static String sanitizeForSpeech(String text) {
+        if (text == null || text.isBlank()) return "";
+        StringBuilder result = new StringBuilder();
+        String fence = null;
+        for (String line : text.split("(?<=\\n)", -1)) {
+            String stripped = line.stripLeading();
+            if (stripped.matches("(?:`{3,}|~{3,})[^`~]*")) {
+                String marker = stripped.startsWith("```") ? "```" : "~~~";
+                if (fence == null || fence.equals(marker)) {
+                    fence = fence == null ? marker : null;
+                    if (line.endsWith("\n")) result.append('\n');
+                    continue;
+                }
+            }
+            if (fence == null) {
+                var inlineCode = java.util.regex.Pattern.compile("`+([^`\\r\\n]+)`+").matcher(line);
+                StringBuilder prose = new StringBuilder();
+                int offset = 0;
+                while (inlineCode.find()) {
+                    prose.append(sanitizeProse(line.substring(offset, inlineCode.start())));
+                    prose.append(inlineCode.group(1));
+                    offset = inlineCode.end();
+                }
+                prose.append(sanitizeProse(line.substring(offset)));
+                line = prose.toString();
+            }
+            result.append(line);
+        }
+        return result.toString();
+    }
+
+    private static String sanitizeProse(String text) {
+        return text.replaceAll("^ {0,3}#{1,6}[ \\t]+", "")
+                .replaceAll("!?\\[([^]\\r\\n]+)]\\(([^)\\r\\n]+)\\)", "$1 ($2)")
+                .replaceAll("\\*\\*(.+?)\\*\\*", "$1")
+                .replaceAll("__(.+?)__", "$1")
+                .replaceAll("(?<!\\*)\\*(\\S(?:.*?\\S)?)\\*(?!\\*)", "$1");
+    }
+
+    /** Prefer natural breaks in the latter half of a bounded chunk; retain every input character. */
+    static java.util.List<String> speechChunks(String text) {
+        if (text == null || text.isBlank()) return java.util.List.of();
+        var chunks = new java.util.ArrayList<String>();
+        final int maxLength = 1500;
+        for (int start = 0; start < text.length();) {
+            int end = Math.min(start + maxLength, text.length());
+            if (end < text.length()) {
+                if (Character.isHighSurrogate(text.charAt(end - 1)) && Character.isLowSurrogate(text.charAt(end))) end--;
+                int minimum = start + maxLength / 2;
+                int boundary = lastBoundary(text, start, end, minimum, "\\r?\\n[ \\t]*\\r?\\n");
+                if (boundary < 0) boundary = lastBoundary(text, start, end, minimum, "[.!?][\\\"'”’)]*\\s+");
+                if (boundary < 0) {
+                    for (int i = end; i >= minimum; i--) {
+                        if (Character.isWhitespace(text.charAt(i - 1))) { boundary = i; break; }
+                    }
+                }
+                if (boundary > start) end = boundary;
+            }
+            chunks.add(text.substring(start, end));
+            start = end;
+        }
+        return java.util.List.copyOf(chunks);
+    }
+
+    private static int lastBoundary(String text, int start, int end, int minimum, String expression) {
+        var matcher = java.util.regex.Pattern.compile(expression).matcher(text).region(start, end);
+        int boundary = -1;
+        while (matcher.find()) if (matcher.end() >= minimum) boundary = matcher.end();
+        return boundary;
+    }
+
+    private void speakChunk(String text, long generation, Runnable onPlaybackStarted) throws Exception {
+        var json = new ObjectMapper();
+        var body = json.createObjectNode().put("model", "gpt-4o-mini-tts").put("voice", "coral")
+                .put("input", text).put("response_format", "pcm");
+        var request = audioRequest("speech", "application/json", json.writeValueAsBytes(body));
+        CompletableFuture<HttpResponse<InputStream>> pending;
+        synchronized (this) {
+            if (closed || Thread.currentThread().isInterrupted() || generation != playbackGeneration.get()) return;
             pending = client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream());
             speechRequest = pending;
         }
@@ -103,7 +207,7 @@ public final class AssistantVoice implements AutoCloseable {
             byte[] pcm = new byte[8192];
             int carry = 0;
             boolean played = false;
-            while (!closed && generation == playbackGeneration.get()) {
+            while (!closed && !Thread.currentThread().isInterrupted() && generation == playbackGeneration.get()) {
                 int count = stream.read(pcm, carry, pcm.length - carry);
                 if (count < 0) break;
                 if (count == 0) continue;
@@ -115,17 +219,14 @@ public final class AssistantVoice implements AutoCloseable {
                     line.open(format);
                     if (line.isControlSupported(BooleanControl.Type.MUTE))
                         ((BooleanControl) line.getControl(BooleanControl.Type.MUTE)).setValue(false);
-                    if (line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-                        FloatControl gain = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
-                        gain.setValue(Math.clamp(0f, gain.getMinimum(), gain.getMaximum()));
-                    }
+                    applyPlaybackGain(line);
                     synchronized (this) {
                         if (closed || generation != playbackGeneration.get()) return;
                         playback = line; line.start();
                     }
                 }
                 for (int offset = 0; offset < length;) {
-                    if (closed || generation != playbackGeneration.get()) return;
+                    if (closed || Thread.currentThread().isInterrupted() || generation != playbackGeneration.get()) return;
                     int written = line.write(pcm, offset, length - offset);
                     if (written <= 0) {
                         if (generation != playbackGeneration.get() || closed) return;
@@ -137,7 +238,7 @@ public final class AssistantVoice implements AutoCloseable {
                 carry = available - length;
                 if (carry > 0) pcm[0] = pcm[length];
             }
-            if (!closed && generation == playbackGeneration.get()) {
+            if (!closed && !Thread.currentThread().isInterrupted() && generation == playbackGeneration.get()) {
                 if (!played || carry != 0) throw new IOException("OpenAI returned empty or invalid speech audio.");
                 line.drain();
             }

@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.Contract;
@@ -74,11 +73,8 @@ public class TelegramNotifier {
     private final Map<String, UserContext> userContexts = new ConcurrentHashMap<>();
     private final Set<String> allowedUsers = ConcurrentHashMap.newKeySet();
     private final Set<String> allowedChats = ConcurrentHashMap.newKeySet();
-    private volatile Function<String, String> questionContext = question -> "";
+    private volatile Function<String, String> questionContext = _ -> "";
     private volatile java.util.function.Supplier<java.util.function.BiFunction<String, String, String>> assistantCommandExecutorFactory;
-    public void setAssistantCommandExecutorFactory(java.util.function.Supplier<java.util.function.BiFunction<String, String, String>> factory) {
-        assistantCommandExecutorFactory = factory;
-    }
     private final Set<String> pendingConversations = ConcurrentHashMap.newKeySet();
     private final ThreadPoolExecutor questionWorkers = new ThreadPoolExecutor(4, 4, 0, TimeUnit.SECONDS,
             new ArrayBlockingQueue<>(32), r -> {
@@ -718,10 +714,6 @@ public class TelegramNotifier {
     public void setOpenaiApiKey(String key) { initializeChatGPT(key); }
     public void setOpenaiModel(String model) {
         openaiModel = model == null || model.isBlank() ? "gpt-4.1-mini" : model.trim();
-        assistantService.configure(chatgptEnabled ? openaiApiKey : null, openaiModel);
-    }
-    public void setChatgptEnabled(boolean enabled) {
-        chatgptEnabled = enabled && openaiApiKey != null && !openaiApiKey.isBlank();
         assistantService.configure(chatgptEnabled ? openaiApiKey : null, openaiModel);
     }
 

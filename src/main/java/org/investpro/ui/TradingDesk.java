@@ -342,6 +342,9 @@ public class TradingDesk extends BorderPane {
     private final TextField quickTradeAmountField = new TextField("1");
     private final AtomicBoolean autoRefreshTasksStarted = new AtomicBoolean(false);
     private final AtomicBoolean positionAutoRefreshStarted = new AtomicBoolean(false);
+    private final AtomicBoolean orderPreparationInFlight = new AtomicBoolean(false);
+    private long marketWatchLoadRequest;
+    private CompletableFuture<MarketWatchCatalogSnapshot> marketWatchCatalogLoad;
     private final AtomicBoolean accountWorkspaceRefreshInFlight = new AtomicBoolean(false);
 
     private final TextArea journalArea = new TextArea();
@@ -562,7 +565,10 @@ public class TradingDesk extends BorderPane {
 
         // Initialize MarketDataEngine (central market data cache and services)
         this.marketDataEngine = new MarketDataEngine();
-        org.investpro.asset.AssetCatalogRuntime.addListener(this::onAssetCatalogChanged);
+        org.investpro.ui.utils.UiBackgroundTasks.submit(() -> {
+            org.investpro.asset.AssetCatalogRuntime.addListener(this::onAssetCatalogChanged);
+            return null;
+        }).exceptionally(error -> { log.warn("Unable to initialize asset catalog listener", error); return null; });
         initializeBlockchainExecutionInfrastructure();
 
         // Wire ExchangeService to SystemOperationsService for monitoring
@@ -571,6 +577,9 @@ public class TradingDesk extends BorderPane {
 
         if (authenticatedExchange instanceof IbkrExchange ibkr && ibkr.ibkrSessionState().connectionSuccessful()) {
             brokerSessions.put(brokerSessionKey(configuration.exchange()), new BrokerSession(ibkr, true, null));
+        }
+        if (authenticatedExchange instanceof Schwab schwab && Boolean.TRUE.equals(schwab.isConnected())) {
+            brokerSessions.put(brokerSessionKey(configuration.exchange()), new BrokerSession(schwab, true, null));
         }
         initialize(configuration);
         installTradingDeskStateBindings();
@@ -1018,6 +1027,7 @@ public class TradingDesk extends BorderPane {
         // ── Settings ─────────────────────────────────────────────────────────
         Menu settingsMenu = new Menu(t("menu.settings"));
         settingsMenu.getItems().setAll(
+                menuItem("Schwab Connection", null, this::openSchwabConnectionPanel),
                 menuItem("Settings", new KeyCodeCombination(KeyCode.COMMA, KeyCombination.CONTROL_DOWN),
                         this::openSettingsPanel),
                 new SeparatorMenuItem(),
@@ -1907,6 +1917,8 @@ public class TradingDesk extends BorderPane {
                 symbolIcon.setFitWidth(20);
                 symbolIcon.setFitHeight(20);
                 symbolIcon.setPreserveRatio(true);
+                ImageView loadedIcon = symbolIcon;
+                CurrencyIconLoader.loadCurrencyIconAsync(pair.getBaseCode()).thenAccept(image -> runOnFx(() -> loadedIcon.setImage(image)));
             }
         }
 
@@ -4058,6 +4070,9 @@ public class TradingDesk extends BorderPane {
                 Image icon = CurrencyIconLoader.loadCurrencyIcon(baseCode);
                 if (icon != null) {
                     ImageView imageView = new ImageView(icon);
+                    CurrencyIconLoader.loadCurrencyIconAsync(baseCode).thenAccept(image -> runOnFx(() -> {
+                        if (Objects.equals(getItem(), s) && getGraphic() == imageView) imageView.setImage(image);
+                    }));
                     imageView.setFitWidth(18);
                     imageView.setFitHeight(18);
                     imageView.setPreserveRatio(true);
@@ -6323,9 +6338,38 @@ public class TradingDesk extends BorderPane {
             default -> OpenOrder.OrderType.MARKET;
         };
 
-        if (!canSubmitOrderByTradability(tradePair, mappedOrderType, amount)) {
-            return;
-        }
+        if (!orderPreparationInFlight.compareAndSet(false, true)) return;
+        Exchange target = exchange;
+        boolean paper = isPaperTradingMode();
+        ensureTradabilityService();
+        UniversalTradabilityService permissionService = universalTradabilityService;
+        SymbolTradability cachedPermission = cachedTradabilityForOrder(tradePair);
+        org.investpro.ui.utils.UiBackgroundTasks.submit(() -> {
+            if (paper) return new PreparedManualOrder(null, null);
+            SymbolTradability status = fetchTradabilityForOrder(tradePair, target, permissionService, cachedPermission);
+            status = reconcileTradabilityWithCurrentExchange(tradePair, status, mappedOrderType, target);
+            return new PreparedManualOrder(status, validateLocalOrder(target, tradePair, mappedOrderType, amount, status));
+        })
+                .orTimeout(20, TimeUnit.SECONDS).whenComplete((status, error) -> runOnFx(() -> {
+                    try {
+                        if (target != exchange || paper != isPaperTradingMode()) {
+                            showWarning("Order", "The trading connection changed while checking permissions. Please retry.");
+                            return;
+                        }
+                        if (error != null) {
+                            showWarning("Order Blocked", "Unable to verify order permissions: " + rootMessage(error));
+                            return;
+                        }
+                        continueSubmitOrderByType(orderType, tradePair, side, amount, mappedOrderType, status.status(), status.catalogDecision());
+                    } finally { orderPreparationInFlight.set(false); }
+                }));
+    }
+
+    private record PreparedManualOrder(SymbolTradability status, org.investpro.asset.OrderTradabilityDecision catalogDecision) {}
+
+    private void continueSubmitOrderByType(String orderType, TradePair tradePair, org.investpro.utils.Side side,
+            double amount, OpenOrder.OrderType mappedOrderType, SymbolTradability status, org.investpro.asset.OrderTradabilityDecision catalogDecision) {
+        if (!canSubmitOrderByTradability(tradePair, mappedOrderType, status, catalogDecision)) return;
 
         switch (orderType) {
             case "MARKET" -> submitMarketOrderInternal(tradePair, side, amount);
@@ -7767,18 +7811,17 @@ public class TradingDesk extends BorderPane {
         updateDeskCommandStrip();
     }
 
-    private SymbolTradability fetchTradabilityForOrder(TradePair pair) {
-        ensureTradabilityService();
-        if (universalTradabilityService == null || pair == null) {
+    private SymbolTradability fetchTradabilityForOrder(TradePair pair, Exchange target, UniversalTradabilityService service, SymbolTradability cached) {
+        if (service == null || pair == null) {
             return null;
         }
 
-        SymbolTradability cached = cachedTradabilityForOrder(pair);
+
         try {
-            CompletableFuture<SymbolTradability> refresh = universalTradabilityService
+            CompletableFuture<SymbolTradability> refresh = service
                     .getTradability(pair, TradabilityScope.ORDER_SUBMISSION, true);
             refresh.thenAccept(status -> {
-                if (status != null) {
+                if (status != null && exchange == target) {
                     tradabilityBySymbol.put(symbolKey(pair), status);
                 }
             });
@@ -7786,7 +7829,7 @@ public class TradingDesk extends BorderPane {
             SymbolTradability status = refresh.get(
                     ORDER_TRADABILITY_REFRESH_TIMEOUT.toMillis(),
                     TimeUnit.MILLISECONDS);
-            if (status != null) {
+            if (status != null && exchange == target) {
                 tradabilityBySymbol.put(symbolKey(pair), status);
             }
             return status;
@@ -7821,9 +7864,34 @@ public class TradingDesk extends BorderPane {
         return age.compareTo(ORDER_TRADABILITY_FALLBACK_MAX_AGE) <= 0 ? cached : null;
     }
 
-    private boolean canSubmitOrderByTradability(TradePair pair, OpenOrder.OrderType orderType, double amount) {
+    private org.investpro.asset.OrderTradabilityDecision validateLocalOrder(Exchange target, TradePair pair,
+            OpenOrder.OrderType orderType, double amount, SymbolTradability status) {
+        if (status == null || !status.orderSubmissionAllowed() || !isTradabilityAllowedForOrderType(status, orderType)) {
+            return org.investpro.asset.OrderTradabilityDecision.block("Live permissions do not allow this order");
+        }
+        org.investpro.asset.TradabilityService localTradabilityService = new org.investpro.asset.TradabilityService(
+                new org.investpro.asset.SqliteLocalAssetRepository(java.nio.file.Path.of("data", "asset-catalog.db")));
+        org.investpro.asset.ExchangeId exchangeId = org.investpro.asset.AssetCatalogService.exchangeId(target);
+        boolean stellarTrustlineExists = Boolean.parseBoolean(
+                String.valueOf(metadataValue(status, "stellar.trustlineExists", "false")));
+        org.investpro.asset.OrderTradabilityDecision catalogDecision = localTradabilityService.validateOrder(
+                new org.investpro.asset.OrderTradabilityRequest(
+                        exchangeId,
+                        pair == null ? "" : pair.toString('/'),
+                        orderType,
+                        java.math.BigDecimal.valueOf(amount),
+                        target != null && !target.isDeskPaperTrading(),
+                        target != null && Boolean.TRUE.equals(target.isConnected()),
+                        Boolean.parseBoolean(String.valueOf(metadataValue(status, "session.orderSubmissionOpen",
+                                status.orderSubmissionAllowed())))),
+                status,
+                stellarTrustlineExists);
+        return catalogDecision;
+    }
+
+    private boolean canSubmitOrderByTradability(TradePair pair, OpenOrder.OrderType orderType, SymbolTradability status, org.investpro.asset.OrderTradabilityDecision catalogDecision) {
         if (isPaperTradingMode()) return exchange != null && pair != null;
-        SymbolTradability status = fetchTradabilityForOrder(pair);
+
         if (status == null) {
             showWarning("Order Blocked", "Tradability could not be verified for %s."
                     .formatted(pair == null ? "selected symbol" : pair.toString('/')));
@@ -7833,7 +7901,7 @@ public class TradingDesk extends BorderPane {
             return false;
         }
 
-        status = reconcileTradabilityWithCurrentExchange(pair, status, orderType);
+
         boolean typeAllowed = isTradabilityAllowedForOrderType(status, orderType);
 
         if (!status.orderSubmissionAllowed() || !typeAllowed) {
@@ -7851,23 +7919,7 @@ public class TradingDesk extends BorderPane {
             return false;
         }
 
-        org.investpro.asset.TradabilityService localTradabilityService = new org.investpro.asset.TradabilityService(
-                new org.investpro.asset.SqliteLocalAssetRepository(java.nio.file.Path.of("data", "asset-catalog.db")));
         org.investpro.asset.ExchangeId exchangeId = org.investpro.asset.AssetCatalogService.exchangeId(exchange);
-        boolean stellarTrustlineExists = Boolean.parseBoolean(
-                String.valueOf(metadataValue(status, "stellar.trustlineExists", "false")));
-        org.investpro.asset.OrderTradabilityDecision catalogDecision = localTradabilityService.validateOrder(
-                new org.investpro.asset.OrderTradabilityRequest(
-                        exchangeId,
-                        pair == null ? "" : pair.toString('/'),
-                        orderType,
-                        java.math.BigDecimal.valueOf(amount),
-                        exchange != null && !exchange.isDeskPaperTrading(),
-                        exchange != null && Boolean.TRUE.equals(exchange.isConnected()),
-                        Boolean.parseBoolean(String.valueOf(metadataValue(status, "session.orderSubmissionOpen",
-                                status.orderSubmissionAllowed())))),
-                status,
-                stellarTrustlineExists);
         if (!catalogDecision.allowed()) {
             if (isOandaExchange(exchangeId, status)
                     && status.status() == org.investpro.trading.tradability.TradabilityStatus.FULLY_TRADABLE
@@ -7905,12 +7957,12 @@ public class TradingDesk extends BorderPane {
     private SymbolTradability reconcileTradabilityWithCurrentExchange(
             TradePair pair,
             SymbolTradability status,
-            OpenOrder.OrderType orderType) {
+            OpenOrder.OrderType orderType, Exchange target) {
         if (status == null
                 || status.orderSubmissionAllowed()
-                || exchange == null
+                || target == null
                 || status.status() != org.investpro.trading.tradability.TradabilityStatus.FULLY_TRADABLE
-                || !exchange.canSubmitOrders()) {
+                || !target.canSubmitOrders()) {
             return status;
         }
 
@@ -7975,7 +8027,7 @@ public class TradingDesk extends BorderPane {
                 "Order submission allowed by current connected exchange session.",
                 Instant.now(),
                 metadata);
-        tradabilityBySymbol.put(symbolKey(reconciled.tradePair()), reconciled);
+
         return reconciled;
     }
 
@@ -8140,7 +8192,33 @@ public class TradingDesk extends BorderPane {
         }
     }
 
+    private record MarketWatchCatalogSnapshot(List<TradePair> pairs, boolean stale) {}
+
     private void loadSymbolsForSelectedExchange() {
+        if (!Platform.isFxApplicationThread()) { Platform.runLater(this::loadSymbolsForSelectedExchange); return; }
+        long request = ++marketWatchLoadRequest;
+        if (marketWatchCatalogLoad != null) marketWatchCatalogLoad.cancel(true);
+        marketWatchItems.clear();
+        symbolSelector.getItems().clear();
+        marketWatchUniverse.clear();
+        Exchange target = exchange;
+        if (target == null) {
+            applySymbolsForSelectedExchange(new MarketWatchCatalogSnapshot(List.of(), true));
+            return;
+        }
+        marketWatchCatalogLoad = org.investpro.ui.utils.UiBackgroundTasks.submit(() -> {
+            var catalog = org.investpro.asset.AssetCatalogRuntime.service();
+            var venue = org.investpro.asset.AssetCatalogService.exchangeId(target);
+            return new MarketWatchCatalogSnapshot(catalog.loadMarketWatchPairs(venue), catalog.isStaleOrMissing(venue));
+        }).orTimeout(20, TimeUnit.SECONDS);
+        marketWatchCatalogLoad.whenComplete((snapshot, error) -> runOnFx(() -> {
+            if (request != marketWatchLoadRequest || target != exchange) return;
+            if (error != null) log.warn("Unable to load Market Watch catalog: {}", rootMessage(error));
+            applySymbolsForSelectedExchange(snapshot != null ? snapshot : new MarketWatchCatalogSnapshot(List.of(), true));
+        }));
+    }
+
+    private void applySymbolsForSelectedExchange(MarketWatchCatalogSnapshot catalogSnapshot) {
         marketWatchItems.clear();
         symbolSelector.getItems().clear();
         marketWatchUniverse.clear();
@@ -8174,11 +8252,11 @@ public class TradingDesk extends BorderPane {
                 .toList();
 
         if (tradePairs.isEmpty()) {
-            tradePairs = assetCatalog.loadMarketWatchPairs(exchangeId);
+            tradePairs = catalogSnapshot.pairs();
         }
 
         if (isStellarExchange(exchange)) {
-            List<TradePair> stellarCatalogPairs = assetCatalog.loadMarketWatchPairs(exchangeId);
+            List<TradePair> stellarCatalogPairs = catalogSnapshot.pairs();
             if (!stellarCatalogPairs.isEmpty()) {
                 LinkedHashSet<TradePair> mergedPairs = new LinkedHashSet<>();
                 tradePairs.stream()
@@ -8195,7 +8273,7 @@ public class TradingDesk extends BorderPane {
             tradePairs = fallbackMarketWatchPairs();
             journal("Market Watch is using fallback symbols while the local %s asset catalog is refreshed."
                     .formatted(exchangeId.id()));
-        } else if (assetCatalog.isStaleOrMissing(exchangeId)) {
+        } else if (catalogSnapshot.stale()) {
             journal("Market Watch loaded %d cached %s assets. Background refresh queued."
                     .formatted(tradePairs.size(), exchangeId.id()));
         }
@@ -8281,7 +8359,9 @@ public class TradingDesk extends BorderPane {
         if (selected != null) loadOrderBook(selected);
 
         updateConnectionStatus();
-        assetCatalog.refreshIfStale(exchange)
+        Exchange catalogExchange = exchange;
+        org.investpro.ui.utils.UiBackgroundTasks.submit(() -> assetCatalog.refreshIfStale(catalogExchange))
+                .thenCompose(java.util.function.Function.identity())
                 .exceptionally(exception -> {
                     log.warn("Asset catalog refresh failed for {}: {}", exchangeId.id(), rootMessage(exception));
                     Platform.runLater(
@@ -8891,6 +8971,7 @@ public class TradingDesk extends BorderPane {
         ChartContainer container = new ChartContainer(target, selected, true, telegramToken,
                 target == exchange ? tradingService : null);
         container.setOnChartError(this::journal);
+        container.setOnChartReady(this::applyNewsEventsToChart);
         applyNewsEventsToChart(container.getChart());
 
         // Set up candle selection to update DataWindow
@@ -8954,6 +9035,7 @@ public class TradingDesk extends BorderPane {
             }
 
             if (tab.getContent() instanceof ChartContainer container) {
+                container.setOnChartReady(this::applyNewsEventsToChart);
                 applyNewsEventsToChart(container.getChart());
                 continue;
             }
@@ -14085,6 +14167,8 @@ public class TradingDesk extends BorderPane {
      */
 
     public void shutdown() {
+        ++marketWatchLoadRequest;
+        if (marketWatchCatalogLoad != null) marketWatchCatalogLoad.cancel(true);
         if (connectedMarketWatch != null) connectedMarketWatch.close();
         if (aiInteractionPanel != null) aiInteractionPanel.close();
         if (aiInteractionStage != null) aiInteractionStage.close();
@@ -14214,6 +14298,16 @@ public class TradingDesk extends BorderPane {
         createIndependentWindow("Settings", settingsPanel, 900, 760);
         journal("Settings panel opened");
         log.info("Settings panel opened");
+    }
+
+    private void openSchwabConnectionPanel() {
+        if (!(exchange instanceof Schwab schwab)) {
+            showWarning("Schwab Connection", "Select Charles Schwab as the exchange first."); return;
+        }
+        createIndependentWindow("Schwab Connection", new org.investpro.ui.panels.SchwabConnectionPanel(schwab, connected -> {
+            connected.setAuthenticatedSessionConnected(true);
+            updateConnectionStatus();
+        }), 680, 360);
     }
 
     private void openPluginManagerPanel() {

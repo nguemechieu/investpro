@@ -48,17 +48,6 @@ public class NewsEventOverlay extends Canvas {
     }
 
     /**
-     * Update chart time range and price range for coordinate mapping.
-     */
-    public void setChartBounds(Instant startTime, Instant endTime, double startPrice, double endPrice) {
-        this.chartStartTime = startTime;
-        this.chartEndTime = endTime;
-        this.chartStartPrice = startPrice;
-        this.chartEndPrice = endPrice;
-        refreshNewsDisplay();
-    }
-
-    /**
      * Update news events to display.
      */
     public void setNewsEvents(List<NewsEvent> events) {

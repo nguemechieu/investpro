@@ -101,10 +101,13 @@ import static org.investpro.ui.charts.ChartColors.BULL_CANDLE_BORDER_COLOR;
 import static org.investpro.ui.charts.ChartColors.BULL_CANDLE_FILL_COLOR;
 import static org.investpro.ui.charts.ChartColors.PLACE_HOLDER_BORDER_COLOR;
 import static org.investpro.ui.charts.ChartColors.PLACE_HOLDER_FILL_COLOR;
+import static org.investpro.ui.charts.ChartColors.TOOLTIP_TEXT_COLOR;
 
 /**
  * Professional canvas-based candlestick chart for InvestPro.
  * This chart should be created by {@link ChartContainer}.
+ * Public event, price-line and trade-overlay methods are integration APIs;
+ * they remain available even when no built-in controller currently calls them.
  */
 @Getter
 @Setter
@@ -1957,7 +1960,7 @@ public class CandleStickChart extends Region {
             if (line.isLabelVisible()) {
                 String text = (line.getLabel() == null || line.getLabel().isBlank())
                         ? formatPrice(line.getPrice())
-                        : "%s %s".formatted(line.getLabel(), formatPrice(line.getPrice()));
+                        : line.getLabel() + " " + formatPrice(line.getPrice());
                 graphicsContext.setFill(line.getColor());
                 graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(), 10));
                 graphicsContext.setTextAlign(TextAlignment.LEFT);
@@ -2228,7 +2231,6 @@ public class CandleStickChart extends Region {
                     continue;
                 }
 
-                double range = maxValue - minValue;
                 double padding = Math.max(1.0, Math.max(Math.abs(maxValue), Math.abs(minValue)) * 0.05);
                 minValue -= padding;
                 maxValue += padding;
@@ -2676,7 +2678,7 @@ public class CandleStickChart extends Region {
         graphicsContext.fillRoundRect(x, y, width, PRICE_BADGE_HEIGHT, 5, 5);
         graphicsContext.setStroke(Color.rgb(148, 163, 184, 0.35));
         graphicsContext.strokeRoundRect(x, y, width, PRICE_BADGE_HEIGHT, 5, 5);
-        graphicsContext.setFill(Color.rgb(241, 245, 249));
+        graphicsContext.setFill(TOOLTIP_TEXT_COLOR);
         graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(), 11));
         graphicsContext.setTextAlign(TextAlignment.CENTER);
         graphicsContext.setTextBaseline(VPos.CENTER);
@@ -3717,9 +3719,6 @@ public class CandleStickChart extends Region {
 
 
 
-        private static PriceLine entry(double price) {
-            return new PriceLine(price, Color.web("#3b82f6"), "Entry", true, false, true, 1.3);
-        }
 
         private boolean isValid() {
             return Double.isFinite(price) && price > 0.0;
@@ -3921,7 +3920,7 @@ public class CandleStickChart extends Region {
                 FileChooser chooser = new FileChooser();
                 chooser.setTitle("Save Chart Screenshot");
                 chooser.setInitialFileName(
-                        "%s-%s.png".formatted(tradePair.toString('-'), SCREENSHOT_FORMAT.format(LocalDateTime.now())));
+                        tradePair.toString('-') + "-" + SCREENSHOT_FORMAT.format(LocalDateTime.now()) + ".png");
                 chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG Image", "*.png"));
                 File file = chooser.showSaveDialog(getScene() == null ? null : getScene().getWindow());
                 if (file == null)
@@ -4074,6 +4073,10 @@ public class CandleStickChart extends Region {
             }
             data.clear();
             priceLines.clear();
+            clearTradeOverlay();
+            if (tradeVisualizationOverlay != null) {
+                tradeVisualizationOverlay.updateCandles(List.of(), 0, 0);
+            }
             getChildren().clear();
         });
     }

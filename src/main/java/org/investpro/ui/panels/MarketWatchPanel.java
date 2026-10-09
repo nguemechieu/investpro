@@ -208,6 +208,9 @@ public class MarketWatchPanel extends StackPane {
                     Image icon = CurrencyIconLoader.loadCurrencyIcon(baseCurrency);
                     if (icon != null) {
                         ImageView imageView = new ImageView(icon);
+                        CurrencyIconLoader.loadCurrencyIconAsync(baseCurrency).thenAccept(image -> javafx.application.Platform.runLater(() -> {
+                            if (java.util.Objects.equals(getItem(), item) && getGraphic() == imageView) imageView.setImage(image);
+                        }));
                         imageView.setFitHeight(20);
                         imageView.setFitWidth(20);
                         imageView.setPreserveRatio(true);

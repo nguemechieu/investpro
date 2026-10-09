@@ -89,8 +89,7 @@ public final class ProductionStartupValidator {
                 List.of(AppConfigKeys.KUCOIN_API_KEY, AppConfigKeys.KUCOIN_API_SECRET,
                         AppConfigKeys.KUCOIN_API_PASSPHRASE),
                 "STELLAR_NETWORK", List.of(AppConfigKeys.STELLAR_PUBLIC_KEY, AppConfigKeys.STELLAR_SECRET_KEY),
-                "SCHWAB", List.of(AppConfigKeys.SCHWAB_CLIENT_ID, AppConfigKeys.SCHWAB_CLIENT_SECRET,
-                        AppConfigKeys.SCHWAB_REFRESH_TOKEN));
+                "SCHWAB", List.of(AppConfigKeys.SCHWAB_CLIENT_ID, AppConfigKeys.SCHWAB_CLIENT_SECRET));
 
         if ("COINBASE".equals(exchange)) {
             boolean hasKey = !missing(configLookup, AppConfigKeys.COINBASE_API_KEY);

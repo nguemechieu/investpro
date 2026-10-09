@@ -4,6 +4,8 @@ import org.investpro.core.SystemCore;
 import org.investpro.core.TelegramNotifier;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.providers.EnvironmentCredentialProvider;
+import org.jspecify.annotations.NonNull;
+
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Properties;
@@ -19,7 +21,7 @@ public final class AssistantRuntime implements AutoCloseable {
     private volatile java.util.function.Function<String, String> appControl;
     public void setAppControl(java.util.function.Function<String, String> control) { appControl = control; }
 
-    public void updateVenues(java.util.Map<String, Exchange> sources) {
+    public void updateVenues(java.util.@NonNull Map<String, Exchange> sources) {
         var snapshot = new java.util.LinkedHashMap<String, Exchange>();
         sources.forEach((name, exchange) -> snapshot.put(AssistantAppData.venueId(name), exchange));
         venues = java.util.Collections.unmodifiableMap(snapshot);
@@ -72,8 +74,12 @@ public final class AssistantRuntime implements AutoCloseable {
         for (String name : new String[]{"TELEGRAM_ALLOWED_USER_IDS", "TELEGRAM_ALLOWED_CHAT_IDS", "TELEGRAM_CHAT_ID", "TELEGRAM_OPENAI_MODEL"}) {
             credentials.get(name).ifPresent(value -> settings.setProperty(name, value));
         }
+        String resolvedToken = token == null || token.isBlank()
+                ? credentials.get("TELEGRAM_BOT_TOKEN").orElse("") : token;
+        resolvedToken = AssistantTelegramSettings.apply(settings, resolvedToken,
+                java.util.prefs.Preferences.userNodeForPackage(org.investpro.ui.panels.SettingsPanel.class));
         return new AssistantRuntime(settings,
-                token == null || token.isBlank() ? credentials.get("TELEGRAM_BOT_TOKEN").orElse("") : token,
+                resolvedToken,
                 key == null || key.isBlank() ? credentials.get("OPENAI_API_KEY").orElse("") : key);
     }
 

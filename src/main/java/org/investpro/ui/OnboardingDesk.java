@@ -118,6 +118,7 @@ public class OnboardingDesk extends StackPane {
 
     private final java.util.function.BiConsumer<MarketConfiguration, Exchange> onReady;
     private IbkrExchange authenticatedIbkr;
+    private org.investpro.exchange.schwab.Schwab authenticatedSchwab;
     private final UserAuthService authService = new UserAuthService();
 
     private final TextField usernameField = new TextField();
@@ -631,6 +632,11 @@ public class OnboardingDesk extends StackPane {
         String selectedExchangeName = exchangeBox.getValue();
         SupportedExchange selectedExchange = SupportedExchange.fromDisplayName(selectedExchangeName);
 
+        if (selectedExchange == SupportedExchange.SCHWAB) {
+            showSchwabAuthorizationStep();
+            return;
+        }
+
         boolean isIbkr = selectedExchange == SupportedExchange.INTERACTIVE_BROKERS;
         if (isIbkr) {
             showIbkrControlPanelCredentialsStep(selectedExchange, selectedExchangeName);
@@ -757,6 +763,24 @@ public class OnboardingDesk extends StackPane {
         card.setStyle(CARD_STYLE);
 
         fadeTo(createShell(card, false, null));
+    }
+
+    private void showSchwabAuthorizationStep() {
+        var credentials = new org.investpro.exchange.credentials.ExchangeCredentialResolver(
+                new org.investpro.exchange.providers.EnvironmentCredentialProvider()).resolve("schwab");
+        var broker = new org.investpro.exchange.schwab.Schwab(credentials);
+        var back = createSecondaryButton("Back");
+        back.setOnAction(_ -> { broker.disconnect(); showConfigurationStep(); });
+        var panel = new org.investpro.ui.panels.SchwabConnectionPanel(broker, authenticated -> {
+            authenticatedSchwab = authenticated;
+            authenticated.setAuthenticatedSessionConnected(true);
+            configuration = new MarketConfiguration(usernameField.getText().trim(), marketTypeBox.getValue(),
+                    venueBox.getValue(), "schwab", "", "", credentials.accountId(), telegramToken.getText().trim(),
+                    openAiField.getText().trim(), null, null, "PAPER", marketSelectionParams(Map.of()));
+            saveConfiguration(configuration);
+            showLoadingOverlay();
+        });
+        fadeTo(createShell(new VBox(14, panel, back), false, null));
     }
 
     private void showIbkrControlPanelCredentialsStep(
@@ -1229,8 +1253,9 @@ public class OnboardingDesk extends StackPane {
 
         Runnable transition = () -> {
             try {
-                onReady.accept(configuration, authenticatedIbkr);
+                onReady.accept(configuration, authenticatedIbkr != null ? authenticatedIbkr : authenticatedSchwab);
                 authenticatedIbkr = null; // The trading desk now owns the connection.
+                authenticatedSchwab = null;
             } catch (Exception exception) {
                 log.error("Failed to open trading desk from onboarding", exception);
                 resetLoadingState("Failed to open trading desk. Please try again.");

@@ -1,6 +1,7 @@
 package org.investpro.exchange.ibkr;
 
 import org.investpro.models.trading.TradePair;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Duration;
 import java.util.List;
@@ -51,7 +52,7 @@ public final class IbkrContractResolver {
         return cache.findByDisplaySymbol(displaySymbol);
     }
 
-    public IbkrResolvedContract requireResolved(TradePair pair) {
+    public @NonNull IbkrResolvedContract requireResolved(TradePair pair) {
         return cached(pair).orElseThrow(() -> new IllegalStateException(
                 "No resolved IBKR contract exists for %s. Please resolve the contract before requesting market data, orderbook, or orders."
                         .formatted(pair)));

@@ -18,6 +18,11 @@ record SchwabApiConfig(
         String oauthTokenUrl,
         boolean sandbox) {
 
+    SchwabApiConfig {
+        requireHttps(baseUrl); requireHttps(traderApiBaseUrl);
+        requireHttps(marketDataBaseUrl); requireHttps(oauthTokenUrl);
+    }
+
     static @NotNull SchwabApiConfig from(@NotNull ExchangeCredentials credentials) {
         String configuredBaseUrl = firstNonBlank(
                 credentials.param("baseUrl"),
@@ -62,13 +67,33 @@ record SchwabApiConfig(
                         normalizedBase + "/marketdata/v1"),
                 firstNonBlank(
                         credentials.param("oauthTokenUrl"),
+                        AppConfig.get("SCHWAB_TOKEN_URL"),
                         normalizedBase + "/v1/oauth/token"),
                 credentials.sandbox() || isPaperLike(environment));
     }
 
     boolean hasRequiredCredentials() {
-        return notBlank(clientId) && notBlank(clientSecret) && notBlank(refreshToken);
+        return notBlank(clientId) && notBlank(clientSecret);
     }
+
+    java.net.URI redirectUri() { return requireHttps(AppConfig.get(AppConfigKeys.SCHWAB_REDIRECT_URI)); }
+
+    java.net.URI authorizationUri() {
+        // Supply the endpoint from the approved product's official OAuth documentation.
+        return requireHttps(AppConfig.get("SCHWAB_AUTHORIZATION_URL"));
+    }
+
+    static java.net.URI requireHttps(String value) {
+        try {
+            var uri = java.net.URI.create(value);
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null
+                    || uri.getUserInfo() != null || uri.getFragment() != null || uri.getQuery() != null)
+                throw new IllegalArgumentException();
+            return uri;
+        } catch (Exception error) { throw new IllegalArgumentException("Schwab requires a valid HTTPS endpoint or callback URL, without credentials, fragments, or query parameters."); }
+    }
+
+    @Override public String toString() { return "SchwabApiConfig[credentials=<redacted>]"; }
 
     private static boolean isPaperLike(String value) {
         if (!notBlank(value)) {

@@ -1849,9 +1849,10 @@ public class BinanceUs extends Exchange {
 
         return async(() -> {
             Map<String, JsonNode> exchangeInfo = loadExchangeInfoBySymbol();
+            JsonNode tradingAccount = loadTradingAccount();
             return pairs.stream()
                     .filter(Objects::nonNull)
-                    .map(pair -> mapBinanceUsTradability(pair, exchangeInfo.get(binanceUsSymbol(pair))))
+                    .map(pair -> mapBinanceUsTradability(pair, exchangeInfo.get(binanceUsSymbol(pair)), tradingAccount))
                     .toList();
         });
     }
@@ -1865,7 +1866,8 @@ public class BinanceUs extends Exchange {
 
         return async(() -> {
             Map<String, JsonNode> exchangeInfo = loadExchangeInfoBySymbol();
-            return mapBinanceUsTradability(pair, exchangeInfo.get(binanceUsSymbol(pair)));
+            JsonNode tradingAccount = loadTradingAccount();
+            return mapBinanceUsTradability(pair, exchangeInfo.get(binanceUsSymbol(pair)), tradingAccount);
         });
     }
 
@@ -1883,7 +1885,7 @@ public class BinanceUs extends Exchange {
             JsonNode root = OBJECT_MAPPER.readTree(response.body());
             JsonNode symbols = root.path("symbols");
             if (!symbols.isArray()) {
-                return Map.of();
+                throw new IllegalStateException("Binance US exchangeInfo did not contain a symbol list");
             }
 
             Map<String, JsonNode> bySymbol = new LinkedHashMap<>();
@@ -1896,7 +1898,7 @@ public class BinanceUs extends Exchange {
             return bySymbol;
         } catch (Exception exception) {
             logger.warn("Unable to load Binance US exchangeInfo for tradability mapping", exception);
-            return Map.of();
+            throw new CompletionException("Binance US product availability could not be verified", exception);
         }
     }
 
@@ -1904,12 +1906,24 @@ public class BinanceUs extends Exchange {
         return pair == null ? "" : (pair.getBaseCode() + pair.getCounterCode()).toUpperCase(Locale.ROOT);
     }
 
-    private SymbolTradability mapBinanceUsTradability(TradePair pair, JsonNode symbolNode) {
+    private JsonNode loadTradingAccount() {
+        JsonNode account = accountState.account();
+        if (account == null && hasCredentials() && !isPaperTrading()) {
+            try {
+                account = sendSignedBinanceUsRequest("GET", "/api/v3/account", Map.of());
+            } catch (Exception exception) {
+                throw new CompletionException("Binance US account trading permissions could not be verified", exception);
+            }
+        }
+        return account;
+    }
+
+    private SymbolTradability mapBinanceUsTradability(TradePair pair, JsonNode symbolNode, JsonNode account) {
         if (pair == null) {
             return defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null");
         }
         if (symbolNode == null || symbolNode.isMissingNode()) {
-            return defaultTradability(pair, TradabilityStatus.PERMISSION_DENIED,
+            return defaultTradability(pair, TradabilityStatus.INACTIVE,
                     "Symbol is not listed in Binance US exchangeInfo");
         }
 
@@ -1920,6 +1934,10 @@ public class BinanceUs extends Exchange {
             case "BREAK" -> TradabilityStatus.MARKET_CLOSED;
             default -> TradabilityStatus.DISABLED;
         };
+        boolean spotAllowed = symbolNode.path("isSpotTradingAllowed").asBoolean(false);
+        if (!spotAllowed && status == TradabilityStatus.FULLY_TRADABLE) {
+            status = TradabilityStatus.UNSUPPORTED_PRODUCT_TYPE;
+        }
 
         Set<String> orderTypes = new HashSet<>();
         JsonNode orderTypesNode = symbolNode.path("orderTypes");
@@ -1949,7 +1967,11 @@ public class BinanceUs extends Exchange {
             status = TradabilityStatus.MIN_SIZE_INVALID;
         }
 
-        boolean canSubmit = canSubmitOrders();
+        boolean accountAllowed = BinanceUsPermissions.allows(symbolNode, account);
+        boolean canSubmit = canSubmitLiveOrders() && accountAllowed;
+        if (status == TradabilityStatus.FULLY_TRADABLE && account != null && !accountAllowed) {
+            status = TradabilityStatus.PERMISSION_DENIED;
+        }
         boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE && canSubmit;
 
         boolean marginAllowed = symbolNode.path("isMarginTradingAllowed").asBoolean(false);
@@ -1957,8 +1979,11 @@ public class BinanceUs extends Exchange {
         String reason = status == TradabilityStatus.FULLY_TRADABLE
                 ? (orderSubmissionAllowed
                         ? "Binance US symbol is tradable"
-                        : "Binance US symbol is tradable; order submission is unavailable until exchange session is active")
-                : "Binance US symbol status=" + statusValue;
+                        : "Binance US spot market is available; live trading requires a connected session and verified account permissions")
+                : status == TradabilityStatus.PERMISSION_DENIED
+                        ? "Binance US account cannot trade this symbol: check canTrade and required symbol permission sets"
+                        : !spotAllowed ? "Binance US symbol is not enabled for spot trading"
+                        : "Binance US symbol status=" + statusValue;
 
         return new SymbolTradability(
                 getExchangeId(),
@@ -2384,6 +2409,13 @@ public class BinanceUs extends Exchange {
             String type) {
         return async(() -> {
             try {
+                SymbolTradability tradability = mapBinanceUsTradability(tradePair,
+                        loadExchangeInfoBySymbol().get(binanceUsSymbol(tradePair)), loadTradingAccount());
+                if (!tradability.isFullyTradable()
+                        || ("MARKET".equals(type) && !tradability.marketOrderAllowed())
+                        || ("LIMIT".equals(type) && !tradability.limitOrderAllowed())) {
+                    throw new IllegalStateException(tradability.reason() + "; requested order type=" + type);
+                }
                 Map<String, String> params = new LinkedHashMap<>();
                 params.put("symbol", binanceSymbol(tradePair));
                 params.put("side", side == Side.SELL ? "SELL" : "BUY");

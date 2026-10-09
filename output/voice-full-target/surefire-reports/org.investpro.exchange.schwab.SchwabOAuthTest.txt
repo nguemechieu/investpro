@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.exchange.schwab.SchwabOAuthTest
+-------------------------------------------------------------------------------
+Tests run: 25, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 30.63 s -- in org.investpro.exchange.schwab.SchwabOAuthTest
