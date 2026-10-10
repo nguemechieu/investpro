@@ -731,7 +731,7 @@ public class SystemCore {
 
         } catch (Exception exception) {
             streaming.set(false);
-            publishErrorEvent("SystemCore", exception, "Failed to start exchange streaming.");
+            publishErrorEvent(exception, "Failed to start exchange streaming.");
             notifyAllChannels(
                     "Streaming failed",
                     "Failed to start streaming: %s".formatted(rootMessage(exception)));
@@ -814,7 +814,7 @@ public class SystemCore {
 
         } catch (Exception exception) {
             streaming.set(false);
-            publishErrorEvent("SystemCore", exception, "Failed to start exchange streaming.");
+            publishErrorEvent(exception, "Failed to start exchange streaming.");
             notifyAllChannels(
                     "Streaming failed",
                     "❌ Failed to start streaming: %s".formatted(rootMessage(exception)));
@@ -900,7 +900,7 @@ public class SystemCore {
             notifyAllChannels("Streaming stopped", "\uD83D\uDED1 Streaming stopped.");
         } catch (Exception exception) {
             log.warn("Failed to stop streaming cleanly", exception);
-            publishErrorEvent("SystemCore", exception, "Failed to stop streaming cleanly.");
+            publishErrorEvent(exception, "Failed to stop streaming cleanly.");
         } finally {
             activeSubscription = null;
             streamConsumer = null;
@@ -1013,7 +1013,7 @@ public class SystemCore {
             streaming.set(false);
             activeSubscription = null;
             streamConsumer = null;
-            publishErrorEvent("SystemCore", exception, "Failed to start custom streaming.");
+            publishErrorEvent(exception, "Failed to start custom streaming.");
             throw new IllegalStateException("Failed to start custom streaming", exception);
         }
     }
@@ -1474,7 +1474,7 @@ public class SystemCore {
     private void notifyAllChannels(String title, String message) {
         org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.IO, () -> {
             notifyTelegram(message); notifyEmail(title, message); return null;
-        }).exceptionally(error -> { log.warn("Notification workers unavailable; notification not sent: {}", safe(title)); return null; });
+        }).exceptionally(_ -> { log.warn("Notification workers unavailable; notification not sent: {}", safe(title)); return null; });
     }
 
     private void notifyTelegram(String message) {
@@ -1844,8 +1844,8 @@ public class SystemCore {
                 Map.of()));
     }
 
-    private void publishErrorEvent(String source, Throwable throwable, String message) {
-        publishErrorEvent(source, throwable, message, true);
+    private void publishErrorEvent(Throwable throwable, String message) {
+        publishErrorEvent("SystemCore", throwable, message, true);
     }
 
     private void publishErrorEvent(String source, Throwable throwable, String message, boolean notifyTelegram) {

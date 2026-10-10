@@ -1113,6 +1113,7 @@ public class Coinbase extends Exchange {
 
         String path = Optional.ofNullable(request.uri().getPath()).orElse("");
         return path.contains("/market/products")
+                || isPublicCoinbaseProductsUrl(request.uri().toString())
                 || path.contains("/market/product_book")
                 || path.contains("/market/products/")
                 || path.contains("/candles");
@@ -1490,11 +1491,7 @@ public class Coinbase extends Exchange {
     }
 
     private @NonNull JsonNode fetchCoinbaseProductsRoot() {
-        List<String> urls = new ArrayList<>();
-        urls.add(PUBLIC_PRODUCTS_URL);
-        // Discover actual exchange contracts publicly, independent of account entitlement.
-        urls.add(PUBLIC_PRODUCTS_URL + "?product_type=FUTURE&contract_expiry_type=PERPETUAL");
-        urls.add(PUBLIC_PRODUCTS_URL + "?product_type=FUTURE&contract_expiry_type=EXPIRING&expiring_contract_status=STATUS_UNEXPIRED");
+        List<String> urls = publicProductDiscoveryUrls();
         if (hasPrivateEndpointAuth()) {
             urls.addAll(coinbaseProductDiscoveryUrls());
         }
@@ -1530,7 +1527,7 @@ public class Coinbase extends Exchange {
                     continue;
                 }
                 String productId = normalizeCoinbaseProductId(firstText(product, "product_id", "id", "symbol"));
-                if (url.contains("/market/products") && (isCoinbaseDerivativeProductId(productId)
+                if (isPublicCoinbaseProductsUrl(url) && (isCoinbaseDerivativeProductId(productId)
                         || "FUTURE".equalsIgnoreCase(firstText(product, "product_type")))) {
                     // Public visibility is not evidence that this account may submit orders.
                     product = product.deepCopy();
@@ -1540,7 +1537,7 @@ public class Coinbase extends Exchange {
                 if (seenProductIds.add(key)) {
                     products.add(product);
                     numProducts++;
-                } else if (!url.contains("/market/products")) {
+                } else if (!isPublicCoinbaseProductsUrl(url)) {
                     for (int i = 0; i < products.size(); i++) {
                         if (key.equals(normalizeCoinbaseProductId(firstText(products.get(i), "product_id", "id", "symbol")))) {
                             products.set(i, product);
@@ -1549,7 +1546,7 @@ public class Coinbase extends Exchange {
                     }
                 }
             }
-            if (!url.contains("/market/products") || segment == CoinbaseProductDiscoverySegment.SPOT)
+            if (!isPublicCoinbaseProductsUrl(url) || segment == CoinbaseProductDiscoverySegment.SPOT)
                 markProductDiscoveryAvailable(segment);
         }
 
@@ -1583,11 +1580,41 @@ public class Coinbase extends Exchange {
                 || url.contains("contract_expiry_type=EXPIRING"));
     }
 
+    private boolean isPublicCoinbaseProductsUrl(String url) {
+        return url != null && (url.contains("/market/products")
+                || url.contains("/api/v3/brokerage/products")
+                && !url.contains("get_tradability_status=true"));
+    }
+
+    private List<String> publicProductDiscoveryUrls() {
+        List<String> urls = new ArrayList<>();
+        urls.add(productsUrl(Map.of("product_type", "SPOT")));
+        urls.add(productsUrl(Map.of("product_type", "EQUITY")));
+        urls.add(productsUrl(Map.of(
+                "product_type", "FUTURE",
+                "contract_expiry_type", "PERPETUAL")));
+        urls.add(productsUrl(Map.of(
+                "product_type", "FUTURE",
+                "contract_expiry_type", "EXPIRING")));
+        for (String underlyingType : List.of(
+                "FUTURES_UNDERLYING_TYPE_INDEX",
+                "FUTURES_UNDERLYING_TYPE_EQUITY_INDEX",
+                "FUTURES_UNDERLYING_TYPE_COMMOD_INDEX",
+                "FUTURES_UNDERLYING_TYPE_COMMOD",
+                "FUTURES_UNDERLYING_TYPE_COMMOD_ETF")) {
+            urls.add(productsUrl(Map.of(
+                    "product_type", "FUTURE",
+                    "futures_underlying_type", underlyingType)));
+        }
+        return urls;
+    }
+
     private CoinbaseProductDiscoverySegment productDiscoverySegment(String url) {
         if (url == null || url.isBlank()) {
             return CoinbaseProductDiscoverySegment.UNKNOWN;
         }
-        if (url.contains("product_type=SPOT") || (url.contains("/market/products") && !url.contains("product_type=FUTURE"))) {
+        if (url.contains("product_type=SPOT")
+                || (url.contains("/market/products") && !url.contains("product_type=FUTURE"))) {
             return CoinbaseProductDiscoverySegment.SPOT;
         }
         if (url.contains("product_type=FUTURE") && url.contains("contract_expiry_type=PERPETUAL")) {
@@ -1698,7 +1725,6 @@ public class Coinbase extends Exchange {
         urls.add(productsUrl(Map.of(
                 "product_type", "FUTURE",
                 "contract_expiry_type", "EXPIRING",
-                "expiring_contract_status", "STATUS_UNEXPIRED",
                 "get_tradability_status", Boolean.toString(true))));
         return urls;
     }
@@ -1727,7 +1753,8 @@ public class Coinbase extends Exchange {
     }
 
     private JsonNode fetchCoinbaseProductsPage(String url) {
-        HttpRequest request = (URI.create(url).getPath().startsWith("/api/v3/brokerage/market/")
+        HttpRequest request = (isPublicCoinbaseProductsUrl(url)
+                || URI.create(url).getPath().startsWith("/api/v3/brokerage/market/")
                 ? baseRequest(url) : authenticatedRequest("GET", url))
                 .GET()
                 .build();

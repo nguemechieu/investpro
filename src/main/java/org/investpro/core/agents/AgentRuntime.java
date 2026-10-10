@@ -16,7 +16,6 @@ import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -51,16 +50,6 @@ public class AgentRuntime {
         agents.add(Objects.requireNonNull(agent, "agent must not be null"));
     }
 
-    /**
-     * Bulk-import agents from an AgentRegistry into this runtime.
-     * Call before start() to load agents configured by a module.
-     */
-    public synchronized void importFrom(@NotNull AgentRegistry registry) {
-        Objects.requireNonNull(registry, "registry must not be null");
-        for (Agent agent : registry.getAgents()) {
-            agents.add(Objects.requireNonNull(agent));
-        }
-    }
 
     /**
      * Register and start a per-symbol SymbolAgent.

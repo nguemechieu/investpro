@@ -345,7 +345,7 @@ public class InvestPro extends Application {
                 }
                 AiAuditLogger.LocalAiRuntimeLauncher.stopManagedProcess();
             });
-            org.investpro.core.concurrent.AppExecutors.finishShutdown().whenComplete((_, error) -> {
+            org.investpro.core.concurrent.AppExecutors.finishShutdown().whenComplete((_, _) -> {
                 log.info("InvestPro shutdown completed.");
                 if (exitPlatform) Platform.runLater(Platform::exit);
             });

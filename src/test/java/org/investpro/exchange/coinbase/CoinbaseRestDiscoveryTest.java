@@ -17,7 +17,7 @@ class CoinbaseRestDiscoveryTest {
         var client = mock(HttpClient.class); field(exchange, "httpClient", client);
         when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenAnswer(call -> {
             HttpRequest request = call.getArgument(0);
-            boolean publicRequest = request.uri().getPath().contains("/market/products");
+            boolean publicRequest = isPublicCatalogRequest(request);
             String query = java.util.Objects.toString(request.uri().getQuery(), "");
             HttpResponse<byte[]> response = mock(HttpResponse.class);
             when(response.statusCode()).thenReturn(publicRequest ? 200 : 403);
@@ -41,6 +41,56 @@ class CoinbaseRestDiscoveryTest {
         assertEquals(ExchangeCapabilityStatus.PERMISSION_REQUIRED, exchange.getPerpetualsAccess());
         assertEquals(ExchangeCapabilityStatus.PERMISSION_REQUIRED, exchange.getExpiringFuturesAccess());
     }
+
+    @Test
+    void listProductsUsesEquityExpiryAndUnderlyingFilters() throws Exception {
+        Coinbase exchange = spy(new Coinbase(new ExchangeCredentials("coinbase", "", "", "", "", "", "", false)));
+        doReturn(false).when(exchange).isPaperTrading();
+        HttpClient client = mock(HttpClient.class);
+        field(exchange, "httpClient", client);
+        List<HttpRequest> requests = new ArrayList<>();
+        when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenAnswer(call -> {
+            HttpRequest request = call.getArgument(0);
+            requests.add(request);
+            HttpResponse<byte[]> response = mock(HttpResponse.class);
+            when(response.statusCode()).thenReturn(200);
+            when(response.headers()).thenReturn(HttpHeaders.of(Map.of(), (a, b) -> true));
+            String body = queryParameters(request).get("product_type").equals("EQUITY")
+                    ? """
+                      {"products":[{"product_id":"ABC","product_type":"EQUITY",
+                      "equity_product_details":{"ticker":"ABC","equity_subtype":"COMMON_STOCK",
+                      "description":"Example equity","fractionable":false}}]}
+                      """
+                    : "{\"products\":[{\"product_id\":\"BTC-USD\",\"product_type\":\"SPOT\"}]}";
+            when(response.body()).thenReturn(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return response;
+        });
+
+        var products = exchange.fetchMarketInstruments().get(5, java.util.concurrent.TimeUnit.SECONDS);
+        Set<Map<String, String>> filters = requests.stream()
+                .map(CoinbaseRestDiscoveryTest::queryParameters)
+                .collect(java.util.stream.Collectors.toSet());
+
+        assertEquals(9, requests.size());
+        assertTrue(requests.stream().allMatch(request ->
+                "/api/v3/brokerage/products".equals(request.uri().getPath())));
+        assertTrue(filters.contains(Map.of("product_type", "SPOT")));
+        assertTrue(filters.contains(Map.of("product_type", "EQUITY")));
+        assertTrue(filters.contains(Map.of("product_type", "FUTURE", "contract_expiry_type", "PERPETUAL")));
+        assertTrue(filters.contains(Map.of("product_type", "FUTURE", "contract_expiry_type", "EXPIRING")));
+        for (String underlyingType : List.of(
+                "FUTURES_UNDERLYING_TYPE_INDEX",
+                "FUTURES_UNDERLYING_TYPE_EQUITY_INDEX",
+                "FUTURES_UNDERLYING_TYPE_COMMOD_INDEX",
+                "FUTURES_UNDERLYING_TYPE_COMMOD",
+                "FUTURES_UNDERLYING_TYPE_COMMOD_ETF")) {
+            assertTrue(filters.contains(Map.of(
+                    "product_type", "FUTURE",
+                    "futures_underlying_type", underlyingType)));
+        }
+        assertTrue(products.stream().anyMatch(product -> product.nativeSymbol().equals("ABC")));
+    }
+
     @Test void marketWatchQuotesUseExactDatedContractIdsOffCallingThread() throws Exception {
         Coinbase exchange = new Coinbase(new ExchangeCredentials("coinbase", "", "", "", "", "", "", false));
         HttpClient client = mock(HttpClient.class);
@@ -100,7 +150,7 @@ class CoinbaseRestDiscoveryTest {
         when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenAnswer(call -> {
             HttpRequest request = call.getArgument(0);
             requests.add(request);
-            boolean publicRequest = request.uri().getPath().contains("/market/products");
+            boolean publicRequest = isPublicCatalogRequest(request);
             HttpResponse<byte[]> response = mock(HttpResponse.class);
             when(response.statusCode()).thenReturn(publicRequest ? 200 : status);
             when(response.headers()).thenReturn(HttpHeaders.of(Map.of(), (a, b) -> true));
@@ -111,8 +161,9 @@ class CoinbaseRestDiscoveryTest {
         });
         var products = exchange.fetchMarketInstruments().get(5, java.util.concurrent.TimeUnit.SECONDS);
         assertEquals("BTC-USD", products.getFirst().nativeSymbol());
-        assertEquals(6, requests.size());
-        assertEquals("https://api.coinbase.com/api/v3/brokerage/market/products", requests.getFirst().uri().toString());
+        assertEquals(12, requests.size());
+        assertEquals("/api/v3/brokerage/products", requests.getFirst().uri().getPath());
+        assertEquals(Map.of("product_type", "SPOT"), queryParameters(requests.getFirst()));
         assertTrue(requests.getFirst().headers().firstValue("Authorization").isEmpty());
         assertEquals(ExchangeCapabilityStatus.PERMISSION_REQUIRED, exchange.getPerpetualsAccess());
         assertEquals(ExchangeCapabilityStatus.PERMISSION_REQUIRED, exchange.getExpiringFuturesAccess());
@@ -123,5 +174,18 @@ class CoinbaseRestDiscoveryTest {
         assertEquals(List.of(new Coinbase.RestAuthDiagnostic("accounts without query", false)), diagnosis);
         assertEquals("/api/v3/brokerage/accounts", requests.getLast().uri().getRawPath());
         assertNull(requests.getLast().uri().getRawQuery());
+    }
+
+    private static boolean isPublicCatalogRequest(HttpRequest request) {
+        return "/api/v3/brokerage/products".equals(request.uri().getPath())
+                && !Objects.toString(request.uri().getQuery(), "").contains("get_tradability_status=true");
+    }
+
+    private static Map<String, String> queryParameters(HttpRequest request) {
+        String query = Objects.toString(request.uri().getRawQuery(), "");
+        if (query.isBlank()) return Map.of();
+        return Arrays.stream(query.split("&"))
+                .map(parameter -> parameter.split("=", 2))
+                .collect(java.util.stream.Collectors.toMap(parts -> parts[0], parts -> parts[1]));
     }
 }

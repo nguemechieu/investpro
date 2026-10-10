@@ -1,5 +1,7 @@
 package org.investpro.core.concurrent;
 
+import org.jspecify.annotations.NonNull;
+
 import java.util.ArrayDeque;
 import java.util.Objects;
 import java.util.concurrent.Executor;
@@ -18,7 +20,7 @@ public final class OrderedExecutor implements Executor {
         this.capacity = capacity;
     }
 
-    @Override public synchronized void execute(Runnable task) {
+    @Override public synchronized void execute(@NonNull Runnable task) {
         Objects.requireNonNull(task);
         if (tasks.size() >= capacity) throw new RejectedExecutionException("Ordered workload queue is full");
         tasks.addLast(task);
