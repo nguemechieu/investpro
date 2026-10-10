@@ -1,0 +1,16 @@
+org\investpro\exchange\binanceus\BinanceUsAuthenticationTest$1.class
+org\investpro\spi\PluginJarDiscoveryTest.class
+org\investpro\exchange\ManualOrderSubmissionTest.class
+org\investpro\exchange\kraken\KrakenAdapterTest.class
+org\investpro\exchange\binanceus\BinanceUsAuthenticationTest.class
+org\investpro\strategy\lab\BacktestJobLifecycleTest.class
+org\investpro\exchange\ibkr\IbkrInstrumentSupportTest.class
+org\investpro\exchange\binanceus\BinanceUsAuthenticationTest$Venue.class
+org\investpro\exchange\ibkr\IbkrPositionCloseTest$Session.class
+org\investpro\strategy\lab\StrategyBacktestValidationTest.class
+org\investpro\spi\PluginJarDiscoveryTest$1.class
+org\investpro\backtesting\BacktestDataValidationTest.class
+org\investpro\utils\HistoricalDataPrefetcherCancellationTest.class
+org\investpro\exchange\ibkr\IbkrPositionCloseTest.class
+org\investpro\strategy\AdditionalStrategiesTest.class
+org\investpro\exchange\UnsupportedOrderRoutingTest.class

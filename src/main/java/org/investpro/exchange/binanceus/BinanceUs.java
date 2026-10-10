@@ -381,8 +381,8 @@ public class BinanceUs extends Exchange {
         super(credentials);
         this.credential = credentials;
 
-        this.apiKey = credentials.apiKey();
-        this.apiSecret = credentials.apiSecret();
+        this.apiKey = credentials.apiKey() == null ? null : credentials.apiKey().strip();
+        this.apiSecret = credentials.apiSecret() == null ? null : credentials.apiSecret().strip();
         initializePaperTradingAccount();
 
         try {
@@ -1348,7 +1348,7 @@ public class BinanceUs extends Exchange {
     }
 
     private boolean hasCredentials() {
-        return credential.hasApiKeySecret();
+        return apiKey != null && !apiKey.isBlank() && apiSecret != null && !apiSecret.isBlank();
     }
 
     @Override
@@ -1570,27 +1570,38 @@ public class BinanceUs extends Exchange {
 
     @Override
     public AuthCheckResult checkAuthentication() {
-        if (apiKey == null || apiKey.isBlank()) {
-            return AuthCheckResult.builder()
-                    .exchangeName(getName())
-                    .success(false)
-                    .credentialIssue(true)
-                    .message("API key is missing or empty")
-                    .checkedAt(Instant.now())
-                    .build();
+        var result = AuthCheckResult.builder().exchangeName(getName())
+                .credentialSource("CONFIGURATION").endpointTested("/api/v3/account").checkedAt(Instant.now());
+        if (!hasCredentials()) {
+            setAuthenticatedSessionConnected(false);
+            return result.success(false).credentialIssue(true).message("Binance US API key and secret are required").build();
         }
-
-        return AuthCheckResult.builder()
-                .exchangeName(getName())
-                .success(true)
-                .httpStatus(200)
-                .credentialSource("CONFIGURATION")
-                .endpointTested("/api/v3/account")
-                .message("Binance US API credentials validated")
-                .checkedAt(Instant.now())
-                .build();
+        try {
+            JsonNode account = sendSignedBinanceUsRequest("GET", "/api/v3/account", Map.of());
+            if (!account.path("balances").isArray()) {
+                setAuthenticatedSessionConnected(false);
+                return result.success(false).message("Binance US returned an incomplete account response; authentication was not verified").build();
+            }
+            setAuthenticatedSessionConnected(true);
+            return result.success(true).httpStatus(200)
+                    .metadata(Map.of("canTrade", Boolean.toString(account.path("canTrade").asBoolean(false))))
+                    .message(account.path("canTrade").asBoolean(false)
+                            ? "Binance US signed account authentication verified"
+                            : "Binance US account authenticated; account trading is disabled. Check Spot Trading permissions and account restrictions.")
+                    .build();
+        } catch (BinanceUsApiException exception) {
+            setAuthenticatedSessionConnected(false);
+            return result.success(false).httpStatus(exception.status).credentialIssue(exception.credentialIssue())
+                    .message(exception.getMessage()).build();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            setAuthenticatedSessionConnected(false);
+            return result.success(false).message("Binance US authentication interrupted; retry connection validation").build();
+        } catch (Exception exception) {
+            setAuthenticatedSessionConnected(false);
+            return result.success(false).message("Binance US private account authentication could not be verified; check connectivity and retry").build();
+        }
     }
-
     @Override
     public CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity) {
         return createMarketOrder(symbol, side, quantity);
@@ -2395,12 +2406,20 @@ public class BinanceUs extends Exchange {
 
     @Override
     public AuthResult AuthCheckResult(String selectedExchange) {
-        if (apiKey == null || apiKey.isBlank()) {
-            return AuthResult.failure("Binance US credentials are not configured");
-        }
-        return AuthResult.success("Binance US authentication validated");
+        var result = checkAuthentication();
+        return result.isSuccess() ? AuthResult.success(result.getMessage()) : AuthResult.failure(result.getMessage());
     }
 
+    private static final class BinanceUsApiException extends IllegalStateException {
+        private final int code;
+        private final int status;
+        private BinanceUsApiException(int code, int status, String message) {
+            super(message);
+            this.code = code;
+            this.status = status;
+        }
+        private boolean credentialIssue() { return code == -2014 || code == -2015 || code == -1022; }
+    }
     private CompletableFuture<String> submitBinanceUsOrder(
             TradePair tradePair,
             Side side,
@@ -2515,8 +2534,20 @@ public class BinanceUs extends Exchange {
         HttpResponse<String> response = sendUncachedRestRequest(builder.build(), true);
         JsonNode body = OBJECT_MAPPER.readTree(response.body());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new RuntimeException(
-                    "Binance US API returned HTTP %d: %s".formatted(response.statusCode(), body));
+            int code = body.path("code").asInt(0);
+            String guidance = switch (code) {
+                case -2015 -> "Binance US rejected API access for " + method + " " + path
+                        + ". Check the Binance.US key, allowed outgoing IP, and permissions for this action."
+                        + (path.equals("/api/v3/order") || path.equals("/api/v3/openOrders")
+                        ? " Reading account data can work while orders are denied: enable Spot Trading on this API key." : "");
+                case -2014 -> "Binance US rejected the API key format. Use a Binance.US API key, not a Binance.com key.";
+                case -1022 -> "Binance US rejected the request signature. Check that the API key and secret belong to the same Binance.US key.";
+                default -> "Binance US API returned HTTP " + response.statusCode() + ": " + body;
+            };
+            if (path.equals("/api/v3/account") && (code == -2015 || code == -2014 || code == -1022)) {
+                setAuthenticatedSessionConnected(false);
+            }
+            throw new BinanceUsApiException(code, response.statusCode(), guidance);
         }
         if (body.has("orderId")) accountState.updateRestOrder(body);
         if (method.equals("DELETE") && path.equals("/api/v3/openOrders") && body.isArray())

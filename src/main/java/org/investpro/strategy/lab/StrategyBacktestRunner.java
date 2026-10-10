@@ -47,7 +47,9 @@ public class StrategyBacktestRunner {
      * Run a backtest for one strategy on one symbol/timeframe.
      */
     public StrategyPerformanceReport run(@NotNull StrategyBacktestRequest request) {
+        java.util.Objects.requireNonNull(request, "Backtest request is required");
         try {
+            validateInputs(request);
             log.info(
                     "Starting backtest: {} on {}/{} with {} candles",
                     request.getStrategyName(),
@@ -69,17 +71,32 @@ public class StrategyBacktestRunner {
             // Run simulation
             return simulateStrategy(request, strategy);
 
+        } catch (java.util.concurrent.CancellationException cancelled) {
+            throw cancelled;
         } catch (Exception e) {
             log.error("Backtest failed for {}", request.getStrategyName(), e);
             return createFailureReport(request, "Backtest error: " + e.getMessage());
         }
     }
 
+    private static void validateInputs(StrategyBacktestRequest request) {
+        if (request.getSymbol().isBlank() || request.getStrategyName().isBlank()) {
+            throw new IllegalArgumentException("Symbol, timeframe and strategy are required");
+        }
+        if (!Double.isFinite(request.getInitialCapital()) || request.getInitialCapital() <= 0
+                || !Double.isFinite(request.getCommissionRate()) || request.getCommissionRate() < 0 || request.getCommissionRate() >= 1
+                || !Double.isFinite(request.getSlippageRate()) || request.getSlippageRate() < 0 || request.getSlippageRate() >= 1
+                || request.getMaxTrades() <= 0 || request.getFallbackExitBars() <= 0) {
+            throw new IllegalArgumentException("Capital and trade limits must be positive; commission and slippage must be finite rates in [0, 1)");
+        }
+        org.investpro.backtesting.BacktestDataValidation.validate(request.getCandles());
+    }
+
     /**
      * Validate backtest request.
      */
-    private boolean validateRequest(StrategyBacktestRequest request) {
-        if (HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(request.getCandles().size())) {
+    private boolean validateRequest(@NonNull StrategyBacktestRequest request) {
+        if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(request.getCandles().size())) {
             int candleCount = request.getCandles().size();
             log.warn("Insufficient candles for basic backtest: {} < {}", candleCount, MIN_LOOKBACK_BARS);
             return false;
@@ -100,6 +117,8 @@ public class StrategyBacktestRunner {
         try {
             StrategyRegistry registry = StrategyRegistry.getInstance();
             return registry.getStrategy(strategyName);
+        } catch (java.util.concurrent.CancellationException cancelled) {
+            throw cancelled;
         } catch (Exception e) {
             log.error("Failed to resolve strategy: {}", strategyName, e);
             return null;
@@ -126,9 +145,9 @@ public class StrategyBacktestRunner {
         int entryBar = -1;
 
         // Loop through candles starting from sufficient lookback
-        for (int i = MIN_LOOKBACK_BARS; i < candles.size() && tradeCount < request.getMaxTrades(); i++) {
+        for (int i = MIN_LOOKBACK_BARS; i < candles.size(); i++) {
+            if (Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("Backtest cancelled");
             CandleData candle = candles.get(i);
-            CandleData previousCandle = i > 0 ? candles.get(i - 1) : candle;
 
             // Get candle window for context
             List<CandleData> window = new ArrayList<>(candles.subList(0, i + 1));
@@ -138,7 +157,6 @@ public class StrategyBacktestRunner {
                 ExitSignal exit = checkExit(
                         currentTrade,
                         candle,
-                        previousCandle,
                         i - entryBar,
                         request.getFallbackExitBars());
 
@@ -201,12 +219,12 @@ public class StrategyBacktestRunner {
 
         // Close any remaining open trade
         if (inTrade && currentTrade != null) {
-            CandleData lastCandle = candles.get(candles.size() - 1);
+            CandleData lastCandle = candles.getLast();
             StrategyBacktestTrade closedTrade = closeTrade(
                     currentTrade,
                     lastCandle.closePrice(),
                     lastCandle.openTime(),
-                    candles.size() - entryBar,
+                    candles.size() - 1 - entryBar,
                     "Backtest end",
                     request.getCommissionRate(),
                     request.getSlippageRate());
@@ -215,7 +233,7 @@ public class StrategyBacktestRunner {
         }
 
         // Calculate statistics
-        return calculateReport(request, trades, warnings, equity, peakEquity);
+        return calculateReport(request, trades, warnings, equity);
     }
 
     /**
@@ -231,9 +249,9 @@ public class StrategyBacktestRunner {
                     .symbol(tradePair)
                     .timeframe(request.getTimeframe())
                     .candles(window)
-                    .currentPrice(window.isEmpty() ? 0 : window.get(window.size() - 1).closePrice())
-                    .bid(window.isEmpty() ? 0 : window.get(window.size() - 1).lowPrice())
-                    .ask(window.isEmpty() ? 0 : window.get(window.size() - 1).highPrice())
+                    .currentPrice(window.isEmpty() ? 0 : window.getLast().closePrice())
+                    .bid(window.isEmpty() ? 0 : window.getLast().lowPrice())
+                    .ask(window.isEmpty() ? 0 : window.getLast().highPrice())
                     .marketBehavior(MarketBehavior.RANGING)
                     .volatility(0.01)
                     .averageVolume(1000000)
@@ -249,6 +267,8 @@ public class StrategyBacktestRunner {
             }
 
             return generateRuleAwareSignal(strategySignal, request, definition, window);
+        } catch (java.util.concurrent.CancellationException cancelled) {
+            throw cancelled;
         } catch (Exception e) {
             log.debug("Signal generation failed", e);
             return null;
@@ -281,7 +301,7 @@ public class StrategyBacktestRunner {
 
         if (candleRules.isEmpty()) {
             if (indicatorMatch != null) {
-                return signalFromIndicatorMatch(request, indicatorMatch, window.get(window.size() - 1));
+                return signalFromIndicatorMatch(request, indicatorMatch, window.getLast());
             }
             return strategySignal != null
                     ? strategySignal
@@ -309,7 +329,7 @@ public class StrategyBacktestRunner {
                     "Candle pattern fired, but indicator rules did not confirm.");
         }
 
-        if (indicatorMatch != null && !sideMatches(indicatorMatch.side(), candleMatch.signalType())) {
+        if (indicatorMatch != null && sideMatches(indicatorMatch.side(), candleMatch.signalType())) {
             return StrategySignal.hold(
                     request.getSymbol(),
                     request.getTimeframe().getCode(),
@@ -317,7 +337,7 @@ public class StrategyBacktestRunner {
                     "Candle pattern side did not confirm indicator signal.");
         }
 
-        if (indicatorMatch == null && hasIndicatorRules && !sideMatches(strategySignal.getSide(), candleMatch.signalType())) {
+        if (indicatorMatch == null && hasIndicatorRules && sideMatches(strategySignal.getSide(), candleMatch.signalType())) {
             return StrategySignal.hold(
                     request.getSymbol(),
                     request.getTimeframe().getCode(),
@@ -325,7 +345,7 @@ public class StrategyBacktestRunner {
                     "Candle pattern side did not confirm indicator signal.");
         }
 
-        return signalFromCandleMatch(request, candleMatch, window.get(window.size() - 1));
+        return signalFromCandleMatch(request, candleMatch, window.getLast());
     }
 
     private IndicatorRuleMatch evaluateIndicatorRules(List<StrategyRuleDefinition> rules, List<CandleData> window) {
@@ -610,7 +630,7 @@ public class StrategyBacktestRunner {
         if (values == null || values.isEmpty()) {
             return null;
         }
-        double value = values.get(values.size() - 1);
+        double value = values.getLast();
         return Double.isNaN(value) ? null : value;
     }
 
@@ -623,8 +643,8 @@ public class StrategyBacktestRunner {
     }
 
     private boolean sideMatches(Side side, SignalType signalType) {
-        return (side == Side.BUY && signalType == SignalType.BUY)
-                || (side == Side.SELL && signalType == SignalType.SELL);
+        return (side != Side.BUY || signalType != SignalType.BUY)
+                && (side != Side.SELL || signalType != SignalType.SELL);
     }
 
     private record CandlePatternMatch(
@@ -666,7 +686,6 @@ public class StrategyBacktestRunner {
     private ExitSignal checkExit(
             StrategyBacktestTrade trade,
             CandleData candle,
-            CandleData previousCandle,
             int barsHeld,
             int fallbackExitBars) {
         double close = candle.closePrice();
@@ -755,8 +774,7 @@ public class StrategyBacktestRunner {
             StrategyBacktestRequest request,
             @NonNull List<StrategyBacktestTrade> trades,
             List<String> warnings,
-            double finalEquity,
-            double peakEquity) {
+            double finalEquity) {
         int winCount = 0;
         int lossCount = 0;
         double sumWins = 0.0;

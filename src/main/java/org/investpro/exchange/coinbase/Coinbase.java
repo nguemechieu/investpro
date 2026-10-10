@@ -626,7 +626,7 @@ public class Coinbase extends Exchange {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return new CoinbaseCandleDataSupplier(secondsPerCandle, tradePair);
+        return new CoinbaseCandleDataSupplier(secondsPerCandle, tradePair, this::sendAsync);
     }
 
     // ---------------------------------------------------------------------
@@ -927,12 +927,20 @@ public class Coinbase extends Exchange {
             if (httpResponse.statusCode() == 429) {
                 if (marketRequest) {
                     marketRestLimiter.onRateLimited(productId);
+                    log.warn("Coinbase rate limited market data. product={} cooldownMs={}", productId, 60_000L);
+                    // The next scheduled poll will retry after the product cooldown.
+                    // Do not occupy both HTTP workers sleeping through that cooldown.
+                    throw new CoinbaseRestRateLimiter.RateLimitBlockedException("product-cooldown", 60_000L);
                 }
 
                 if (attempt < maxAttempts - 1) {
                     long backoffMs = retryDelayMs(httpResponse, attempt);
                     log.warn("Coinbase rate limited for {}. Retrying in {}ms ({}/{})",
                             request.uri(), backoffMs, attempt + 1, maxAttempts);
+                    if (permitAcquired) {
+                        marketRestLimiter.releasePermit();
+                        permitAcquired = false;
+                    }
                     sleepBeforeRetry(request, backoffMs);
                     return sendWithRetry(request, attempt + 1, maxAttempts);
                 }
@@ -949,8 +957,7 @@ public class Coinbase extends Exchange {
                     marketRestLimiter.onNonRateLimitFailure();
                 }
 
-                String errorMsg = "Coinbase HTTP %d for %s: %s"
-                        .formatted(httpResponse.statusCode(), request.uri().getPath(), "<response omitted>");
+                String errorMsg = CoinbaseHttpError.message(httpResponse.statusCode(), request.uri().getPath(), body);
 
                 if (isCoinbasePermissionDeniedProductDiscovery(request, httpResponse.statusCode(), body)) {
                     log.info("Coinbase product discovery permission required for {}.", request.uri());
@@ -968,13 +975,8 @@ public class Coinbase extends Exchange {
             return body;
 
         } catch (CoinbaseRestRateLimiter.RateLimitBlockedException blockedException) {
-            if (attempt < maxAttempts - 1) {
-                long waitMs = Math.max(500L, blockedException.waitMs());
-                log.debug("Coinbase REST blocked by limiter reason={} route={} product={} waitMs={}",
-                        blockedException.reason(), route, productId, waitMs);
-                sleepBeforeRetry(request, waitMs);
-                return sendWithRetry(request, attempt + 1, maxAttempts);
-            }
+            log.debug("Coinbase REST deferred reason={} route={} product={} waitMs={}",
+                    blockedException.reason(), route, productId, blockedException.waitMs());
             throw blockedException;
 
         } catch (IOException exception) {
@@ -992,6 +994,10 @@ public class Coinbase extends Exchange {
                         exception.getMessage());
 
                 try {
+                    if (permitAcquired) {
+                        marketRestLimiter.releasePermit();
+                        permitAcquired = false;
+                    }
                     Thread.sleep(backoffMs);
                 } catch (InterruptedException interruptedException) {
                     Thread.currentThread().interrupt();
@@ -1025,20 +1031,19 @@ public class Coinbase extends Exchange {
     }
 
     private @NotNull CompletableFuture<String> sendAsyncWithRetry(HttpRequest request, int attempt, int maxAttempts) {
-        String route = request.uri().getPath();
-        String productId = CoinbaseRestRateLimiter.extractProductId(request.uri());
         boolean marketRequest = isMarketDataRequest(request);
 
-        CompletableFuture<Void> permitFuture = CompletableFuture.runAsync(() -> {
-            if (marketRequest) {
-                marketRestLimiter.acquirePermit(route, productId);
-                log.debug("Coinbase REST request allowed by limiter route={} product={} attempt={}", route, productId,
-                        attempt + 1);
-            }
-        });
+        if (marketRequest) {
+            // Queue the entire request, not just permit acquisition. A worker owns
+            // its slot until HTTP completion, including failures and cancellation.
+            return org.investpro.core.concurrent.AppExecutors.submit(
+                    org.investpro.core.concurrent.AppExecutors.COINBASE_REST,
+                    () -> sendWithRetry(request, attempt, maxAttempts));
+        }
 
-        return permitFuture
-                .thenCompose(ignored -> httpClient.sendAsync(refreshRequestAuthentication(request), HttpResponse.BodyHandlers.ofByteArray())
+        return CompletableFuture.supplyAsync(() -> refreshRequestAuthentication(request),
+                        org.investpro.core.concurrent.AppExecutors.IO)
+                .thenCompose(signedRequest -> httpClient.sendAsync(signedRequest, HttpResponse.BodyHandlers.ofByteArray())
                         .thenCompose(httpResponse -> {
                             String contentEncoding = httpResponse.headers()
                                     .firstValue("Content-Encoding")
@@ -1049,32 +1054,23 @@ public class Coinbase extends Exchange {
                                     contentEncoding);
 
                             if (httpResponse.statusCode() == 429) {
-                                if (marketRequest) {
-                                    marketRestLimiter.onRateLimited(productId);
-                                }
-
                                 if (attempt < maxAttempts - 1) {
                                     long backoffMs = retryDelayMs(httpResponse, attempt);
                                     log.warn("Coinbase rate limited for {}. Retrying in {}ms ({}/{})",
                                             request.uri(), backoffMs, attempt + 1, maxAttempts);
                                     return CompletableFuture
-                                            .runAsync(() -> sleepBeforeRetry(request, backoffMs))
+                                            .runAsync(() -> {}, CompletableFuture.delayedExecutor(backoffMs,
+                                                    TimeUnit.MILLISECONDS, org.investpro.core.concurrent.AppExecutors.IO))
                                             .thenCompose(x -> sendAsyncWithRetry(request, attempt + 1, maxAttempts));
                                 }
-                            } else if (marketRequest) {
-                                marketRestLimiter.onSuccess(productId);
                             }
 
                             if (httpResponse.statusCode() >= 400) {
-                                if (httpResponse.statusCode() == 401 && !marketRequest
+                                if (httpResponse.statusCode() == 401
                                         && !"/api/v3/brokerage/products".equals(request.uri().getPath())) {
                                     rejectPrivateAuthentication();
                                 }
-                                if (marketRequest && httpResponse.statusCode() != 429) {
-                                    marketRestLimiter.onNonRateLimitFailure();
-                                }
-                                String errorMsg = "Coinbase HTTP %d for %s: %s"
-                                        .formatted(httpResponse.statusCode(), request.uri().getPath(), "<response omitted>");
+                                String errorMsg = CoinbaseHttpError.message(httpResponse.statusCode(), request.uri().getPath(), body);
                                 if (isCoinbasePermissionDeniedProductDiscovery(request, httpResponse.statusCode(), body)) {
                                     log.info("Coinbase product discovery permission required for {}.", request.uri());
                                 }
@@ -1082,11 +1078,6 @@ public class Coinbase extends Exchange {
                             }
 
                             return CompletableFuture.completedFuture(body);
-                        })
-                        .whenComplete((ignored2, throwable) -> {
-                            if (marketRequest) {
-                                marketRestLimiter.releasePermit();
-                            }
                         }));
     }
 
@@ -2667,6 +2658,19 @@ public class Coinbase extends Exchange {
     }
 
     private @NotNull String send(HttpRequest request) {
+        if (isMarketDataRequest(request)) {
+            CompletableFuture<String> response = sendAsync(request);
+            try {
+                return response.get();
+            } catch (InterruptedException exception) {
+                response.cancel(true);
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Coinbase market request interrupted", exception);
+            } catch (ExecutionException exception) {
+                if (exception.getCause() instanceof RuntimeException cause) throw cause;
+                throw new RuntimeException("Coinbase market request failed", exception.getCause());
+            }
+        }
         return sendWithRetry(request, 0, 3);
     }
 

@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: org.investpro.exchange.binanceus.BinanceUsSharedStateTest
 -------------------------------------------------------------------------------
-Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.316 s -- in org.investpro.exchange.binanceus.BinanceUsSharedStateTest
+Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 11.82 s -- in org.investpro.exchange.binanceus.BinanceUsSharedStateTest

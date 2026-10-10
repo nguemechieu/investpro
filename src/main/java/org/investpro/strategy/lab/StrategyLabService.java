@@ -85,13 +85,10 @@ public class StrategyLabService {
         this.instrumentCompatibilityService = new StrategyInstrumentCompatibilityService();
 
         // Create dedicated thread pool for strategy backtests
-        this.executorService = Executors.newFixedThreadPool(
-                4,
-                r -> {
-                    Thread t = new Thread(r, "strategy-lab-worker");
-                    t.setDaemon(true);
-                    return t;
-                });
+        this.executorService = new java.util.concurrent.ThreadPoolExecutor(2, 2, 30, java.util.concurrent.TimeUnit.SECONDS,
+                new java.util.concurrent.ArrayBlockingQueue<>(32), r -> {
+                    Thread t = new Thread(r, "investpro-backtest-ranking"); t.setDaemon(true); return t;
+                }, new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
 
         log.info("StrategyLabService initialized with backtesting engine");
     }
@@ -223,12 +220,12 @@ public class StrategyLabService {
             @NotNull Timeframe timeframe,
             @NotNull List<CandleData> candles,
             @NotNull List<String> strategyNames) {
-        return CompletableFuture.supplyAsync(() -> {
+        return org.investpro.core.concurrent.AppExecutors.submit(executorService, () -> {
             List<CandleData> cleanCandles = sanitizeCandles(candles);
             int candleCount = cleanCandles.size();
             HistoricalDataPrefetcher.DataReadiness readiness = HistoricalDataPrefetcher
                     .evaluateDataReadiness(candleCount, candleCount);
-            if (HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
+            if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
                 log.warn("Cannot evaluate strategies for {}/{}: only {} candles available, readiness={}",
                         symbol, timeframe.getCode(), candleCount, readiness);
                 return null;
@@ -293,7 +290,7 @@ public class StrategyLabService {
                     symbol, timeframe.getCode(), assignment == null ? "NONE" : assignment.getStrategyId(),
                     selected.getScore());
             return assignment;
-        }, executorService);
+        });
     }
 
     /**
@@ -334,7 +331,7 @@ public class StrategyLabService {
             @NotNull String symbol,
             @NotNull List<Timeframe> timeframes,
             @NotNull List<String> strategyNames) {
-        return CompletableFuture.supplyAsync(() -> {
+        return org.investpro.core.concurrent.AppExecutors.submit(executorService, () -> {
             List<StrategyPerformanceReport> allResults = new ArrayList<>();
 
             int totalTests = strategyNames.size() * timeframes.size();
@@ -347,7 +344,7 @@ public class StrategyLabService {
                 HistoricalDataPrefetcher.DataReadiness readiness = HistoricalDataPrefetcher
                         .evaluateDataReadiness(candleCount, candleCount);
 
-                if (HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
+                if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
                     log.warn("Skipping Strategy Lab backtests for {}/{}: insufficient candles={} readiness={}",
                             symbol, timeframe.getCode(), candleCount, readiness);
                     rankingsCache.put(cacheKey, List.of());
@@ -395,7 +392,7 @@ public class StrategyLabService {
 
             return rankingEngine.rank(allResults);
 
-        }, executorService);
+        });
     }
 
     /**
@@ -483,23 +480,13 @@ public class StrategyLabService {
      * Shutdown the service.
      */
     public void shutdown() {
-        executorService.shutdown();
-        try {
-            if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {
-                executorService.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            executorService.shutdownNow();
-            Thread.currentThread().interrupt();
-        } finally {
-            try {
-                localAiRuntimeService.close();
-            } catch (Exception exception) {
-                log.debug("Unable to close local AI runtime service", exception);
-            }
-        }
+        for (Runnable pending : executorService.shutdownNow())
+            if (pending instanceof java.util.concurrent.Future<?> future) future.cancel(true);
+        org.investpro.core.concurrent.AppExecutors.cleanup(() -> {
+            try { localAiRuntimeService.close(); }
+            catch (Exception error) { log.debug("Unable to close local AI runtime service", error); }
+        });
     }
-
     /**
      * Make cache key for symbol/timeframe.
      */

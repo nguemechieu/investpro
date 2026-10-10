@@ -11,7 +11,7 @@ import java.time.Instant;
  */
 @Data
 public class Ticker {
-    public enum QuoteType { LIVE, FROZEN, DELAYED, DELAYED_FROZEN }
+    public enum QuoteType { LIVE, FROZEN, DELAYED, DELAYED_FROZEN, SIMULATED }
     private QuoteType quoteType = QuoteType.LIVE;
 
     // Explicit getters (Lombok @Data not being invoked)

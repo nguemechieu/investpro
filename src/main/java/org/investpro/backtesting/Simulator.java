@@ -48,19 +48,25 @@ public class Simulator {
             throw new IllegalArgumentException("Initial balance must be positive and commission must be nonnegative and finite");
         }
 
+        BacktestDataValidation.validate(historicalData);
         // Initialize strategy
         strategy.initialize(historicalData);
 
         // Process data and get signals
         List<BacktestStrategy.SignalEvent> signals = strategy.processData();
         Map<Integer, List<BacktestStrategy.SignalEvent>> signalsByCandle = new HashMap<>();
+        if (signals == null) throw new IllegalArgumentException("Strategy returned no signal collection");
         for (BacktestStrategy.SignalEvent signal : signals) {
+            if (signal == null || signal.type() == null || signal.candleIndex() < 0 || signal.candleIndex() >= historicalData.size()) {
+                throw new IllegalArgumentException("Strategy signal has an invalid candle index or type");
+            }
             signalsByCandle.computeIfAbsent(signal.candleIndex(), ignored -> new ArrayList<>()).add(signal);
         }
         equityCurve.add(config.getInitialBalance());
 
         // Execute trades based on signals
         for (int idx = 0; idx < historicalData.size(); idx++) {
+            if (Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("Backtest cancelled");
             CandleData candle = historicalData.get(idx);
             double price = candle.closePrice();
             if (!Double.isFinite(price) || price <= 0) {

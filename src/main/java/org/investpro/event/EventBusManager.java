@@ -29,11 +29,9 @@ public class EventBusManager {
     private final List<Consumer<AgentEvent>> allSubscribers = new CopyOnWriteArrayList<>();
     private final Map<String, List<Consumer<AgentEvent>>> typedSubscribers = new ConcurrentHashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
-    private final ExecutorService executor = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r, "investpro-event-bus-manager");
-        t.setDaemon(true);
-        return t;
-    });
+    private final java.util.concurrent.Executor executor = new org.investpro.core.concurrent.OrderedExecutor(
+            org.investpro.core.concurrent.AppExecutors.IO, 512);
+    private final java.util.concurrent.atomic.AtomicLong generation = new java.util.concurrent.atomic.AtomicLong();
 
     private EventBusManager() {
     }
@@ -50,7 +48,7 @@ public class EventBusManager {
 
     public void shutdown() {
         if (running.compareAndSet(true, false)) {
-            executor.shutdownNow();
+            generation.incrementAndGet();
             log.info("EventBusManager shutdown.");
         }
     }
@@ -83,7 +81,9 @@ public class EventBusManager {
         if (event == null || !running.get()) {
             return;
         }
-        executor.submit(() -> {
+        long session = generation.get();
+        executor.execute(() -> {
+            if (!running.get() || session != generation.get()) return;
             for (Consumer<AgentEvent> subscriber : allSubscribers) {
                 try {
                     subscriber.accept(event);

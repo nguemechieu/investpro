@@ -39,7 +39,7 @@ public class CapabilityAwareOrderPanel extends OrderPanel {
      * Creates a capability-aware order panel.
      *
      * @param systemCore  application system core (passed to parent)
-     * @param tradePair   initially selected trade pair (may be null)
+     * @param tradePair   initially selected trade pair (maybe null)
      * @param capability  the capability profile of the currently active exchange
      */
     public CapabilityAwareOrderPanel(

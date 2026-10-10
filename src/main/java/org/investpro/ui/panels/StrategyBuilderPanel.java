@@ -1143,8 +1143,7 @@ public class StrategyBuilderPanel extends VBox {
             conversation.appendText("\nUser: " + question + "\n");
             prompt.clear();
             askButton.setDisable(true);
-            CompletableFuture
-                    .supplyAsync(() -> answerAiAssistantQuestion(question))
+            org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.ASSISTANT, () -> answerAiAssistantQuestion(question))
                     .whenComplete((answer, throwable) -> Platform.runLater(() -> {
                         if (throwable != null) {
                             conversation.appendText("AI: I could not process that request: "
@@ -1252,7 +1251,7 @@ public class StrategyBuilderPanel extends VBox {
             return new AiStrategyGenerationRequest(
                     modelCombo.getValue(),
                     prompt.getText(),
-                    resolveTestPairPair(),
+                    Optional.empty(),
                     Optional.ofNullable(timeframeCombo.getValue()),
                     false,
                     disclaimer.isSelected());
@@ -1260,8 +1259,11 @@ public class StrategyBuilderPanel extends VBox {
 
         dialog.showAndWait().ifPresent(request -> {
             setAutoStrategyStatus("AI strategy generation started...");
-            CompletableFuture
-                    .supplyAsync(() -> new SafeAiStrategyGenerator().generate(request))
+            org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.MARKET_DATA, this::resolveTestPairPair)
+                    .thenCompose(pair -> org.investpro.core.concurrent.AppExecutors.submit(
+                            org.investpro.core.concurrent.AppExecutors.ASSISTANT, () -> new SafeAiStrategyGenerator().generate(
+                                    new AiStrategyGenerationRequest(request.model(), request.prompt(), pair,
+                                            request.optionalTimeframe(), request.overwriteCurrentStrategy(), request.disclaimerAccepted()))))
                     .whenComplete(
                             (result, throwable) -> Platform.runLater(() -> handleAiStrategyResult(result, throwable)));
         });
@@ -1286,8 +1288,7 @@ public class StrategyBuilderPanel extends VBox {
     private void generateAutoStrategyCandidates() {
         Timeframe timeframe = selectedOrDefaultTimeframe();
         setAutoStrategyStatus("Generating Auto Strategy Lab candidates...");
-        CompletableFuture
-                .supplyAsync(() -> {
+        org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.BACKTEST, () -> {
                     StrategyGenerationContext context = createAutoStrategyContext(timeframe, false);
                     return new AbstractMap.SimpleEntry<>(context, autoStrategyLab.generateCandidates(context).join());
                 })
@@ -1314,8 +1315,7 @@ public class StrategyBuilderPanel extends VBox {
         }
         Timeframe timeframe = selectedOrDefaultTimeframe();
         setAutoStrategyStatus("Fetching candles and evaluating candidates...");
-        CompletableFuture
-                .supplyAsync(() -> {
+        org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.BACKTEST, () -> {
                     StrategyGenerationContext context = createAutoStrategyContext(timeframe, true);
                     return new AbstractMap.SimpleEntry<>(context,
                             autoStrategyLab.evaluateCandidates(lastAutoCandidates, context).join());
@@ -1342,40 +1342,31 @@ public class StrategyBuilderPanel extends VBox {
             setAutoStrategyStatus("No evaluated candidates to assign.");
             return;
         }
-        StrategyAssignmentDecision decision = autoStrategyLab.assignBest(
-                lastAutoEvaluations,
-                lastAutoContext == null ? null
-                        : org.investpro.strategy.StrategySelectionService.getInstance()
-                                .getCurrentAssignment(lastAutoContext.symbol(), lastAutoContext.timeframe()),
-                lastAutoContext,
-                true);
-        setAutoStrategyStatus("Decision: " + decision.reason());
-        if (decision.assigned()) {
-            showAlert("Auto Strategy Lab", "Assigned " + decision.strategyName() + "\n" + decision.reason());
-        } else {
-            showAlert("Auto Strategy Lab", decision.reason() + "\n" + String.join("\n", decision.warnings()));
-        }
+        var evaluations = List.copyOf(lastAutoEvaluations);
+        var context = lastAutoContext;
+        org.investpro.ui.utils.UiBackgroundTasks.submit(() -> autoStrategyLab.assignBest(evaluations,
+                context == null ? null : org.investpro.strategy.StrategySelectionService.getInstance()
+                        .getCurrentAssignment(context.symbol(), context.timeframe()), context, true))
+                .whenComplete((decision, error) -> Platform.runLater(() -> {
+                    if (error != null) { setAutoStrategyStatus("Assignment failed: " + error.getMessage()); return; }
+                    setAutoStrategyStatus("Decision: " + decision.reason());
+                    showAlert("Auto Strategy Lab", decision.assigned()
+                            ? "Assigned " + decision.strategyName() + "\n" + decision.reason()
+                            : decision.reason() + "\n" + String.join("\n", decision.warnings()));
+                }));
     }
-
     private void startAutoImproveScheduler() {
+        Timeframe timeframe = selectedOrDefaultTimeframe();
+        StrategyDefinition definition = strategyNameField != null && strategyNameField.getText() != null
+                && !strategyNameField.getText().trim().isBlank() && ruleRows != null && !ruleRows.isEmpty()
+                ? currentStrategyDefinition() : null;
         setAutoStrategyStatus("Scheduled auto improvement enabled.");
-        autoStrategyScheduler.startAutoImprovement(
-                autoStrategyLab,
-                () -> List.of(createAutoStrategyContext(selectedOrDefaultTimeframe(), true)),
+        autoStrategyScheduler.startAutoImprovement(autoStrategyLab,
+                () -> List.of(createAutoStrategyContext(timeframe, true)),
                 context -> org.investpro.strategy.StrategySelectionService.getInstance()
                         .getCurrentAssignment(context.symbol(), context.timeframe()),
-                context -> {
-                    if (strategyNameField == null
-                            || strategyNameField.getText() == null
-                            || strategyNameField.getText().trim().isBlank()
-                            || ruleRows == null
-                            || ruleRows.isEmpty()) {
-                        return null;
-                    }
-                    return currentStrategyDefinition();
-                });
+                context -> definition);
     }
-
     private StrategyGenerationContext createAutoStrategyContext(Timeframe timeframe, boolean includeCandles) {
         Optional<TradePair> pair = resolveTestPairPair();
         String symbol = pair.map(value -> value.toString('/')).orElse("UNKNOWN");
@@ -1680,52 +1671,38 @@ public class StrategyBuilderPanel extends VBox {
     }
 
     private void saveStrategy() {
-        if (!validateStrategy()) {
-            return;
-        }
-
+        if (!validateStrategy()) return;
         StrategyDefinition definition = currentStrategyDefinition();
-        persistStrategyDefinition(definition);
-
         String indicatorSummary = (ruleRows != null && !ruleRows.isEmpty() ? ruleRows.stream()
-                .map(StrategyRuleRow::getIndicatorName)
-                : parameterRows.stream()
-                        .map(StrategyParameterRow::getIndicatorName))
-                .distinct()
-                .collect(Collectors.joining(", "));
-
-        showAlert("Strategy Saved ✓",
-                "'" + definition.getName() + "' is now registered in the live strategy registry.\n"
-                        + "Indicators: " + indicatorSummary
-                        + "\n\nIt can now be assigned from the Strategy Lab, Backtesting, or decision engines.");
-        log.info("User strategy '{}' saved and registered with params: {}", definition.getName(),
-                definition.getParameters());
+                .map(StrategyRuleRow::getIndicatorName) : parameterRows.stream()
+                .map(StrategyParameterRow::getIndicatorName)).distinct().collect(Collectors.joining(", "));
+        setAutoStrategyStatus("Saving strategy...");
+        org.investpro.ui.utils.UiBackgroundTasks.submit(() -> {
+            persistStrategyDefinition(definition); return null;
+        }).whenComplete((_, error) -> Platform.runLater(() -> {
+            if (error != null) { showAlert("Save Failed", error.getMessage()); return; }
+            showAlert("Strategy Saved", "'" + definition.getName() + "' is now registered in the live strategy registry.\n"
+                    + "Indicators: " + indicatorSummary
+                    + "\n\nIt can now be assigned from the Strategy Lab, Backtesting, or decision engines.");
+            setAutoStrategyStatus("Strategy saved: " + definition.getName());
+        }));
     }
 
     private void testStrategy() {
-        if (!validateStrategy()) {
-            return;
-        }
-
+        if (!validateStrategy()) return;
         StrategyDefinition definition = currentStrategyDefinition();
-        persistStrategyDefinition(definition);
-
-        Optional<TradePair> testPair = resolveTestPairPair();
-        if (testPair.isEmpty()) {
-            showAlert("Backtest unavailable", "No exchange symbol is available for the built-in test run.");
-            return;
-        }
-
-        Timeframe selectedTimeframe = timeframeCombo.getValue();
-        if (selectedTimeframe == null) {
-            showAlert("Backtest unavailable", "Please select a timeframe before testing.");
-            return;
-        }
-
-        TradePair pair = testPair.get();
-        openBacktestingAndRun(definition, pair, selectedTimeframe);
+        Timeframe timeframe = timeframeCombo.getValue();
+        if (timeframe == null) { showAlert("Backtest unavailable", "Please select a timeframe before testing."); return; }
+        setAutoStrategyStatus("Preparing strategy test...");
+        org.investpro.ui.utils.UiBackgroundTasks.submit(() -> {
+            persistStrategyDefinition(definition); return null;
+        }).thenCompose(_ -> org.investpro.ui.utils.UiBackgroundTasks.marketData(this::resolveTestPairPair))
+                .whenComplete((pair, error) -> Platform.runLater(() -> {
+                    if (error != null) { showAlert("Backtest unavailable", error.getMessage()); return; }
+                    if (pair.isEmpty()) { showAlert("Backtest unavailable", "No exchange symbol is available for the built-in test run."); return; }
+                    openBacktestingAndRun(definition, pair.get(), timeframe);
+                }));
     }
-
     private void openBacktestingAndRun(StrategyDefinition definition, TradePair pair, Timeframe timeframe) {
         try {
             BacktestingPanel backtestingPanel = new BacktestingPanel(systemCore);
@@ -1739,8 +1716,7 @@ public class StrategyBuilderPanel extends VBox {
                     definition.getName(), pair.toString('/'), timeframe.getCode());
         } catch (Exception exception) {
             log.error("Unable to open Backtesting panel for {}", definition.getName(), exception);
-            CompletableFuture
-                    .supplyAsync(() -> runRealBacktest(definition, pair, timeframe))
+            org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.BACKTEST, () -> runRealBacktest(definition, pair, timeframe))
                     .whenComplete((report, throwable) -> Platform.runLater(() -> {
                         if (throwable != null) {
                             showAlert("Backtest Failed", throwable.getMessage());

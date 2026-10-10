@@ -45,7 +45,8 @@ public class SymbolAgent implements Agent {
     private final TradePair symbol;
     private final SymbolAgentManager manager;
 
-    private AgentContext context;
+    private volatile AgentContext context;
+    private final AtomicLong lifecycle = new AtomicLong();
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicLong tickCount = new AtomicLong(0);
     private final AtomicBoolean evaluationStarted = new AtomicBoolean(false);
@@ -62,6 +63,7 @@ public class SymbolAgent implements Agent {
 
     @Override
     public void start(AgentContext context) {
+        lifecycle.incrementAndGet();
         this.context = context;
         running.set(true);
         SymbolAgentState state = manager.ensureSymbol(symbol);
@@ -83,6 +85,7 @@ public class SymbolAgent implements Agent {
     @Override
     public void stop() {
         running.set(false);
+        lifecycle.incrementAndGet();
         log.info("SymbolAgent stopped for {}", symbol.toString('/'));
     }
 
@@ -158,10 +161,15 @@ public class SymbolAgent implements Agent {
         }
 
         Timeframe timeframe = Timeframe.H1;
+        long session = lifecycle.get();
         fetchHistoricalCandles(timeframe)
-                .thenCompose(candles -> StrategyLabService.getInstance()
-                        .evaluateAndAssignBest(symbol.toString('/'), timeframe, candles))
+                .thenCompose(candles -> {
+                    if (!running.get() || session != lifecycle.get())
+                        return CompletableFuture.failedFuture(new java.util.concurrent.CancellationException());
+                    return StrategyLabService.getInstance().evaluateAndAssignBest(symbol.toString('/'), timeframe, candles);
+                })
                 .thenAccept(assignment -> {
+                    if (!running.get() || session != lifecycle.get()) return;
                     if (assignment == null) {
                         markFailed("No strategy passed real-candle evaluation");
                     } else {
@@ -169,6 +177,7 @@ public class SymbolAgent implements Agent {
                     }
                 })
                 .exceptionally(exception -> {
+                    if (!running.get() || session != lifecycle.get()) return null;
                     markFailed(rootMessage(exception));
                     return null;
                 });
@@ -220,25 +229,23 @@ public class SymbolAgent implements Agent {
             return CompletableFuture.failedFuture(new IllegalStateException("Exchange context is unavailable"));
         }
 
-        try {
-            CandleDataSupplier supplier = context.getExchange().getCandleDataSupplier(timeframe.getSeconds(), symbol);
+        var exchange = context.getExchange();
+        return org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.MARKET_DATA, () -> {
+            CandleDataSupplier supplier = exchange.getCandleDataSupplier(timeframe.getSeconds(), symbol);
             if (supplier == null) {
-                return CompletableFuture.failedFuture(new IllegalStateException(
-                        "No candle data supplier for " + symbol.toString('/') + " " + timeframe.getCode()));
+                throw new IllegalStateException(
+                        "No candle data supplier for " + symbol.toString('/') + " " + timeframe.getCode());
             }
-
             Future<List<CandleData>> candlesFuture = supplier.get();
-            return CompletableFuture.supplyAsync(() -> {
-                try {
-                    List<CandleData> candles = candlesFuture.get(20, TimeUnit.SECONDS);
-                    return candles == null ? List.of() : candles;
-                } catch (Exception exception) {
-                    throw new IllegalStateException("Historical candle fetch failed", exception);
-                }
-            });
-        } catch (Exception exception) {
-            return CompletableFuture.failedFuture(exception);
-        }
+            try {
+                List<CandleData> candles = candlesFuture.get(20, TimeUnit.SECONDS);
+                return candles == null ? List.of() : candles;
+            } catch (Exception exception) {
+                candlesFuture.cancel(true);
+                if (exception instanceof InterruptedException) Thread.currentThread().interrupt();
+                throw new IllegalStateException("Historical candle fetch failed", exception);
+            }
+        });
     }
 
     private void markAssigned(StrategyAssignment assignment) {

@@ -70,7 +70,12 @@ public class CoinbaseRestRateLimiter {
 			throw new RateLimitBlockedException("concurrency-limit", 500L);
 		}
 
-		paceRequests();
+		try {
+			paceRequests();
+		} catch (RuntimeException exception) {
+			permits.release();
+			throw exception;
+		}
 	}
 
 	/**

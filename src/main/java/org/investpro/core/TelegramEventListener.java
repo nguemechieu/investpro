@@ -8,6 +8,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
@@ -37,6 +38,11 @@ public class TelegramEventListener implements Consumer<AgentEvent> {
      */
     @Getter
     private volatile boolean listening = false;
+    private final java.util.concurrent.Executor notifications = new org.investpro.core.concurrent.OrderedExecutor(
+            org.investpro.core.concurrent.AppExecutors.IO, 128);
+    private final java.util.function.Consumer<AgentEvent> asyncHandler = event -> notifications.execute(() -> {
+        if (listening) accept(event);
+    });
     private long lastNotificationTime = System.currentTimeMillis();
     private static final long MIN_NOTIFICATION_INTERVAL_MS = 500; // Prevent spam
 
@@ -58,7 +64,7 @@ public class TelegramEventListener implements Consumer<AgentEvent> {
 
         try {
             // Subscribe to ALL agent events
-            eventBus.subscribeAll(this);
+            eventBus.subscribeAll(asyncHandler);
             listening = true;
             log.info("✅ TelegramEventListener started - Telegram notifications enabled");
         } catch (Exception exception) {
@@ -77,6 +83,7 @@ public class TelegramEventListener implements Consumer<AgentEvent> {
         }
 
         listening = false;
+        eventBus.unsubscribeAll(asyncHandler);
         log.info("TelegramEventListener stopped");
     }
 
@@ -92,7 +99,8 @@ public class TelegramEventListener implements Consumer<AgentEvent> {
         try {
             String eventType = event.type();
             Map<String, Object> metadata = event.metadata();
-            String severity = (String) metadata.getOrDefault("severity", "INFO");
+            if (AgentEvent.ERROR.equals(eventType) && Boolean.FALSE.equals(metadata.get("notifyTelegram"))) return;
+            String severity = (String) metadata.getOrDefault("severity", AgentEvent.ERROR.equals(eventType) ? "ERROR" : "INFO");
             String message = event.payload() instanceof String ? (String) event.payload() : "";
             long currentTime = System.currentTimeMillis();
             long deltaTime = currentTime - lastNotificationTime;
@@ -274,6 +282,14 @@ public class TelegramEventListener implements Consumer<AgentEvent> {
      * Format error notification
      */
     private String formatErrorNotification(AgentEvent event) {
+        Throwable failure = event.payload() instanceof Throwable error ? error : null;
+        while (failure != null && failure.getCause() != null) failure = failure.getCause();
+        String source = event.source() == null || event.source().isBlank() ? "InvestPro" : event.source();
+        String errorType = Objects.toString(event.metadata().get("errorType"),
+                failure == null ? "Stream error" : failure.getClass().getSimpleName());
+        String details = Objects.toString(event.metadata().get("error"),
+                failure != null ? Objects.toString(failure.getMessage(), "No details available")
+                        : Objects.toString(event.payload(), "No details available"));
         return """
                 ❌ **ERROR**
 
@@ -282,9 +298,9 @@ public class TelegramEventListener implements Consumer<AgentEvent> {
                 Details: %s
                 Time: %s
                 """.formatted(
-                getStringAttribute(event, "source"),
-                getStringAttribute(event, "errorType"),
-                event.payload() instanceof String ? event.payload() : "An error occurred",
+                source,
+                errorType,
+                details,
                 event.timestamp());
     }
 
@@ -295,7 +311,7 @@ public class TelegramEventListener implements Consumer<AgentEvent> {
         try {
             // Add emoji prefix based on severity
             String prefix = switch (severity) {
-                case "CRITICAL" -> "🔴";
+                case "CRITICAL", "ERROR" -> "🔴";
                 case "WARNING" -> "🟡";
                 case "INFO" -> "🔵";
                 default -> "⚪";

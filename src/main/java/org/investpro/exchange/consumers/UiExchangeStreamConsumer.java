@@ -42,8 +42,10 @@ import java.util.function.Consumer;
  */
 @Slf4j
 @Getter
-public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
-    private final LatestUiUpdates displayUpdates = new LatestUiUpdates(this::queueOnFx);
+public class UiExchangeStreamConsumer implements ExchangeStreamConsumer, AutoCloseable {
+    private final org.investpro.ui.utils.UiUpdateBatcher displayUpdates = new org.investpro.ui.utils.UiUpdateBatcher();
+    private volatile boolean closed;
+    @Override public void close() { closed = true; displayUpdates.close(); }
 
     private static final int MAX_RECENT_TRADES = 500;
     private static final int MAX_RECENT_FILLS = 500;
@@ -82,6 +84,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
     private Consumer<Ticker> tickerHandler;
     private Consumer<Trade> tradeHandler;
     private Consumer<CandleData> candleHandler;
+    private BiConsumer<TradePair, CandleData> candleWithPairHandler;
     private Consumer<OrderBook> orderBookHandler;
     private Consumer<Account> accountHandler;
     private Consumer<OpenOrder> openOrderHandler;
@@ -159,6 +162,11 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         return this;
     }
 
+    public UiExchangeStreamConsumer onCandleUpdateWithPair(BiConsumer<TradePair, CandleData> handler) {
+        candleWithPairHandler = handler;
+        return this;
+    }
+
     public UiExchangeStreamConsumer onRawMessageUpdate(@Nullable Consumer<String> handler) {
         this.rawMessageHandler = handler;
         return this;
@@ -166,6 +174,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onTicker(String exchangeName, TradePair tradePair, Ticker ticker) {
+        if (closed) return;
         if (tradePair == null || ticker == null) {
             return;
         }
@@ -174,7 +183,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         tickerEvents.incrementAndGet();
         latestTickers.put(key(exchangeName, tradePair), ticker);
 
-        displayUpdates.submit("ticker:" + key(exchangeName, tradePair), () -> safeRun(() -> {
+        displayUpdates.latest("ticker:" + key(exchangeName, tradePair), () -> safeRun(() -> {
             if (tickerHandler != null) {
                 tickerHandler.accept(ticker);
             }
@@ -183,6 +192,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onTrade(String exchangeName, TradePair tradePair, Trade trade) {
+        if (closed) return;
         if (trade == null) {
             return;
         }
@@ -202,6 +212,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onCandle(String exchangeName, TradePair tradePair, CandleData candle) {
+        if (closed) return;
         if (tradePair == null || candle == null) {
             return;
         }
@@ -214,11 +225,13 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
             if (candleHandler != null) {
                 candleHandler.accept(candle);
             }
+            if (candleWithPairHandler != null) candleWithPairHandler.accept(tradePair, candle);
         });
     }
 
     @Override
     public void onOrderBook(String exchangeName, TradePair tradePair, OrderBook orderBook) {
+        if (closed) return;
         if (tradePair == null || orderBook == null) {
             return;
         }
@@ -227,7 +240,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         orderBookEvents.incrementAndGet();
         latestOrderBooks.put(key(exchangeName, tradePair), orderBook);
 
-        displayUpdates.submit("book:" + key(exchangeName, tradePair), () -> safeRun(() -> {
+        displayUpdates.latest("book:" + key(exchangeName, tradePair), () -> safeRun(() -> {
             if (orderBookHandler != null) {
                 orderBookHandler.accept(orderBook);
             }
@@ -236,6 +249,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onAccount(String exchangeName, Account account) {
+        if (closed) return;
         if (account == null) {
             return;
         }
@@ -253,18 +267,22 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onBalanceChanged(String exchangeName, Account account) {
+        if (closed) return;
         onAccount(exchangeName, account);
     }
 
     public void onBalance(String exchangeName, Account account) {
+        if (closed) return;
         onAccount(exchangeName, account);
     }
 
     public void onOrder(String exchangeName, OpenOrder order) {
+        if (closed) return;
         onOpenOrder(exchangeName, order);
     }
 
     public void onOpenOrder(String exchangeName, OpenOrder order) {
+        if (closed) return;
         if (order == null) {
             return;
         }
@@ -288,10 +306,12 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onOpenOrders(String exchangeName, List<OpenOrder> orders) {
+        if (closed) return;
         onOrders(exchangeName, orders);
     }
 
     public void onOrders(String exchangeName, List<OpenOrder> orders) {
+        if (closed) return;
         markUpdated(exchangeName, null);
 
         openOrders.clear();
@@ -311,6 +331,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
     }
 
     public void onFill(String exchangeName, TradePair tradePair, Trade fill) {
+        if (closed) return;
         if (fill == null) {
             return;
         }
@@ -336,6 +357,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
     }
 
     public void onPosition(String exchangeName, Position position) {
+        if (closed) return;
         if (position == null) {
             return;
         }
@@ -358,6 +380,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
     }
 
     public void onPositions(String exchangeName, List<Position> newPositions) {
+        if (closed) return;
         markUpdated(exchangeName, null);
 
         positions.clear();
@@ -416,6 +439,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onConnected(String exchangeName) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
 
         markUpdated(safeExchangeName, null);
@@ -426,6 +450,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onDisconnected(String exchangeName, String reason) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeReason = reason == null || reason.isBlank() ? "disconnected" : reason.trim();
 
@@ -437,6 +462,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onOrderAccepted(String exchangeName, String orderId) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeOrderId = safeId(orderId);
 
@@ -448,6 +474,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onOrderRejected(String exchangeName, String clientOrderId, String reason) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeOrderId = safeId(clientOrderId);
         String safeReason = reason == null || reason.isBlank() ? "rejected" : reason.trim();
@@ -462,6 +489,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onOrderFilled(String exchangeName, String orderId, Trade fill) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeOrderId = safeId(orderId);
 
@@ -477,6 +505,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onOrderCancelled(String exchangeName, String orderId) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeOrderId = safeId(orderId);
 
@@ -488,6 +517,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     @Override
     public void onRawMessage(String exchangeName, String channel, String rawJson) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeChannel = channel == null || channel.isBlank() ? "unknown" : channel.trim();
 
@@ -507,6 +537,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
     }
 
     public void onStatus(String exchangeName, String message) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeMessage = message == null || message.isBlank() ? "status update" : message.trim();
 
@@ -521,6 +552,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
     }
 
     public void onError(String exchangeName, Throwable throwable) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String message = rootMessage(throwable);
 
@@ -671,27 +703,15 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
     }
 
     private void runOnFx(Runnable runnable) {
-        if (runnable == null) {
-            return;
-        }
-
-        try {
-            if (Platform.isFxApplicationThread()) {
-                safeRun(runnable);
-            } else {
-                Platform.runLater(() -> safeRun(runnable));
-            }
-        } catch (IllegalStateException exception) {
-            safeRun(runnable);
+        if (runnable == null || closed) return;
+        try { displayUpdates.event(() -> safeRun(runnable)); }
+        catch (java.util.concurrent.RejectedExecutionException error) {
+            errorEvents.incrementAndGet();
+            log.warn("UI event queue saturated; refresh the account snapshot", error);
         }
     }
-
-    private void queueOnFx(Runnable runnable) {
-        try { Platform.runLater(() -> safeRun(runnable)); }
-        catch (IllegalStateException exception) { safeRun(runnable); }
-    }
-
     private void safeRun(Runnable runnable) {
+        if (closed) return;
         try {
             runnable.run();
         } catch (Exception exception) {

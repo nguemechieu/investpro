@@ -12,6 +12,58 @@ import java.util.*;
 import static org.mockito.Mockito.*;
 
 class SignalAgentFeedTest {
+    @Test void historicalSeedingDoesNotBlockStrategyAndDuplicateEventsShareTheRequest() throws Exception {
+        var service = mock(StrategyDecisionService.class);
+        var exchange = mock(Exchange.class);
+        var pair = new TradePair("BTC", "USD");
+        var context = new AgentContext(); context.setExchange(exchange); context.setEventBus(mock(AgentEventBus.class));
+        var requested = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        when(exchange.getCandleDataSupplier(anyInt(), eq(pair))).thenAnswer(_ -> {
+            org.junit.jupiter.api.Assertions.assertTrue(Thread.currentThread().getName().startsWith("investpro-market-data-"));
+            requested.countDown(); release.await(); return null;
+        });
+        var agent = new SignalAgent(service); agent.start(context);
+        var event = AgentEvent.of(AgentEvent.MARKET_CANDLE, "test",
+                new CandleData(100, 100.5, 101, 99, 360000, 10),
+                Map.of("symbol", "BTC/USD", "timeframe", "1h", "tradePairObject", pair));
+        try {
+            org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
+                agent.onEvent(event); agent.onEvent(event);
+            });
+            org.junit.jupiter.api.Assertions.assertTrue(requested.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            verify(exchange).getCandleDataSupplier(3600, pair);
+            verifyNoInteractions(service);
+        } finally { agent.stop(); release.countDown(); }
+    }
+
+    @Test void candleBeforeQuoteIsEvaluatedWhenLiveQuoteArrives() throws Exception {
+        var service = mock(StrategyDecisionService.class);
+        var bus = mock(AgentEventBus.class);
+        var pair = new TradePair("BTC", "USD");
+        var context = new AgentContext(); context.setEventBus(bus);
+        var agent = new SignalAgent(service); agent.start(context);
+        var signal = StrategySignal.builder().symbol("BTC/USD").timeframe("1h").strategyId("test")
+                .strategyName("Test").side(Side.BUY).confidence(0.8).build();
+        when(service.generateDecision(anyString(), anyString(), anyList(), anyDouble(), anyDouble(), anyDouble(),
+                anyDouble(), anyDouble(), any(), eq(pair)))
+                .thenReturn(StrategyDecisionResult.success("test", null, signal, List.of()));
+        Map<String,Object> metadata = Map.of("symbol", "BTC/USD", "timeframe", "1h", "tradePairObject", pair);
+        var candles = new ArrayList<CandleData>();
+        for (int i = 0; i < 120; i++) candles.add(new CandleData(100, 100.5, 101, 99, 100000 + i * 3600, 10));
+        agent.onEvent(new AgentEvent(AgentEvent.MARKET_CANDLE, "test", candles, java.time.Instant.now(), metadata));
+        verifyNoInteractions(service, bus);
+        var quote = new Ticker(100.5, 100, 101, 10, System.currentTimeMillis());
+        var tick = new AgentEvent(AgentEvent.MARKET_TICK, "test", quote, java.time.Instant.now(), metadata);
+        agent.onEvent(tick); agent.onEvent(tick);
+        verify(service, times(1)).generateDecision(anyString(), anyString(), anyList(), anyDouble(), anyDouble(),
+                anyDouble(), anyDouble(), anyDouble(), any(), eq(pair));
+        verify(bus, times(1)).publish(any());
+        agent.stop();
+        agent.start(context); agent.onEvent(tick);
+        verify(bus, times(1)).publish(any());
+        agent.stop();
+    }
     @Test void indicativeQuotesCannotProduceExecutableStrategySignals() throws Exception {
         var service = mock(StrategyDecisionService.class);
         var bus = mock(AgentEventBus.class);

@@ -98,6 +98,9 @@ public class SymbolAgentManager {
         }
         state.updateTimestamp();
         symbolStates.put(symbolKey(symbol), state);
+        String venue = state.getMarketInstrument() == null ? symbol.getExchangeId() : state.getMarketInstrument().exchangeId();
+        org.investpro.core.state.SystemStateStore.getInstance().updateStrategy(venue, symbol,
+                state.getActiveStrategyName(), String.valueOf(state.getState()));
         log.debug("Updated symbol state: {} -> {}", symbol, state.getTradingMode());
     }
 

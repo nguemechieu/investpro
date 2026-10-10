@@ -147,14 +147,20 @@ public class MarketInfoPanel extends ScrollPane {
 
         applyLoadingState(pair);
 
-        CompletableFuture<MarketStats> statsFuture = dataProvider.getMarketInfo(exchange, pair);
+        var venue = exchange;
+        CompletableFuture<MarketStats> statsFuture = org.investpro.ui.utils.UiBackgroundTasks
+                .marketData(() -> dataProvider.getMarketInfo(venue, pair))
+                .thenCompose(java.util.function.Function.identity());
         loadAccountSnapshot(pair);
 
         statsFuture
-                .thenAccept(stats -> Platform.runLater(() -> updateStats(stats)))
+                .thenAccept(stats -> Platform.runLater(() -> {
+                    if (currentPair == pair && exchange == venue) updateStats(stats);
+                }))
                 .exceptionally(error -> {
                     log.warn("Failed to load market info for {}", pair, error);
                     Platform.runLater(() -> {
+                        if (currentPair != pair || exchange != venue) return;
                         currentStats = null;
                         renderCurrentState("Market stats unavailable. Showing available pair metrics only.");
                     });
@@ -224,9 +230,11 @@ public class MarketInfoPanel extends ScrollPane {
         }
 
         try {
-            exchange.fetchAccount()
+            var venue = exchange;
+            org.investpro.ui.utils.UiBackgroundTasks.marketData(venue::fetchAccount)
+                    .thenCompose(java.util.function.Function.identity())
                     .thenAccept(account -> Platform.runLater(() -> {
-                        if (pair != currentPair) {
+                        if (pair != currentPair || venue != exchange) {
                             return;
                         }
                         currentAccount = account;
@@ -238,7 +246,7 @@ public class MarketInfoPanel extends ScrollPane {
                     .exceptionally(error -> {
                         log.debug("Unable to load account balances for market info", error);
                         Platform.runLater(() -> {
-                            if (pair != currentPair) {
+                            if (pair != currentPair || venue != exchange) {
                                 return;
                             }
                             currentAccount = null;

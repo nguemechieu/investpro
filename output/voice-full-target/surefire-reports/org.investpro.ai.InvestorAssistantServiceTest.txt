@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: org.investpro.ai.InvestorAssistantServiceTest
 -------------------------------------------------------------------------------
-Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.063 s -- in org.investpro.ai.InvestorAssistantServiceTest
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in org.investpro.ai.InvestorAssistantServiceTest

@@ -135,7 +135,7 @@ public class OpenAiReasoningService implements AiReasoningService {
 
     private AiTradeReviewResponse parseOpenAiResponse(String responseBody, long processingTime) {
         try {
-            Map response = objectMapper.readValue(responseBody, Map.class);
+            Map response =objectMapper.readValue(responseBody, Map.class);
 
             // Extract content from response
             List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
@@ -148,7 +148,7 @@ public class OpenAiReasoningService implements AiReasoningService {
             String content = (String) message.get("content");
 
             // Parse JSON response from AI
-            Map<String, Object> aiDecision = objectMapper.readValue(content, Map.class);
+            Map aiDecision = objectMapper.readValue(content, Map.class);
 
             // Extract fields from AI response
             String decisionStr = (String) aiDecision.get("decision");

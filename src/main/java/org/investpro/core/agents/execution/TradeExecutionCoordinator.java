@@ -53,6 +53,12 @@ import static org.investpro.utils.Side.HOLD;
 @Getter
 @Setter
 public class TradeExecutionCoordinator {
+    private volatile long executionGeneration;
+    private volatile boolean suspended;
+
+    public synchronized void stopProcessing() { suspended = true; executionGeneration++; }
+    public synchronized void resumeProcessing() { executionGeneration++; suspended = false; }
+    private boolean current(long session) { return !suspended && session == executionGeneration; }
 
     private final RiskManagementSystem riskManagementSystem;
     private final AiReasoningService aiReasoningService;
@@ -120,7 +126,10 @@ public class TradeExecutionCoordinator {
             @NotNull TradeRiskContext riskContext) {
         Objects.requireNonNull(side, "side cannot be null");
         Objects.requireNonNull(riskContext, "riskContext cannot be null");
-        return processSignalInternal(null, side, riskContext);
+        long session = executionGeneration;
+        return org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.TRADING,
+                () -> processSignalInternal(null, side, riskContext, session)).thenCompose(java.util.function.Function.identity())
+                .exceptionally(error -> TradeExecutionResult.failed(rootMessage(error)));
     }
 
     public CompletableFuture<TradeExecutionResult> processSignal(
@@ -128,7 +137,10 @@ public class TradeExecutionCoordinator {
             @NotNull TradeRiskContext riskContext) {
         Objects.requireNonNull(signal, "signal cannot be null");
         Objects.requireNonNull(riskContext, "riskContext cannot be null");
-        return processSignalInternal(signal, signal.getSide(), riskContext);
+        long session = executionGeneration;
+        return org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.TRADING,
+                () -> processSignalInternal(signal, signal.getSide(), riskContext, session)).thenCompose(java.util.function.Function.identity())
+                .exceptionally(error -> TradeExecutionResult.failed(rootMessage(error)));
     }
 
     public CompletableFuture<TradeExecutionResult> processReviewedSignal(
@@ -144,8 +156,9 @@ public class TradeExecutionCoordinator {
     private CompletableFuture<TradeExecutionResult> processSignalInternal(
             @Nullable StrategySignal signal,
             @Nullable Side side,
-            @NotNull TradeRiskContext riskContext) {
+            @NotNull TradeRiskContext riskContext, long session) {
         try {
+            if (!current(session)) return completed(TradeExecutionResult.rejected("Trading stopped or session changed"));
             if (side == null || side == HOLD) {
                 return completed(TradeExecutionResult.wait(
                         "Signal is HOLD or missing side",
@@ -176,7 +189,7 @@ public class TradeExecutionCoordinator {
                 }
             }
 
-            return executeWithTransitionGuards(signal, side, riskContext);
+            return executeWithTransitionGuards(signal, side, riskContext, session);
 
         } catch (Exception exception) {
             log.error("TradeExecutionCoordinator: Unexpected error while processing signal", exception);
@@ -203,7 +216,7 @@ public class TradeExecutionCoordinator {
     private CompletableFuture<TradeExecutionResult> executeWithTransitionGuards(
             @Nullable StrategySignal signal,
             @NotNull Side side,
-            @NotNull TradeRiskContext riskContext) {
+            @NotNull TradeRiskContext riskContext, long session) {
         Exchange exchange = executionEngine.getExchange();
         TradePair symbol = riskContext.getSymbol();
         String exchangeName = exchange != null ? exchange.getName() : riskContext.getBroker();
@@ -243,14 +256,15 @@ public class TradeExecutionCoordinator {
         CompletableFuture<TradeExecutionResult> guardedExecution;
         try {
             guardedExecution = hasPendingOrder(exchange, symbol)
-                .thenCompose(hasPending -> {
+                .thenComposeAsync(hasPending -> {
                     if (hasPending) {
                         return completed(TradeExecutionResult.rejected(
                                 "Pending order already exists for " + symbolText + "; skipping duplicate action."));
                     }
 
                     return fetchCurrentPosition(exchange, symbol)
-                            .thenCompose(currentPosition -> {
+                            .thenComposeAsync(currentPosition -> {
+                                if (!current(session)) return completed(TradeExecutionResult.rejected("Trading stopped or session changed"));
                                 Side currentPositionSide = currentPosition
                                         .map(Position::getSide)
                                         .orElse(null);
@@ -281,10 +295,10 @@ public class TradeExecutionCoordinator {
                                             side,
                                             org.investpro.core.pipeline.BotRiskContextService.refresh(exchange, riskContext),
                                             exchangeName,
-                                            symbolText);
+                                            symbolText, session);
                                 };
-                            });
-                })
+                            }, org.investpro.core.concurrent.AppExecutors.TRADING);
+                }, org.investpro.core.concurrent.AppExecutors.TRADING)
                 .exceptionally(exception -> TradeExecutionResult.failed(rootMessage(exception)));
         } catch (Exception exception) {
             portfolioLock.release();
@@ -305,16 +319,30 @@ public class TradeExecutionCoordinator {
             @NotNull Side side,
             @NotNull TradeRiskContext riskContext,
             @Nullable String exchangeName,
-            @NotNull String symbolText) {
+            @NotNull String symbolText, long session) {
         try {
+            if (!current(session)) return completed(TradeExecutionResult.rejected("Trading stopped or session changed"));
             TradeRiskContext validatedContext = applyPreTradeValidation(side, riskContext, symbolText);
             if (validatedContext == null) {
                 return completed(TradeExecutionResult.rejected(
                         "Pre-trade validation rejected execution for " + symbolText));
             }
 
-            RiskDecision riskDecision = riskManagementSystem.evaluateTrade(validatedContext);
+            return org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.RISK,
+                    () -> riskManagementSystem.evaluateTrade(validatedContext))
+                    .thenComposeAsync(riskDecision -> reviewAndExecute(signal, side, riskContext, validatedContext,
+                            exchangeName, symbolText, riskDecision, session), org.investpro.core.concurrent.AppExecutors.ASSISTANT)
+                    .exceptionally(error -> TradeExecutionResult.failed(rootMessage(error)));
+        } catch (Exception error) {
+            return completed(TradeExecutionResult.failed(rootMessage(error)));
+        }
+    }
 
+    private CompletableFuture<TradeExecutionResult> reviewAndExecute(StrategySignal signal, Side side,
+            TradeRiskContext riskContext, TradeRiskContext validatedContext, String exchangeName,
+            String symbolText, RiskDecision riskDecision, long session) {
+        try {
+            if (!current(session)) return completed(TradeExecutionResult.rejected("Trading stopped or session changed"));
             if (riskDecision == null) {
                 return completed(TradeExecutionResult.rejected(
                         "RiskManagementSystem returned null decision"));
@@ -335,9 +363,13 @@ public class TradeExecutionCoordinator {
             FinalRiskGate.OrderApprovalDecision finalDecision = FinalRiskGate.makeDecision(riskDecision, aiResponse);
 
             if (finalDecision.isApproved()) {
-                CompletableFuture<ExecutionEngine.PositionExecutionResult> executionFuture = signal != null
-                        ? executionEngine.executeApprovedOrder(signal, validatedContext, finalDecision)
-                        : executionEngine.executeApprovedOrder(side, validatedContext, finalDecision);
+                CompletableFuture<ExecutionEngine.PositionExecutionResult> executionFuture =
+                        org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.TRADING,
+                                () -> !current(session) ? CompletableFuture.<ExecutionEngine.PositionExecutionResult>failedFuture(
+                                        new IllegalStateException("Trading stopped or session changed")) : signal != null
+                                        ? executionEngine.executeApprovedOrder(signal, validatedContext, finalDecision)
+                                        : executionEngine.executeApprovedOrder(side, validatedContext, finalDecision))
+                                .thenCompose(java.util.function.Function.identity());
 
                 return executionFuture
                         .thenApply(executionResult -> {

@@ -17,6 +17,34 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class UiLoadingResponsivenessTest {
+    @Test void strategyLabHealthQueryDoesNotBlockJavaFx() throws Exception {
+        new JFXPanel();
+        var core = mock(SystemCore.class);
+        var exchange = mock(Exchange.class);
+        var lab = mock(org.investpro.strategy.lab.StrategyLabService.class);
+        var snapshot = mock(org.investpro.strategy.lab.StrategyLabSnapshot.class);
+        var ai = mock(org.investpro.ai.local.grpc.LocalAiRuntimeService.class);
+        when(core.getExchange()).thenReturn(exchange);
+        when(core.getLabService()).thenReturn(lab);
+        when(core.getAiReasoningService()).thenReturn(ai);
+        when(exchange.getSupportedTimeframes()).thenReturn(List.of(Timeframe.H1));
+        when(exchange.getTradePairSymbol()).thenReturn(List.of());
+        when(lab.getSnapshot(any(), any())).thenReturn(snapshot);
+        when(snapshot.getRankings()).thenReturn(List.of());
+        var requested = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        when(ai.healthStatus()).thenAnswer(_ -> {
+            assertFalse(Platform.isFxApplicationThread());
+            requested.countDown(); release.await();
+            return org.investpro.ai.local.grpc.AiGrpcHealthStatus.unavailable("Test health response");
+        });
+        try {
+            fx(() -> new StrategyLabPanel(core));
+            assertTrue(requested.await(3, TimeUnit.SECONDS));
+            assertEquals("heartbeat", fx(() -> "heartbeat"));
+        } finally { release.countDown(); }
+    }
+
     private static <T> T fx(Callable<T> operation) throws Exception {
         CompletableFuture<T> result = new CompletableFuture<>();
         Platform.runLater(() -> { try { result.complete(operation.call()); } catch (Throwable error) { result.completeExceptionally(error); } });

@@ -259,6 +259,7 @@ public class CandleStickChart extends Region {
     private StackPane chartStackPane;
 
     private volatile boolean disposed;
+    private volatile UiExchangeStreamConsumer liveUiConsumer;
     private volatile boolean restoringPreferences;
     private volatile boolean paging;
     private volatile long loadingStartTime = -1L;
@@ -979,7 +980,7 @@ public class CandleStickChart extends Region {
                         && initLatch.await(10, SECONDS)
                         && websocketClient.supportsStreamingTrades(tradePair)) {
 
-                    ExchangeStreamConsumer exchangeS = new UiExchangeStreamConsumer()
+                    UiExchangeStreamConsumer exchangeS = new UiExchangeStreamConsumer()
                             .onTradeUpdate(updateInProgressCandleTask::accept)
                             .onStatus(message -> log.debug("Chart stream status for {}: {}", tradePair, message))
                             .onError((exchangeName, throwable) -> log.warn(
@@ -989,7 +990,10 @@ public class CandleStickChart extends Region {
                                     throwable == null ? "unknown" : throwable.getMessage(),
                                     throwable));
 
+                    liveUiConsumer = exchangeS;
+                    if (disposed) { exchangeS.close(); return; }
                     websocketClient.streamLiveTrades(tradePair, exchangeS);
+                    if (disposed) { exchangeS.close(); websocketClient.stopStreamLiveTrades(tradePair); return; }
                     streamingStarted = true;
 
                     log.info("Live trade WebSocket stream started for {}", tradePair);
@@ -1199,6 +1203,26 @@ public class CandleStickChart extends Region {
         startChartDataLoading();
     }
 
+    /** Applies a matching stream bar without refetching history or resetting the user's zoom. */
+    public void acceptStreamCandle(TradePair pair, int periodSeconds, CandleData candle) {
+        if (!Platform.isFxApplicationThread()) {
+            runOnFx(() -> acceptStreamCandle(pair, periodSeconds, candle)); return;
+        }
+        if (disposed || candle == null || pair == null || periodSeconds != secondsPerCandle
+                || !tradePair.toString('/').equals(pair.toString('/')) || data.isEmpty()) return;
+        if (!Double.isFinite(candle.closePrice()) || candle.closePrice() <= 0
+                || candle.openTime() % secondsPerCandle != 0) return;
+        boolean followingLatest = firstVisibleIndex + visibleCandles >= data.size();
+        data.put(candle.openTime(), candle);
+        while (data.size() > 1000) {
+            data.pollFirstEntry(); firstVisibleIndex = Math.max(0, firstVisibleIndex - 1);
+        }
+        if (followingLatest) firstVisibleIndex = Math.max(0, data.size() - visibleCandles);
+        updateXAxisBoundsFromVisibleWindow();
+        recalculateIndicators();
+        drawChartContents(true);
+    }
+
     private void setVisibleCandleCount(int requestedVisible) {
         int previousVisible = visibleCandles;
         visibleCandles = Math.clamp(data.size(), 1, requestedVisible);
@@ -1369,6 +1393,13 @@ public class CandleStickChart extends Region {
         xAxis.layout();
         yAxis.layout();
         extraAxis.layout();
+    }
+
+    /** Repaint presentation data without starting another historical/network load. */
+    public void repaintFromCache() {
+        if (disposed) return;
+        if (!Platform.isFxApplicationThread()) { runOnFx(this::repaintFromCache); return; }
+        drawChartContents(true);
     }
 
     private void drawChartContents(boolean clear) {
@@ -4040,6 +4071,7 @@ public class CandleStickChart extends Region {
         if (disposed)
             return;
         disposed = true;
+        if (liveUiConsumer != null) liveUiConsumer.close();
         paging = false;
         loading.set(false);
         try {
@@ -4047,12 +4079,14 @@ public class CandleStickChart extends Region {
             noticeClearTimer.stop();
         } catch (Exception ignored) {
         }
-        try {
-            if (exchange.getWebsocketClient() != null)
-                exchange.getWebsocketClient().stopStreamLiveTrades(tradePair);
-        } catch (Exception exception) {
-            log.debug("Unable to stop live stream for {}", tradePair, exception);
-        }
+        org.investpro.core.concurrent.AppExecutors.cleanup(() -> {
+            try {
+                if (exchange.getWebsocketClient() != null)
+                    exchange.getWebsocketClient().stopStreamLiveTrades(tradePair);
+            } catch (Exception exception) {
+                log.debug("Unable to stop live stream for {}", tradePair, exception);
+            }
+        });
         shutdownExecutor(updateInProgressCandleExecutor);
         shutdownExecutor(chartLoadingExecutor);
         shutdownExecutor(chartTimeoutExecutor);
@@ -4086,20 +4120,7 @@ public class CandleStickChart extends Region {
             return;
         }
 
-        executor.shutdown();
-
-        try {
-            if (!executor.awaitTermination(2, TimeUnit.SECONDS)) {
-                executor.shutdownNow();
-
-                if (!executor.awaitTermination(2, TimeUnit.SECONDS)) {
-                    log.warn("Executor did not terminate cleanly after forced shutdown.");
-                }
-            }
-        } catch (InterruptedException exception) {
-            executor.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
+        executor.shutdownNow();
     }
 
     public void reset() {

@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: org.investpro.strategy.management.StrategyAssignmentManagerSafetyGateTest
 -------------------------------------------------------------------------------
-Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.769 s -- in org.investpro.strategy.management.StrategyAssignmentManagerSafetyGateTest
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.734 s -- in org.investpro.strategy.management.StrategyAssignmentManagerSafetyGateTest

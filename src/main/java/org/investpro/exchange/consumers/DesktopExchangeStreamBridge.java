@@ -37,11 +37,17 @@ import java.util.function.Consumer;
 @Slf4j
 @Getter
 @Setter
-public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
+public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer, AutoCloseable {
 
     private static final long DUPLICATE_TRANSIENT_ERROR_LOG_INTERVAL_MS = 30_000L;
 
     private final TradingDesk tradingDesk;
+    private volatile int candleDurationSeconds = 3600;
+    private final org.investpro.core.state.SystemStateStore state = org.investpro.core.state.SystemStateStore.getInstance();
+    private final org.investpro.ui.utils.UiUpdateBatcher uiUpdates = new org.investpro.ui.utils.UiUpdateBatcher();
+
+    private volatile boolean closed;
+    @Override public void close() { closed = true; uiUpdates.close(); }
 
     private final AtomicLong tickerEvents = new AtomicLong();
     private final AtomicLong tradeEvents = new AtomicLong();
@@ -82,6 +88,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onTicker(String exchangeName, TradePair tradePair, Ticker ticker) {
+        if (closed) return;
         if (tradePair == null || ticker == null) {
             return;
         }
@@ -90,11 +97,15 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         tickerEvents.incrementAndGet();
         lastTickerAt = Instant.now();
 
-        runOnFx("ticker update", () -> tradingDesk.updateTickerFromStream(tradePair, ticker));
+        var key = state.key(exchangeName, tradePair);
+        state.updateTicker(exchangeName, tradePair, ticker);
+        uiUpdates.latest(key, () -> state.ticker(exchangeName, tradePair)
+                .ifPresent(quote -> tradingDesk.updateTickerFromStream(tradePair, quote.ticker())));
     }
 
     @Override
     public void onTrade(String exchangeName, TradePair tradePair, Trade trade) {
+        if (closed) return;
         if (trade == null) {
             return;
         }
@@ -108,6 +119,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onCandle(String exchangeName, TradePair tradePair, CandleData candle) {
+        if (closed) return;
         if (candle == null) {
             return;
         }
@@ -116,11 +128,14 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         candleEvents.incrementAndGet();
         lastCandleAt = Instant.now();
 
-        runOnFx("candle update", tradingDesk::updateCandleFromStream);
+        int period = candleDurationSeconds;
+        uiUpdates.latest("candle:" + state.key(exchangeName, tradePair) + ":" + candle.openTime(),
+                () -> tradingDesk.updateCandleFromStream(tradePair, period, candle));
     }
 
     @Override
     public void onOrderBook(String exchangeName, TradePair tradePair, OrderBook orderBook) {
+        if (closed) return;
         if (orderBook == null) {
             return;
         }
@@ -129,11 +144,15 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         orderBookEvents.incrementAndGet();
         lastOrderBookAt = Instant.now();
 
-        runOnFx("order book update", () -> tradingDesk.updateOrderBookFromStream(orderBook));
+        TradePair pair = tradePair == null ? orderBook.getTradePair() : tradePair;
+        state.updateBook(exchangeName, pair, orderBook);
+        uiUpdates.latest("book:" + state.key(exchangeName, pair),
+                () -> state.book(exchangeName, pair).ifPresent(book -> tradingDesk.updateOrderBookFromStream(book.orderBook(pair))));
     }
 
     @Override
     public void onAccount(String exchangeName, Account account) {
+        if (closed) return;
         if (account == null) {
             return;
         }
@@ -142,21 +161,28 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         accountEvents.incrementAndGet();
         lastAccountAt = Instant.now();
 
-        runOnFx("account update", () -> tradingDesk.updateAccountFromStream(account));
+        state.updateAccount(exchangeName, account);
+        Account snapshot = new Account(); snapshot.copyFrom(account);
+        snapshot.setTotalBalance(account.getTotalBalance()); snapshot.setAvailableBalance(account.getAvailableBalance());
+        snapshot.setEquity(account.getEquity()); snapshot.setMarginUsed(account.getMarginUsed()); snapshot.setFreeMargin(account.getFreeMargin());
+        uiUpdates.latest("account:" + exchangeName, () -> tradingDesk.updateAccountFromStream(snapshot));
     }
 
     @Override
     public void onBalanceChanged(String exchangeName, Account account) {
+        if (closed) return;
         onAccount(exchangeName, account);
     }
 
     @Override
     public void onBalance(@Nullable String exchangeName, @Nullable Account account) {
+        if (closed) return;
         onAccount(exchangeName, account);
     }
 
     @Override
     public void onOrder(@Nullable String exchangeName, @Nullable OpenOrder order) {
+        if (closed) return;
         if (order == null) {
             return;
         }
@@ -171,10 +197,13 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onOpenOrders(String exchangeName, List<OpenOrder> orders) {
+        if (closed) return;
         onOrders(exchangeName, orders);
     }
 @Override
     public void onOrders(@Nullable String exchangeName, @Nullable List<OpenOrder> orders) {
+        if (closed) return;
+        if (orders != null) state.updateOrders(exchangeName, orders);
         if (orders == null || orders.isEmpty()) {
             return;
         }
@@ -193,6 +222,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     }
 
     public void onFill(@Nullable String exchangeName, @Nullable TradePair tradePair, @Nullable Trade fill) {
+        if (closed) return;
         if (fill == null) {
             return;
         }
@@ -205,6 +235,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     }
 
     public void onPosition(@Nullable String exchangeName, @Nullable Position position) {
+        if (closed) return;
         if (position == null) {
             return;
         }
@@ -217,6 +248,8 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     }
 
     public void onPositions(@Nullable String exchangeName, @Nullable List<Position> positions) {
+        if (closed) return;
+        if (positions != null) state.updatePositions(exchangeName, positions);
         if (positions == null || positions.isEmpty()) {
             return;
         }
@@ -262,6 +295,8 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onConnected(String exchangeName) {
+        if (closed) return;
+        state.updateHealth(exchangeName, true, "Connected");
         String safeExchangeName = normalizeExchangeName(exchangeName);
 
         connectionEvents.incrementAndGet();
@@ -276,6 +311,8 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onDisconnected(String exchangeName, String reason) {
+        if (closed) return;
+        state.updateHealth(exchangeName, false, "Disconnected");
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeReason = reason == null || reason.isBlank() ? "Disconnected" : reason.trim();
 
@@ -291,6 +328,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onOrderAccepted(String exchangeName, String orderId) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeOrderId = orderId == null || orderId.isBlank() ? "unknown" : orderId.trim();
 
@@ -306,6 +344,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onOrderRejected(String exchangeName, String clientOrderId, String reason) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeOrderId = clientOrderId == null || clientOrderId.isBlank() ? "unknown" : clientOrderId.trim();
         String safeReason = reason == null || reason.isBlank() ? "Rejected" : reason.trim();
@@ -326,6 +365,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onOrderFilled(String exchangeName, String orderId, Trade fill) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeOrderId = orderId == null || orderId.isBlank() ? "unknown" : orderId.trim();
 
@@ -347,6 +387,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onOrderCancelled(String exchangeName, String orderId) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeOrderId = orderId == null || orderId.isBlank() ? "unknown" : orderId.trim();
 
@@ -362,6 +403,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onRawMessage(String exchangeName, String channel, String rawJson) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeChannel = channel == null || channel.isBlank() ? "unknown" : channel.trim();
 
@@ -380,6 +422,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onStatus(@Nullable String exchangeName, @Nullable String message) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeMessage = message == null || message.isBlank() ? "Streaming" : message.trim();
 
@@ -391,6 +434,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onError(@Nullable String exchangeName, @Nullable Throwable throwable) {
+        if (closed) return;
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String message = rootMessage(throwable);
 
@@ -511,17 +555,14 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         Objects.requireNonNull(task, "task must not be null");
 
         try {
-            if (Platform.isFxApplicationThread()) {
-                safeRun(operationName, task);
-            } else {
-                Platform.runLater(() -> safeRun(operationName, task));
-            }
+            uiUpdates.event(() -> safeRun(operationName, task));
         } catch (IllegalStateException exception) {
-            safeRun(operationName, task);
+            log.debug("JavaFX unavailable; skipped UI update {}", operationName);
         }
     }
 
     private void safeRun(@NotNull String operationName, @NotNull Runnable task) {
+        if (closed) return;
         try {
             task.run();
         } catch (Exception exception) {

@@ -71,6 +71,9 @@ public class Binance extends Exchange {
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
     private static final String MARKET_DATA_WS_URL = "";
     private ExchangeWebSocketClient websocketClient;
+    private volatile boolean privateAuthenticated;
+    private volatile boolean streamConnected;
+    private final org.investpro.exchange.infrastructure.PollingExchangeStreamer polling = new org.investpro.exchange.infrastructure.PollingExchangeStreamer(this);
     private final java.util.concurrent.atomic.AtomicBoolean connected = new java.util.concurrent.atomic.AtomicBoolean(
             false);
 
@@ -283,7 +286,7 @@ public class Binance extends Exchange {
 
     @Override
     public StreamTransport getStreamTransport() {
-        return StreamTransport.WEBSOCKET;
+        return StreamTransport.POLLING;
     }
 
     @Override
@@ -303,22 +306,22 @@ public class Binance extends Exchange {
 
     @Override
     public void connectStream() {
-
+        streamConnected = true;
     }
 
     @Override
     public void disconnectStream() {
-
+        stopAllStreams();
     }
 
     @Override
     public boolean isStreamConnected() {
-        return false;
+        return streamConnected;
     }
 
     @Override
     public void reconnectStream() {
-
+        connectStream();
     }
 
     @Override
@@ -403,12 +406,12 @@ public class Binance extends Exchange {
 
     @Override
     public void stopAllStreams() {
-
+        polling.stopAll(); streamConnected = false;
     }
 
     @Override
     public void streamTicker(TradePair tradePair, ExchangeStreamConsumer consumer) {
-
+        polling.streamTicker(tradePair, consumer); streamConnected = true;
     }
 
     @Override
@@ -423,27 +426,27 @@ public class Binance extends Exchange {
 
     @Override
     public void streamOrderBook(TradePair tradePair, ExchangeStreamConsumer consumer) {
-
+        polling.streamOrderBook(tradePair, consumer); streamConnected = true;
     }
 
     @Override
     public void streamCandles(TradePair tradePair, int secondsPerCandle, ExchangeStreamConsumer consumer) {
-
+        polling.streamCandles(tradePair, secondsPerCandle, consumer); streamConnected = true;
     }
 
     @Override
     public void streamAccount(ExchangeStreamConsumer consumer) {
-
+        if (hasPrivateAuthentication()) polling.streamAccount(consumer);
     }
 
     @Override
     public void streamBalances(ExchangeStreamConsumer consumer) {
-
+        if (hasPrivateAuthentication()) polling.streamAccount(consumer);
     }
 
     @Override
     public void streamOrders(ExchangeStreamConsumer consumer) {
-
+        if (hasPrivateAuthentication()) polling.streamOrders(consumer);
     }
 
     @Override
@@ -458,7 +461,7 @@ public class Binance extends Exchange {
 
     @Override
     public void stopTickerStream(TradePair tradePair) {
-
+        polling.stopTicker(tradePair);
     }
 
     @Override
@@ -468,27 +471,27 @@ public class Binance extends Exchange {
 
     @Override
     public void stopOrderBookStream(TradePair tradePair) {
-
+        polling.stopOrderBook(tradePair);
     }
 
     @Override
     public void stopCandlesStream(TradePair tradePair, int secondsPerCandle) {
-
+        polling.stopCandles(tradePair, secondsPerCandle);
     }
 
     @Override
     public void stopAccountStream() {
-
+        polling.stopAccount();
     }
 
     @Override
     public void stopBalancesStream() {
-
+        polling.stopAccount();
     }
 
     @Override
     public void stopOrdersStream() {
-
+        polling.stopOrders();
     }
 
     @Override
@@ -659,6 +662,7 @@ public class Binance extends Exchange {
         if ("LIMIT".equals(type)) {
             return createLimitOrder(tradePair, side, quantity, order.getPrice());
         }
+        if (!"MARKET".equals(type)) return failedFuture(new UnsupportedOperationException("Unsupported Binance order type: " + type));
         return createMarketOrder(tradePair, side, quantity);
     }
 
@@ -881,6 +885,7 @@ public class Binance extends Exchange {
     @Override
     public void disconnect() {
         connected.set(false);
+        privateAuthenticated = false;
         if (websocketClient != null) {
             websocketClient.close();
         }
@@ -1180,7 +1185,7 @@ public class Binance extends Exchange {
     @Override
     public CompletableFuture<Account> fetchAccount() {
         if (!isPaperTrading() && hasCredentials()) {
-            return CompletableFuture.supplyAsync(this::fetchLiveAccount);
+            return CompletableFuture.supplyAsync(() -> { try { Account account = fetchLiveAccount(); privateAuthenticated = true; return account; } catch (RuntimeException error) { privateAuthenticated = false; throw error; } });
         }
         return CompletableFuture.supplyAsync(() -> {
             Account account = new Account();
@@ -1491,7 +1496,7 @@ public class Binance extends Exchange {
         if (!hasCredentials()) {
             return AuthResult.failure("Binance credentials are not configured");
         }
-        return AuthResult.success("Binance authentication validated");
+        try { fetchAccount().join(); return AuthResult.success("Binance private account access verified"); } catch (Exception error) { privateAuthenticated = false; return AuthResult.failure("Binance private authentication failed"); }
     }
 
     private CompletableFuture<String> submitBinanceOrder(
@@ -1771,11 +1776,11 @@ public class Binance extends Exchange {
 
         return AuthCheckResult.builder()
                 .exchangeName(getName())
-                .success(true)
-                .httpStatus(200)
+                .success(privateAuthenticated)
+                .httpStatus(privateAuthenticated ? 200 : 0)
                 .credentialSource("CONFIGURATION")
                 .endpointTested("/api/v3/account")
-                .message("Binance API credentials validated")
+                .message("Binance private access " + (privateAuthenticated ? "verified" : "not verified"))
                 .checkedAt(Instant.now())
                 .build();
     }

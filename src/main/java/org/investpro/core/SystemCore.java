@@ -465,6 +465,7 @@ public class SystemCore {
             @NotNull TradingService tradingService,
             TradePair selectedTradePair) {
         this.tradingService = Objects.requireNonNull(tradingService, "tradingService cannot be null");
+        tradeExecutionCoordinator.resumeProcessing();
         selectTradePair(selectedTradePair);
 
         // Initialize and start EventBusManager for event-driven architecture
@@ -552,7 +553,8 @@ public class SystemCore {
     }
 
     public void stop() {
-        stopStreaming();
+        tradeExecutionCoordinator.stopProcessing();
+        // Stopping automated execution leaves read-only market/account streams available.
 
         // Symbol agents are owned/stopped by SmartBot runtime.
         symbolAgents.clear();
@@ -578,11 +580,7 @@ public class SystemCore {
             signalMonitorService.stop();
         }
 
-        // Shutdown EventBusManager gracefully
-        if (eventBusManager != null) {
-            eventBusManager.shutdown();
-            log.info("✅ EventBusManager shutdown complete - Event-driven architecture stopped");
-        }
+        // EventBusManager and its workers belong to the application, not this trading core.
 
         closeAiReasoningService();
 
@@ -1178,6 +1176,7 @@ public class SystemCore {
 
             @Override
             public void onConnected(String exchangeName) {
+                org.investpro.core.state.SystemStateStore.getInstance().updateHealth(exchangeName, true, "Connected");
                 eventBus.publish(event(
                         "STREAM_CONNECTED",
                         exchangeName,
@@ -1189,6 +1188,7 @@ public class SystemCore {
 
             @Override
             public void onDisconnected(String exchangeName, String reason) {
+                org.investpro.core.state.SystemStateStore.getInstance().updateHealth(exchangeName, false, "Disconnected");
                 eventBus.publish(event(
                         "STREAM_DISCONNECTED",
                         exchangeName,
@@ -1207,16 +1207,33 @@ public class SystemCore {
 
             @Override
             public void onError(String exchangeName, Throwable throwable) {
+                Throwable cause = throwable;
+                while (cause != null) {
+                    if (cause instanceof org.investpro.exchange.coinbase.CoinbaseRestRateLimiter.RateLimitBlockedException deferred) {
+                        log.debug("Market poll deferred. exchange={} reason={} retryAfterMs={}",
+                                exchangeName, deferred.reason(), deferred.waitMs());
+                        onStatus(exchangeName, "Market polling deferred: " + deferred.reason());
+                        return;
+                    }
+                    cause = cause.getCause();
+                }
                 systemEventRecorder.recordExecutionError(rootMessage(throwable));
-                publishErrorEvent(exchangeName, throwable, "Exchange stream error.");
-
-                notifyAllChannels(
-                        "Stream error",
-                        "❌ Stream error on %s: %s".formatted(exchangeName, rootMessage(throwable)));
+                boolean eventOwnsTelegram = telegramEventListener != null && telegramEventListener.isListening();
+                publishErrorEvent(exchangeName, throwable, "Exchange stream error.", eventOwnsTelegram);
+                String detail = "❌ Stream error on %s: %s".formatted(exchangeName, rootMessage(throwable));
+                // The event listener owns Telegram delivery while running. Email
+                // still receives the alert; stopped bots retain direct delivery.
+                org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.IO, () -> {
+                    if (!eventOwnsTelegram) notifyTelegram(detail);
+                    notifyEmail("Stream error", detail);
+                    return null;
+                });
             }
 
             @Override
             public void onTicker(String exchangeName, TradePair tradePair, Ticker ticker) {
+                if (tradePair != null && ticker != null)
+                    org.investpro.core.state.SystemStateStore.getInstance().updateTicker(exchangeName, tradePair, ticker);
                 if (exchange != null && tradePair != null && ticker != null) {
                     exchange.updateLocalPaperMarketPrice(tradePair, ticker.getLastPrice());
                 }
@@ -1238,6 +1255,7 @@ public class SystemCore {
 
             @Override
             public void onOrderBook(String exchangeName, TradePair tradePair, OrderBook orderBook) {
+                if (orderBook != null) org.investpro.core.state.SystemStateStore.getInstance().updateBook(exchangeName, tradePair, orderBook);
                 systemEventRecorder.recordMarketTick(); // Track as market data event
                 eventBus.publish(event(
                         AgentEvent.ORDER_BOOK_UPDATE,
@@ -1265,6 +1283,7 @@ public class SystemCore {
 
             @Override
             public void onAccount(String exchangeName, Account account) {
+                if (account != null) org.investpro.core.state.SystemStateStore.getInstance().updateAccount(exchangeName, account);
                 try {
                     double balance = account != null ? account.balancesView().values().stream()
                             .mapToDouble(Double::doubleValue).sum() : 0;
@@ -1348,6 +1367,7 @@ public class SystemCore {
 
             @Override
             public void onOrders(String exchangeName, List<OpenOrder> orders) {
+                if (orders != null) org.investpro.core.state.SystemStateStore.getInstance().updateOrders(exchangeName, orders);
 
             }
 
@@ -1358,6 +1378,7 @@ public class SystemCore {
 
             @Override
             public void onPositions(String exchangeName, List<Position> positions) {
+                if (positions != null) org.investpro.core.state.SystemStateStore.getInstance().updatePositions(exchangeName, positions);
                 ExchangeStreamConsumer.super.onPositions(exchangeName, positions);
             }
 
@@ -1451,8 +1472,9 @@ public class SystemCore {
     }
 
     private void notifyAllChannels(String title, String message) {
-        notifyTelegram(message);
-        notifyEmail(title, message);
+        org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.IO, () -> {
+            notifyTelegram(message); notifyEmail(title, message); return null;
+        }).exceptionally(error -> { log.warn("Notification workers unavailable; notification not sent: {}", safe(title)); return null; });
     }
 
     private void notifyTelegram(String message) {
@@ -1823,11 +1845,18 @@ public class SystemCore {
     }
 
     private void publishErrorEvent(String source, Throwable throwable, String message) {
+        publishErrorEvent(source, throwable, message, true);
+    }
+
+    private void publishErrorEvent(String source, Throwable throwable, String message, boolean notifyTelegram) {
         smartBot.getEventBus().publish(event(
                 AgentEvent.ERROR,
                 source,
                 throwable,
                 Map.of(
+                        "notifyTelegram", notifyTelegram,
+                        "severity", "ERROR",
+                        "errorType", throwable == null ? "Unknown error" : throwable.getClass().getSimpleName(),
                         "message", safe(message),
                         "error", rootMessage(throwable))));
     }

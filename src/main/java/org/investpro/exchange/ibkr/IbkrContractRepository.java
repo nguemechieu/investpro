@@ -75,12 +75,16 @@ public final class IbkrContractRepository {
         if (pair == null) {
             return Optional.empty();
         }
+        String nativeId = normalize(pair.getNativeSymbol());
+        if (nativeId.matches("[0-9]+")) return findByConIdExchange(Long.parseLong(nativeId), "");
         String symbol = normalize(pair.getBaseCode());
         String currency = normalize(pair.getCounterCode());
-        return findAll().stream()
+        List<IbkrResolvedContract> matches = findAll().stream()
                 .filter(contract -> normalize(contract.symbol()).equals(symbol))
                 .filter(contract -> currency.isBlank() || normalize(contract.currency()).equals(currency))
-                .findFirst();
+                .toList();
+        if (matches.stream().map(IbkrResolvedContract::conId).distinct().count() > 1) return Optional.empty();
+        return matches.stream().findFirst();
     }
 
     public synchronized Optional<IbkrResolvedContract> findByDisplaySymbol(String displaySymbol) {
@@ -88,11 +92,13 @@ public final class IbkrContractRepository {
         if (normalized.isBlank()) {
             return Optional.empty();
         }
-        return findAll().stream()
+        List<IbkrResolvedContract> matches = findAll().stream()
                 .filter(contract -> normalizeDisplay(contract.userFriendlySymbol()).equals(normalized)
                         || normalizeDisplay(contract.symbol()).equals(normalized)
                         || normalizeDisplay(contract.localSymbol()).equals(normalized))
-                .findFirst();
+                .toList();
+        if (matches.stream().map(IbkrResolvedContract::conId).distinct().count() > 1) return Optional.empty();
+        return matches.stream().findFirst();
     }
 
     private void writeAll(List<IbkrResolvedContract> contracts) {

@@ -1,0 +1,209 @@
+/*******************************************************************************
+ * TABLE VIEW OPTIMIZATIONS
+ * Enhanced styling for data tables with improved readability and performance
+ ******************************************************************************/
+
+/* ============================================================================
+   TABLE VIEW CORE STYLES
+   ============================================================================ */
+
+.table-view {
+    -fx-background-color: #020617;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-table-cell-border-color: rgba(51, 65, 85, 0.65);
+    -fx-control-inner-background: #020617;
+    -fx-control-inner-background-alt: #08111f;
+    -fx-font-size: 12;
+}
+
+.table-view .placeholder .label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12;
+}
+
+/* ============================================================================
+   COLUMN HEADER STYLES
+   ============================================================================ */
+
+.table-view .column-header-background {
+    -fx-background-color: #1e293b;
+    -fx-border-color: #475569;
+    -fx-border-width: 0 0 1 0;
+}
+
+.table-view .column-header {
+    -fx-background-color: #1e293b;
+    -fx-border-color: #334155;
+    -fx-border-width: 0 1 1 0;
+    -fx-padding: 7 5 7 5;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: #e0f2fe;
+    -fx-font-size: 12;
+    -fx-font-weight: 900;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.table-view .column-header:hover {
+    -fx-background-color: #243244;
+}
+
+.table-view .column-header:pressed {
+    -fx-background-color: #1d4ed8;
+}
+
+/* ============================================================================
+   TABLE ROW STYLES
+   ============================================================================ */
+
+.table-row-cell {
+    -fx-background-color: #020617;
+    -fx-border-color: rgba(51, 65, 85, 0.65);
+    -fx-border-width: 0 0 1 0;
+    -fx-cell-size: 28;
+    -fx-padding: 0;
+}
+
+.table-row-cell:odd {
+    -fx-background-color: #08111f;
+}
+
+.table-row-cell:hover {
+    -fx-background-color: #1e293b;
+    -fx-effect: dropshadow(gaussian, rgba(37, 99, 235, 0.15), 4, 0, 0, 1);
+}
+
+.table-row-cell:selected {
+    -fx-background-color: #1d4ed8;
+    -fx-effect: dropshadow(gaussian, rgba(37, 99, 235, 0.3), 6, 0, 0, 2);
+}
+
+/* ============================================================================
+   TABLE CELL STYLES
+   ============================================================================ */
+
+.table-cell {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 12;
+    -fx-padding: 5 7 5 7;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.table-row-cell:selected .table-cell {
+    -fx-text-fill: white;
+    -fx-font-weight: 600;
+}
+
+.table-cell:focus {
+    -fx-border-color: #60a5fa;
+    -fx-border-width: 1;
+}
+
+/* ============================================================================
+   PROFITABILITY HIGHLIGHTING
+   ============================================================================ */
+
+.table-cell.profit {
+    -fx-text-fill: #4ade80;
+    -fx-font-weight: 600;
+}
+
+.table-cell.loss {
+    -fx-text-fill: #f87171;
+    -fx-font-weight: 600;
+}
+
+.table-cell.neutral {
+    -fx-text-fill: #94a3b8;
+}
+
+/* ============================================================================
+   TREE TABLE VIEW STYLES
+   ============================================================================ */
+
+.tree-table-view {
+    -fx-background-color: #020617;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-table-cell-border-color: rgba(51, 65, 85, 0.65);
+    -fx-control-inner-background: #020617;
+    -fx-control-inner-background-alt: #08111f;
+}
+
+.tree-table-view .column-header-background {
+    -fx-background-color: #1e293b;
+    -fx-border-color: #475569;
+    -fx-border-width: 0 0 1 0;
+}
+
+.tree-table-view .column-header {
+    -fx-background-color: #1e293b;
+    -fx-border-color: #334155;
+    -fx-border-width: 0 1 1 0;
+}
+
+.tree-table-view .column-header .label {
+    -fx-text-fill: #e0f2fe;
+    -fx-font-weight: 900;
+    -fx-font-size: 12;
+}
+
+.tree-table-row-cell {
+    -fx-background-color: #020617;
+    -fx-border-color: rgba(51, 65, 85, 0.65);
+    -fx-border-width: 0 0 1 0;
+    -fx-cell-size: 28;
+}
+
+.tree-table-row-cell:odd {
+    -fx-background-color: #08111f;
+}
+
+.tree-table-row-cell:hover {
+    -fx-background-color: #1e293b;
+}
+
+.tree-table-row-cell:selected {
+    -fx-background-color: #1d4ed8;
+}
+
+.tree-table-cell {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 12;
+    -fx-padding: 5 7 5 7;
+}
+
+.tree-table-row-cell:selected .tree-table-cell {
+    -fx-text-fill: white;
+}
+
+/* ============================================================================
+   SORT COLUMN INDICATOR
+   ============================================================================ */
+
+.table-column {
+    -fx-alignment: CENTER;
+}
+
+.table-view .column-header-background .filler {
+    -fx-background-color: #1e293b;
+}
+
+.table-view .filler {
+    -fx-background-color: #1e293b;
+}
+
+/* ============================================================================
+   SCROLLBAR INTEGRATION
+   ============================================================================ */
+
+.table-view .scroll-bar {
+    -fx-background-color: #0b1120;
+}
+
+.table-view .scroll-bar:vertical {
+    -fx-border-width: 1 0 0 1;
+    -fx-border-color: #334155;
+}

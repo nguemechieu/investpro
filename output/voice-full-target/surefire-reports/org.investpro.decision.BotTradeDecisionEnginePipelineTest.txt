@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: org.investpro.decision.BotTradeDecisionEnginePipelineTest
 -------------------------------------------------------------------------------
-Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.860 s -- in org.investpro.decision.BotTradeDecisionEnginePipelineTest
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.256 s -- in org.investpro.decision.BotTradeDecisionEnginePipelineTest

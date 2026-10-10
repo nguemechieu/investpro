@@ -15,6 +15,8 @@ public interface ExchangeCapabilities {
 
     boolean supportsStopLossTakeProfit();
 
+    default boolean supportsStopOrders() { return supportsStopLossTakeProfit(); }
+
     boolean supportsBracketOrders();
 
     default boolean supportsTrailingStopOrders() {

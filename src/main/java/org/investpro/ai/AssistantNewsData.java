@@ -14,7 +14,7 @@ final class AssistantNewsData {
     private static final ObjectMapper JSON = new ObjectMapper();
     private final RssNewsService service;
 
-    AssistantNewsData(RssNewsService service) {
+    public AssistantNewsData(RssNewsService service) {
         this.service = Objects.requireNonNull(service);
     }
 

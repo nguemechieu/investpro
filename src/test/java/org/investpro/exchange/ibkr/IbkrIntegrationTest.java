@@ -37,8 +37,8 @@ class IbkrIntegrationTest {
         TradePair pair = new TradePair("EUR", "USD");
 
         assertThat(mapper.toContract(pair, MARKET_TYPES.STOCKS).secType()).isEqualTo("CASH");
-        assertThat(mapper.toContract(pair, MARKET_TYPES.FUTURES).secType()).isEqualTo("FUT");
-        assertThat(mapper.toContract(pair, ORDER_TYPES.STOP_LIMIT).secType()).isEqualTo("OPT");
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> mapper.toContract(pair, MARKET_TYPES.FUTURES));
+        assertThat(mapper.toContract(pair, ORDER_TYPES.STOP_LIMIT).secType()).isEqualTo("CASH");
     }
 
     @Test
@@ -145,7 +145,7 @@ class IbkrIntegrationTest {
                 null,
                 null,
                 "DU123456",
-                true, Map.of("watchlist", ""));
+                true, Map.of("watchlist", "", "marketDataSimulation", "true"));
 
         IbkrExchange exchange = new IbkrExchange(credentials, new StubIbkrTwsSession());
         exchange.setUserSelectedTradingMode("PAPER");

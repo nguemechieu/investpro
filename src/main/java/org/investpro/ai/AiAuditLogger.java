@@ -12,10 +12,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -54,87 +52,6 @@ public class AiAuditLogger {
         } catch (IOException e) {
             log.warn("Failed to create audit log directory: {}", e.getMessage());
         }
-    }
-
-    /**
-     * Log an AI trade review.
-     */
-    public void logReview(AiTradeReviewRequest request, AiTradeReviewResponse aiResponse,
-            FinalRiskGate.OrderApprovalDecision gateDecision) {
-        try {
-            AiAuditRecord record = buildAuditRecord(request, aiResponse, gateDecision);
-            String jsonLine = objectMapper.writeValueAsString(record);
-
-            // Append to JSONL file (one JSON object per line)
-            Files.writeString(
-                    Paths.get(logFilePath),
-                    "%s\n".formatted(jsonLine),
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.APPEND);
-
-            log.debug("AI trade review logged: {}", record.getAuditId());
-
-        } catch (IOException e) {
-            log.error("Failed to write AI audit log: {}", e.getMessage());
-        } catch (Exception e) {
-            log.error("Error building audit record: {}", e.getMessage());
-        }
-    }
-
-    /**
-     * Build audit record from request, AI response, and gate decision.
-     */
-    private AiAuditRecord buildAuditRecord(AiTradeReviewRequest request,
-            AiTradeReviewResponse aiResponse,
-            FinalRiskGate.OrderApprovalDecision gateDecision) {
-        String blockersStr = request.getRiskDecision() != null &&
-                request.getRiskDecision().getBlockers() != null
-                        ? String.join("; ", request.getRiskDecision().getBlockers())
-                        : "";
-
-        assert request.getRiskDecision() != null;
-        return AiAuditRecord.builder()
-                // Identifiers
-                .auditId(UUID.randomUUID().toString())
-                .timestamp(LocalDateTime.now())
-
-                // Trade Context
-                .symbol(request.getSymbol() != null ? request.getSymbol().toString() : "N/A")
-                .strategyName(request.getStrategyName())
-                .signalSide(request.getSignalSide())
-                .signalConfidence(request.getSignalConfidence())
-
-                // Risk Context
-                .riskDecisionBlockers(blockersStr)
-                .riskDecisionPositionSize(request.getRiskDecision().getFinalPositionSize())
-                .riskDecisionLeverage(request.getRiskDecision().getFinalLeverage())
-
-                // AI Response
-                .aiDecision(aiResponse.getDecision().toString())
-                .aiConfidence(aiResponse.getConfidence())
-                .aiSuggestedRiskMultiplier(aiResponse.getSuggestedRiskMultiplier())
-                .aiSuggestedPositionSize(aiResponse.getSuggestedPositionSize())
-                .concernCount(aiResponse.getConcerns() != null ? aiResponse.getConcerns().size() : 0)
-                .modelName(aiResponse.getModelName())
-                .aiProcessingTimeMs(aiResponse.getProcessingTimeMs())
-                .aiHadErrors(aiResponse.isHadErrors())
-
-                // Final Gate Decision
-                .finalDecision(gateDecision.getStatus().toString())
-                .wasApproved(gateDecision.isApproved())
-                .rejectionReason(gateDecision.isApproved() ? null : gateDecision.getSummary())
-
-                // Account State at Review Time
-                .accountEquity(request.getAccountEquity())
-                .portfolioHeatPercent(request.getPortfolioHeatPercent())
-                .drawdownPercent(request.getCurrentDrawdownPercent())
-
-                // Outcome (populated later if trade executes)
-                .realizedPnL(null)
-                .exitReason(null)
-                .userFeedback(null)
-
-                .build();
     }
 
     /**
@@ -226,7 +143,6 @@ public class AiAuditLogger {
             try {
                 managedProcess = processBuilder.start();
                 log.info("Started local Python AI runtime process. Waiting for gRPC health at {}:{}...", host, port);
-
                 if (waitUntilHealthy(host, port, timeoutMs, DEFAULT_STARTUP_WAIT)) {
                     log.info("Local Python AI runtime is healthy at {}:{}.", host, port);
                 } else {
@@ -241,7 +157,6 @@ public class AiAuditLogger {
         public static synchronized void stopManagedProcess() {
             Process process = managedProcess;
             managedProcess = null;
-
             if (process == null || !process.isAlive()) {
                 return;
             }

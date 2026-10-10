@@ -24,11 +24,7 @@ public final class IbkrContractMapper {
         }
 
         if (marketTypeHint == MARKET_TYPES.FUTURES) {
-            return new IbkrContract(symbol, "FUT", "GLOBEX", currency, defaultFutureExpiry(), null, null, "1");
-        }
-
-        if (symbol.length() > 5) {
-            return new IbkrContract(symbol, "OPT", "SMART", currency, defaultOptionExpiry(), 100.0, "C", "100");
+            throw new IllegalArgumentException("Select a broker-resolved futures contract with its actual expiry and multiplier.");
         }
 
         return new IbkrContract(symbol, "STK", "SMART", currency, null, null, null, null);
@@ -36,11 +32,6 @@ public final class IbkrContractMapper {
 
     public IbkrContract toContract(@NotNull TradePair pair, ORDER_TYPES orderTypeHint) {
         Objects.requireNonNull(pair, "pair must not be null");
-        if (orderTypeHint == ORDER_TYPES.STOP_LIMIT) {
-            String symbol = pair.getBaseCurrency().getCode().toUpperCase(Locale.ROOT);
-            String currency = pair.getCounterCurrency().getCode().toUpperCase(Locale.ROOT);
-            return new IbkrContract(symbol, "OPT", "SMART", currency, defaultOptionExpiry(), 100.0, "C", "100");
-        }
         return toContract(pair, MARKET_TYPES.STOCKS);
     }
 
@@ -63,15 +54,7 @@ public final class IbkrContractMapper {
     }
 
     private boolean isFxCode(String code) {
-        return code.length() == 3;
-    }
-
-    private String defaultFutureExpiry() {
-        return "202612";
-    }
-
-    private String defaultOptionExpiry() {
-        return "20261220";
+        return java.util.Set.of("USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "HKD", "SGD", "CNH", "SEK", "NOK", "DKK", "MXN", "ZAR", "PLN", "HUF", "CZK", "ILS", "TRY", "KRW", "INR", "BRL").contains(code);
     }
 
     public record IbkrContract(

@@ -155,6 +155,9 @@ public class UnifiedStrategy extends BaseStrategy {
             case "Adaptive Momentum Pullback" -> adaptiveMomentumPullback(context, features);
             case "AI Hybrid" -> aiHybrid(context, features);
             case "ML Model" -> mlModel(context, features);
+            case "RSI Trend Filter" -> rsiTrendFilter(context, features);
+            case "Bollinger Reentry" -> bollingerReentry(context, features);
+            case "Engulfing Reversal" -> engulfingReversal(context, features);
             default -> noSignal(context, "Unknown base strategy: " + baseName);
         };
 
@@ -187,6 +190,49 @@ public class UnifiedStrategy extends BaseStrategy {
     // Strategy Implementations
     // =========================================================================
 
+    private @NotNull StrategySignal rsiTrendFilter(StrategyContext context, FeatureRow features) {
+        double rsi = features.getRsi();
+        if (features.emasAlignedBullish() && features.trendUp()
+                && rsi > 50 && rsi < parameters.getOverboughtThreshold()) {
+            return signal(context, BUY, 0.65, "Bullish EMA alignment with positive, non-overbought RSI", features);
+        }
+        if (features.emasAlignedBearish() && features.trendDown()
+                && rsi < 50 && rsi > parameters.getOversoldThreshold()) {
+            return signal(context, SELL, 0.65, "Bearish EMA alignment with negative, non-oversold RSI", features);
+        }
+        return noSignal(context, "RSI and trend do not agree");
+    }
+
+    private @NotNull StrategySignal bollingerReentry(StrategyContext context, FeatureRow features) {
+        var candles = context.getCandles();
+        // Calculate prior bands using only prior candles; never compare against a future band.
+        FeatureRow previous = featurePipeline.computeLatest(candles.subList(0, candles.size() - 1),
+                FeaturePipelineConfig.from(parameters));
+        if (previous == null) return noSignal(context, "Prior Bollinger bands unavailable");
+        boolean inside = features.getClose() > features.getLowerBand() && features.getClose() < features.getUpperBand();
+        if (inside && previous.getClose() < previous.getLowerBand() && features.getClose() > previous.getClose()) {
+            return signal(context, BUY, 0.65, "Price reentered Bollinger bands from below", features);
+        }
+        if (inside && previous.getClose() > previous.getUpperBand() && features.getClose() < previous.getClose()) {
+            return signal(context, SELL, 0.65, "Price reentered Bollinger bands from above", features);
+        }
+        return noSignal(context, "No Bollinger band reentry");
+    }
+
+    private @NotNull StrategySignal engulfingReversal(StrategyContext context, FeatureRow features) {
+        var candles = context.getCandles();
+        CandleData previous = candles.get(candles.size() - 2);
+        CandleData current = candles.getLast();
+        boolean engulfs = Math.min(current.openPrice(), current.closePrice()) <= Math.min(previous.openPrice(), previous.closePrice())
+                && Math.max(current.openPrice(), current.closePrice()) >= Math.max(previous.openPrice(), previous.closePrice());
+        if (engulfs && previous.closePrice() < previous.openPrice() && current.closePrice() > current.openPrice()) {
+            return signal(context, BUY, 0.65, "Bullish body engulfing reversal", features);
+        }
+        if (engulfs && previous.closePrice() > previous.openPrice() && current.closePrice() < current.openPrice()) {
+            return signal(context, SELL, 0.65, "Bearish body engulfing reversal", features);
+        }
+        return noSignal(context, "No opposing-body engulfing pattern");
+    }
     private @NotNull StrategySignal trendFollowing(@NotNull StrategyContext context, @NotNull FeatureRow features) {
         boolean bullish = features.trendUp() && features.emasAlignedBullish();
         boolean bearish = features.trendDown() && features.emasAlignedBearish();

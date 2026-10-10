@@ -111,6 +111,13 @@ public final class IbkrTwsContractGateway {
     private Object buildContract(IbkrContractCandidate candidate) throws Exception {
         Object contract = IbkrApiRuntime.type("com.ib.client.Contract").getConstructor().newInstance();
         invokeIfPresent(contract, "conid", candidate.conId() == null ? null : candidate.conId().intValue());
+        if (candidate.hasConId()) {
+            // An exact broker ID already identifies expiry, strike, currency and security type.
+            if (!candidate.exchange().isBlank()) {
+                invokeIfPresent(contract, "exchange", candidate.exchange());
+            }
+            return contract;
+        }
         invokeIfPresent(contract, "symbol", candidate.symbol());
         invokeIfPresent(contract, "secType", firstNonBlank(candidate.secType(), candidate.securityType().ibkrCode()));
         invokeIfPresent(contract, "exchange", firstNonBlank(candidate.exchange(), defaultExchange(candidate)));

@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.exchange.infrastructure.PollingExchangeStreamerTest
+-------------------------------------------------------------------------------
+Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 11.06 s -- in org.investpro.exchange.infrastructure.PollingExchangeStreamerTest

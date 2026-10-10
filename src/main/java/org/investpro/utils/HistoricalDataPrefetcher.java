@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
@@ -84,9 +85,9 @@ public record HistoricalDataPrefetcher(HistoricalDataRepository repository, Data
 
 
 
-   static String identity;
 
-   static DataSupplierFactory factory;
+
+
 
     public static HistoricalDataPrefetcher forCurrentExchange(
             @NotNull Exchange exchange,
@@ -96,7 +97,8 @@ public record HistoricalDataPrefetcher(HistoricalDataRepository repository, Data
 
         String exchangeName = exchange.getClass().getSimpleName().toLowerCase();
         String packageName = exchange.getClass().getPackageName().toLowerCase();
-        identity = exchangeName + " " + packageName;
+        String identity = exchangeName + " " + packageName;
+        DataSupplierFactory factory;
 
 
 
@@ -153,6 +155,11 @@ public record HistoricalDataPrefetcher(HistoricalDataRepository repository, Data
     ) {
         try {
             return performDataFetch(pair, startTime, endTime, timeframeCode, progressCallback);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CancellationException("Historical data fetch cancelled");
+        } catch (CancellationException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to prefetch historical data for {} {}: {}", pair, timeframeCode, e.getMessage(), e);
             notifyProgress(progressCallback, -1);
@@ -251,8 +258,15 @@ public record HistoricalDataPrefetcher(HistoricalDataRepository repository, Data
         int unchangedPages = 0;
 
         for (int page = 1; page <= maxPages; page++) {
+            if (Thread.currentThread().isInterrupted()) throw new CancellationException("Historical data fetch cancelled");
             Future<List<CandleData>> future = supplier.get();
-            List<CandleData> pageCandles = future.get();
+            List<CandleData> pageCandles;
+            try {
+                pageCandles = future.get();
+            } catch (InterruptedException e) {
+                future.cancel(true);
+                throw e;
+            }
             List<CandleData> cleanedPage = cleanCandles(pageCandles);
 
             if (cleanedPage.isEmpty()) {
@@ -410,7 +424,7 @@ public record HistoricalDataPrefetcher(HistoricalDataRepository repository, Data
 
     @Contract(pure = true)
     public static boolean hasEnoughDataForBasicTesting(int candleCount) {
-        return candleCount < MIN_CANDLES_FOR_BASIC_TEST;
+        return candleCount >= MIN_CANDLES_FOR_BASIC_TEST;
     }
 
     public static boolean hasEnoughDataForGoodTesting(int candleCount) {
@@ -455,6 +469,9 @@ public record HistoricalDataPrefetcher(HistoricalDataRepository repository, Data
 
         try {
             callback.accept(progress);
+
+        } catch (CancellationException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("Historical data progress callback failed: {}", e.getMessage());
         }

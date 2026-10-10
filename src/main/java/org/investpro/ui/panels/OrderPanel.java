@@ -107,7 +107,7 @@ public class OrderPanel extends VBox {
         TradePair preferred = initial;
         buildUI(initial == null ? List.of() : List.of(initial), initial);
         placeOrderButton.setDisable(true);
-        org.investpro.ui.utils.UiBackgroundTasks.submit(() -> loadSymbols(preferred))
+        org.investpro.ui.utils.UiBackgroundTasks.marketData(() -> loadSymbols(preferred))
                 .orTimeout(20, TimeUnit.SECONDS).whenComplete((symbols, error) -> javafx.application.Platform.runLater(() -> {
                     if (error != null) {
                         log.warn("OrderPanel symbol loading failed", error);
@@ -164,7 +164,7 @@ public class OrderPanel extends VBox {
     }
 
     private void loadInitialQuote(TradePair pair) {
-        org.investpro.ui.utils.UiBackgroundTasks.submit(() -> systemCore.getExchange().fetchOrderBook(pair))
+        org.investpro.ui.utils.UiBackgroundTasks.marketData(() -> systemCore.getExchange().fetchOrderBook(pair))
                 .thenCompose(java.util.function.Function.identity()).orTimeout(3, TimeUnit.SECONDS)
                 .whenComplete((book, error) -> javafx.application.Platform.runLater(() -> {
                     if (error != null) { log.debug("OrderPanel initial quote unavailable", error); return; }

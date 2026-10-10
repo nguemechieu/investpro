@@ -11,7 +11,6 @@ import org.investpro.data.CandleData;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.CandleDataSupplier;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -39,9 +38,39 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
+    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+    private static final CoinbaseRestRateLimiter REST_LIMITER = new CoinbaseRestRateLimiter();
+    private final java.util.function.Function<HttpRequest, CompletableFuture<String>> transport;
 
     public CoinbaseCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        this(secondsPerCandle, tradePair, CoinbaseCandleDataSupplier::sendStandalone);
+    }
+
+    CoinbaseCandleDataSupplier(int secondsPerCandle, TradePair tradePair,
+            java.util.function.Function<HttpRequest, CompletableFuture<String>> transport) {
         super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+        this.transport = Objects.requireNonNull(transport);
+    }
+
+    private static CompletableFuture<String> sendStandalone(HttpRequest request) {
+        return org.investpro.core.concurrent.AppExecutors.submit(
+                org.investpro.core.concurrent.AppExecutors.COINBASE_REST, () -> {
+            String product = CoinbaseRestRateLimiter.extractProductId(request.uri());
+            REST_LIMITER.acquirePermit(request.uri().getPath(), product);
+            try {
+                var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 429) {
+                    REST_LIMITER.onRateLimited(product);
+                    logger.warn("Coinbase rate limited candles. product={} cooldownMs={}", product, 60_000L);
+                    throw new CoinbaseRestRateLimiter.RateLimitBlockedException("product-cooldown", 60_000L);
+                }
+                if (response.statusCode() >= 400)
+                    throw new IllegalStateException(CoinbaseHttpError.message(
+                            response.statusCode(), request.uri().getPath(), response.body()));
+                REST_LIMITER.onSuccess(product);
+                return response.body();
+            } finally { REST_LIMITER.releasePermit(); }
+        });
     }
 
     @Override
@@ -65,7 +94,7 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return new CoinbaseCandleDataSupplier(secondsPerCandle, tradePair);
+        return new CoinbaseCandleDataSupplier(secondsPerCandle, tradePair, transport);
     }
 
     @Override
@@ -100,22 +129,12 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
-        return HttpClient.newHttpClient().sendAsync(
+        CompletableFuture<String> request = transport.apply(
                         HttpRequest.newBuilder()
                                 .uri(URI.create(uriStr))
-                                .GET().build(),
-                        HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    String body = response.body();
-
-                    if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                        logger.warn("Coinbase candles request failed for {} {}: status={}, body={}",
-                                tradePair,
-                                granularity.apiName(),
-                                response.statusCode(),
-                                abbreviate(body));
-                        return Collections.emptyList();
-                    }
+                                .timeout(java.time.Duration.ofSeconds(30))
+                                .GET().build());
+        CompletableFuture<List<CandleData>> result = request.thenApply(body -> {
 
                     if (body == null || body.isBlank()) {
                         logger.warn("Coinbase candles request returned an empty body for {} {}", tradePair, granularity.apiName());
@@ -181,6 +200,8 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                         return Collections.emptyList();
                     }
                 });
+        result.whenComplete((_, _) -> { if (result.isCancelled()) request.cancel(true); });
+        return result;
     }
 
     private @NonNull String abbreviate(String value) {
@@ -198,11 +219,6 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
 
     private String encode(String value) {
         return URLEncoder.encode(String.valueOf(value), StandardCharsets.UTF_8);
-    }
-
-    @Contract(pure = true)
-    private @NotNull String granularityName(int seconds) {
-        return CoinbaseGranularity.fromSeconds(seconds).apiName();
     }
 
     private record CoinbaseGranularity(String apiName, int seconds) {
@@ -230,7 +246,7 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                             .comparingInt((CoinbaseGranularity granularity) ->
                                     Math.abs(granularity.seconds() - requestedSeconds))
                             .thenComparing(Comparator.comparingInt(CoinbaseGranularity::seconds).reversed()))
-                    .orElse(SUPPORTED.get(0));
+                    .orElse(SUPPORTED.getFirst());
 
             logger.warn(
                     "Coinbase does not support {}s candles; using {} ({}s) instead.",

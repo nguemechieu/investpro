@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.news.NewsIntelligenceServicesTest
+-------------------------------------------------------------------------------
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.108 s -- in org.investpro.news.NewsIntelligenceServicesTest

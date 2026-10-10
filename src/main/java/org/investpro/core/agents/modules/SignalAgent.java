@@ -42,6 +42,9 @@ public class SignalAgent implements Agent {
     private final Map<String, List<CandleData>> candleHistory = new ConcurrentHashMap<>();
     private final Map<String, org.investpro.models.trading.Ticker> quotes = new ConcurrentHashMap<>();
     private final Map<String, Integer> publishedBars = new ConcurrentHashMap<>();
+    private final Map<String, AgentEvent> latestCandleEvents = new ConcurrentHashMap<>();
+    private final Map<String, Long> tickEvaluationTimes = new ConcurrentHashMap<>();
+    private final Map<String, String> decisionReasons = new ConcurrentHashMap<>();
     private static final int MAX_CANDLES_PER_CONTEXT = 500;
     private static final int MIN_SEEDED_CANDLES = 120;
 
@@ -59,7 +62,7 @@ public class SignalAgent implements Agent {
     }
 
     @Override
-    public void start(AgentContext context) {
+    public synchronized void start(AgentContext context) {
         if (running) {
             log.warn("SignalAgent is already started");
             return;
@@ -73,7 +76,7 @@ public class SignalAgent implements Agent {
     }
 
     @Override
-    public void stop() {
+    public synchronized void stop() {
         if (!running) {
             return;
         }
@@ -83,12 +86,17 @@ public class SignalAgent implements Agent {
         this.eventBus = null;
         quotes.clear();
         publishedBars.clear();
+        latestCandleEvents.clear();
+        tickEvaluationTimes.clear();
+        decisionReasons.clear();
+        seedTasks.values().forEach(task -> task.cancel(true)); seedTasks.clear(); seedAttempts.clear();
+        candleHistory.clear();
 
         log.info("SignalAgent stopped");
     }
 
     @Override
-    public void onEvent(AgentEvent event) {
+    public synchronized void onEvent(AgentEvent event) {
         if (!running || event == null) {
             return;
         }
@@ -118,6 +126,8 @@ public class SignalAgent implements Agent {
             String symbol = resolveSymbol(metadata);
             String timeframe = resolveTimeframe(metadata);
             TradePair tradePair = resolveTradePair(metadata);
+            if (symbol == null || timeframe == null) return;
+            latestCandleEvents.put(symbol + "_" + timeframe, event);
 
             List<CandleData> candles = seedHistoryIfNeeded(symbol, timeframe, tradePair,
                     resolveCandles(symbol, timeframe, event.payload()));
@@ -136,7 +146,7 @@ public class SignalAgent implements Agent {
                     || System.currentTimeMillis() - quote.getTimestamp() > 30_000
                     || quote.getTimestamp() > System.currentTimeMillis() + 1_000
                     || !(quote.getBidPrice() > 0) || !(quote.getAskPrice() > quote.getBidPrice())) {
-                log.debug("Signal skipped for {}: fresh bid/ask quote unavailable", symbol);
+                recordDecisionReason(symbol + "_" + timeframe, "Waiting for fresh live bid/ask quote");
                 return;
             }
             Double bid = quote.getBidPrice();
@@ -161,16 +171,16 @@ public class SignalAgent implements Agent {
                     tradePair);
 
             if (!result.isSuccess()) {
-                log.debug("Strategy decision rejected for {}/{}: {}", symbol, timeframe,
-                        result.getRejectionReason());
+                recordDecisionReason(symbol + "_" + timeframe, result.getRejectionReason());
                 return;
             }
 
             if (!result.hasActionableSignal()) {
-                log.trace("No actionable signal (HOLD) for {}/{}", symbol, timeframe);
+                recordDecisionReason(symbol + "_" + timeframe, "HOLD: " + result.getSignal().getReason());
                 return;
             }
 
+            decisionReasons.remove(symbol + "_" + timeframe);
             StrategySignal signal = result.getSignal().toBuilder()
                     .metadata("bid", bid).metadata("ask", ask)
                     .metadata("quote_timestamp", quote.getTimestamp())
@@ -207,7 +217,23 @@ public class SignalAgent implements Agent {
     private void handleTickEvent(AgentEvent event) {
         if (event.payload() instanceof org.investpro.models.trading.Ticker ticker) {
             String symbol = resolveSymbol(event.metadata());
-            if (symbol != null) quotes.put(symbol, ticker);
+            if (symbol != null) {
+                quotes.put(symbol, ticker);
+                // Retry a candle skipped because its quote arrived later. Limit evaluations per context.
+                latestCandleEvents.forEach((key, candleEvent) -> {
+                    if (!symbol.equals(resolveSymbol(candleEvent.metadata()))) return;
+                    long now = System.currentTimeMillis();
+                    var evaluate = new java.util.concurrent.atomic.AtomicBoolean(false);
+                    tickEvaluationTimes.compute(key, (_, previous) -> {
+                        if (previous == null || now - previous >= 1_000) {
+                            evaluate.set(true);
+                            return now;
+                        }
+                        return previous;
+                    });
+                    if (evaluate.get()) handleCandleEvent(candleEvent);
+                });
+            }
         }
         // Tick events are for real-time monitoring, not strategy signals
         log.trace("Received tick event for: {}", event.metadata().get("tradePair"));
@@ -284,6 +310,12 @@ public class SignalAgent implements Agent {
                 .isPresent();
     }
 
+    private void recordDecisionReason(String key, String reason) {
+        String value = reason == null ? "Unspecified decision rejection" : reason;
+        if (!value.equals(decisionReasons.put(key, value))) {
+            log.info("Strategy evaluation {}: {}", key, value);
+        }
+    }
     private String resolveSymbol(Map<String, Object> metadata) {
         Object symbol = metadata.get("symbol");
         if (symbol != null && !String.valueOf(symbol).isBlank()) {
@@ -359,59 +391,43 @@ public class SignalAgent implements Agent {
         return candles.subList(candles.size() - MAX_CANDLES_PER_CONTEXT, candles.size());
     }
 
-    private List<CandleData> seedHistoryIfNeeded(
-            String symbol,
-            String timeframe,
-            TradePair tradePair,
+    private final Map<String, Long> seedAttempts = new ConcurrentHashMap<>();
+    private final Map<String, java.util.concurrent.CompletableFuture<?>> seedTasks = new ConcurrentHashMap<>();
+
+    private List<CandleData> seedHistoryIfNeeded(String symbol, String timeframe, TradePair tradePair,
             List<CandleData> currentCandles) {
-        if (currentCandles == null) {
-            currentCandles = List.of();
-        }
-        if (currentCandles.size() >= MIN_SEEDED_CANDLES || context == null || context.getExchange() == null
-                || tradePair == null) {
-            return currentCandles;
-        }
-
-        try {
+        if (currentCandles == null) currentCandles = List.of();
+        AgentContext session = context;
+        if (currentCandles.size() >= MIN_SEEDED_CANDLES || session == null
+                || session.getExchange() == null || tradePair == null) return currentCandles;
+        String key = symbol + "_" + timeframe;
+        long now = System.currentTimeMillis();
+        if (seedTasks.containsKey(key) || now - seedAttempts.getOrDefault(key, 0L) < 30_000) return currentCandles;
+        seedAttempts.put(key, now);
+        var future = org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.MARKET_DATA, () -> {
             int seconds = CandleAggregator.TIMEFRAME_SECONDS.getOrDefault(timeframe, 3600);
-            CandleDataSupplier supplier = context.getExchange().getCandleDataSupplier(seconds, tradePair);
-            if (supplier == null) {
-                return currentCandles;
+            CandleDataSupplier supplier = session.getExchange().getCandleDataSupplier(seconds, tradePair);
+            return supplier == null ? List.<CandleData>of() : supplier.get().get(4, TimeUnit.SECONDS);
+        });
+        seedTasks.put(key, future);
+        future.whenComplete((seeded, error) -> {
+            synchronized (SignalAgent.this) {
+                seedTasks.remove(key, future);
+                if (!running || context != session) return;
+                if (error != null || seeded == null || seeded.isEmpty()) {
+                    log.debug("SignalAgent history unavailable for {}/{}", symbol, timeframe); return;
+                }
+                List<CandleData> latest = candleHistory.getOrDefault(key, List.of());
+                int latestBar = latest.isEmpty() ? Integer.MAX_VALUE : latest.getLast().openTime();
+                var merged = new java.util.TreeMap<Integer, CandleData>();
+                seeded.stream().filter(java.util.Objects::nonNull).filter(c -> c.openTime() <= latestBar)
+                        .forEach(c -> merged.put(c.openTime(), c));
+                latest.forEach(c -> merged.put(c.openTime(), c));
+                candleHistory.put(key, new ArrayList<>(trimCandles(new ArrayList<>(merged.values()))));
             }
-
-            List<CandleData> seeded = supplier.get().get(4, TimeUnit.SECONDS);
-            if (seeded == null || seeded.isEmpty()) {
-                return currentCandles;
-            }
-
-            int latestRequestedBar = currentCandles.isEmpty() ? Integer.MAX_VALUE
-                    : currentCandles.getLast().openTime();
-            List<CandleData> merged = new ArrayList<>(seeded.stream().filter(java.util.Objects::nonNull)
-                    .filter(candle -> candle.openTime() <= latestRequestedBar).toList());
-            merged.addAll(currentCandles);
-            List<CandleData> sorted = merged.stream()
-                    .filter(java.util.Objects::nonNull)
-                    .collect(java.util.stream.Collectors.toMap(
-                            CandleData::openTime,
-                            candle -> candle,
-                            (first, second) -> second,
-                            java.util.TreeMap::new))
-                    .values()
-                    .stream()
-                    .sorted(Comparator.comparingInt(CandleData::openTime))
-                    .toList();
-
-            List<CandleData> trimmed = new ArrayList<>(trimCandles(sorted));
-            candleHistory.put("%s_%s".formatted(symbol, timeframe), trimmed);
-            log.info("SignalAgent seeded {} candles for {}/{}", trimmed.size(), symbol, timeframe);
-            return List.copyOf(trimmed);
-        } catch (Exception exception) {
-            log.debug("SignalAgent could not seed candle history for {}/{}: {}", symbol, timeframe,
-                    exception.getMessage());
-            return currentCandles;
-        }
+        });
+        return currentCandles;
     }
-
     private double number(Object value, double fallback) {
         if (value instanceof Number number) {
             return number.doubleValue();

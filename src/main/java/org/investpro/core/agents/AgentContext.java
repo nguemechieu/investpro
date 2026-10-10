@@ -22,9 +22,9 @@ public class AgentContext {
 
     private AgentEventBus eventBus;
 
-    private boolean autoTradingEnabled;
+    private volatile boolean autoTradingEnabled;
 
-    private boolean aiReasoningEnabled;
+    private volatile boolean aiReasoningEnabled;
 
     private double maxRiskPerTrade = 0.01;
 

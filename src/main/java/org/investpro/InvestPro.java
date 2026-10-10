@@ -82,6 +82,9 @@ public class InvestPro extends Application {
     private BorderPane root;
     private ScreenManager screenManager;
     private org.investpro.ai.AssistantRuntime assistantRuntime;
+    private final org.investpro.ui.utils.UiFreezeDetector uiFreezeDetector = new org.investpro.ui.utils.UiFreezeDetector();
+    private volatile boolean closing;
+    private java.util.concurrent.CompletableFuture<org.investpro.ai.AssistantRuntime> startupTask;
 
     public static void main(String[] args) {
         initializeGlobalExceptionHandling();
@@ -127,18 +130,28 @@ public class InvestPro extends Application {
 
     @Override
     public void start(@NotNull Stage primaryStage) {
-        assistantRuntime = org.investpro.ai.AssistantRuntime.fromEnvironment("", "");
-        assistantRuntime.start();
         this.primaryStage = Objects.requireNonNull(primaryStage, "primaryStage must not be null");
 
         try {
-            StrategyBootstrapper.initialize();
-            AiAuditLogger.LocalAiRuntimeLauncher.startIfConfigured();
-
             configurePrimaryStage();
-            showOnboarding();
-
+            uiFreezeDetector.start();
+            root.setCenter(new javafx.scene.layout.VBox(10, new javafx.scene.control.ProgressIndicator(),
+                    new javafx.scene.control.Label("Loading InvestPro services…")));
             primaryStage.show();
+            startupTask = org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.IO, () -> {
+                StrategyBootstrapper.initialize();
+                AiAuditLogger.LocalAiRuntimeLauncher.startIfConfigured();
+                var runtime = org.investpro.ai.AssistantRuntime.fromEnvironment("", "");
+                if (closing) { runtime.close(); throw new java.util.concurrent.CancellationException(); }
+                runtime.start();
+                if (closing) { runtime.close(); throw new java.util.concurrent.CancellationException(); }
+                return runtime;
+            });
+            startupTask.whenComplete((runtime, error) -> Platform.runLater(() -> {
+                if (closing) { if (runtime != null) runtime.close(); return; }
+                if (error != null) { showErrorAlert("Startup Error", "Failed to start InvestPro services.", error); return; }
+                assistantRuntime = runtime; showOnboarding();
+            }));
 
             log.info("InvestPro JavaFX application started.");
 
@@ -311,21 +324,31 @@ public class InvestPro extends Application {
     }
 
     private void closeApplication(boolean exitPlatform) {
+        if (closing) return;
+        closing = true;
+        uiFreezeDetector.close();
         try {
             if (screenManager != null) {
                 screenManager.shutdown();
             }
-            AiAuditLogger.LocalAiRuntimeLauncher.stopManagedProcess();
-            log.info("InvestPro shutdown completed.");
 
         } catch (Exception exception) {
             log.warn("Error while shutting down InvestPro", exception);
 
         } finally {
-            if (assistantRuntime != null) assistantRuntime.close();
-            if (exitPlatform) {
-                Platform.exit();
-            }
+            var runtime = assistantRuntime;
+            org.investpro.core.concurrent.AppExecutors.cleanup(() -> {
+                if (runtime != null) runtime.close();
+                if (startupTask != null) {
+                    try { var started = startupTask.join(); if (started != runtime) started.close(); }
+                    catch (java.util.concurrent.CompletionException | java.util.concurrent.CancellationException ignored) { }
+                }
+                AiAuditLogger.LocalAiRuntimeLauncher.stopManagedProcess();
+            });
+            org.investpro.core.concurrent.AppExecutors.finishShutdown().whenComplete((_, error) -> {
+                log.info("InvestPro shutdown completed.");
+                if (exitPlatform) Platform.runLater(Platform::exit);
+            });
         }
     }
 

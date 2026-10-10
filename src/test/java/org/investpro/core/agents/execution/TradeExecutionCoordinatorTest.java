@@ -28,6 +28,26 @@ import java.lang.reflect.Field;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TradeExecutionCoordinatorTest {
+    @Test void queuedSignalFromPreviousSessionCannotExecuteAfterRestart() throws Exception {
+        var started = new java.util.concurrent.CountDownLatch(2);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var pool = org.investpro.core.concurrent.AppExecutors.TRADING;
+        for (int i = 0; i < 2; i++) org.investpro.core.concurrent.AppExecutors.submit(pool, () -> {
+            started.countDown(); release.await(); return null;
+        });
+        var engine = org.mockito.Mockito.mock(ExecutionEngine.class);
+        var ai = org.mockito.Mockito.mock(AiReasoningService.class);
+        var coordinator = new TradeExecutionCoordinator(new RiskManagementSystem(), ai, engine);
+        try {
+            assertTrue(started.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            var stale = coordinator.processSignal(Side.HOLD, TradeRiskContext.builder().build());
+            coordinator.stopProcessing(); coordinator.resumeProcessing();
+            release.countDown();
+            assertTrue(stale.get(2, java.util.concurrent.TimeUnit.SECONDS).rejected());
+            org.mockito.Mockito.verifyNoInteractions(engine, ai);
+        } finally { release.countDown(); }
+    }
+
     @Test
     void brokerOrderFailureBlocksAndReleasesLocksForNextSignal() {
         var exchange = org.mockito.Mockito.mock(org.investpro.exchange.Exchange.class);

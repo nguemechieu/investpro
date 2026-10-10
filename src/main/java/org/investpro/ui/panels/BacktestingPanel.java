@@ -112,6 +112,9 @@ public class BacktestingPanel extends StackPane {
     private final HistoricalDataRepository historicalDataRepository;
     private final BacktestingService backtestingService;
     private SystemCore systemCore;
+    private volatile Thread activeBacktestThread;
+    private volatile java.util.concurrent.CompletableFuture<?> activeBacktestFuture;
+    private volatile long backtestGeneration;
     private final AtomicBoolean backtestRunning = new AtomicBoolean(false);
 
     private static final double DEFAULT_INITIAL_EQUITY = 10_000.0;
@@ -282,8 +285,13 @@ public class BacktestingPanel extends StackPane {
         Button cancelBtn = new Button("Cancel");
         cancelBtn.setStyle(primaryButtonStyle("#ef4444"));
         cancelBtn.setOnAction(event -> {
+            Thread task = activeBacktestThread;
+            backtestGeneration++;
+            if (activeBacktestFuture != null) activeBacktestFuture.cancel(true);
+            activeBacktestThread = null;
+            if (task != null) task.interrupt();
             backtestRunning.set(false);
-            statusLabel.setText("Cancel requested...");
+            statusLabel.setText("Backtest cancelled.");
             setRunningUi(false);
         });
 
@@ -566,7 +574,7 @@ public class BacktestingPanel extends StackPane {
     }
 
     private void loadSymbolsAsync() {
-        CompletableFuture.supplyAsync(this::resolveBacktestingSymbols)
+        org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.MARKET_DATA, this::resolveBacktestingSymbols)
                 .thenAccept(symbols -> Platform.runLater(() -> applyLoadedSymbols(symbols)))
                 .exceptionally(exception -> {
                     log.warn("Failed to load backtesting symbols asynchronously: {}", exception.getMessage());
@@ -704,7 +712,7 @@ public class BacktestingPanel extends StackPane {
         progressBar.setProgress(-1);
         setRunningUi(true);
 
-        Thread prefetchThread = new Thread(() -> {
+        var prefetch = org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.IO, () -> {
             try {
                 prefetchHistoricalData(selectedPair, selectedTimeframe, startDate, endDate);
             } catch (Exception exception) {
@@ -716,11 +724,11 @@ public class BacktestingPanel extends StackPane {
                     setRunningUi(false);
                 });
             }
+            return null;
         });
-
-        prefetchThread.setName("data-prefetch-worker");
-        prefetchThread.setDaemon(true);
-        prefetchThread.start();
+        prefetch.exceptionally(error -> { Platform.runLater(() -> {
+            backtestRunning.set(false); setRunningUi(false); statusLabel.setText("Data workers are busy. Try again shortly.");
+        }); return null; });
     }
 
     /**
@@ -764,12 +772,13 @@ public class BacktestingPanel extends StackPane {
                         }
                     }));
 
+            if (!fetchedData.isEmpty()) backtestingService.storeHistoricalData(pair, start, end, timeframeCode, fetchedData);
             Platform.runLater(() -> {
                 if (fetchedData.isEmpty()) {
                     statusLabel.setText("No data fetched. The pair may not be available on Binance.");
                     dataQualityLabel.setText("Data quality: failed");
                 } else {
-                    backtestingService.storeHistoricalData(pair, start, end, timeframeCode, fetchedData);
+
                     statusLabel.setText("Successfully cached " + fetchedData.size() + " real candles for "
                             + displayTradePair(pair) + " " + timeframeCode + ". Ready for backtesting!");
                     dataQualityLabel
@@ -791,6 +800,14 @@ public class BacktestingPanel extends StackPane {
         }
     }
 
+    private void postBacktestUpdate(Runnable update) {
+        Thread source = Thread.currentThread();
+        long session = backtestGeneration;
+        Platform.runLater(() -> {
+            if (session == backtestGeneration && activeBacktestThread == source && backtestRunning.get()) update.run();
+        });
+    }
+
     private void runBacktestAsync() {
         if (backtestRunning.get()) {
             statusLabel.setText("Backtest already running...");
@@ -798,7 +815,7 @@ public class BacktestingPanel extends StackPane {
         }
 
         BacktestInput input = readBacktestInput();
-        if (input.isValid()) {
+        if (!input.isValid()) {
             statusLabel.setText(input.validationMessage());
             progressBar.setProgress(0);
             return;
@@ -810,12 +827,15 @@ public class BacktestingPanel extends StackPane {
         progressBar.setProgress(-1);
         setRunningUi(true);
 
-        Thread backTestThread = new Thread(() -> {
+        long session = ++backtestGeneration;
+        activeBacktestFuture = org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.BACKTEST, () -> {
+            if (session != backtestGeneration) throw new java.util.concurrent.CancellationException();
+            activeBacktestThread = Thread.currentThread();
             try {
                 runBacktest(input);
             } catch (Exception exception) {
                 log.error("Backtest error", exception);
-                Platform.runLater(() -> {
+                postBacktestUpdate(() -> {
                     statusLabel.setText("Error: " + exception.getMessage());
                     dataQualityLabel.setText("Data quality: failed");
                     progressBar.setProgress(0);
@@ -823,11 +843,16 @@ public class BacktestingPanel extends StackPane {
                     setRunningUi(false);
                 });
             }
+            return null;
         });
-
-        backTestThread.setName("strategy-backtest-worker");
-        backTestThread.setDaemon(true);
-        backTestThread.start();
+        activeBacktestFuture.exceptionally(error -> {
+            Platform.runLater(() -> {
+                if (session == backtestGeneration) {
+                    backtestRunning.set(false); setRunningUi(false);
+                    statusLabel.setText("Backtest unavailable or cancelled. Try again when workers are free.");
+                }
+            }); return null;
+        });
     }
 
     private BacktestInput readBacktestInput() {
@@ -844,6 +869,9 @@ public class BacktestingPanel extends StackPane {
             return BacktestInput.invalid("Please select strategy, symbol, and timeframe");
         }
 
+        if (!Double.isFinite(initialBalance) || initialBalance <= 0) {
+            return BacktestInput.invalid("Initial balance must be positive and finite");
+        }
         if (startDate == null || endDate == null || endDate.isBefore(startDate)) {
             return BacktestInput.invalid("Invalid date range");
         }
@@ -864,12 +892,12 @@ public class BacktestingPanel extends StackPane {
             int requestedBars = input.requestedBars();
             String timeframeCode = selectedTimeframe.getCode();
 
-            Platform.runLater(() -> statusLabel.setText("Updating historical data from exchange for "
+            postBacktestUpdate(() -> statusLabel.setText("Updating historical data from exchange for "
                     + displayTradePair(selectedPair) + " " + timeframeCode));
 
             refreshHistoricalDataCache(input);
 
-            Platform.runLater(() -> statusLabel.setText(
+            postBacktestUpdate(() -> statusLabel.setText(
                     "Loading saved historical data for " + displayTradePair(selectedPair) + " " + timeframeCode));
 
             List<CandleData> candles = loadEnoughCandles(selectedPair, selectedTimeframe, startDate, endDate,
@@ -880,10 +908,10 @@ public class BacktestingPanel extends StackPane {
 
             DataReadiness readiness = evaluateDataReadiness(candles, warmupBars, requestedBars);
 
-            Platform.runLater(() -> dataQualityLabel.setText(readiness.message()));
+            postBacktestUpdate(() -> dataQualityLabel.setText(readiness.message()));
 
             if (!readiness.ready()) {
-                Platform.runLater(() -> {
+                postBacktestUpdate(() -> {
                     statusLabel.setText(readiness.message());
                     progressBar.setProgress(0);
                     backtestRunning.set(false);
@@ -897,7 +925,7 @@ public class BacktestingPanel extends StackPane {
             }
 
             List<CandleData> finalCandles = candles;
-            Platform.runLater(() -> statusLabel.setText("Executing strategy backtest with " + finalCandles.size()
+            postBacktestUpdate(() -> statusLabel.setText("Executing strategy backtest with " + finalCandles.size()
                     + " candles and initial balance $" + String.format(Locale.ROOT, "%.2f", initialBalance) + "..."));
 
             List<BacktestTrade> trades = executeBacktest(strategyName, selectedPair, timeframeCode, orderType, candles,
@@ -905,7 +933,7 @@ public class BacktestingPanel extends StackPane {
 
             InstitutionalBacktestMetrics metrics = calculateInstitutionalMetrics(trades, initialBalance);
 
-            Platform.runLater(() -> {
+            postBacktestUpdate(() -> {
                 tradesTable.setItems(FXCollections.observableArrayList(trades));
                 updatePriceActionChart(finalCandles, trades);
                 updateEquityChart(trades, initialBalance);
@@ -934,7 +962,7 @@ public class BacktestingPanel extends StackPane {
 
         } catch (Exception exception) {
             log.error("Backtest execution error", exception);
-            Platform.runLater(() -> {
+            postBacktestUpdate(() -> {
                 statusLabel.setText("Error: " + exception.getMessage());
                 dataQualityLabel.setText("Data quality: error");
                 progressBar.setProgress(0);
@@ -947,7 +975,7 @@ public class BacktestingPanel extends StackPane {
     private void refreshHistoricalDataCache(@NotNull BacktestInput input) {
         if (systemCore == null || systemCore.getExchange() == null) {
             log.info("Skipping historical data refresh because no exchange is available");
-            Platform.runLater(() -> dataQualityLabel.setText("Data quality: cached data only - no exchange connected"));
+            postBacktestUpdate(() -> dataQualityLabel.setText("Data quality: cached data only - no exchange connected"));
             return;
         }
 
@@ -967,26 +995,28 @@ public class BacktestingPanel extends StackPane {
                     historicalDataRepository);
 
             List<CandleData> fetched = preFetcher.fetchAndCacheDataSync(input.selectedPair(), fetchStart, fetchEnd,
-                    timeframeCode, progress -> Platform.runLater(() -> {
+                    timeframeCode, progress -> postBacktestUpdate(() -> {
                         if (progress >= 0) {
                             progressBar.setProgress(progress / 100.0);
                             statusLabel.setText("Updating historical data... " + progress + "%");
                         }
                     }));
 
-            Platform.runLater(() -> {
+            if (Thread.currentThread().isInterrupted() || activeBacktestThread != Thread.currentThread()) throw new java.util.concurrent.CancellationException("Backtest cancelled");
+            if (!fetched.isEmpty()) backtestingService.storeHistoricalData(input.selectedPair(), fetchStart, fetchEnd, timeframeCode, fetched);
+            postBacktestUpdate(() -> {
                 if (fetched.isEmpty()) {
                     dataQualityLabel.setText("Data quality: using existing cached data - exchange returned no candles");
                 } else {
-                    backtestingService.storeHistoricalData(input.selectedPair(), fetchStart, fetchEnd, timeframeCode,
-                            fetched);
                     dataQualityLabel.setText(
                             "Data quality: saved/updated " + fetched.size() + " exchange candles before backtest");
                 }
             });
+        } catch (java.util.concurrent.CancellationException exception) {
+            throw exception;
         } catch (Exception exception) {
             log.warn("Historical data refresh failed; continuing with cached data: {}", exception.getMessage());
-            Platform.runLater(() -> dataQualityLabel
+            postBacktestUpdate(() -> dataQualityLabel
                     .setText("Data quality: cached data - refresh failed: " + exception.getMessage()));
         }
     }
@@ -1204,6 +1234,7 @@ public class BacktestingPanel extends StackPane {
         int warmupBars = Math.max(50, safeWarmupBars(strategy));
 
         for (int i = warmupBars; i < candles.size(); i++) {
+            if (Thread.currentThread().isInterrupted() || activeBacktestThread != Thread.currentThread()) throw new java.util.concurrent.CancellationException("Backtest cancelled");
             if (!backtestRunning.get()) {
                 break;
             }
@@ -1551,9 +1582,10 @@ public class BacktestingPanel extends StackPane {
         if (total <= 0) {
             return;
         }
+        if (index % 100 != 0 && index < total - 1) return;
 
         double progress = (double) index / total;
-        Platform.runLater(() -> progressBar.setProgress(progress));
+        postBacktestUpdate(() -> progressBar.setProgress(progress));
     }
 
     private LocalDate candleDate(CandleData candle) {
@@ -1958,7 +1990,7 @@ public class BacktestingPanel extends StackPane {
 
     private void assignTestedStrategy() {
         BacktestInput input = lastSuccessfulBacktestInput;
-        if (input == null || input.isValid()) {
+        if (input == null || !input.isValid()) {
             showAlert("No Backtest Selected", "Run a backtest before assigning a strategy.", Alert.AlertType.WARNING);
             return;
         }
@@ -2251,7 +2283,7 @@ public class BacktestingPanel extends StackPane {
         }
 
         boolean isValid() {
-            return validationMessage != null && !validationMessage.isBlank();
+            return validationMessage != null && validationMessage.isBlank();
         }
     }
 

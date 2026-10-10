@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.exchange.binanceus.BinanceUsAuthenticationTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.718 s -- in org.investpro.exchange.binanceus.BinanceUsAuthenticationTest

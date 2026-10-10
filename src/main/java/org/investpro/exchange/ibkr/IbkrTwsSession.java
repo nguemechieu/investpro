@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
@@ -44,6 +45,7 @@ public class IbkrTwsSession {
     private volatile CompletableFuture<IbkrAccountSnapshot> summaryFuture;
     private volatile int summaryRequest;
     private volatile IbkrAccountSnapshot snapshot;
+    private final Map<Integer, Object> positionContracts = new ConcurrentHashMap<>();
     private final Map<Integer, Position> positions = new ConcurrentHashMap<>();
     private final Map<Integer, OpenOrder> openOrders = new ConcurrentHashMap<>();
     private volatile CompletableFuture<List<Position>> positionFuture;
@@ -69,7 +71,7 @@ public class IbkrTwsSession {
     }
 
     private static TradePair pair(Object contract) {
-        try { return new TradePair(String.valueOf(call(contract, "symbol")), String.valueOf(call(contract, "currency"))); }
+        try { TradePair pair = new TradePair(String.valueOf(call(contract, "symbol")), String.valueOf(call(contract, "currency"))); pair.setNativeSymbol(String.valueOf(call(contract, "conid"))); return pair; }
         catch (Exception error) { throw new IllegalStateException("Unable to map IBKR contract", error); }
     }
 
@@ -151,6 +153,9 @@ public class IbkrTwsSession {
         if (signal != null) { try { call(signal, "issueSignal"); } catch (RuntimeException ignored) { } }
         if (pump != null) pump.interrupt();
         failSession("IBKR API disconnected; check order status before retrying any pending submission.");
+        positions.clear();
+        positionContracts.clear();
+        openOrders.clear();
         quotes.clear();
         quoteIds.clear();
         quoteWaiters.clear();
@@ -169,7 +174,7 @@ public class IbkrTwsSession {
         boolean connected = socketConnected();
         boolean apiReady = connected && apiAvailable;
         return new IbkrSessionState(profile.mode(), profile.host(), profile.port(), profile.clientId(), profile.paper(),
-                connected, apiReady, !accounts.isEmpty(), snapshot != null, !quotes.isEmpty(), false,
+                connected, apiReady, !accounts.isEmpty(), snapshot != null, quotes.entrySet().stream().anyMatch(entry -> { synchronized (entry.getValue()) { return validQuote(entry.getValue()); } }), false,
                 apiReady && !selectedAccount.isBlank(), failure, connected ? Instant.now() : null, accounts);
     }
 
@@ -214,8 +219,23 @@ public class IbkrTwsSession {
         return quoteWaiters.get(id).thenApply(ticker -> ticker).orTimeout(12, TimeUnit.SECONDS);
     }
 
+    public Optional<IbkrResolvedContract> positionContract(String positionId) {
+        Object contract;
+        try { contract = positionContracts.get(Integer.parseInt(positionId)); }
+        catch (NumberFormatException error) { return Optional.empty(); }
+        if (contract == null) return Optional.empty();
+        return Optional.of(new IbkrResolvedContract(((Number) call(contract, "conid")).longValue(),
+                String.valueOf(call(contract, "symbol")), String.valueOf(call(contract, "localSymbol")),
+                String.valueOf(call(contract, "secType")), String.valueOf(call(contract, "currency")),
+                String.valueOf(call(contract, "exchange")), String.valueOf(call(contract, "primaryExch")),
+                String.valueOf(call(contract, "tradingClass")), String.valueOf(call(contract, "multiplier")),
+                String.valueOf(call(contract, "lastTradeDateOrContractMonth")), ((Number) call(contract, "strike")).doubleValue(),
+                String.valueOf(call(contract, "right")), null, null, "", "", "", "", "TWS_POSITION",
+                Instant.now(), Instant.now(), ""));
+    }
     public CompletableFuture<String> submit(IbkrResolvedContract contract, Side side, double quantity,
                                               String type, double price, double stopPrice) {
+        if (side != Side.BUY && side != Side.SELL) return CompletableFuture.failedFuture(new IllegalArgumentException("IBKR requires BUY or SELL"));
         if (!Double.isFinite(quantity) || quantity <= 0)
             return CompletableFuture.failedFuture(new IllegalArgumentException("IBKR quantity must be positive and finite."));
         try {
@@ -224,6 +244,9 @@ public class IbkrTwsSession {
                 return CompletableFuture.failedFuture(new IllegalStateException("Remote IBKR paper orders are disabled; use local paper simulation."));
             }
             Object current = client();
+            if (contract == null) return CompletableFuture.failedFuture(new IllegalArgumentException("A resolved IBKR contract is required."));
+            if (List.of("IND", "CONTFUT", "NEWS", "BAG").contains(contract.secType().toUpperCase(java.util.Locale.ROOT))) return CompletableFuture.failedFuture(new UnsupportedOperationException("This IBKR contract requires a tradable underlying or explicit combination legs"));
+            if (!List.of("MKT", "LMT", "STP", "STP LMT", "TRAIL").contains(type)) return CompletableFuture.failedFuture(new UnsupportedOperationException("Unsupported IBKR order type: " + type));
             Object order = IbkrApiRuntime.type("com.ib.client.Order").getConstructor().newInstance();
             call(order, "account", account);
             call(order, "action", side == Side.BUY ? "BUY" : "SELL");
@@ -310,8 +333,9 @@ public class IbkrTwsSession {
                         Object contract = args[1];
                         double quantity = Double.parseDouble(args[2].toString());
                         int conId = (Integer) call(contract, "conid");
-                        if (quantity == 0) positions.remove(conId);
+                        if (quantity == 0) { positions.remove(conId); positionContracts.remove(conId); }
                         else {
+                            positionContracts.put(conId, contract);
                             Position position = new Position(pair(contract));
                             position.setPositionId(String.valueOf(conId));
                             position.setSide(quantity > 0 ? Side.BUY : Side.SELL);
@@ -453,6 +477,9 @@ public class IbkrTwsSession {
         if (List.of(502, 503, 504, 326, 1100, 1300).contains(code)) failSession(message);
         if (code == 1101 || code == 1102) {
             if (code == 1101) {
+                positions.clear();
+                positionContracts.clear();
+                openOrders.clear();
                 quotes.clear();
                 quoteIds.clear();
                 quoteWaiters.clear();
@@ -462,6 +489,10 @@ public class IbkrTwsSession {
             failure = message;
         }
         if (code >= 2100 && code <= 2199) return;
+        if (code == 10167 && quoteWaiters.containsKey(id)) {
+            updateQuoteType(id, 3);
+            return; // IBKR is delivering delayed ticks, not rejecting the subscription.
+        }
         if (code == 10089 && quoteWaiters.containsKey(id)
                 && String.valueOf(args[codeIndex + 1]).toLowerCase(java.util.Locale.ROOT)
                 .contains("delayed market data is available")) {
@@ -474,7 +505,13 @@ public class IbkrTwsSession {
         String reason = String.valueOf(args[codeIndex + 1]);
         IllegalStateException dataError = IbkrMarketDataException.isSubscriptionError(code, reason)
                 ? new IbkrMarketDataException(code, reason) : new IllegalStateException(message);
-        if (quote != null) quote.completeExceptionally(dataError);
+        if (quote != null) {
+            double[] prices = quotes.get(id);
+            if (prices != null) synchronized (prices) { java.util.Arrays.fill(prices, 0); }
+            quote.completeExceptionally(dataError);
+            // A completed waiter cannot be changed; subsequent callers must see this rejection too.
+            quoteWaiters.put(id, CompletableFuture.failedFuture(dataError));
+        }
         CompletableFuture<List<org.investpro.data.CandleData>> history = histories.get(id);
         if (history != null) history.completeExceptionally(dataError);
         if (id == summaryRequest && summaryFuture != null) summaryFuture.completeExceptionally(new IllegalStateException(message));
@@ -538,7 +575,16 @@ public class IbkrTwsSession {
         }
     }
 
+    private static boolean validQuote(double[] prices) {
+        return Double.isFinite(prices[0]) && prices[0] >= 0
+                && Double.isFinite(prices[1]) && prices[1] >= 0
+                && Double.isFinite(prices[2]) && prices[2] >= 0 && prices[3] > 0
+                && (prices[2] > 0 || (prices[0] > 0 && prices[1] > 0))
+                && !(prices[0] > 0 && prices[1] > 0 && prices[0] > prices[1]);
+    }
+
     private Ticker ticker(int id, double[] prices) {
+        if (!validQuote(prices)) return null;
         double mid = prices[2] > 0 ? prices[2] : prices[0] > 0 && prices[1] > 0 ? (prices[0] + prices[1]) / 2 : 0;
         if (mid <= 0) return null;
         Ticker ticker = new Ticker(mid, prices[0], prices[1], mid, mid, mid, 0, (long) prices[3]);

@@ -24,6 +24,14 @@ import java.util.List;
 @Builder(toBuilder = true)
 public class StrategyBacktestRequest {
 
+    /** A queued backtest owns a stable snapshot even if the caller reuses its candle list. */
+    public static class StrategyBacktestRequestBuilder {
+        public StrategyBacktestRequestBuilder candles(List<CandleData> candles) {
+            this.candles = candles == null ? null : List.copyOf(candles);
+            return this;
+        }
+    }
+
     /**
      * Trading symbol, e.g., "BTC/USD", "EUR/USD".
      */

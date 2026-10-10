@@ -99,15 +99,16 @@ public final class BacktestJob implements Comparable<BacktestJob> {
      * Transitions the job from QUEUED to RUNNING.
      * Records the worker thread so it can be interrupted later.
      */
-    void markRunning(@NotNull Thread thread) {
-        status.set(BacktestJobStatus.RUNNING);
+    synchronized void markRunning(@NotNull Thread thread) {
+        if (!status.compareAndSet(BacktestJobStatus.QUEUED, BacktestJobStatus.RUNNING)) return;
         this.workerThread = thread;
         this.startedAt = Instant.now();
     }
 
     /** Transitions to COMPLETED and resolves the future. */
-    void markCompleted(@NotNull StrategyPerformanceReport result) {
-        status.set(BacktestJobStatus.COMPLETED);
+    synchronized void markCompleted(@NotNull StrategyPerformanceReport result) {
+        if (!status.compareAndSet(BacktestJobStatus.RUNNING, BacktestJobStatus.COMPLETED)) return;
+        workerThread = null;
         completedAt = Instant.now();
         future.complete(result);
         if (onComplete != null) {
@@ -116,8 +117,10 @@ public final class BacktestJob implements Comparable<BacktestJob> {
     }
 
     /** Transitions to FAILED and completes the future exceptionally. */
-    void markFailed(@NotNull Throwable cause) {
+    synchronized void markFailed(@NotNull Throwable cause) {
+        if (isTerminal()) return;
         status.set(BacktestJobStatus.FAILED);
+        workerThread = null;
         completedAt = Instant.now();
         future.completeExceptionally(cause);
         if (onComplete != null) {
@@ -135,7 +138,7 @@ public final class BacktestJob implements Comparable<BacktestJob> {
      * @return {@code true} if cancellation was initiated; {@code false} if
      *         the job was already in a terminal state.
      */
-    public boolean cancel() {
+    public synchronized boolean cancel() {
         BacktestJobStatus current = status.get();
         if (current == BacktestJobStatus.COMPLETED
                 || current == BacktestJobStatus.FAILED

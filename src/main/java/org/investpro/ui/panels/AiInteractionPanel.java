@@ -34,8 +34,10 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
     private java.util.concurrent.Future<?> speechTask;
     private final org.investpro.ai.AssistantVoice voice;
     private final Button microphone = new Button("Speak");
-    private final CheckBox speakReplies = new CheckBox("Read replies aloud");
-    private final Button replay = new Button("Listen to reply");
+    private final CheckBox speakReplies = new CheckBox("Auto-read assistant responses");
+    private final Button replay = new Button("Read Aloud");
+    private final Button stopAudioButton = new Button("Stop");
+    private boolean speaking;
     private boolean recording;
     private String lastReply = "";
     private byte[] attachedScreenshot;
@@ -50,8 +52,8 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         this.assistant = assistant;
         voice = assistant.createVoice();
         double savedGain = preferences.getDouble("voicePlaybackGainDb", 4.0);
-        voice.setPlaybackGainDb((float) (Double.isFinite(savedGain) ? Math.clamp(savedGain, -12.0, 12.0) : 4.0));
-        Slider volume = new Slider(-12, 12, voice.getPlaybackGainDb());
+        voice.setPlaybackGainDb((float) (Double.isFinite(savedGain) ? Math.clamp(savedGain, -12.0, 6.0) : 4.0));
+        Slider volume = new Slider(-12, 6, voice.getPlaybackGainDb());
         volume.setId("voice-volume"); volume.setAccessibleText("Voice Volume in decibels");
         volume.setPrefWidth(130); volume.setBlockIncrement(1);
         Label volumeValue = new Label();
@@ -63,7 +65,9 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         HBox volumeControl = new HBox(6, new Label("Voice Volume"), volume, volumeValue);
         volumeControl.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         Tooltip.install(volumeControl, new Tooltip("Playback gain, limited to your audio device capabilities. 0 dB is unchanged volume."));
-        speakReplies.setSelected(true);
+        speakReplies.setId("voice-auto-read");
+        speakReplies.setSelected(preferences.getBoolean("voiceAutoRead", false));
+        speakReplies.selectedProperty().addListener((_, _, enabled) -> preferences.putBoolean("voiceAutoRead", enabled));
         setPadding(new Insets(20));
         getStyleClass().add("ai-interaction-panel");
         Label title = new Label("Your trading & investment assistant");
@@ -95,9 +99,11 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         clear.setOnAction(_ -> { assistant.reset(conversation); cancelSpeech(); clearScreenshot(); lastReply = ""; replay.setDisable(true); messages.getChildren().clear(); welcome(); });
         microphone.setOnAction(_ -> toggleRecording());
         replay.setDisable(true); replay.setOnAction(_ -> speak(lastReply));
-        Button stopAudio ,capture;
-        stopAudio= new Button("Stop audio"); stopAudio.setOnAction(_ -> { cancelSpeech(); status.setText("Audio stopped."); });
-        capture = new Button("Take screenshot");
+        replay.setId("voice-read-aloud");
+        stopAudioButton.setId("voice-stop");
+        stopAudioButton.setDisable(true);
+        stopAudioButton.setOnAction(_ -> { stopAudio(); status.setText("Audio stopped."); });
+        Button capture = new Button("Take screenshot");
         capture.setOnAction(_ -> {
             capture.setDisable(true); status.setText("Capturing InvestPro…");
             worker.execute(() -> {
@@ -130,7 +136,7 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         Button removeScreenshot = new Button("Remove screenshot"); removeScreenshot.setOnAction(_ -> clearScreenshot());
         screenshotPreview.setFitWidth(300); screenshotPreview.setFitHeight(150); screenshotPreview.setPreserveRatio(true);
         screenshotPreview.setVisible(false); screenshotPreview.setManaged(false);
-        actions = new FlowPane(10, 8, send, clear, microphone, speakReplies, volumeControl, replay, stopAudio, capture, telegramScreenshot, removeScreenshot);
+        actions = new FlowPane(10, 8, send, clear, microphone, speakReplies, volumeControl, replay, stopAudioButton, capture, telegramScreenshot, removeScreenshot);
         Label context = new Label("Ask for trades, order cancellation or bot pause/resume. Review the action, then enter /confirm CODE to execute. Speak records up to 60 seconds; the transcript is editable before sending. Voice is AI-generated.");
         context.setWrapText(true);
         VBox composer = new VBox(9, screenshotPreview, question, actions, context);
@@ -172,7 +178,6 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         if (prompt.isBlank() && png != null) prompt = "Explain what is visible in this InvestPro screenshot.";
         if (closed || send.isDisabled() || prompt.isBlank()) return;
         if (prompt.length() > 6000) { status.setText("Please shorten your question to 6000 characters."); return; }
-        cancelSpeech();
         message("You", prompt); question.clear();
         Label reply = message("InvestPro", "Connecting…");
         send.setDisable(true); clear.setDisable(true);
@@ -192,7 +197,8 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
                 if (closed) return;
                 reply.setText(completed); send.setDisable(false); clear.setDisable(false);
                 if (png != null && attachedScreenshot == png) clearScreenshot();
-                lastReply = completed; replay.setDisable(completed.isBlank());
+                lastReply = completed; updateSpeechControls();
+                addMessageReadAloud(reply, completed);
                 progress.setVisible(false); progress.setManaged(false);
                 status.setText(assistant.isConfigured() ? "Ready · OpenAI" : "Set OPENAI_API_KEY to enable answers");
                 question.requestFocus();
@@ -215,23 +221,46 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
             });
         }
     }
+    private void addMessageReadAloud(Label body, String completeResponse) {
+        if (completeResponse == null || completeResponse.isBlank()) return;
+        VBox card = (VBox) body.getParent();
+        HBox header = (HBox) card.getChildren().getFirst();
+        Button read = new Button("Read Aloud");
+        read.setAccessibleText("Read this complete assistant response aloud");
+        read.setOnAction(_ -> speak(completeResponse));
+        header.getChildren().add(read);
+    }
+
+    private void updateSpeechControls() {
+        replay.setText(speaking ? "Restart" : "Read Aloud");
+        replay.setDisable(closed || lastReply.isBlank());
+        stopAudioButton.setDisable(!speaking);
+    }
+
+    private void finishSpeech(long request, String message) {
+        if (closed || request != speechRequest) return;
+        speaking = false;
+        updateSpeechControls();
+        status.setText(message);
+    }
+
     private void speak(String text) {
         if (closed || text == null || text.isBlank()) return;
         cancelSpeech();
         long request = speechRequest;
+        speaking = true; updateSpeechControls();
         status.setText("Preparing spoken reply…");
         speechTask = speechWorker.submit(() -> {
             try {
                 if (!closed && request == speechRequest) voice.speak(text, () -> Platform.runLater(() -> {
                     if (!closed && request == speechRequest) status.setText("Reading reply aloud…");
                 }));
-                Platform.runLater(() -> { if (!closed && request == speechRequest) status.setText("Spoken reply finished."); });
+                Platform.runLater(() -> finishSpeech(request, "Spoken reply finished."));
             } catch (Exception error) {
                 String reason = error instanceof javax.sound.sampled.LineUnavailableException || error instanceof IllegalArgumentException
                         ? "Speaker output unavailable. Check your default audio device and volume."
-                        : error instanceof java.io.IOException || error instanceof IllegalStateException ? error.getMessage()
-                        : "Speech playback failed (" + error.getClass().getSimpleName() + ").";
-                Platform.runLater(() -> { if (!closed && request == speechRequest) status.setText(reason); });
+                        : "Could not read the reply. Check your audio device, network and OpenAI configuration, then try again.";
+                Platform.runLater(() -> finishSpeech(request, reason));
             }
         });
     }
@@ -243,6 +272,7 @@ public final class AiInteractionPanel extends BorderPane implements AutoCloseabl
         if (speechTask != null) { speechTask.cancel(true); speechTask = null; }
         speechWorker.purge();
         voice.stopSpeaking();
+        speaking = false; updateSpeechControls();
     }
     private void clearScreenshot() {
         attachedScreenshot = null; screenshotPreview.setImage(null); screenshotPreview.setVisible(false);

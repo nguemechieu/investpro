@@ -36,6 +36,74 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class PollingExchangeStreamerTest {
+    @Test void fortyCoinbaseCandlePollsStartAtDifferentTimesAndRestartResetsPhase() throws Exception {
+        var exchange = coinbase(false, false);
+        var scheduler = scheduler(mock(ScheduledFuture.class));
+        var streamer = new PollingExchangeStreamer(exchange, () -> scheduler);
+        var consumer = mock(ExchangeStreamConsumer.class);
+        for (int index = 0; index < 40; index++)
+            streamer.streamCandles(new TradePair("ASSET" + index, "USD"), 60, consumer);
+        var delays = ArgumentCaptor.forClass(Long.class);
+        verify(scheduler, times(40)).scheduleAtFixedRate(any(Runnable.class), delays.capture(), eq(60L), eq(TimeUnit.SECONDS));
+        assertEquals(java.util.stream.LongStream.range(0, 40).boxed().toList(), delays.getAllValues());
+        streamer.stopAll();
+        clearInvocations(scheduler);
+        streamer.streamCandles(new TradePair("BTC", "USD"), 60, consumer);
+        verify(scheduler).scheduleAtFixedRate(any(Runnable.class), eq(0L), eq(60L), eq(TimeUnit.SECONDS));
+        streamer.stopAll();
+    }
+    @Test void unfinishedOrderPollCannotOverlapAndStoppedPollCannotDeliverLateSnapshot() {
+        var exchange = mock(Exchange.class);
+        when(exchange.getName()).thenReturn("Test");
+        when(exchange.canUseCapability(ExchangeFeature.OPEN_ORDERS)).thenReturn(true);
+        var response = new CompletableFuture<List<org.investpro.models.trading.OpenOrder>>();
+        when(exchange.fetchAllOpenOrders()).thenReturn(response);
+        var task = mock(ScheduledFuture.class);
+        var scheduler = scheduler(task);
+        var consumer = mock(ExchangeStreamConsumer.class);
+        var streamer = new PollingExchangeStreamer(exchange, () -> scheduler);
+        streamer.streamOrders(consumer);
+        var poll = ArgumentCaptor.forClass(Runnable.class);
+        verify(scheduler).scheduleAtFixedRate(poll.capture(), eq(0L), eq(20L), eq(TimeUnit.SECONDS));
+        poll.getValue().run(); poll.getValue().run();
+        verify(exchange).fetchAllOpenOrders();
+        streamer.stopAll();
+        response.complete(List.of());
+        verifyNoInteractions(consumer);
+    }
+
+    @Test void oandaBatchesSubscribersSkipsOverlappingRequestsAndNeverPollsDepth() throws Exception {
+        var exchange = mock(org.investpro.exchange.oanda.Oanda.class);
+        when(exchange.getName()).thenReturn("OANDA");
+        var eur = new TradePair("EUR", "USD");
+        var gbp = new TradePair("GBP", "USD");
+        var response = new CompletableFuture<Map<String, Ticker>>();
+        when(exchange.getLatestPrices(anyList())).thenReturn(response);
+        var task = mock(ScheduledFuture.class);
+        var scheduler = scheduler(task);
+        var streamer = new PollingExchangeStreamer(exchange, () -> scheduler);
+        var first = mock(ExchangeStreamConsumer.class);
+        var second = mock(ExchangeStreamConsumer.class);
+        streamer.streamTicker(eur, first);
+        streamer.streamTicker(gbp, first);
+        streamer.streamTicker(eur, second);
+        streamer.streamOrderBook(eur, first);
+        var poll = ArgumentCaptor.forClass(Runnable.class);
+        verify(scheduler).scheduleAtFixedRate(poll.capture(), eq(0L), eq(30L), eq(TimeUnit.SECONDS));
+        poll.getValue().run(); poll.getValue().run();
+        verify(exchange).getLatestPrices(List.of(eur, gbp));
+        verify(exchange, never()).getLivePrice(any());
+        verify(exchange, never()).fetchOrderBook(any());
+        var eurQuote = new Ticker();
+        var gbpQuote = new Ticker();
+        response.complete(Map.of("EUR_USD", eurQuote, "GBP_USD", gbpQuote));
+        verify(first).onTicker("OANDA", eur, eurQuote);
+        verify(first).onTicker("OANDA", gbp, gbpQuote);
+        verify(second).onTicker("OANDA", eur, eurQuote);
+        streamer.stopAll();
+        verify(task).cancel(false);
+    }
+
     @Test
     void candlePollingDeliversQuoteBeforeLatestClosedCandleAndStopsCleanly() throws Exception {
         Exchange exchange = mock(Exchange.class);
@@ -171,7 +239,7 @@ class PollingExchangeStreamerTest {
 
     private ScheduledExecutorService scheduler(ScheduledFuture<?> future) {
         ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
-        doReturn(future).when(scheduler).scheduleAtFixedRate(any(Runnable.class), eq(0L), anyLong(), eq(TimeUnit.SECONDS));
+        doReturn(future).when(scheduler).scheduleAtFixedRate(any(Runnable.class), anyLong(), anyLong(), eq(TimeUnit.SECONDS));
         return scheduler;
     }
 
@@ -217,7 +285,7 @@ class PollingExchangeStreamerTest {
         streamer.streamTicker(pair, consumer);
         streamer.streamOrderBook(pair, consumer);
         ArgumentCaptor<Runnable> tasks = ArgumentCaptor.forClass(Runnable.class);
-        verify(scheduler, times(2)).scheduleAtFixedRate(tasks.capture(), eq(0L), anyLong(), eq(TimeUnit.SECONDS));
+        verify(scheduler, times(2)).scheduleAtFixedRate(tasks.capture(), anyLong(), anyLong(), eq(TimeUnit.SECONDS));
         tasks.getAllValues().forEach(Runnable::run);
         verify(consumer).onTicker("Coinbase", pair, ticker);
         verify(consumer, never()).onError(anyString(), any());
@@ -243,7 +311,7 @@ class PollingExchangeStreamerTest {
         streamer.streamPositions(consumer);
         streamer.streamPositions(consumer);
         ArgumentCaptor<Runnable> tasks = ArgumentCaptor.forClass(Runnable.class);
-        verify(scheduler, times(3)).scheduleAtFixedRate(tasks.capture(), eq(0L), anyLong(), eq(TimeUnit.SECONDS));
+        verify(scheduler, times(3)).scheduleAtFixedRate(tasks.capture(), anyLong(), anyLong(), eq(TimeUnit.SECONDS));
         tasks.getAllValues().forEach(Runnable::run);
         verify(exchange).fetchAllPositions();
         verify(exchange).fetchAllOpenOrders();

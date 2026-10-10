@@ -4,17 +4,16 @@ import java.util.concurrent.*;
 
 /** Bounded workers for UI-initiated reads. Saturation never runs work on the caller thread. */
 public final class UiBackgroundTasks {
-    private static final ThreadPoolExecutor WORKERS = new ThreadPoolExecutor(4, 4, 30, TimeUnit.SECONDS,
-            new ArrayBlockingQueue<>(64), runnable -> {
-                Thread thread = new Thread(runnable, "ui-background-load");
-                thread.setDaemon(true);
-                return thread;
-            }, new ThreadPoolExecutor.AbortPolicy());
+    private static final ThreadPoolExecutor WORKERS = org.investpro.core.concurrent.AppExecutors.IO;
 
     private UiBackgroundTasks() {}
 
     public static <T> CompletableFuture<T> submit(Callable<T> operation) {
         return submit(WORKERS, operation);
+    }
+
+    public static <T> CompletableFuture<T> marketData(Callable<T> operation) {
+        return submit(org.investpro.core.concurrent.AppExecutors.MARKET_DATA, operation);
     }
 
     static <T> CompletableFuture<T> submit(ThreadPoolExecutor executor, Callable<T> operation) {

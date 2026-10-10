@@ -28,7 +28,7 @@ public final class IbkrContractSearchController {
         TextInputDialog input = new TextInputDialog();
         input.setTitle("IBKR Contract Search");
         input.setHeaderText("Search IBKR contracts");
-        input.setContentText("Symbol");
+        input.setContentText("Symbol or contract ID (conId)");
         input.showAndWait()
                 .map(String::trim)
                 .filter(value -> !value.isBlank())
@@ -76,7 +76,8 @@ public final class IbkrContractSearchController {
     private void addResolvedContract(IbkrResolvedContract contract) {
         try {
             TradePair pair = TradePair.fromSymbol(contract.symbol() + "_" + contract.currency());
-            pair.setNativeSymbol(contract.userFriendlySymbol());
+            pair.setNativeSymbol(String.valueOf(contract.conId()));
+            pair.setDisplaySymbol(contract.userFriendlySymbol());
             addToMarketWatch.accept(pair);
             showInfo("Resolved " + contract.userFriendlySymbol() + " as IBKR conId " + contract.conId() + ".");
         } catch (SQLException | ClassNotFoundException exception) {

@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class IbkrClientPortalClient {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder().build();
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(10)).build();
     private static final String DEFAULT_CLIENT_PORTAL_URL = "https://localhost:5000/v1/api";
     private static final long AUTH_STATUS_CACHE_SECONDS = 15L;
     private static final long TICKLE_REFRESH_SECONDS = 55L;
@@ -167,7 +167,7 @@ public final class IbkrClientPortalClient {
                 return Optional.empty();
             }
 
-            String path = "/iserver/marketdata/snapshot?conids=%s&fields=31,84,85,86,88,70,71,87"
+            String path = "/iserver/marketdata/snapshot?conids=%s&fields=31,84,85,86,88,70,71,87,6509"
                     .formatted(url(conid));
             HttpResponse<String> response = HTTP_CLIENT.send(
                     request(path).GET().build(),
@@ -186,11 +186,23 @@ public final class IbkrClientPortalClient {
             double low = firstDouble(tickerNode, "71", "low", "lowPrice");
             double volume = firstDouble(tickerNode, "87", "volume");
             double mid = positiveOr(last, bid > 0 && ask > 0 ? (bid + ask) / 2.0 : 0.0);
-            if (mid <= 0.0) {
+            if (!Double.isFinite(last) || !Double.isFinite(bid) || !Double.isFinite(ask) || last < 0 || bid < 0 || ask < 0 || !Double.isFinite(mid) || mid <= 0.0 || (bid > 0 && ask > 0 && bid > ask)) {
                 return Optional.empty();
             }
 
-            return Optional.of(new Ticker(mid, bid, ask, mid, high, low, volume, System.currentTimeMillis()));
+            long updated = tickerNode.path("_updated").asLong(0);
+            String availability = tickerNode.path("6509").asText("");
+            if (updated <= 0 || availability.isEmpty()) return Optional.empty();
+            Ticker ticker = new Ticker(last, bid, ask, 0, high, low, volume, updated);
+            ticker.setQuoteType(switch (availability.charAt(0)) {
+                case 'R' -> Ticker.QuoteType.LIVE;
+                case 'D' -> Ticker.QuoteType.DELAYED;
+                case 'Z' -> Ticker.QuoteType.FROZEN;
+                case 'Y' -> Ticker.QuoteType.DELAYED_FROZEN;
+                default -> null;
+            });
+            if (ticker.getQuoteType() == null) return Optional.empty();
+            return Optional.of(ticker);
         } catch (Exception exception) {
             log.debug("Unable to fetch IBKR live ticker for {}: {}", tradePair, exception.getMessage());
             return Optional.empty();
@@ -237,14 +249,14 @@ public final class IbkrClientPortalClient {
             }
 
             OrderBook orderBook = new OrderBook(tradePair);
-            if (bid > 0.0) {
-                orderBook.setBids(List.of(new OrderBook.PriceLevel(bid, Math.max(1.0, bidSize), 1)));
+            if (Double.isFinite(bid) && bid > 0.0 && Double.isFinite(bidSize) && bidSize > 0) {
+                orderBook.setBids(List.of(new OrderBook.PriceLevel(bid, bidSize, 1)));
             }
-            if (ask > 0.0) {
-                orderBook.setAsks(List.of(new OrderBook.PriceLevel(ask, Math.max(1.0, askSize), 1)));
+            if (Double.isFinite(ask) && ask > 0.0 && Double.isFinite(askSize) && askSize > 0) {
+                orderBook.setAsks(List.of(new OrderBook.PriceLevel(ask, askSize, 1)));
             }
             orderBook.setTimestamp(Instant.now());
-            orderBook.setSequence("ibkr-live-" + System.currentTimeMillis());
+            orderBook.setSequence("ibkr-top-of-book-snapshot-" + System.currentTimeMillis());
             return Optional.of(orderBook);
         } catch (Exception exception) {
             log.debug("Unable to fetch IBKR live order book for {}: {}", tradePair, exception.getMessage());
@@ -281,14 +293,14 @@ public final class IbkrClientPortalClient {
             }
 
             OrderBook orderBook = new OrderBook(tradePair);
-            if (bid > 0.0) {
-                orderBook.setBids(List.of(new OrderBook.PriceLevel(bid, Math.max(1.0, bidSize), 1)));
+            if (Double.isFinite(bid) && bid > 0.0 && Double.isFinite(bidSize) && bidSize > 0) {
+                orderBook.setBids(List.of(new OrderBook.PriceLevel(bid, bidSize, 1)));
             }
-            if (ask > 0.0) {
-                orderBook.setAsks(List.of(new OrderBook.PriceLevel(ask, Math.max(1.0, askSize), 1)));
+            if (Double.isFinite(ask) && ask > 0.0 && Double.isFinite(askSize) && askSize > 0) {
+                orderBook.setAsks(List.of(new OrderBook.PriceLevel(ask, askSize, 1)));
             }
             orderBook.setTimestamp(Instant.now());
-            orderBook.setSequence("ibkr-live-" + conid + "-" + System.currentTimeMillis());
+            orderBook.setSequence("ibkr-top-of-book-snapshot-" + conid + "-" + System.currentTimeMillis());
             return Optional.of(orderBook);
         } catch (Exception exception) {
             log.debug("Unable to fetch IBKR live order book for {}: {}", contract.userFriendlySymbol(),
@@ -302,7 +314,7 @@ public final class IbkrClientPortalClient {
             return Optional.empty();
         }
         try {
-            String path = "/iserver/marketdata/snapshot?conids=%s&fields=31,84,85,86,88,70,71,87"
+            String path = "/iserver/marketdata/snapshot?conids=%s&fields=31,84,85,86,88,70,71,87,6509"
                     .formatted(url(conid));
             HttpResponse<String> response = HTTP_CLIENT.send(
                     request(path).GET().build(),
@@ -321,10 +333,22 @@ public final class IbkrClientPortalClient {
             double low = firstDouble(tickerNode, "71", "low", "lowPrice");
             double volume = firstDouble(tickerNode, "87", "volume");
             double mid = positiveOr(last, bid > 0 && ask > 0 ? (bid + ask) / 2.0 : 0.0);
-            if (mid <= 0.0) {
+            if (!Double.isFinite(last) || !Double.isFinite(bid) || !Double.isFinite(ask) || last < 0 || bid < 0 || ask < 0 || !Double.isFinite(mid) || mid <= 0.0 || (bid > 0 && ask > 0 && bid > ask)) {
                 return Optional.empty();
             }
-            return Optional.of(new Ticker(mid, bid, ask, mid, high, low, volume, System.currentTimeMillis()));
+            long updated = tickerNode.path("_updated").asLong(0);
+            String availability = tickerNode.path("6509").asText("");
+            if (updated <= 0 || availability.isEmpty()) return Optional.empty();
+            Ticker ticker = new Ticker(last, bid, ask, 0, high, low, volume, updated);
+            ticker.setQuoteType(switch (availability.charAt(0)) {
+                case 'R' -> Ticker.QuoteType.LIVE;
+                case 'D' -> Ticker.QuoteType.DELAYED;
+                case 'Z' -> Ticker.QuoteType.FROZEN;
+                case 'Y' -> Ticker.QuoteType.DELAYED_FROZEN;
+                default -> null;
+            });
+            if (ticker.getQuoteType() == null) return Optional.empty();
+            return Optional.of(ticker);
         } catch (Exception exception) {
             log.debug("Unable to fetch IBKR live ticker for conid {}: {}", conid, exception.getMessage());
             return Optional.empty();
@@ -378,8 +402,9 @@ public final class IbkrClientPortalClient {
             return Optional.empty();
         }
 
-        if (!candidate.hasConId() && "CASH".equalsIgnoreCase(candidate.secType())) {
-            return Optional.of(resolvedFromCandidate(candidate));
+        if (!candidate.hasConId()) {
+            log.debug("ibkr.contract.unresolved: no broker conId for {}", candidate.symbol());
+            return Optional.empty();
         }
 
         List<String> paths = new ArrayList<>();
@@ -598,9 +623,8 @@ public final class IbkrClientPortalClient {
     }
 
     private IbkrResolvedContract resolvedFromCandidate(IbkrContractCandidate candidate) {
-        long conId = candidate.conId() == null || candidate.conId() <= 0
-                ? Math.abs((candidate.symbol() + candidate.currency() + candidate.secType()).hashCode())
-                : candidate.conId();
+        if (!candidate.hasConId()) throw new IbkrMarketDataException("A real IBKR broker conId is required");
+        long conId = candidate.conId();
         Instant now = Instant.now();
         String secType = firstNonBlank(candidate.secType(), candidate.securityType().ibkrCode());
         return new IbkrResolvedContract(
@@ -672,6 +696,7 @@ public final class IbkrClientPortalClient {
     private HttpRequest.Builder requestForBase(String baseUrl, String path) {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + path))
+                .timeout(java.time.Duration.ofSeconds(15))
                 .header("Accept", "application/json")
                 .header("User-Agent", "InvestPro/1.0");
         String token = bearerToken();

@@ -1,0 +1,7 @@
+org\investpro\core\TelegramNotifier$PollResult.class
+org\investpro\exchange\kraken\KrakenCandleDataSupplier.class
+org\investpro\core\TelegramNotifier$ApiResult.class
+org\investpro\exchange\ManualOrderSubmission.class
+org\investpro\exchange\binanceus\BinanceUs$BinanceUsApiException.class
+org\investpro\exchange\ManualOrderSubmission$Type.class
+org\investpro\backtesting\BacktestDataValidation.class

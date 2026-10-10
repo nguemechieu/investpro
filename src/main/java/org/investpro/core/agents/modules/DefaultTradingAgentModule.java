@@ -80,9 +80,10 @@ public class DefaultTradingAgentModule implements AgentModule {
     }
 
     private RiskReviewer createRiskReviewer(@NotNull SystemCoreDependencies dependencies) {
-        return request -> CompletableFuture.supplyAsync(() -> {
+        return request -> org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.TRADING,
+                () -> buildRiskContext(dependencies, request.getSignal())).thenCompose(riskContext ->
+                org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.RISK, () -> {
             StrategySignal signal = request.getSignal();
-            TradeRiskContext riskContext = buildRiskContext(dependencies, signal);
             RiskDecision decision = dependencies.riskManagementSystem().evaluateTrade(riskContext);
 
             if (!decision.canProceed()) {
@@ -109,7 +110,7 @@ public class DefaultTradingAgentModule implements AgentModule {
                     .warnings(decision.getWarnings())
                     .metadata(java.util.Map.of("riskDecision", decision, "riskContext", riskContext))
                     .build();
-        });
+        }));
     }
 
     private TradeRiskContext buildRiskContext(

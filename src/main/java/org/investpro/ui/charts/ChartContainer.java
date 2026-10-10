@@ -589,7 +589,7 @@ public class ChartContainer extends Region {
         if (candleStickChart == null) candleChartContainer.getChildren().setAll(new javafx.scene.control.Label("Loading chart…"));
         var supplierTask = new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<PreparedChart>>();
         chartPreparation = tradingServiceReady.thenCompose(service -> {
-            var task = org.investpro.ui.utils.UiBackgroundTasks.submit(() -> {
+            var task = org.investpro.ui.utils.UiBackgroundTasks.marketData(() -> {
                 if (disposed || request != chartRequest) throw new java.util.concurrent.CancellationException();
                 CandleDataSupplier supplier = exchange.getCandleDataSupplier(durationSeconds, tradePair);
                 if (supplier == null) throw new IllegalStateException("Candle data is unavailable for " + tradePair);

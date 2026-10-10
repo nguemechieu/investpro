@@ -8,6 +8,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class SimulatorTest {
+    @Test void rejectsSignalsOutsideTheHistoricalWindow() {
+        assertThrows(IllegalArgumentException.class, () -> simulator(config(), List.of(buy(-1))).run(List.of(candle(100))));
+        assertThrows(IllegalArgumentException.class, () -> simulator(config(), List.of(buy(1))).run(List.of(candle(100))));
+    }
+    private int timestampOffset;
     @Test
     void feesAreChargedOnNotionalAndTradeProfitMatchesAccountProfit() {
         BacktestConfig config = config();
@@ -61,6 +66,6 @@ class SimulatorTest {
     }
 
     private CandleData candle(double price) {
-        return new CandleData(price, price, price, price, 1_600_000_000, 100);
+        return new CandleData(price, price, price, price, 1_600_000_000 + timestampOffset++ * 3600, 100);
     }
 }

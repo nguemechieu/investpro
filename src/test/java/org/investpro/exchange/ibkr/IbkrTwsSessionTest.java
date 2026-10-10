@@ -44,6 +44,7 @@ class IbkrTwsSessionTest {
             first.completeExceptionally(new java.util.concurrent.TimeoutException());
             var second = session.ticker(contract);
             callback(session, "error", socket.quoteId, 0L, 10089, "Additional subscription required. Delayed market data is available.", "");
+            callback(session, "error", socket.quoteId, 0L, 10167, "Requested market data is not subscribed. Displaying delayed market data.", "");
             assertFalse(second.isDone());
             callback(session, "tickPrice", socket.quoteId, 66, 200.0, null);
             callback(session, "tickPrice", socket.quoteId, 67, 201.0, null);
@@ -70,7 +71,10 @@ class IbkrTwsSessionTest {
         waiters.put(42, waiter);
         field(session, "quoteWaiters", waiters);
         callback(session, "error", 42, 10089, "Additional subscription required; no delayed data.", "");
-        assertTrue(waiter.isCompletedExceptionally());
+        assertTrue(waiter.isCompletedExceptionally());        var disabled = new java.util.concurrent.CompletableFuture<Ticker>();
+        waiters.put(43, disabled);
+        callback(session, "error", 43, 10186, "Requested market data is not subscribed. Delayed market data is not enabled.", "");
+        assertTrue(disabled.isCompletedExceptionally());
     }
 
     @Test void historicalSubscriptionFailureProvidesGuidanceWithoutDisconnecting() throws Exception {
@@ -149,5 +153,20 @@ class IbkrTwsSessionTest {
         field(session, "pendingOrders", pending);
         callback(session, "error", 100, 0L, 201, "Order rejected", "");
         assertTrue(result.isCompletedExceptionally());
+    }
+    @Test void rejectedSubscriptionInvalidatesAnAlreadyCompletedQuote() throws Exception {
+        IbkrTwsSession session = session();
+        var prices = new java.util.concurrent.ConcurrentHashMap<Integer, double[]>();
+        double[] cached = {100, 101, 100.5, System.currentTimeMillis()};
+        prices.put(42, cached);
+        field(session, "quotes", prices);
+        var waiters = new java.util.concurrent.ConcurrentHashMap<Integer, java.util.concurrent.CompletableFuture<Ticker>>();
+        waiters.put(42, java.util.concurrent.CompletableFuture.completedFuture(new Ticker(100.5, 100, 101, 0, System.currentTimeMillis())));
+        field(session, "quoteWaiters", waiters);
+        assertTrue(session.state().marketDataPermissionAvailable());
+        callback(session, "error", 42, 354, "Not subscribed");
+        assertArrayEquals(new double[4], cached);
+        assertTrue(waiters.get(42).isCompletedExceptionally());
+        assertFalse(session.state().marketDataPermissionAvailable());
     }
 }

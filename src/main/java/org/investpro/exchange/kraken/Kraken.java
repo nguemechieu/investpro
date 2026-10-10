@@ -48,23 +48,33 @@ import static org.investpro.exchange.oanda.Oanda.OBJECT_MAPPER;
 public class Kraken extends Exchange {
 
     private static final String KRAKEN_REST_URL = "https://api.kraken.com";
-    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+    private final HttpClient httpClient;
+    private final String restUrl;
+    private volatile boolean connected;
+    private volatile boolean authenticated;
+    private volatile boolean streamConnected;
+    private final org.investpro.exchange.infrastructure.PollingExchangeStreamer polling = new org.investpro.exchange.infrastructure.PollingExchangeStreamer(this);
     private static final String API_KEY_HEADER = "API-Key";
     private static final String API_SIGN_HEADER = "API-Sign";
     private final AtomicLong nonceCounter = new AtomicLong(System.currentTimeMillis() * 1000L);
 
     public Kraken(ExchangeCredentials exchangeCredentials) {
+        this(exchangeCredentials, HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(10)).build(), KRAKEN_REST_URL);
+    }
+    Kraken(ExchangeCredentials exchangeCredentials, HttpClient client, String baseUrl) {
         super(exchangeCredentials);
+        httpClient = Objects.requireNonNull(client);
+        restUrl = Objects.requireNonNull(baseUrl);
     }
 
     @Override
     public void buy(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss, double takeProfit, double slippage) {
-
+        if (!supportsMarketType(marketType) || stopLoss > 0 || takeProfit > 0) throw new UnsupportedOperationException("Kraken protected legacy entries are not implemented"); createMarketOrder(tradePair, Side.BUY, size).join();
     }
 
     @Override
     public void sell(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss, double takeProfit, double slippage) {
-
+        if (!supportsMarketType(marketType) || stopLoss > 0 || takeProfit > 0) throw new UnsupportedOperationException("Kraken protected legacy entries are not implemented"); createMarketOrder(tradePair, Side.SELL, size).join();
     }
 
     @Override
@@ -105,32 +115,32 @@ public class Kraken extends Exchange {
 
     @Override
     public String getTimestamp() {
-        return "";
+        return Instant.now().toString();
     }
 
     @Override
     public Instant now() {
-        return null;
+        return Instant.now();
     }
 
     @Override
     public boolean supportsMarketType(MARKET_TYPES marketType) {
-        return false;
+        return marketType == MARKET_TYPES.SPOT || marketType == MARKET_TYPES.CRYPTO;
     }
 
     @Override
     public List<MARKET_TYPES> getSupportedMarketTypes() {
-        return List.of();
+        return List.of(MARKET_TYPES.SPOT, MARKET_TYPES.CRYPTO);
     }
 
     @Override
     public @NotNull ExchangeCapability getCapability() {
-        return null;
+        return ExchangeCapability.builder().exchangeId(getExchangeId()).exchangeName(getName()).displayName(getName()).apiBaseUrl(restUrl).authenticationType("API_KEY").supportsSpot(true).supportsCrypto(true).supportsLiveTrading(true).supportsPaperTradingMode(true).supportsAccountInfo(true).supportsBalances(true).supportsMarketOrders(true).supportsLimitOrders(true).supportsStopOrders(true).supportsOpenOrders(true).supportsTicker(true).supportsTickers(true).supportsHistoricalCandles(true).supportsOrderBook(true).supportsPollingFallback(true).supportsStreamingPrices(true).build();
     }
 
     @Override
     public AuthCheckResult checkAuthentication() {
-        return null;
+        return AuthCheckResult.builder().exchangeName(getName()).success(authenticated).credentialIssue(!hasLiveCredentials()).endpointTested("/0/private/Balance").message(authenticated ? "Kraken private access verified" : "Kraken private access not verified").checkedAt(Instant.now()).build();
     }
 
     @Override
@@ -140,12 +150,12 @@ public class Kraken extends Exchange {
 
     @Override
     public boolean supportsPaperTradingMode() {
-        return false;
+        return true;
     }
 
     @Override
     public boolean supportsOrderBook() {
-        return false;
+        return true;
     }
 
     @Override
@@ -190,7 +200,7 @@ public class Kraken extends Exchange {
 
     @Override
     public boolean supportsCrypto() {
-        return false;
+        return true;
     }
 
     @Override
@@ -240,43 +250,12 @@ public class Kraken extends Exchange {
 
     @Override
     public AuthResult AuthCheckResult(String selectedExchange) {
-        if (isPaperTrading()) {
-            return AuthResult.success("Kraken paper trading mode enabled.");
-        }
-
-        ExchangeCredentials credentials = getCredentials();
-        if (credentials == null || credentials.apiKey() == null || credentials.apiKey().isBlank()) {
-            return AuthResult.failure("Kraken API key is missing.");
-        }
-        if (credentials.apiSecret() == null || credentials.apiSecret().isBlank()) {
-            return AuthResult.failure("Kraken API secret is missing.");
-        }
-
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(KRAKEN_REST_URL + "/0/public/SystemStatus"))
-                    .header("Accept", "application/json")
-                    .GET()
-                    .build();
-            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                JsonNode root = OBJECT_MAPPER.readTree(response.body());
-                JsonNode status = root.path("result").path("status");
-                if (!status.isMissingNode() && !status.asText("").isBlank()) {
-                    return AuthResult.success("Kraken connectivity verified. System status: " + status.asText());
-                }
-                return AuthResult.success("Kraken connectivity verified.");
-            }
-            return AuthResult.failure("Kraken connectivity check failed (HTTP " + response.statusCode() + ").");
-        } catch (Exception exception) {
-            log.warn("Kraken auth/connectivity check failed", exception);
-            return AuthResult.failure("Kraken connectivity check failed: " + exception.getMessage());
-        }
+        authenticated = false; if (isPaperTrading()) return AuthResult.success("Local paper trading enabled; private access is not authenticated."); if (!hasLiveCredentials()) return AuthResult.failure("Kraken API key and secret are required."); try { postPrivate("/0/private/Balance", Map.of()); authenticated = true; return AuthResult.success("Kraken private account access verified."); } catch (Exception error) { return AuthResult.failure("Kraken authentication failed: " + error.getMessage()); }
     }
 
     @Override
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
-        return null;
+        var pairs = getTradePairSymbol(); return pairs.isEmpty() ? null : pairs.getFirst();
     }
 
     @Override
@@ -285,11 +264,12 @@ public class Kraken extends Exchange {
 
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(KRAKEN_REST_URL + "/0/public/AssetPairs"))
+                    .uri(URI.create(restUrl + "/0/public/AssetPairs"))
+                    .timeout(java.time.Duration.ofSeconds(15))
                     .header("Accept", "application/json")
                     .GET()
                     .build();
-            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 return pairs;
@@ -332,12 +312,12 @@ public class Kraken extends Exchange {
 
     @Override
     public List<TradePair> getTradablePairs() throws SQLException, ClassNotFoundException {
-        return List.of();
+        return getTradePairSymbol();
     }
 
     @Override
     public boolean supportsTradePair(TradePair tradePair) {
-        return false;
+        return tradePair != null && getTradePairSymbol().stream().anyMatch(pair -> pair.toString('/').equalsIgnoreCase(tradePair.toString('/')));
     }
 
     @Override
@@ -352,21 +332,22 @@ public class Kraken extends Exchange {
         }
         try {
             String krakenPair = toKrakenPair(tradePair);
-            String url = KRAKEN_REST_URL + "/0/public/Ticker?pair=" + url(krakenPair);
+            String url = restUrl + "/0/public/Ticker?pair=" + url(krakenPair);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .timeout(java.time.Duration.ofSeconds(15))
                     .header("Accept", "application/json")
                     .GET()
                     .build();
-            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                return getLivePrice(tradePair);
+                throw new IllegalStateException("Kraken ticker request failed");
             }
 
             JsonNode root = OBJECT_MAPPER.readTree(response.body());
             JsonNode result = root.path("result");
             if (!result.isObject() || result.isEmpty()) {
-                return getLivePrice(tradePair);
+                throw new IllegalStateException("Kraken ticker request failed");
             }
 
             JsonNode tickerNode = firstObjectValue(result);
@@ -387,54 +368,54 @@ public class Kraken extends Exchange {
             return ticker;
         } catch (Exception exception) {
             log.debug("Unable to fetch Kraken ticker for {}", tradePair, exception);
-            return getLivePrice(tradePair);
+            throw new IllegalStateException("Kraken ticker request failed");
         }
     }
 
     @Override
     public CompletableFuture<Ticker> fetchTicker(TradePair tradePair) {
-        return CompletableFuture.completedFuture(getLivePrice(tradePair));
+        return CompletableFuture.supplyAsync(() -> getLivePrice(tradePair));
     }
 
     @Override
     public CompletableFuture<List<Ticker>> fetchTickers(List<TradePair> tradePairs) {
-        return null;
+        return CompletableFuture.supplyAsync(() -> tradePairs.stream().map(this::getLivePrice).toList());
     }
 
     @Override
     public CompletableFuture<List<Ticker>> getTicker(TradePair pair) {
-        return null;
+        return fetchTicker(pair).thenApply(List::of);
     }
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return null;
+        return new KrakenCandleDataSupplier(this, secondsPerCandle, tradePair);
     }
 
     @Override
     public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken fetchCandleDataForInProgressCandle is not implemented"));
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken fetchRecentTradesUntil is not implemented"));
     }
 
     @Override
     public CompletableFuture<?> getOrderBook(TradePair tradePair) {
-        return null;
+        return fetchOrderBook(tradePair);
     }
 
     @Override
     public Account getUserAccountDetails() throws ExecutionException, InterruptedException {
-        return null;
+        return fetchAccount().get();
     }
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
         if (isPaperTrading()) {
-            return fetchAccount();
+            return CompletableFuture.completedFuture(localPaperAccount());
         }
         return CompletableFuture.supplyAsync(this::fetchLiveAccountFromKraken);
     }
@@ -442,7 +423,7 @@ public class Kraken extends Exchange {
     @Override
     public CompletableFuture<Double> fetchAvailableBalance(String currencyCode) {
         if (isPaperTrading()) {
-            return fetchAvailableBalance(currencyCode);
+            return CompletableFuture.completedFuture(localPaperAccount().getAvailableBalances().getOrDefault(normalizeAssetFromKraken(currencyCode), 0.0));
         }
         String normalized = normalizeAssetFromKraken(currencyCode);
         return fetchAccount().thenApply(account -> account.getBalances().getOrDefault(normalized, 0.0));
@@ -450,55 +431,54 @@ public class Kraken extends Exchange {
 
     @Override
     public CompletableFuture<Double> fetchTotalBalance(String currencyCode) {
-        return fetchAvailableBalance(currencyCode);
+        return CompletableFuture.completedFuture(localPaperAccount().getAvailableBalances().getOrDefault(normalizeAssetFromKraken(currencyCode), 0.0));
     }
 
     @Override
     public CompletableFuture<Double> fetchEquity() {
-        return null;
+        return fetchAccount().thenApply(Account::getEquity);
     }
 
     @Override
     public CompletableFuture<Double> fetchMarginUsed() {
-        return null;
+        return fetchAccount().thenApply(Account::getMarginUsed);
     }
 
     @Override
     public CompletableFuture<Double> fetchFreeMargin() {
-        return null;
+        return fetchAccount().thenApply(Account::getFreeMargin);
     }
 
     @Override
     public CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity) {
-        return null;
+        return createMarketOrder(symbol, side, quantity);
     }
 
     @Override
     public CompletableFuture<String> placeLimitOrder(TradePair symbol, Side side, double quantity, double limitPrice) {
-        return null;
+        return createLimitOrder(symbol, side, quantity, limitPrice);
     }
 
     @Override
     public CompletableFuture<String> createOrder(Order order) throws JsonProcessingException {
-        return null;
+        if (order == null || order.getSide() == null) return failedFuture(new IllegalArgumentException("Order and side are required")); try { TradePair pair = TradePair.fromSymbol(order.getSymbol()); String type = order.getType() == null ? "MARKET" : order.getType().trim().toUpperCase(Locale.ROOT); return switch(type) { case "MARKET" -> createMarketOrder(pair, order.getSide(), order.getQuantity()); case "LIMIT" -> createLimitOrder(pair, order.getSide(), order.getQuantity(), order.getPrice()); default -> failedFuture(new UnsupportedOperationException("Unsupported Kraken order type: " + type)); }; } catch (Exception error) { return failedFuture(error); }
     }
 
     @Override
     public Order createOrder(int id, TradePair tradePair, String type, double price, double amount, Side side, double stopLoss, double takeProfit, double slippage) {
-        return null;
+        return super.createOrder((long) id, tradePair, type, price, amount, side, stopLoss, takeProfit, slippage);
     }
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
-
-        return CompletableFuture.supplyAsync(() -> submitKrakenOrder(tradePair, side, amount, null, "market"));
+        if (isPaperTrading()) return localPaperOrderExecution().createMarketOrder(tradePair, side, amount); return CompletableFuture.supplyAsync(() -> submitKrakenOrder(tradePair, side, amount, null, "market"));
     }
 
     @Override
     public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
             double limitPrice) {
         if (isPaperTrading()) {
-            return createLimitOrder(tradePair, side, amount, limitPrice);
+            return localPaperOrderExecution().createLimitOrder(tradePair, side, amount, limitPrice);
         }
         return CompletableFuture
                 .supplyAsync(() -> submitKrakenOrder(tradePair, side, amount, limitPrice, "limit"));
@@ -506,18 +486,18 @@ public class Kraken extends Exchange {
 
     @Override
     public CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice) {
-        return null;
+        if (isPaperTrading()) return localPaperOrderExecution().createStopOrder(tradePair, side, amount, stopPrice); return CompletableFuture.supplyAsync(() -> submitKrakenOrder(tradePair, side, amount, stopPrice, "stop-loss"));
     }
 
     @Override
     public CompletableFuture<String> createBracketOrder(TradePair tradePair, Side side, double amount, double entryPrice, double stopLoss, double takeProfit) {
-        return null;
+        if (isPaperTrading()) return localPaperOrderExecution().createBracketOrder(tradePair, side, amount, entryPrice, stopLoss, takeProfit); return failedFuture(new UnsupportedOperationException("Kraken bracket orders are not implemented; no entry was submitted"));
     }
 
     @Override
     public CompletableFuture<String> cancelOrder(String orderId) {
         if (isPaperTrading()) {
-            return cancelOrder(orderId);
+            return localPaperOrderExecution().cancelOrder(orderId);
         }
         if (orderId == null || orderId.isBlank()) {
             return failedFuture(new IllegalArgumentException("orderId must not be blank"));
@@ -531,30 +511,30 @@ public class Kraken extends Exchange {
 
     @Override
     public CompletableFuture<List<String>> cancelOrders(List<String> orderIds) {
-        return null;
+        Objects.requireNonNull(orderIds); var futures = orderIds.stream().map(this::cancelOrder).toList(); return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).thenApply(_ -> futures.stream().map(CompletableFuture::join).toList());
     }
 
     @Override
     public CompletableFuture<String> cancelAllOrders() {
-        return null;
+        if (isPaperTrading()) return localPaperOrderExecution().cancelAllOrders(); return CompletableFuture.supplyAsync(() -> postPrivate("/0/private/CancelAll", Map.of()).path("result").path("count").asText());
     }
 
     @Override
     public CompletableFuture<Optional<Order>> fetchOrder(String orderId) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken fetchOrder is not implemented"));
     }
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
         if (isPaperTrading()) {
-            return fetchAllOpenOrders();
+            return localPaperOrderExecution().fetchAllOpenOrders();
         }
         return CompletableFuture.supplyAsync(this::fetchKrakenOpenOrders);
     }
 
     @Override
     public CompletableFuture<List<Order>> fetchOrderHistory(TradePair tradePair, Instant since) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken fetchOrderHistory is not implemented"));
     }
 
     @Override
@@ -576,21 +556,22 @@ public class Kraken extends Exchange {
 
         try {
             String krakenPair = toKrakenPair(tradePair);
-            String url = KRAKEN_REST_URL + "/0/public/Depth?pair=" + url(krakenPair) + "&count=20";
+            String url = restUrl + "/0/public/Depth?pair=" + url(krakenPair) + "&count=20";
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .timeout(java.time.Duration.ofSeconds(15))
                     .header("Accept", "application/json")
                     .GET()
                     .build();
-            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                return fetchOrderBook(tradePair);
+                return failedFuture(new IllegalStateException("Kraken order book request failed"));
             }
 
             JsonNode root = OBJECT_MAPPER.readTree(response.body());
             JsonNode result = root.path("result");
             if (!result.isObject() || result.isEmpty()) {
-                return fetchOrderBook(tradePair);
+                return failedFuture(new IllegalStateException("Kraken order book request failed"));
             }
 
             JsonNode orderBookNode = firstObjectValue(result);
@@ -602,20 +583,49 @@ public class Kraken extends Exchange {
             return CompletableFuture.completedFuture(orderBook);
         } catch (Exception exception) {
             log.debug("Unable to fetch Kraken order book for {}", tradePair, exception);
-            return fetchOrderBook(tradePair);
+            return failedFuture(new IllegalStateException("Kraken order book request failed"));
         }
     }
 
     @Override
     public String supportsTimeframe(int secondsPerCandle) {
-        return "";
+        return KrakenCandleDataSupplier.INTERVALS.contains(secondsPerCandle) ? "SUPPORTED" : "UNSUPPORTED";
     }
 
     @Override
     public List<Timeframe> getSupportedTimeframes() {
-        return List.of();
+        return Arrays.stream(Timeframe.values()).filter(timeframe -> KrakenCandleDataSupplier.INTERVALS.contains(timeframe.getSeconds())).toList();
     }
 
+    List<org.investpro.data.CandleData> fetchCandles(TradePair pair, int seconds) {
+        if (!KrakenCandleDataSupplier.INTERVALS.contains(seconds)) throw new IllegalArgumentException("Unsupported Kraken interval");
+        try {
+            var request = HttpRequest.newBuilder(URI.create(restUrl + "/0/public/OHLC?pair=" + url(toKrakenPair(pair)) + "&interval=" + seconds / 60))
+                    .timeout(java.time.Duration.ofSeconds(15)).GET().build();
+            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) throw new IllegalStateException("Kraken OHLC HTTP " + response.statusCode());
+            var root = OBJECT_MAPPER.readTree(response.body());
+            if (!root.path("error").isEmpty()) throw new IllegalStateException("Kraken OHLC request rejected");
+            var fields = root.path("result").fields();
+            while (fields.hasNext()) {
+                var field = fields.next();
+                if (!field.getValue().isArray()) continue;
+                List<org.investpro.data.CandleData> candles = new ArrayList<>();
+                var rows = field.getValue();
+                // The last Kraken OHLC row is the uncommitted current candle.
+                for (int i = 0; i < rows.size() - 1; i++) {
+                    var row = rows.get(i);
+                    candles.add(new org.investpro.data.CandleData(row.get(1).asDouble(), row.get(4).asDouble(),
+                            row.get(2).asDouble(), row.get(3).asDouble(), row.get(0).asInt(), row.get(6).asDouble()));
+                }
+                return List.copyOf(candles);
+            }
+            throw new IllegalStateException("Kraken returned no OHLC series");
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new java.util.concurrent.CancellationException("Kraken candles cancelled");
+        } catch (Exception error) { throw new IllegalStateException("Kraken candles unavailable", error); }
+    }
     private List<OrderBook.PriceLevel> parsePriceLevels(JsonNode levelsNode) {
         List<OrderBook.PriceLevel> levels = new ArrayList<>();
         if (!levelsNode.isArray()) {
@@ -830,10 +840,12 @@ public class Kraken extends Exchange {
         if (tradePair == null) {
             throw new IllegalArgumentException("tradePair must not be null");
         }
-        if (amount <= 0.0) {
+        if (!Double.isFinite(amount) || amount <= 0.0) {
             throw new IllegalArgumentException("amount must be greater than zero");
         }
 
+        if (side != Side.BUY && side != Side.SELL) throw new IllegalArgumentException("BUY or SELL required");
+        if (!"market".equals(orderType) && (price == null || !Double.isFinite(price) || price <= 0)) throw new IllegalArgumentException("Positive finite price required");
         Map<String, String> payload = new LinkedHashMap<>();
         payload.put("pair", toKrakenPair(tradePair));
         payload.put("type", side == Side.SELL ? "sell" : "buy");
@@ -863,7 +875,8 @@ public class Kraken extends Exchange {
             String signature = sign(path, nonce, body, credentials.apiSecret());
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(KRAKEN_REST_URL + path))
+                    .uri(URI.create(restUrl + path))
+                    .timeout(java.time.Duration.ofSeconds(15))
                     .header("Accept", "application/json")
                     .header("Content-Type", "application/x-www-form-urlencoded")
                     .header(API_KEY_HEADER, credentials.apiKey().trim())
@@ -871,7 +884,7 @@ public class Kraken extends Exchange {
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
 
-            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new IllegalStateException(
                         "Kraken private request failed: HTTP " + response.statusCode() + " - " + response.body());
@@ -1029,22 +1042,22 @@ public class Kraken extends Exchange {
 
     @Override
     public void connect() {
-
+        connected = isPaperTrading() || AuthCheckResult(getName()).success();
     }
 
     @Override
     public void disconnect() {
-
+        connected = false; authenticated = false; stopAllStreams();
     }
 
     @Override
     public void reconnect() {
-
+        disconnect(); connect();
     }
 
     @Override
     public Boolean isConnected() {
-        return null;
+        return connected;
     }
 
     @Override
@@ -1064,67 +1077,67 @@ public class Kraken extends Exchange {
 
     @Override
     public CompletableFuture<List<Position>> fetchPositions(TradePair tradePair) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken fetchPositions is not implemented"));
     }
 
     @Override
     public CompletableFuture<List<Position>> fetchAllPositions() {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken fetchAllPositions is not implemented"));
     }
 
     @Override
     public CompletableFuture<Optional<Position>> fetchPosition(TradePair tradePair) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken fetchPosition is not implemented"));
     }
 
     @Override
     public CompletableFuture<String> closePosition(TradePair tradePair) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken closePosition is not implemented"));
     }
 
     @Override
     public CompletableFuture<String> closeAllPositions() {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken closeAllPositions is not implemented"));
     }
 
     @Override
     public CompletableFuture<String> closePosition(TradePair symbol, String positionId) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken closePosition is not implemented"));
     }
 
     @Override
     public CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken closePartialPosition is not implemented"));
     }
 
     @Override
     public CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken modifyStopLoss is not implemented"));
     }
 
     @Override
     public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken modifyTakeProfit is not implemented"));
     }
 
     @Override
     public CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken enableTrailingStop is not implemented"));
     }
 
     @Override
     public CompletableFuture<Boolean> validateOrder(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss, double takeProfit, double slippage) {
-        return null;
+        return CompletableFuture.completedFuture(tradePair != null && supportsMarketType(marketType) && Double.isFinite(size) && size > 0 && Double.isFinite(slippage) && slippage >= 0);
     }
 
     @Override
     public double normalizeAmount(TradePair tradePair, double amount) {
-        return 0;
+        return Double.isFinite(amount) && amount > 0 ? amount : 0;
     }
 
     @Override
     public double normalizePrice(TradePair tradePair, double price) {
-        return 0;
+        return Double.isFinite(price) && price > 0 ? price : 0;
     }
 
     @Override
@@ -1144,17 +1157,17 @@ public class Kraken extends Exchange {
 
     @Override
     public CompletableFuture<Double> fetchLeverage(TradePair tradePair) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken fetchLeverage is not implemented"));
     }
 
     @Override
     public CompletableFuture<String> setLeverage(TradePair tradePair, double leverage) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken setLeverage is not implemented"));
     }
 
     @Override
     public StreamTransport getStreamTransport() {
-        return null;
+        return StreamTransport.POLLING;
     }
 
     @Override
@@ -1169,47 +1182,47 @@ public class Kraken extends Exchange {
 
     @Override
     public boolean supportsPollingFallback() {
-        return false;
+        return true;
     }
 
     @Override
     public void connectStream() {
-
+        streamConnected = true;
     }
 
     @Override
     public void disconnectStream() {
-
+        stopAllStreams();
     }
 
     @Override
     public boolean isStreamConnected() {
-        return false;
+        return streamConnected;
     }
 
     @Override
     public void reconnectStream() {
-
+        connectStream();
     }
 
     @Override
     public void stream(ExchangeStreamSubscription subscription, ExchangeStreamConsumer consumer) {
-
+        Objects.requireNonNull(subscription); Objects.requireNonNull(consumer); for (TradePair pair : subscription.getTradePairs()) { if (subscription.isTicker()) streamTicker(pair, consumer); if (subscription.isOrderBook()) streamOrderBook(pair, consumer); if (subscription.isCandles()) streamCandles(pair, subscription.getSecondsPerCandle(), consumer); } if (hasPrivateAuthentication()) { if (subscription.isAccount() || subscription.isBalances()) polling.streamAccount(consumer); if (subscription.isOrders()) polling.streamOrders(consumer); } streamConnected = true;
     }
 
     @Override
     public void stopStreaming(ExchangeStreamSubscription subscription) {
-
+        for (TradePair pair : subscription.getTradePairs()) { if (subscription.isTicker()) polling.stopTicker(pair); if (subscription.isOrderBook()) polling.stopOrderBook(pair); if (subscription.isCandles()) polling.stopCandles(pair, subscription.getSecondsPerCandle()); } if (subscription.isAccount() || subscription.isBalances()) polling.stopAccount(); if (subscription.isOrders()) polling.stopOrders();
     }
 
     @Override
     public void stopAllStreams() {
-
+        polling.stopAll(); streamConnected = false;
     }
 
     @Override
     public void streamTicker(TradePair tradePair, ExchangeStreamConsumer consumer) {
-
+        polling.streamTicker(tradePair, consumer); streamConnected = true;
     }
 
     @Override
@@ -1224,27 +1237,27 @@ public class Kraken extends Exchange {
 
     @Override
     public void streamOrderBook(TradePair tradePair, ExchangeStreamConsumer consumer) {
-
+        polling.streamOrderBook(tradePair, consumer); streamConnected = true;
     }
 
     @Override
     public void streamCandles(TradePair tradePair, int secondsPerCandle, ExchangeStreamConsumer consumer) {
-
+        polling.streamCandles(tradePair, secondsPerCandle, consumer); streamConnected = true;
     }
 
     @Override
     public void streamAccount(ExchangeStreamConsumer consumer) {
-
+        if (hasPrivateAuthentication()) polling.streamAccount(consumer);
     }
 
     @Override
     public void streamBalances(ExchangeStreamConsumer consumer) {
-
+        if (hasPrivateAuthentication()) polling.streamAccount(consumer);
     }
 
     @Override
     public void streamOrders(ExchangeStreamConsumer consumer) {
-
+        if (hasPrivateAuthentication()) polling.streamOrders(consumer);
     }
 
     @Override
@@ -1259,7 +1272,7 @@ public class Kraken extends Exchange {
 
     @Override
     public void stopTickerStream(TradePair tradePair) {
-
+        polling.stopTicker(tradePair);
     }
 
     @Override
@@ -1269,27 +1282,27 @@ public class Kraken extends Exchange {
 
     @Override
     public void stopOrderBookStream(TradePair tradePair) {
-
+        polling.stopOrderBook(tradePair);
     }
 
     @Override
     public void stopCandlesStream(TradePair tradePair, int secondsPerCandle) {
-
+        polling.stopCandles(tradePair, secondsPerCandle);
     }
 
     @Override
     public void stopAccountStream() {
-
+        polling.stopAccount();
     }
 
     @Override
     public void stopBalancesStream() {
-
+        polling.stopAccount();
     }
 
     @Override
     public void stopOrdersStream() {
-
+        polling.stopOrders();
     }
 
     @Override
@@ -1304,16 +1317,16 @@ public class Kraken extends Exchange {
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTrades(TradePair tradePair) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken fetchAccountTrades is not implemented"));
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTradesSince(TradePair tradePair, Instant since) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken fetchAccountTradesSince is not implemented"));
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTradesBetween(TradePair tradePair, Instant from, Instant to) {
-        return null;
+        return failedFuture(new UnsupportedOperationException("Kraken fetchAccountTradesBetween is not implemented"));
     }
 }

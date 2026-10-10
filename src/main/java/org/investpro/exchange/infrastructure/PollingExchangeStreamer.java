@@ -29,6 +29,11 @@ public class PollingExchangeStreamer {
 
     private final Exchange exchange;
     private final Supplier<ScheduledExecutorService> schedulerFactory;
+    private final java.util.concurrent.Executor marketWorker;
+    private final Map<TradePair, java.util.concurrent.CopyOnWriteArrayList<ExchangeStreamConsumer>> oandaTickerConsumers = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicBoolean oandaPricingInFlight = new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicLong streamGeneration = new java.util.concurrent.atomic.AtomicLong();
+    private ScheduledFuture<?> oandaTickerTask;
     private ScheduledExecutorService scheduler;
     private final Set<ExchangeFeature> skippedFeatures = ConcurrentHashMap.newKeySet();
     private final Map<TradePair, ScheduledFuture<?>> tickerTasks = new ConcurrentHashMap<>();
@@ -36,6 +41,7 @@ public class PollingExchangeStreamer {
     private final Map<TradePair, AtomicInteger> orderBookCycles = new ConcurrentHashMap<>();
     private record CandleKey(TradePair pair, int seconds) {}
     private final Map<CandleKey, ScheduledFuture<?>> candleTasks = new ConcurrentHashMap<>();
+    private long coinbasePollSequence;
 
     @Override
     public String toString() {
@@ -45,24 +51,39 @@ public class PollingExchangeStreamer {
     }
 
     private final Map<TradePair, ScheduledFuture<?>> orderBookTasks = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicBoolean accountInFlight = new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicBoolean ordersInFlight = new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicBoolean positionsInFlight = new java.util.concurrent.atomic.AtomicBoolean();
+    private final Map<TradePair, java.util.concurrent.atomic.AtomicBoolean> depthInFlight = new ConcurrentHashMap<>();
     private ScheduledFuture<?> accountTask;
     private ScheduledFuture<?> ordersTask;
     private ScheduledFuture<?> positionsTask;
 
     public PollingExchangeStreamer(Exchange exchange) {
-        this(exchange, () -> Executors.newScheduledThreadPool(3, runnable -> {
+        this(exchange, () -> Executors.newScheduledThreadPool(1, runnable -> {
             Thread thread = new Thread(runnable, "%s-polling-stream".formatted(exchange.getName()));
             thread.setDaemon(true);
             return thread;
-        }));
+        }), org.investpro.core.concurrent.AppExecutors.MARKET_DATA);
     }
 
     PollingExchangeStreamer(Exchange exchange, Supplier<ScheduledExecutorService> schedulerFactory) {
+        this(exchange, schedulerFactory, Runnable::run);
+    }
+
+    PollingExchangeStreamer(Exchange exchange, Supplier<ScheduledExecutorService> schedulerFactory,
+            java.util.concurrent.Executor marketWorker) {
         this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
         this.schedulerFactory = Objects.requireNonNull(schedulerFactory, "schedulerFactory must not be null");
+        this.marketWorker = Objects.requireNonNull(marketWorker);
     }
 
     public synchronized void streamTicker(TradePair tradePair, ExchangeStreamConsumer consumer) {
+        if (exchange instanceof Oanda oanda) {
+            oandaTickerConsumers.computeIfAbsent(tradePair, _ -> new java.util.concurrent.CopyOnWriteArrayList<>()).addIfAbsent(consumer);
+            if (oandaTickerTask == null) oandaTickerTask = scheduleAtFixedRate(() -> pollOandaPrices(oanda), tickerPeriodSeconds());
+            return;
+        }
         tickerTasks.computeIfAbsent(tradePair, pair -> scheduleAtFixedRate(() -> {
             try {
                 if (exchange instanceof Coinbase coinbase) {
@@ -90,6 +111,10 @@ public class PollingExchangeStreamer {
     }
 
     public synchronized void streamOrderBook(TradePair tradePair, ExchangeStreamConsumer consumer) {
+        if (exchange instanceof Oanda) {
+            log.debug("OANDA has no exchange depth stream; order book polling disabled");
+            return;
+        }
         orderBookTasks.computeIfAbsent(tradePair, pair -> scheduleAtFixedRate(() -> {
             try {
                 if (exchange instanceof Coinbase coinbase) {
@@ -108,12 +133,9 @@ public class PollingExchangeStreamer {
                     }
                 }
 
-                exchange.fetchOrderBook(pair)
-                        .thenAccept(orderBook -> consumer.onOrderBook(exchange.getName(), pair, orderBook))
-                        .exceptionally(throwable -> {
-                            consumer.onError(exchange.getName(), unwrap(throwable));
-                            return null;
-                        });
+                pollAsync(depthInFlight.computeIfAbsent(pair, _ -> new java.util.concurrent.atomic.AtomicBoolean()),
+                        () -> exchange.fetchOrderBook(pair),
+                        book -> consumer.onOrderBook(exchange.getName(), pair, book), consumer);
             } catch (Exception exception) {
                 consumer.onError(exchange.getName(), exception);
             }
@@ -203,31 +225,15 @@ public class PollingExchangeStreamer {
 
         accountTask = scheduleAtFixedRate(() -> {
             if (!canStart(ExchangeFeature.ACCOUNT_INFO)) return;
-            try {
-                exchange.fetchAccount()
-                        .exceptionally(ex -> {
-                            try {
-                                return exchange.getUserAccountDetails();
-                            } catch (Exception exception) {
-                                throw new RuntimeException(exception);
-                            }
-                        })
-                        .thenAccept(account -> {
-                            consumer.onAccount(exchange.getName(), account);
-                            if (exchange.canUseCapability(ExchangeFeature.BALANCES)) {
-                                consumer.onBalanceChanged(exchange.getName(), account);
-                            }
-                        })
-                        .exceptionally(throwable -> {
-                            consumer.onError(exchange.getName(), unwrap(throwable));
-                            return null;
-                        });
-            } catch (Exception exception) {
-                consumer.onError(exchange.getName(), exception);
-            }
+            pollAsync(accountInFlight, () -> exchange.fetchAccount().exceptionallyAsync(error -> {
+                try { return exchange.getUserAccountDetails(); }
+                catch (Exception failure) { throw new java.util.concurrent.CompletionException(failure); }
+            }, marketWorker), account -> {
+                consumer.onAccount(exchange.getName(), account);
+                if (exchange.canUseCapability(ExchangeFeature.BALANCES)) consumer.onBalanceChanged(exchange.getName(), account);
+            }, consumer);
         }, accountPeriodSeconds());
     }
-
     public synchronized void streamOrders(ExchangeStreamConsumer consumer) {
         if (exchange instanceof org.investpro.exchange.binanceus.BinanceUs binanceUs) {
             binanceUs.streamOrders(consumer);
@@ -242,19 +248,10 @@ public class PollingExchangeStreamer {
 
         ordersTask = scheduleAtFixedRate(() -> {
             if (!canStart(ExchangeFeature.OPEN_ORDERS)) return;
-            try {
-                exchange.fetchAllOpenOrders()
-                        .thenAccept(orders -> consumer.onOpenOrders(exchange.getName(), orders))
-                        .exceptionally(throwable -> {
-                            consumer.onError(exchange.getName(), unwrap(throwable));
-                            return null;
-                        });
-            } catch (Exception exception) {
-                consumer.onError(exchange.getName(), exception);
-            }
+            pollAsync(ordersInFlight, exchange::fetchAllOpenOrders,
+                    orders -> consumer.onOpenOrders(exchange.getName(), orders), consumer);
         }, privatePeriodSeconds());
     }
-
     public synchronized void streamPositions(ExchangeStreamConsumer consumer) {
         if (!canStart(ExchangeFeature.POSITIONS)) {
             return;
@@ -265,20 +262,32 @@ public class PollingExchangeStreamer {
 
         positionsTask = scheduleAtFixedRate(() -> {
             if (!canStart(ExchangeFeature.POSITIONS)) return;
-            try {
-                exchange.fetchAllPositions()
-                        .thenAccept(positions -> consumer.onPositions(exchange.getName(), positions))
-                        .exceptionally(throwable -> {
-                            consumer.onError(exchange.getName(), unwrap(throwable));
-                            return null;
-                        });
-            } catch (Exception exception) {
-                consumer.onError(exchange.getName(), exception);
-            }
+            pollAsync(positionsInFlight, exchange::fetchAllPositions,
+                    positions -> consumer.onPositions(exchange.getName(), positions), consumer);
         }, privatePeriodSeconds());
     }
 
+    private <T> void pollAsync(java.util.concurrent.atomic.AtomicBoolean gate,
+            Supplier<java.util.concurrent.CompletableFuture<T>> request, java.util.function.Consumer<T> deliver,
+            ExchangeStreamConsumer consumer) {
+        if (!gate.compareAndSet(false, true)) return;
+        long session = streamGeneration.get();
+        try {
+            request.get().whenComplete((value, error) -> {
+                try {
+                    if (session != streamGeneration.get()) return;
+                    if (error != null) consumer.onError(exchange.getName(), unwrap(error));
+                    else deliver.accept(value);
+                } finally { gate.set(false); }
+            });
+        } catch (Exception error) {
+            gate.set(false);
+            if (session == streamGeneration.get()) consumer.onError(exchange.getName(), error);
+        }
+    }
     public synchronized void stopTicker(TradePair tradePair) {
+        oandaTickerConsumers.remove(tradePair);
+        if (oandaTickerConsumers.isEmpty()) { cancel(oandaTickerTask); oandaTickerTask = null; }
         cancel(tickerTasks.remove(tradePair));
         tickerCycles.remove(tradePair);
     }
@@ -289,7 +298,10 @@ public class PollingExchangeStreamer {
             try {
                 var supplier = exchange.getCandleDataSupplier(seconds, pair);
                 if (supplier == null) throw new IllegalStateException("Candle supplier unavailable");
-                var candles = supplier.get().get(15, TimeUnit.SECONDS);
+                var pending = supplier.get();
+                java.util.List<org.investpro.data.CandleData> candles;
+                try { candles = pending.get(15, TimeUnit.SECONDS); }
+                catch (Exception error) { pending.cancel(true); throw error; }
                 long now = java.time.Instant.now().getEpochSecond();
                 var latest = candles.stream().filter(java.util.Objects::nonNull)
                         .filter(candle -> (long) candle.openTime() + seconds <= now)
@@ -338,6 +350,8 @@ public class PollingExchangeStreamer {
     }
 
     public synchronized void stopAll() {
+        streamGeneration.incrementAndGet();
+        cancel(oandaTickerTask); oandaTickerTask = null; oandaTickerConsumers.clear();
         candleTasks.values().forEach(this::cancel);
         candleTasks.clear();
         tickerTasks.values().forEach(this::cancel);
@@ -353,20 +367,61 @@ public class PollingExchangeStreamer {
             scheduler.shutdownNow();
             scheduler = null;
         }
+        coinbasePollSequence = 0;
     }
 
     private @NotNull ScheduledFuture<?> scheduleAtFixedRate(Runnable runnable, long periodSeconds) {
         if (scheduler == null) {
             scheduler = schedulerFactory.get();
         }
+        var inFlight = new java.util.concurrent.atomic.AtomicBoolean();
+        long session = streamGeneration.get();
         return scheduler.scheduleAtFixedRate(() -> {
-            try {
-                runnable.run();
-            } catch (Throwable ignored) {
-                // Individual tasks report errors to their consumer; keep scheduler threads
-                // alive.
+            if (!inFlight.compareAndSet(false, true)) return;
+            try { marketWorker.execute(() -> {
+                try { if (session == streamGeneration.get()) runnable.run(); }
+                catch (Throwable error) { log.warn("Polling task failed for {}", exchange.getName(), error); }
+                finally { inFlight.set(false); }
+            }); }
+            catch (java.util.concurrent.RejectedExecutionException error) {
+                inFlight.set(false); log.warn("Market data workers busy; deferring {} poll", exchange.getName());
             }
-        }, 0, periodSeconds, TimeUnit.SECONDS);
+        }, exchange instanceof Coinbase ? coinbasePollSequence++ % periodSeconds : 0,
+                periodSeconds, TimeUnit.SECONDS);
+    }
+
+    private void pollOandaPrices(Oanda oanda) {
+        if (!oandaPricingInFlight.compareAndSet(false, true)) return;
+        long session = streamGeneration.get();
+        var pairs = oandaTickerConsumers.keySet().stream().sorted(java.util.Comparator.comparing(p -> p.toString('/'))).toList();
+        try {
+            java.util.concurrent.CompletableFuture<Map<String, org.investpro.models.trading.Ticker>> prices =
+                    java.util.concurrent.CompletableFuture.completedFuture(new java.util.HashMap<>());
+            for (int offset = 0; offset < pairs.size(); offset += 20) {
+                var batch = pairs.subList(offset, Math.min(offset + 20, pairs.size()));
+                prices = prices.thenCompose(accumulator -> oanda.getLatestPrices(batch).thenApply(values -> {
+                    if (values != null) accumulator.putAll(values);
+                    return accumulator;
+                }));
+            }
+            prices.whenComplete((quotes, error) -> {
+                try {
+                    if (session != streamGeneration.get()) return;
+                    for (TradePair pair : pairs) {
+                        var consumers = oandaTickerConsumers.get(pair);
+                        if (consumers == null) continue;
+                        for (ExchangeStreamConsumer consumer : consumers) {
+                            if (error != null) { consumer.onError(exchange.getName(), unwrap(error)); continue; }
+                            var ticker = quotes == null ? null : quotes.get(pair.toString('_'));
+                            if (ticker != null) consumer.onTicker(exchange.getName(), pair, ticker);
+                        }
+                    }
+                } finally { oandaPricingInFlight.set(false); }
+            });
+        } catch (Exception error) {
+            oandaPricingInFlight.set(false);
+            oandaTickerConsumers.values().forEach(consumers -> consumers.forEach(c -> c.onError(exchange.getName(), error)));
+        }
     }
 
     private void cancel(ScheduledFuture<?> future) {

@@ -1,0 +1,17 @@
+-------------------------------------------------------------------------------
+Test set: org.investpro.core.TelegramRemoteDeskTest
+-------------------------------------------------------------------------------
+Tests run: 19, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.035 s <<< FAILURE! -- in org.investpro.core.TelegramRemoteDeskTest
+org.investpro.core.TelegramRemoteDeskTest.uppercaseSettingsWorkWhenLowercaseSettingsAreBlank -- Time elapsed: 0.011 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <null> but was: <123>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertNull.failNotNull(AssertNull.java:50)
+	at org.junit.jupiter.api.AssertNull.assertNull(AssertNull.java:35)
+	at org.junit.jupiter.api.AssertNull.assertNull(AssertNull.java:30)
+	at org.junit.jupiter.api.Assertions.assertNull(Assertions.java:279)
+	at org.investpro.core.TelegramRemoteDeskTest.uppercaseSettingsWorkWhenLowercaseSettingsAreBlank(TelegramRemoteDeskTest.java:188)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:583)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
+

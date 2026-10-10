@@ -26,7 +26,7 @@ public final class ConnectedMarketWatchModel {
         var failures = java.util.concurrent.ConcurrentHashMap.<String>newKeySet();
         List<CompletableFuture<List<Row>>> loads = connected.entrySet().stream().map(entry ->
                 CompletableFuture.completedFuture(entry.getValue())
-                        .thenComposeAsync(instruments::loadForExchange)
+                        .thenComposeAsync(instruments::loadForExchange, org.investpro.core.concurrent.AppExecutors.MARKET_DATA)
                         .orTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
                         .thenApply(products -> products.stream().filter(Objects::nonNull)
                                 .filter(product -> product.tradePair() != null)

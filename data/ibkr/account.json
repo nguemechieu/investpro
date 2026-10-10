@@ -3,11 +3,11 @@
   "broker" : "Interactive Brokers",
   "paper" : true,
   "equity" : 100000.0,
-  "availableFunds" : 94500.0,
+  "availableFunds" : 94540.24579236086,
   "marginUsed" : 0.0,
   "buyingPower" : 100000.0,
   "balances" : {
-    "USD" : 94500.0
+    "USD" : 94540.24579236086
   },
-  "updatedAt" : 1791505990.618830300
+  "updatedAt" : 1791631267.984323600
 }

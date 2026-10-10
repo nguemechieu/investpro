@@ -19,11 +19,9 @@ import java.util.function.Consumer;
 public class AgentEventBus {
     private final Map<String, List<Consumer<AgentEvent>>> subscribers = new ConcurrentHashMap<>();
     private final List<Consumer<AgentEvent>> allSubscribers = new CopyOnWriteArrayList<>();
-    private final ExecutorService executor = Executors.newCachedThreadPool(runnable -> {
-        Thread thread = new Thread(runnable, "investpro-agent-event-bus");
-        thread.setDaemon(true);
-        return thread;
-    });
+    private final java.util.concurrent.Executor executor = new org.investpro.core.concurrent.OrderedExecutor(
+            org.investpro.core.concurrent.AppExecutors.STRATEGY, 512);
+    private final java.util.concurrent.atomic.AtomicLong generation = new java.util.concurrent.atomic.AtomicLong();
 
     public AgentEventBus() {
     }
@@ -36,7 +34,7 @@ public class AgentEventBus {
 
     public void stop() {
         running.set(false);
-        executor.shutdownNow();
+        generation.incrementAndGet();
     }
 
     public void subscribe(String eventType, Consumer<AgentEvent> handler) {
@@ -91,7 +89,8 @@ public class AgentEventBus {
         if (event == null || !running.get()) {
             return;
         }
-        executor.submit(() -> publish(event));
+        long session = generation.get();
+        executor.execute(() -> { if (session == generation.get()) publish(event); });
     }
 
     private void safeAccept(Consumer<AgentEvent> handler, AgentEvent event) {

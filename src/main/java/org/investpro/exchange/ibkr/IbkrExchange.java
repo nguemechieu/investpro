@@ -107,7 +107,7 @@ public class IbkrExchange extends InteractiveBrokers {
                 new IbkrAdaptiveContractDetailsService(connectionManager, twsDetails, clientPortalDetails,
                         clientPortalClient),
                 contractCache);
-        this.marketDataProvider = new IbkrMarketDataProvider(connectionManager, clientPortalClient, contractResolver);
+        this.marketDataProvider = new IbkrMarketDataProvider(connectionManager, clientPortalClient, contractResolver, credentials.booleanParamOrDefault("marketDataSimulation", false));
         this.featureAvailabilityService = new IbkrFeatureAvailabilityService();
         this.accountService = new IbkrAccountService(
                 connectionManager,
@@ -235,16 +235,23 @@ public class IbkrExchange extends InteractiveBrokers {
     }
 
     @Override
+    public CompletableFuture<String> createOrder(Order order) {
+        if (order == null || order.getTradePair() == null || (order.getSide() != Side.BUY && order.getSide() != Side.SELL))
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Exact trade pair and BUY/SELL side are required"));
+        String type = order.getType() == null ? "MARKET" : order.getType().trim().toUpperCase(Locale.ROOT);
+        return switch (type) {
+            case "MARKET", "MKT" -> createMarketOrder(order.getTradePair(), order.getSide(), order.getQuantity());
+            case "LIMIT", "LMT" -> createLimitOrder(order.getTradePair(), order.getSide(), order.getQuantity(), order.getPrice());
+            case "STOP", "STP", "STOP_LOSS" -> createStopOrder(order.getTradePair(), order.getSide(), order.getQuantity(), order.getPrice());
+            default -> CompletableFuture.failedFuture(new UnsupportedOperationException("Unsupported IBKR order type: " + type));
+        };
+    }
+    @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
         if (isPaperTrading()) return orderExecution().createMarketOrder(tradePair, side, amount);
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return submitBrokerOrder(tradePair, side, amount, "MKT", 0, 0);
-        ensureResolvedContract(tradePair);
-        if (canTradeNow()) {
-            return CompletableFuture
-                    .failedFuture(new IllegalStateException("IBKR live trading gate denied market order"));
-        }
-        return CompletableFuture.completedFuture(orderService.submitMarket(tradePair, side, amount));
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Live IBKR orders require the connected TWS/Gateway API; no simulated order was submitted."));
     }
 
     @Override
@@ -253,12 +260,7 @@ public class IbkrExchange extends InteractiveBrokers {
         if (isPaperTrading()) return orderExecution().createLimitOrder(tradePair, side, amount, limitPrice);
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return submitBrokerOrder(tradePair, side, amount, "LMT", limitPrice, 0);
-        ensureResolvedContract(tradePair);
-        if (canTradeNow()) {
-            return CompletableFuture
-                    .failedFuture(new IllegalStateException("IBKR live trading gate denied limit order"));
-        }
-        return CompletableFuture.completedFuture(orderService.submitLimit(tradePair, side, amount, limitPrice));
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Live IBKR orders require the connected TWS/Gateway API; no simulated order was submitted."));
     }
 
     @Override
@@ -266,12 +268,7 @@ public class IbkrExchange extends InteractiveBrokers {
         if (isPaperTrading()) return orderExecution().createStopOrder(tradePair, side, amount, stopPrice);
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return submitBrokerOrder(tradePair, side, amount, "STP", 0, stopPrice);
-        ensureResolvedContract(tradePair);
-        if (canTradeNow()) {
-            return CompletableFuture
-                    .failedFuture(new IllegalStateException("IBKR live trading gate denied stop order"));
-        }
-        return CompletableFuture.completedFuture(orderService.submitStop(tradePair, side, amount, stopPrice));
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Live IBKR orders require the connected TWS/Gateway API; no simulated order was submitted."));
     }
 
     @Override
@@ -290,7 +287,7 @@ public class IbkrExchange extends InteractiveBrokers {
     public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
         if (isPaperTrading()) return orderExecution().fetchOpenOrders(tradePair);
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
-            return fetchAllOpenOrders().thenApply(orders -> orders.stream().filter(order -> order.getTradePair().equals(tradePair)).toList());
+            return fetchAllOpenOrders().thenApply(orders -> orders.stream().filter(order -> matchesPair(order.getTradePair(), tradePair)).toList());
         return CompletableFuture.completedFuture(orderService.fetchOpenOrders(tradePair));
     }
 
@@ -307,7 +304,7 @@ public class IbkrExchange extends InteractiveBrokers {
         if (isPaperTrading()) return orderExecution().cancelOrder(orderId);
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return connectionManager.getTwsSession().cancel(orderId);
-        return CompletableFuture.completedFuture(orderService.cancelOrder(orderId));
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Live IBKR cancellation requires the TWS/Gateway API"));
     }
 
     @Override
@@ -317,7 +314,7 @@ public class IbkrExchange extends InteractiveBrokers {
             List<CompletableFuture<String>> cancellations = orderIds.stream().map(this::cancelOrder).toList();
             return CompletableFuture.allOf(cancellations.toArray(CompletableFuture[]::new)).thenApply(_ -> cancellations.stream().map(CompletableFuture::join).toList());
         }
-        return CompletableFuture.completedFuture(orderService.cancelOrders(orderIds));
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Live IBKR cancellation requires the TWS/Gateway API"));
     }
 
     @Override
@@ -325,13 +322,13 @@ public class IbkrExchange extends InteractiveBrokers {
         if (isPaperTrading()) return orderExecution().cancelAllOrders();
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
             return fetchAllOpenOrders().thenCompose(orders -> cancelOrders(orders.stream().map(OpenOrder::getOrderId).toList())).thenApply(ids -> String.valueOf(ids.size()));
-        return CompletableFuture.completedFuture(orderService.cancelAll());
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Live IBKR cancellation requires the TWS/Gateway API"));
     }
 
     @Override
     public CompletableFuture<List<Position>> fetchPositions(TradePair tradePair) {
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
-            return fetchAllPositions().thenApply(positions -> positions.stream().filter(position -> position.getTradePair().equals(tradePair)).toList());
+            return fetchAllPositions().thenApply(positions -> positions.stream().filter(position -> matchesPair(position.getTradePair(), tradePair)).toList());
         return CompletableFuture.completedFuture(positionService.fetchFor(tradePair));
     }
 
@@ -351,46 +348,66 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<String> closePosition(TradePair tradePair) {
-        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
-            return CompletableFuture.failedFuture(new UnsupportedOperationException("Native IBKR portfolio modification is not implemented; no broker action was sent."));
-        positionService.close(tradePair);
-        return CompletableFuture.completedFuture("CLOSED");
+        return closeBrokerPosition(tradePair, null, null);
     }
 
     @Override
     public CompletableFuture<String> closeAllPositions() {
-        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
-            return CompletableFuture.failedFuture(new UnsupportedOperationException("Native IBKR portfolio modification is not implemented; no broker action was sent."));
-        positionService.closeAll();
-        return CompletableFuture.completedFuture("CLOSED_ALL");
+        if (isPaperTrading()) {
+            var closes = localPaperPositions().stream().map(position -> closeLocalPaperPosition(position.getTradePair())).toList();
+            return CompletableFuture.allOf(closes.toArray(CompletableFuture[]::new)).thenApply(_ -> "LOCAL_CLOSED_ALL");
+        }
+        boolean approved = approvedRisk.get() || liveRiskApprovalGate.getAsBoolean();
+        if (!approved || !liveTradingLicenseGate.getAsBoolean()) return CompletableFuture.failedFuture(new IllegalStateException("IBKR risk or license approval required"));
+        if (connectionManager.getConnectionMode() != IbkrConnectionMode.TWS_API) return CompletableFuture.failedFuture(new UnsupportedOperationException("Live closes require the TWS/Gateway API"));
+        return fetchAllPositions().thenCompose(positions -> {
+            var closes = positions.stream().map(position -> submitPositionClose(position, position.getQuantity(), approved)).toList();
+            return CompletableFuture.allOf(closes.toArray(CompletableFuture[]::new))
+                    .thenApply(_ -> "CLOSE_ORDERS_SUBMITTED:" + closes.stream().map(CompletableFuture::join).toList());
+        });
     }
 
     @Override
     public CompletableFuture<String> closePosition(TradePair symbol, String positionId) {
-        return closePosition(symbol);
+        return closeBrokerPosition(symbol, positionId, null);
     }
 
     @Override
     public CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity) {
-        if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
-            return CompletableFuture.failedFuture(new UnsupportedOperationException("Native IBKR portfolio modification is not implemented; no broker action was sent."));
-        if (symbol == null || quantity <= 0.0) {
-            return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("Trade pair and quantity must be provided"));
-        }
-        double exitPrice = marketDataProvider.fetchTicker(symbol).join().getMidPrice();
-        Optional<Position> existing = positionService.fetchOne(symbol);
-        positionService.closePartial(symbol, quantity, exitPrice);
-
-        existing.ifPresent(position -> {
-            double signedCashDelta = position.getSide() == Side.BUY
-                    ? (quantity * exitPrice)
-                    : -(quantity * exitPrice);
-            accountService.applyFillCashChange(signedCashDelta);
-        });
-        return CompletableFuture.completedFuture("PARTIAL_CLOSED");
+        if (!Double.isFinite(quantity) || quantity <= 0) return CompletableFuture.failedFuture(new IllegalArgumentException("Close quantity must be positive and finite")); return closeBrokerPosition(symbol, positionId, quantity);
     }
 
+    private CompletableFuture<String> closeBrokerPosition(TradePair pair, String positionId, Double requestedQuantity) {
+        if (pair == null) return CompletableFuture.failedFuture(new IllegalArgumentException("Trade pair is required"));
+        if (isPaperTrading()) {
+            if (requestedQuantity == null) return closeLocalPaperPosition(pair);
+            var position = localPaperPositions().stream().filter(p -> p.getTradePair().toString('/').equalsIgnoreCase(pair.toString('/'))).findFirst();
+            if (position.isEmpty() || requestedQuantity > position.get().getQuantity()) return CompletableFuture.failedFuture(new IllegalArgumentException("Close exceeds local position"));
+            return localPaperOrderExecution().createMarketOrder(pair, position.get().getSide() == Side.BUY ? Side.SELL : Side.BUY, requestedQuantity);
+        }
+        if (connectionManager.getConnectionMode() != IbkrConnectionMode.TWS_API) return CompletableFuture.failedFuture(new UnsupportedOperationException("Live closes require the TWS/Gateway API"));
+        boolean approved = approvedRisk.get() || liveRiskApprovalGate.getAsBoolean();
+        if (!approved || !liveTradingLicenseGate.getAsBoolean()) return CompletableFuture.failedFuture(new IllegalStateException("IBKR risk or license approval required"));
+        return fetchAllPositions().thenCompose(positions -> {
+            var matches = positions.stream().filter(p -> p.getTradePair().toString('/').equalsIgnoreCase(pair.toString('/')))
+                    .filter(p -> positionId == null || positionId.isBlank() || positionId.equals(p.getPositionId()))
+                    .filter(p -> pair.getNativeSymbol() == null || !pair.getNativeSymbol().matches("[0-9]+") || pair.getNativeSymbol().equals(p.getPositionId())).toList();
+            if (matches.size() != 1) return CompletableFuture.failedFuture(new IllegalStateException("Select an exact IBKR position/contract; found " + matches.size() + " matches"));
+            var position = matches.getFirst();
+            return submitPositionClose(position, requestedQuantity == null ? position.getQuantity() : requestedQuantity, approved);
+        });
+    }
+
+    private CompletableFuture<String> submitPositionClose(Position position, double quantity, boolean approved) {
+        if (!approved || !liveTradingLicenseGate.getAsBoolean()) return CompletableFuture.failedFuture(new IllegalStateException("IBKR risk or license approval required"));
+        if (!Double.isFinite(quantity) || quantity <= 0 || quantity > position.getQuantity()) return CompletableFuture.failedFuture(new IllegalArgumentException("Close exceeds the broker position"));
+        var session = connectionManager.getTwsSession();
+        if (!session.state().connectionSuccessful()) return CompletableFuture.failedFuture(new IllegalStateException("IBKR API is disconnected"));
+        var contract = session.positionContract(position.getPositionId());
+        if (contract.isEmpty()) return CompletableFuture.failedFuture(new IllegalStateException("Exact IBKR position contract unavailable"));
+        if (position.getSide() != Side.BUY && position.getSide() != Side.SELL) return CompletableFuture.failedFuture(new IllegalStateException("Position side unavailable"));
+        return session.submit(contract.get(), position.getSide() == Side.BUY ? Side.SELL : Side.BUY, quantity, "MKT", 0, 0);
+    }
     @Override
     public CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss) {
         if (connectionManager.getConnectionMode() == IbkrConnectionMode.TWS_API)
@@ -418,21 +435,16 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public Ticker getLivePrice(TradePair tradePair) {
-        ensureResolvedContract(tradePair);
         return marketDataProvider.fetchTicker(tradePair).join();
     }
 
     @Override
     public CompletableFuture<Ticker> fetchTicker(TradePair tradePair) {
-        ensureResolvedContract(tradePair);
         return marketDataProvider.fetchTicker(tradePair);
     }
 
     @Override
     public CompletableFuture<List<Ticker>> fetchTickers(List<TradePair> tradePairs) {
-        if (tradePairs != null) {
-            tradePairs.forEach(this::ensureResolvedContract);
-        }
         return marketDataProvider.fetchTickers(tradePairs);
     }
 
@@ -443,7 +455,6 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        ensureResolvedContract(tradePair);
         return marketDataProvider.candleDataSupplier(secondsPerCandle, tradePair);
     }
 
@@ -453,15 +464,13 @@ public class IbkrExchange extends InteractiveBrokers {
             Instant currentCandleStartedAt,
             long secondsIntoCurrentCandle,
             int secondsPerCandle) {
-        ensureResolvedContract(tradePair);
         return marketDataProvider.fetchCandleDataForInProgressCandle(
                 tradePair,
-                currentCandleStartedAt);
+                currentCandleStartedAt, secondsPerCandle);
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
-        ensureResolvedContract(tradePair);
         return marketDataProvider.fetchRecentTradesUntil(tradePair, stopAt);
     }
 
@@ -529,7 +538,6 @@ public class IbkrExchange extends InteractiveBrokers {
 
     @Override
     public CompletableFuture<org.investpro.models.trading.OrderBook> fetchOrderBook(TradePair tradePair) {
-        ensureResolvedContract(tradePair);
         return marketDataProvider.fetchOrderBook(tradePair);
     }
 
@@ -599,7 +607,20 @@ public class IbkrExchange extends InteractiveBrokers {
     }
 
     public TradePair parsePair(String symbol) throws SQLException, ClassNotFoundException {
-        TradePair tradePair = TradePair.fromSymbol(symbol);
+        Optional<IbkrResolvedContract> resolved = contractRepository.findByDisplaySymbol(symbol);
+        if (resolved.isEmpty() && symbol != null && symbol.matches("[0-9]+")) {
+            resolved = contractRepository.findByConIdExchange(Long.parseLong(symbol), "");
+            if (resolved.isEmpty()) throw new IllegalArgumentException("Resolve this IBKR contract ID before trading.");
+        }
+        TradePair tradePair;
+        if (resolved.isPresent()) {
+            var contract = resolved.get();
+            tradePair = new TradePair(contract.symbol(), contract.currency());
+            tradePair.setNativeSymbol(String.valueOf(contract.conId()));
+            tradePair.setDisplaySymbol(contract.userFriendlySymbol());
+        } else {
+            tradePair = TradePair.fromSymbol(symbol);
+        }
         tradePair.setTradingSession(IbkrTradingSessionFactory.forInstrument(symbol));
         return tradePair;
     }
@@ -779,7 +800,11 @@ public class IbkrExchange extends InteractiveBrokers {
         if (requested == null) {
             return true;
         }
-        return source != null && requested.toString('/').equals(source.toString('/'));
+        if (source == null) return false;
+        String requestedId = requested.getNativeSymbol();
+        String sourceId = source.getNativeSymbol();
+        if (requestedId != null && requestedId.matches("[0-9]+")) return requestedId.equals(sourceId);
+        return requested.toString('/').equals(source.toString('/'));
     }
 
     private boolean matchesSince(Instant timestamp, Instant since) {
@@ -799,6 +824,9 @@ public class IbkrExchange extends InteractiveBrokers {
             return Math.abs(orderId.hashCode());
         }
     }
+
+    @Override
+    public boolean supportsStopOrders() { return true; }
 
     @Override
     public boolean supportsLiveTrading() {

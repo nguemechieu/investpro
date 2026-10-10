@@ -92,7 +92,7 @@ public class BacktestReportPanel extends ScrollPane {
                 String.format("%.2f%%", metrics.getTotalReturnPercent()) + ")";
         addMetricRow(grid, row++, "Total Return", createMetricValueColored(returnStr, metrics.getTotalReturn() >= 0));
 
-        addMetricRow(grid, row+1, "Annualized Return", createMetricValue(String.format("%.2f%%", metrics.getAnnualizedReturn())));
+        addMetricRow(grid, row, "Annualized Return", createMetricValue(String.format("%.2f%%", metrics.getAnnualizedReturn())));
 
         section.getChildren().addAll(title, grid);
         return section;
@@ -123,7 +123,7 @@ public class BacktestReportPanel extends ScrollPane {
         addMetricRow(grid, row++, "Profit Factor", createMetricValueColored(String.format("%.2f", metrics.getProfitFactor()),
                 metrics.getProfitFactor() >= 1.5));
 
-        addMetricRow(grid, row+1, "Expectancy / Trade", createMetricValue(formatCurrency(metrics.getExpectancy())));
+        addMetricRow(grid, row, "Expectancy / Trade", createMetricValue(formatCurrency(metrics.getExpectancy())));
 
         section.getChildren().addAll(title, grid);
         return section;
@@ -154,7 +154,7 @@ public class BacktestReportPanel extends ScrollPane {
 
         addMetricRow(grid, row++, "Calmar Ratio", createMetricValue(String.format("%.2f", metrics.getCalmarRatio())));
 
-        addMetricRow(grid, row+1, "Recovery Factor", createMetricValueColored(String.format("%.2f", metrics.getRecoveryFactor()),
+        addMetricRow(grid, row, "Recovery Factor", createMetricValueColored(String.format("%.2f", metrics.getRecoveryFactor()),
                 metrics.getRecoveryFactor() >= 2.0));
 
         section.getChildren().addAll(title, grid);
@@ -188,7 +188,7 @@ public class BacktestReportPanel extends ScrollPane {
         addMetricRow(grid, row++, "VaR (95%)", createMetricValueColored(formatCurrency(metrics.getVar95()),
                 metrics.getVar95() >= 0));
 
-        addMetricRow(grid, row+1, "CVaR (95%)", createMetricValueColored(formatCurrency(metrics.getCvar95()),
+        addMetricRow(grid, row, "CVaR (95%)", createMetricValueColored(formatCurrency(metrics.getCvar95()),
                 metrics.getCvar95() >= 0));
 
         section.getChildren().addAll(title, grid);

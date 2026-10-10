@@ -67,7 +67,8 @@ public class StrategyLabPanel extends BorderPane {
     private static final DateTimeFormatter LOG_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final SystemCore systemCore;
-    private final StrategyLabService labService;
+    private volatile StrategyLabService labService;
+    private final CompletableFuture<StrategyLabService> labReady;
 
     private String selectedSymbol = "EUR/USD";
     private Timeframe selectedTimeframe = Timeframe.H1;
@@ -120,13 +121,20 @@ public class StrategyLabPanel extends BorderPane {
 
     public StrategyLabPanel(@NotNull SystemCore systemCore) throws SQLException, ClassNotFoundException {
         this.systemCore = Objects.requireNonNull(systemCore, "systemCore must not be null");
-        this.labService = systemCore.getLabService() == null
-                ? StrategyLabService.getInstance()
-                : systemCore.getLabService();
-
+        var existing = systemCore.getLabService();
+        labReady = existing == null
+                ? org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.IO,
+                        StrategyLabService::getInstance)
+                : CompletableFuture.completedFuture(existing);
         initializeUI();
         LocalizationService.applyTranslations(this);
-        refreshUI();
+        setRunning(true, "Loading Strategy Lab...");
+        labReady.whenComplete((service, error) -> runOnFx(() -> {
+            if (error != null) { setRunning(false, "Strategy Lab unavailable; reopen to retry."); appendLog(rootMessage(error)); return; }
+            labService = service;
+            setRunning(false, "Ready");
+            refreshUI();
+        }));
     }
 
     @SuppressWarnings("unused")
@@ -302,8 +310,7 @@ public class StrategyLabPanel extends BorderPane {
         }
 
         setStatusText("Loading symbols...");
-        CompletableFuture
-                .supplyAsync(() -> {
+        org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.MARKET_DATA, () -> {
                     try {
                         List<TradePair> symbols = systemCore.getExchange().getTradePairSymbol();
                         return symbols == null ? List.<TradePair>of() : symbols;
@@ -417,8 +424,7 @@ public class StrategyLabPanel extends BorderPane {
         }
 
         List<TradePair> snapshotSymbols = List.copyOf(symbols);
-        CompletableFuture
-                .supplyAsync(() -> {
+        org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.MARKET_DATA, () -> {
                     try {
                         UniversalTradabilityService tradabilityService = new UniversalTradabilityService(
                                 systemCore.getExchange(),
@@ -937,8 +943,7 @@ public class StrategyLabPanel extends BorderPane {
         Timeframe timeframe = selectedTimeframe;
         long requestId = refreshSequence.incrementAndGet();
 
-        CompletableFuture
-                .supplyAsync(() -> labService.getSnapshot(symbol, timeframe))
+        labReady.thenCompose(service -> org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.IO, () -> service.getSnapshot(symbol, timeframe)))
                 .whenComplete((loadedSnapshot, throwable) -> runOnFx(() -> {
                     if (requestId != refreshSequence.get()) {
                         return;
@@ -1089,13 +1094,18 @@ public class StrategyLabPanel extends BorderPane {
             return;
         }
 
-        AiGrpcHealthStatus status = runtimeService.healthStatus();
+        long requestId = refreshSequence.get();
+        org.investpro.ui.utils.UiBackgroundTasks.submit(runtimeService::healthStatus)
+                .whenComplete((status, error) -> runOnFx(() -> {
+                    if (requestId != refreshSequence.get()) return;
+                    if (error != null) { aiStatusLabel.setText("Status: Health query unavailable"); return; }
         aiStatusLabel.setText("Status: " + safe(status.status()));
         aiLatencyLabel.setText(String.format("Latency: %.1f ms", status.avgLatencyMs()));
         aiCircuitLabel.setText("Circuit: " + safe(status.circuitState()));
         aiConservativeModeLabel.setText("Conservative mode: " + (status.conservativeMode() ? "ENABLED" : "DISABLED"));
         aiReqRateLabel.setText("Requests/min: " + status.requestsPerMinute());
         aiLastErrorLabel.setText("Last error: " + safe(status.lastError()));
+                }));
     }
 
     private void testSelectedStrategy() {
@@ -1239,24 +1249,15 @@ public class StrategyLabPanel extends BorderPane {
         dialog.setResultConverter(buttonType -> buttonType == ButtonType.OK ? combo.getValue() : null);
 
         dialog.showAndWait().ifPresent(strategyName -> {
-            try {
-                StrategyAssignment assignment = StrategySelectionService.getInstance()
-                        .manuallyAssign(selectedSymbol, selectedTimeframe, strategyName, true,
-                                "Manual assignment from Strategy Lab");
-
-                if (assignment != null) {
-                    appendLog("Manually assigned: " + assignment.getStrategyId());
-                }
-
-                refreshUI();
-
-            } catch (Exception exception) {
-                log.error("Manual assignment failed", exception);
-                appendLog("Manual assignment failed: " + rootMessage(exception));
-            }
+            String symbol = selectedSymbol;
+            Timeframe timeframe = selectedTimeframe;
+            persistAssignment("Assigning strategy...", () -> {
+                var assignment = StrategySelectionService.getInstance().manuallyAssign(symbol, timeframe, strategyName,
+                        true, "Manual assignment from Strategy Lab");
+                return assignment == null ? "Assignment unavailable." : "Manually assigned: " + assignment.getStrategyId();
+            });
         });
     }
-
     private void unassign() {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Unassign Strategy");
@@ -1268,24 +1269,17 @@ public class StrategyLabPanel extends BorderPane {
                 return;
             }
 
-            try {
-                StrategyAssignment active = StrategyAssignmentRepository.getInstance()
-                        .getActive(selectedSymbol, selectedTimeframe);
-                if (active != null) {
-                    StrategyAssignmentRepository.getInstance().delete(active.getAssignmentId());
-                    appendLog("Unassigned: " + selectedSymbol + "/" + selectedTimeframe.getCode());
-                } else {
-                    appendLog("No active assignment to unassign.");
-                }
-                refreshUI();
-
-            } catch (Exception exception) {
-                log.error("Unassign failed", exception);
-                appendLog("Unassign failed: " + rootMessage(exception));
-            }
+            String symbol = selectedSymbol;
+            Timeframe timeframe = selectedTimeframe;
+            persistAssignment("Unassigning strategy...", () -> {
+                var repository = StrategyAssignmentRepository.getInstance();
+                var active = repository.getActive(symbol, timeframe);
+                if (active == null) return "No active assignment to unassign.";
+                repository.delete(active.getAssignmentId());
+                return "Unassigned: " + symbol + "/" + timeframe.getCode();
+            });
         });
     }
-
     private void openDisableDialog() {
         Dialog<String> dialog = new Dialog<>();
         org.investpro.ui.theme.DialogStyles.apply(dialog);
@@ -1306,24 +1300,26 @@ public class StrategyLabPanel extends BorderPane {
         dialog.setResultConverter(buttonType -> buttonType == ButtonType.OK ? reasonArea.getText() : null);
 
         dialog.showAndWait().ifPresent(reason -> {
-            try {
-                StrategyAssignment assignment = StrategyAssignmentRepository.getInstance()
-                        .getActive(selectedSymbol, selectedTimeframe);
-                if (assignment == null) {
-                    appendLog("No active assignment to disable.");
-                    return;
-                }
-                StrategyAssignmentRepository.getInstance().save(assignment.disabled(reason));
-                appendLog("Disabled: " + assignment.getStrategyId());
-                refreshUI();
-
-            } catch (Exception exception) {
-                log.error("Disable assignment failed", exception);
-                appendLog("Disable failed: " + rootMessage(exception));
-            }
+            String symbol = selectedSymbol;
+            Timeframe timeframe = selectedTimeframe;
+            persistAssignment("Disabling assignment...", () -> {
+                var repository = StrategyAssignmentRepository.getInstance();
+                var assignment = repository.getActive(symbol, timeframe);
+                if (assignment == null) return "No active assignment to disable.";
+                repository.save(assignment.disabled(reason));
+                return "Disabled: " + assignment.getStrategyId();
+            });
         });
     }
 
+    private void persistAssignment(String status, java.util.concurrent.Callable<String> operation) {
+        setRunning(true, status);
+        org.investpro.ui.utils.UiBackgroundTasks.submit(operation).whenComplete((message, error) -> runOnFx(() -> {
+            setRunning(false, error == null ? "Ready" : "Assignment update failed.");
+            appendLog(error == null ? message : "Assignment update failed: " + rootMessage(error));
+            refreshUI();
+        }));
+    }
     private CompletableFuture<List<CandleData>> fetchHistoricalCandles() {
         TradePair pair = symbolCombo == null ? null : symbolCombo.getValue();
         if (pair == null) {
@@ -1373,33 +1369,27 @@ public class StrategyLabPanel extends BorderPane {
         if (timeframe == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Select a timeframe first."));
         }
-        HistoricalDataPrefetcher preFetcher = HistoricalDataPrefetcher.forCurrentExchange(
-                systemCore.getExchange(),
-                systemCore.getHistoricalDataRepository());
+        var exchange = systemCore.getExchange();
+        var repository = systemCore.getHistoricalDataRepository();
         LocalDateTime end = LocalDateTime.now();
         LocalDateTime start = historicalWindowStart(end, timeframe);
         appendLog("Fetching historical candles for " + pair.toString('/') + "/" + timeframe.getCode() + "...");
-
-        return preFetcher.fetchAndCacheData(
-                pair,
-                start,
-                end,
-                timeframe.getCode(),
-                progress -> {
-                    if (progress >= 0) {
-                        runOnFx(() -> setRunning(true,
-                                "Fetching " + timeframe.getCode() + " candles: " + progress + "%"));
-                    }
-                }).thenApply(candles -> validateBacktestDataDepth(pair, timeframe, candles));
+        return org.investpro.core.concurrent.AppExecutors.submit(org.investpro.core.concurrent.AppExecutors.MARKET_DATA,
+                () -> HistoricalDataPrefetcher.forCurrentExchange(exchange, repository).fetchAndCacheData(
+                        pair, start, end, timeframe.getCode(), progress -> {
+                            if (progress >= 0) runOnFx(() -> setRunning(true,
+                                    "Fetching " + timeframe.getCode() + " candles: " + progress + "%"));
+                        }))
+                .thenCompose(java.util.function.Function.identity())
+                .thenApply(candles -> validateBacktestDataDepth(pair, timeframe, candles));
     }
-
     private List<CandleData> validateBacktestDataDepth(
             TradePair pair,
             Timeframe timeframe,
             List<CandleData> candles) {
         List<CandleData> safeCandles = candles == null ? List.of() : candles;
         int candleCount = safeCandles.size();
-        if (HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
+        if (!HistoricalDataPrefetcher.hasEnoughDataForBasicTesting(candleCount)) {
             throw new IllegalStateException("Not enough historical candles for "
                     + pair.toString('/') + "/" + timeframe.getCode()
                     + ": " + candleCount + " loaded. Basic backtesting requires at least 100.");
@@ -1447,14 +1437,14 @@ public class StrategyLabPanel extends BorderPane {
         this.running = running;
 
         runOnFx(() -> {
-            testSelectedButton.setDisable(running);
-            testAllStrategiesButton.setDisable(running);
-            testAllTimeframesButton.setDisable(running);
-            rankButton.setDisable(running);
-            assignBestButton.setDisable(running);
-            manualAssignButton.setDisable(running);
-            unassignButton.setDisable(running);
-            disableAssignmentButton.setDisable(running);
+            testSelectedButton.setDisable(running || labService == null);
+            testAllStrategiesButton.setDisable(running || labService == null);
+            testAllTimeframesButton.setDisable(running || labService == null);
+            rankButton.setDisable(running || labService == null);
+            assignBestButton.setDisable(running || labService == null);
+            manualAssignButton.setDisable(running || labService == null);
+            unassignButton.setDisable(running || labService == null);
+            disableAssignmentButton.setDisable(running || labService == null);
 
             statusLabel.setText(status == null || status.isBlank() ? "Ready" : status);
             progressBar.setProgress(running ? ProgressBar.INDETERMINATE_PROGRESS : 0.0);
@@ -1483,26 +1473,15 @@ public class StrategyLabPanel extends BorderPane {
                 return;
             }
 
-            try {
-                StrategyAssignment assignment = StrategySelectionService.getInstance()
-                        .manuallyAssign(symbol, timeframe, strategyName, true,
-                                "Manual assignment from Strategy Lab ranking");
-
-                if (assignment != null) {
-                    appendLog("Assigned from backtest results: " + assignment.getStrategyId() +
-                            " (Score: " + String.format("%.1f", report.getScore()) + ")");
-                    refreshUI();
-                } else {
-                    appendLog("Assignment failed for strategy: " + strategyName);
-                }
-
-            } catch (Exception exception) {
-                log.error("Assignment from ranking failed", exception);
-                appendLog("Assignment failed: " + rootMessage(exception));
-            }
+            persistAssignment("Assigning strategy from results...", () -> {
+                var assignment = StrategySelectionService.getInstance().manuallyAssign(symbol, timeframe, strategyName,
+                        true, "Manual assignment from Strategy Lab ranking");
+                return assignment == null ? "Assignment failed for strategy: " + strategyName
+                        : "Assigned from backtest results: " + assignment.getStrategyId()
+                        + " (Score: " + String.format("%.1f", report.getScore()) + ")";
+            });
         });
     }
-
     private void runOnFx(Runnable runnable) {
         if (runnable == null) {
             return;

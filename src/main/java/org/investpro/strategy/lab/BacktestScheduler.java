@@ -636,6 +636,7 @@ public final class BacktestScheduler {
 
         Thread currentThread = Thread.currentThread();
         job.markRunning(currentThread);
+        if (job.getStatus() != BacktestJobStatus.RUNNING) return;
         runningJobIds.add(job.getJobId());
         notifyStatsListeners();
 

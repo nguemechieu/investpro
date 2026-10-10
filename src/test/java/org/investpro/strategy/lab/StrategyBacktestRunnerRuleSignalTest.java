@@ -23,6 +23,12 @@ class StrategyBacktestRunnerRuleSignalTest {
 
     @Test
     void macdSignalRuleCreatesBacktestTradesOnOneHourCandles() {
+        StrategyPerformanceReport report = backtest(5, 20);
+        assertNotNull(report);
+        assertTrue(report.getTotalTrades() > 0, "MACD_SIGNAL rule should create at least one backtest trade");
+    }
+
+    private StrategyPerformanceReport backtest(int maxTrades, int exitBars) {
         String strategyName = "test-macd-signal-rule";
         StrategyDefinition definition = StrategyDefinition.builder()
                 .name(strategyName)
@@ -46,13 +52,18 @@ class StrategyBacktestRunnerRuleSignalTest {
                 .symbol("BTC/USD")
                 .timeframe(Timeframe.H1)
                 .candles(oscillatingCandles(180))
-                .maxTrades(5)
+                .maxTrades(maxTrades)
+                .fallbackExitBars(exitBars)
                 .build());
 
-        assertNotNull(report);
-        assertTrue(report.getTotalTrades() > 0, "MACD_SIGNAL rule should create at least one backtest trade");
+        return report;
     }
 
+    @Test void tradeLimitDoesNotSkipTheLastTradesExitRules() {
+        var report = backtest(1, 1);
+        org.junit.jupiter.api.Assertions.assertEquals(1, report.getTotalTrades());
+        org.junit.jupiter.api.Assertions.assertEquals(1, report.getTrades().getFirst().getBarsHeld());
+    }
     private static List<CandleData> oscillatingCandles(int count) {
         List<CandleData> candles = new ArrayList<>();
         for (int i = 0; i < count; i++) {

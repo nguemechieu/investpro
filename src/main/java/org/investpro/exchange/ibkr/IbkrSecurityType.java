@@ -10,6 +10,14 @@ public enum IbkrSecurityType {
     OPTION("OPT"),
     INDEX("IND"),
     CFD("CFD"),
+    FUTURES_OPTION("FOP"),
+    CONTINUOUS_FUTURE("CONTFUT"),
+    BOND("BOND"),
+    FUND("FUND"),
+    WARRANT("WAR"),
+    COMMODITY("CMDTY"),
+    CRYPTO("CRYPTO"),
+    COMBINATION("BAG"),
     UNKNOWN("");
 
     private final String ibkrCode;
@@ -27,8 +35,16 @@ public enum IbkrSecurityType {
         return switch (normalized) {
             case "STK" -> STOCK;
             case "CASH" -> FOREX;
-            case "FUT", "CONTFUT" -> FUTURE;
-            case "OPT", "FOP", "WAR" -> OPTION;
+            case "FUT" -> FUTURE;
+            case "CONTFUT" -> CONTINUOUS_FUTURE;
+            case "OPT" -> OPTION;
+            case "FOP" -> FUTURES_OPTION;
+            case "WAR", "IOPT" -> WARRANT;
+            case "BOND" -> BOND;
+            case "FUND" -> FUND;
+            case "CMDTY" -> COMMODITY;
+            case "CRYPTO" -> CRYPTO;
+            case "BAG" -> COMBINATION;
             case "IND" -> INDEX;
             case "CFD" -> CFD;
             default -> UNKNOWN;

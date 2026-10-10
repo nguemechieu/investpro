@@ -55,17 +55,22 @@ public final class PluginRegistry {
             synchronized (PluginRegistry.class) {
                 local = defaultRegistry;
                 if (local == null) {
-                    local = new PluginRegistry(
-                            loadProviders(ExchangeProvider.class),
-                            loadProviders(StrategyProvider.class),
-                            loadProviders(IndicatorProvider.class),
-                            loadProviders(RiskModuleProvider.class),
-                            loadProviders(MarketDataProvider.class));
+                    ClassLoader parent = Thread.currentThread().getContextClassLoader();
+                    if (parent == null) parent = PluginRegistry.class.getClassLoader();
+                    local = load(PluginJarLoader.createClassLoader(
+                            java.nio.file.Path.of(System.getProperty("investpro.plugins.directory", "plugins")), parent));
                     defaultRegistry = local;
                 }
             }
         }
         return local;
+    }
+
+    public static PluginRegistry load(ClassLoader classLoader) {
+        Objects.requireNonNull(classLoader, "classLoader");
+        return new PluginRegistry(loadProviders(ExchangeProvider.class, classLoader),
+                loadProviders(StrategyProvider.class, classLoader), loadProviders(IndicatorProvider.class, classLoader),
+                loadProviders(RiskModuleProvider.class, classLoader), loadProviders(MarketDataProvider.class, classLoader));
     }
 
     public static PluginRegistry of(
@@ -132,26 +137,28 @@ public final class PluginRegistry {
                 .toUpperCase(Locale.ROOT);
     }
 
-    private static <T extends InvestProPlugin> List<T> loadProviders(Class<T> providerType) {
+    private static <T extends InvestProPlugin> List<T> loadProviders(Class<T> providerType, ClassLoader classLoader) {
         List<T> providers = new ArrayList<>();
-        ServiceLoader<T> loader = ServiceLoader.load(providerType);
-
-        try {
-            for (T provider : loader) {
+        var iterator = ServiceLoader.load(providerType, classLoader).iterator();
+        while (true) {
+            try {
+                if (!iterator.hasNext()) break;
+            } catch (ServiceConfigurationError | RuntimeException error) {
+                log.warn("Unable to enumerate {} providers", providerType.getSimpleName(), error);
+                break;
+            }
+            try {
+                T provider = iterator.next();
                 if (isValidProvider(providerType.getSimpleName(), provider)) {
                     providers.add(provider);
                     logLoaded(providerType.getSimpleName(), provider);
                 }
+            } catch (ServiceConfigurationError | RuntimeException error) {
+                log.warn("Ignoring failed {} provider; continuing discovery", providerType.getSimpleName(), error);
             }
-        } catch (ServiceConfigurationError error) {
-            log.warn("Failed to load {} via ServiceLoader: {}", providerType.getSimpleName(), error.getMessage(), error);
-        } catch (RuntimeException exception) {
-            log.warn("Unexpected failure loading {} providers", providerType.getSimpleName(), exception);
         }
-
         return providers;
     }
-
     private static Map<String, ExchangeProvider> indexExchangeProviders(List<ExchangeProvider> providers) {
         Map<String, ExchangeProvider> indexed = new LinkedHashMap<>();
         for (ExchangeProvider provider : providers) {

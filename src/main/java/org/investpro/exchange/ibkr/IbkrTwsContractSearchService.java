@@ -20,6 +20,19 @@ public final class IbkrTwsContractSearchService implements IbkrContractSearchSer
             return CompletableFuture.failedFuture(new IllegalStateException("IBKR session is not connected."));
         }
         String normalized = IbkrContractResolver.normalizeSearchTerm(userSearchTerm);
+        if (normalized.matches("[0-9]+")) {
+            try {
+                long conId = Long.parseLong(normalized);
+                if (conId <= 0 || conId > Integer.MAX_VALUE) {
+                    return CompletableFuture.failedFuture(new IllegalArgumentException("Invalid IBKR contract ID."));
+                }
+                return CompletableFuture.completedFuture(List.of(new IbkrContractCandidate(
+                        conId, "", "Contract " + conId, IbkrSecurityType.UNKNOWN,
+                        "", "", "", "", "", "", "", "", "", "TWS_API", "")));
+            } catch (NumberFormatException exception) {
+                return CompletableFuture.failedFuture(new IllegalArgumentException("Invalid IBKR contract ID.", exception));
+            }
+        }
         if (looksLikeForex(normalized)) {
             String[] parts = normalized.split("/");
             IbkrContractCandidate candidate = new IbkrContractCandidate(

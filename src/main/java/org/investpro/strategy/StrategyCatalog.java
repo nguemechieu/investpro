@@ -39,7 +39,10 @@ public final class StrategyCatalog {
             "RSI Failure Swing",
             "Volume Spike Reversal",
             "ML Model",
-            "Adaptive Momentum Pullback");
+            "Adaptive Momentum Pullback",
+            "RSI Trend Filter",
+            "Bollinger Reentry",
+            "Engulfing Reversal");
 
     public static final Map<String, StrategyDefinition> STRATEGY_DEFINITIONS = buildCatalog();
     private static final Map<String, StrategyDefinition> RUNTIME_DEFINITIONS = new ConcurrentHashMap<>();
